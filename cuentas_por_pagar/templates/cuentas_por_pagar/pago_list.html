@@ -1,0 +1,405 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+
+{% block title %}Pagos Registrados - Cuentas por Pagar{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-1 text-dark">Pagos Registrados</h1>
+                    <p class="text-muted mb-0">Historial y gestión de transacciones de pago</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'crear_pago' %}" class="btn btn-success">
+                        <i class="fas fa-hand-holding-usd me-2"></i>Registrar Pago
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tarjetas de Resumen -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 bg-light h-100">
+                <div class="card-body text-center py-3">
+                    <h4 class="text-primary mb-1">{{ pagos.paginator.count|intcomma }}</h4>
+                    <p class="text-muted small mb-0">Total Pagos</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 bg-light h-100">
+                <div class="card-body text-center py-3">
+                    <h4 class="text-success mb-1">${{ total_pagado|default:0|floatformat:2|intcomma }}</h4>
+                    <p class="text-muted small mb-0">Monto Total Pagado</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 bg-light h-100">
+                <div class="card-body text-center py-3">
+                    <h4 class="text-info mb-1">{{ metodos_count|default:"-" }}</h4>
+                    <p class="text-muted small mb-0">Métodos de Pago</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 bg-light h-100">
+                <div class="card-body text-center py-3">
+                    <p class="text-muted small mb-0">
+                        <i class="fas fa-search me-1"></i>
+                        Usa el buscador para filtrar pagos
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-0 py-3">
+            <h5 class="card-title mb-0 text-dark">
+                <i class="fas fa-filter text-primary me-2"></i>
+                Buscar Pagos
+            </h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-8">
+                    <label class="form-label small text-muted mb-1">Buscar por factura o referencia</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0">
+                            <i class="fas fa-search text-muted"></i>
+                        </span>
+                        <input type="text" name="q" class="form-control border-start-0" 
+                               placeholder="Número de factura, referencia de pago..." 
+                               value="{{ request.GET.q }}">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary flex-fill">
+                            <i class="fas fa-search me-2"></i>Buscar
+                        </button>
+                        <a href="{% url 'lista_pagos' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-2"></i>Limpiar
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabla de Pagos -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-0 py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0 text-dark">
+                    <i class="fas fa-money-bill-wave text-success me-2"></i>
+                    Lista de Pagos
+                </h5>
+                <span class="badge bg-primary rounded-pill">{{ pagos|length }}</span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            {% if pagos %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="border-0 ps-4">Factura</th>
+                            <th class="border-0">Proveedor</th>
+                            <th class="border-0 text-center">Fecha Pago</th>
+                            <th class="border-0 text-end">Monto</th>
+                            <th class="border-0 text-center">Método</th>
+                            <th class="border-0 text-center">Referencia</th>
+                            <th class="border-0 text-center">Registrado por</th>
+                            <th class="border-0 text-center pe-4">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pago in pagos %}
+                        <tr>
+                            <!-- Factura -->
+                            <td class="ps-4">
+                                <div class="d-flex align-items-center">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-file-invoice text-primary me-2"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <strong class="d-block">{{ pago.factura.numero_factura }}</strong>
+                                        <small class="text-muted">
+                                            OC: {{ pago.factura.orden_compra.folio }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- Proveedor -->
+                            <td>
+                                <small class="text-muted">
+                                    {{ pago.factura.orden_compra.proveedor.razon_social|truncatewords:2 }}
+                                </small>
+                            </td>
+
+                            <!-- Fecha -->
+                            <td class="text-center">
+                                <div class="d-flex flex-column align-items-center">
+                                    <strong>{{ pago.fecha_pago }}</strong>
+                                    <small class="text-muted">
+                                        {{ pago.creado_en|date:"d/m/Y" }}
+                                    </small>
+                                </div>
+                            </td>
+
+                            <!-- Monto -->
+                            <td class="text-end">
+                                <div class="d-flex flex-column align-items-end">
+                                    <strong class="text-success">${{ pago.monto_pagado|floatformat:2|intcomma }}</strong>
+                                    <small class="text-muted">
+                                        Pendiente: ${{ pago.factura.monto_pendiente|floatformat:2|intcomma }}
+                                    </small>
+                                </div>
+                            </td>
+
+                            <!-- Método de Pago -->
+                            <td class="text-center">
+                                <span class="badge {% if pago.metodo_pago == 'TRANSFERENCIA' %}bg-info{% elif pago.metodo_pago == 'CHEQUE' %}bg-warning{% elif pago.metodo_pago == 'EFECTIVO' %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">
+                                    <i class="fas {% if pago.metodo_pago == 'TRANSFERENCIA' %}fa-exchange-alt{% elif pago.metodo_pago == 'CHEQUE' %}fa-money-check{% elif pago.metodo_pago == 'EFECTIVO' %}fa-money-bill-wave{% else %}fa-credit-card{% endif %} me-1"></i>
+                                    {{ pago.get_metodo_pago_display }}
+                                </span>
+                            </td>
+
+                            <!-- Referencia -->
+                            <td class="text-center">
+                                {% if pago.referencia %}
+                                <code class="bg-light px-2 py-1 rounded border">{{ pago.referencia }}</code>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Registrado por -->
+                            <td class="text-center">
+                                <small class="text-muted">
+                                    {{ pago.registrado_por.username|default:"Sistema" }}
+                                </small>
+                            </td>
+
+                            <!-- Acciones -->
+                            <td class="text-center pe-4">
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a href="{% url 'editar_pago' pago.pk %}" 
+                                       class="btn btn-outline-warning" 
+                                       title="Editar pago">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'eliminar_pago' pago.pk %}" 
+                                       class="btn btn-outline-danger" 
+                                       title="Eliminar pago">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <!-- Empty State -->
+            <div class="text-center py-5">
+                <i class="fas fa-money-bill-wave fa-4x text-muted mb-3"></i>
+                <h5 class="text-muted">No se encontraron pagos</h5>
+                <p class="text-muted mb-4">
+                    {% if request.GET.q %}
+                    No hay pagos que coincidan con tu búsqueda
+                    {% else %}
+                    No hay pagos registrados en el sistema
+                    {% endif %}
+                </p>
+                <a href="{% url 'crear_pago' %}" class="btn btn-success">
+                    <i class="fas fa-hand-holding-usd me-2"></i>Registrar Primer Pago
+                </a>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Paginación -->
+        {% if is_paginated %}
+        <div class="card-footer bg-white border-0 py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <small class="text-muted">
+                        Mostrando {{ pagos.start_index }} - {{ pagos.end_index }} de {{ pagos.paginator.count }} pagos
+                    </small>
+                </div>
+                <nav aria-label="Paginación de pagos">
+                    <ul class="pagination pagination-sm mb-0">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+                                    {{ num }}
+                                </a>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card {
+        transition: transform 0.2s ease-in-out;
+    }
+    
+    .card:hover {
+        transform: translateY(-1px);
+    }
+    
+    .table th {
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #6c757d;
+    }
+    
+    .table td {
+        vertical-align: middle;
+        padding: 1rem 0.75rem;
+    }
+    
+    .btn-group .btn {
+        border-radius: 6px;
+        margin: 0 1px;
+        padding: 0.375rem 0.5rem;
+    }
+    
+    .badge {
+        font-size: 0.75em;
+        font-weight: 500;
+    }
+    
+    .table-hover tbody tr:hover {
+        background-color: rgba(0, 123, 255, 0.04);
+    }
+    
+    .input-group-text {
+        background-color: #f8f9fa;
+        border-color: #dee2e6;
+    }
+    
+    code {
+        font-size: 0.8em;
+        color: #6c757d;
+    }
+    
+    /* Colores para métodos de pago */
+    .bg-info { background-color: #17a2b8 !important; }
+    .bg-warning { background-color: #ffc107 !important; color: #000 !important; }
+    .bg-success { background-color: #28a745 !important; }
+    .bg-secondary { background-color: #6c757d !important; }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        
+        .btn-group .btn {
+            margin: 0;
+            border-radius: 4px;
+        }
+        
+        .table-responsive {
+            font-size: 0.875rem;
+        }
+        
+        .d-flex.flex-column small {
+            font-size: 0.75rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Efectos de hover suaves
+    const tableRows = document.querySelectorAll('tbody tr');
+    tableRows.forEach(row => {
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', function(e) {
+            // Evitar que se active cuando se hace click en los botones
+            if (!e.target.closest('a, button')) {
+                const editLink = this.querySelector('a[href*="editar"]');
+                if (editLink) {
+                    window.location.href = editLink.href;
+                }
+            }
+        });
+    });
+
+    // Auto-focus en el campo de búsqueda
+    const searchInput = document.querySelector('input[name="q"]');
+    if (searchInput && !searchInput.value) {
+        setTimeout(() => searchInput.focus(), 100);
+    }
+
+    // Calcular total pagado si no está definido
+    function calcularTotalPagado() {
+        const montos = document.querySelectorAll('td.text-end strong.text-success');
+        let total = 0;
+        montos.forEach(monto => {
+            const texto = monto.textContent.replace('$', '').replace(/,/g, '');
+            total += parseFloat(texto) || 0;
+        });
+        
+        const totalElement = document.querySelector('h4.text-success');
+        if (totalElement && total > 0) {
+            totalElement.textContent = '$' + total.toLocaleString('es-MX', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+    }
+
+    calcularTotalPagado();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends 'ternium/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Catálogo de Materiales</h2>
+        <a href="{% url 'crear_material' %}" class="btn btn-primary btn-lg shadow-sm">
+            <i class="fas fa-plus me-2"></i>Añadir Nuevo Material
+        </a>
+    </div>
+    
+    {% if messages %}
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <ul class="messages mb-0">
+            {% for message in messages %}
+                <li>{{ message }}</li>
+            {% endfor %}
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            {% if materiales %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Nombre del Material</th>
+                            <th>Unidad de Negocio (Empresa)</th>
+                            <th class="text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for material in materiales %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'detalle_material' material.pk %}" class="text-decoration-none fw-bold">
+                                    {{ material.nombre }}
+                                </a>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ material.empresa.nombre }}</span>
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group" role="group" aria-label="Acciones del Material">
+                                    <a href="{% url 'detalle_material' material.pk %}" class="btn btn-sm btn-outline-info" title="Ver Detalle">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'editar_material' material.pk %}" class="btn btn-sm btn-outline-primary" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-center text-muted p-4">No hay materiales registrados. <a href="{% url 'crear_material' %}">Añade el primero</a>.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

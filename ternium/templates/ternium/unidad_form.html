@@ -1,0 +1,474 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if object %}
+        Editar Activo: {{ object.internal_id }}
+    {% else %}
+        Registrar Nuevo Activo
+    {% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --form-primary: #1a73e8;
+        --form-primary-dark: #0d62d1;
+        --form-secondary: #34a853;
+        --form-accent: #fbbc05;
+        --form-light: #f8f9fa;
+        --form-dark: #202124;
+        --form-gray: #5f6368;
+        --form-border: #dadce0;
+        --form-success: #0f9d58;
+        --form-error: #ea4335;
+        --form-warning: #fbbc05;
+        --form-info: #1a73e8;
+    }
+    .form-container { background: linear-gradient(135deg, #f5f7fa 0%, #e4e7eb 100%); min-height: calc(100vh - 180px); padding: 2rem 0; }
+    .card-form { border: none; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08); transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); background: white; }
+    .card-form:hover { box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12); transform: translateY(-4px); }
+    .card-header-form { background: linear-gradient(135deg, var(--form-primary) 0%, var(--form-primary-dark) 100%); padding: 1.5rem 2rem; border-bottom: none; }
+    .card-header-form h5 { font-weight: 600; font-size: 1.5rem; display: flex; align-items: center; }
+    .card-header-form h5 i { background: rgba(255, 255, 255, 0.2); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 12px; }
+    .accordion-form .accordion-item { border: 1px solid var(--form-border); border-radius: 12px; overflow: hidden; margin-bottom: 1rem; background: var(--form-light); }
+    .accordion-form .accordion-button { background: linear-gradient(to right, rgba(26, 115, 232, 0.05), rgba(26, 115, 232, 0.1)); padding: 1.25rem 1.5rem; font-weight: 600; color: var(--form-dark); box-shadow: none; border: none; }
+    .accordion-form .accordion-button:not(.collapsed) { background: linear-gradient(to right, rgba(26, 115, 232, 0.1), rgba(26, 115, 232, 0.15)); color: var(--form-primary); box-shadow: none; }
+    .accordion-form .accordion-button::after { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%231a73e8'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e"); transform: scale(1.2); }
+    .form-label { font-weight: 600; color: var(--form-dark); margin-bottom: 0.5rem; display: flex; align-items: center; }
+    .form-label i { margin-right: 8px; color: var(--form-primary); font-size: 0.9em; }
+    .form-control, .form-select { border: 2px solid var(--form-border); border-radius: 8px; padding: 0.75rem 1rem; transition: all 0.2s ease; background-color: white; }
+    .form-control:focus, .form-select:focus { border-color: var(--form-primary); box-shadow: 0 0 0 0.25rem rgba(26, 115, 232, 0.15); }
+    .btn-form-primary { background: linear-gradient(135deg, var(--form-primary) 0%, var(--form-primary-dark) 100%); border: none; border-radius: 10px; padding: 0.75rem 1.5rem; font-weight: 600; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(26, 115, 232, 0.25); }
+    .btn-form-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(26, 115, 232, 0.35); background: linear-gradient(135deg, var(--form-primary-dark) 0%, #0a4fac 100%); }
+    .btn-form-secondary { background: white; border: 2px solid var(--form-border); color: var(--form-gray); border-radius: 10px; padding: 0.75rem 1.5rem; font-weight: 600; transition: all 0.3s ease; }
+    .btn-form-secondary:hover { border-color: var(--form-primary); color: var(--form-primary); background: rgba(26, 115, 232, 0.05); }
+    .file-preview { border: 2px dashed var(--form-border); border-radius: 12px; padding: 1.5rem; text-align: center; margin-top: 1rem; transition: all 0.3s ease; background: var(--form-light); }
+    .file-preview img { max-height: 150px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+    .form-section-title { display: flex; align-items: center; margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 2px solid rgba(26, 115, 232, 0.1); }
+    .form-section-title i { background: var(--form-primary); color: white; width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 12px; }
+    .form-section-title h6 { margin: 0; font-weight: 600; color: var(--form-dark); }
+    .required-field::after { content: " *"; color: var(--form-error); }
+    .help-text { font-size: 0.85rem; color: var(--form-gray); margin-top: 0.25rem; }
+    .empresas-checkboxes { max-height: 200px; overflow-y: auto; padding: 1rem; border-radius: 8px; background: white; border: 1px solid var(--form-border); }
+    
+    /* ESTILOS PARA CORREGIR LOS CHECKBOXES */
+    .form-check {
+        display: flex; /* Usar flexbox para alinear */
+        align-items: center; /* Centrar verticalmente */
+        padding-left: 0; /* Resetear padding para control manual */
+        margin-bottom: 0.75rem;
+    }
+    .form-check-input {
+        width: 1.2em;
+        height: 1.2em;
+        margin-top: 0; /* Resetear margen superior */
+        margin-right: 0.75rem; /* Añadir espacio entre el checkbox y el texto */
+    }
+    .form-check-label {
+        font-weight: 500;
+        padding-top: 2px; /* Pequeño ajuste para alineación perfecta */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <div class="container-fluid">
+        <div class="row justify-content-center">
+            <div class="col-12 col-xl-10">
+                <div class="card card-form animate-fade-in">
+                    <div class="card-header card-header-form text-white">
+                        <h5 class="mb-0 text-white">
+                            <i class="fas fa-truck-moving"></i>
+                            {% if object %}
+                                Editar Activo: <strong>{{ object.internal_id }}</strong>
+                            {% else %}
+                                Registrar Nuevo Activo
+                            {% endif %}
+                        </h5>
+                    </div>
+                    <div class="card-body p-4 p-md-5">
+                        
+                        <form method="post" enctype="multipart/form-data" novalidate id="assetForm">
+                            {% csrf_token %}
+                            
+                            {% if form.non_field_errors %}
+                                <div class="alert alert-danger d-flex align-items-center" role="alert">
+                                    <i class="fas fa-exclamation-circle me-2"></i>
+                                    <div>{% for error in form.non_field_errors %}{{ error }}{% endfor %}</div>
+                                </div>
+                            {% endif %}
+
+                            <div class="accordion accordion-form" id="assetFormAccordion">
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="headingOne">
+                                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+                                            <i class="fas fa-id-card me-2"></i> <strong>1. Identificación del Activo</strong>
+                                        </button>
+                                    </h2>
+                                    <div id="collapseOne" class="accordion-collapse collapse show" aria-labelledby="headingOne" data-bs-parent="#assetFormAccordion">
+                                        <div class="accordion-body">
+
+                                            <div class="row">
+                                                <div class="col-md-12 mb-4">
+                                                    <label for="id_tipo_propiedad" class="form-label">
+                                                        <i class="fas fa-sitemap"></i> Tipo de Propiedad
+                                                    </label>
+                                                    <select name="tipo_propiedad" id="id_tipo_propiedad" class="form-select">
+                                                        <option value="PROPIA" {% if not object or object.tipo_propiedad == 'PROPIA' %}selected{% endif %}>Propia</option>
+                                                        <option value="PERMISIONARIO" {% if object.tipo_propiedad == 'PERMISIONARIO' %}selected{% endif %}>Permisionario</option>
+                                                        <option value="OTRA_EMPRESA" {% if object.tipo_propiedad == 'OTRA_EMPRESA' %}selected{% endif %}>De Otra Empresa</option>
+                                                    </select>
+                                                    <div class="help-text">Define la relación de propiedad con el activo. Esto mostrará u ocultará otras secciones.</div>
+                                                </div>
+                                            </div>
+                                            <hr class="my-3">
+
+                                            <div class="form-section-title">
+                                                <i class="fas fa-fingerprint"></i>
+                                                <h6>Información Básica del Activo</h6>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-md-4 mb-4">
+                                                    <label for="{{ form.internal_id.id_for_label }}" class="form-label required-field">
+                                                        <i class="fas fa-barcode"></i>{{ form.internal_id.label }}
+                                                    </label>
+                                                    {{ form.internal_id }}
+                                                    {% if form.internal_id.errors %}
+                                                        <div class="text-danger mt-1"><small><i class="fas fa-exclamation-circle me-1"></i>{{ form.internal_id.errors.as_text }}</small></div>
+                                                    {% endif %}
+                                                    <div class="help-text">Identificador único interno del activo</div>
+                                                </div>
+                                                <div class="col-md-4 mb-4">
+                                                    <label for="{{ form.license_plate.id_for_label }}" class="form-label">
+                                                        <i class="fas fa-tag"></i>{{ form.license_plate.label }}
+                                                    </label>
+                                                    {{ form.license_plate }}
+                                                    <div class="help-text">Número de placa de circulación</div>
+                                                </div>
+                                                <div class="col-md-4 mb-4">
+                                                    <label for="{{ form.asset_type.id_for_label }}" class="form-label">
+                                                        <i class="fas fa-truck"></i>{{ form.asset_type.label }}
+                                                    </label>
+                                                    {{ form.asset_type }}
+                                                </div>
+                                                <div class="col-md-6 mb-4">
+                                                    <label for="{{ form.make_model.id_for_label }}" class="form-label">
+                                                        <i class="fas fa-industry"></i>{{ form.make_model.label }}
+                                                    </label>
+                                                    {{ form.make_model }}
+                                                    <div class="help-text">Marca y modelo del vehículo</div>
+                                                </div>
+                                                <div class="col-md-3 mb-4">
+                                                    <label for="{{ form.year.id_for_label }}" class="form-label">
+                                                        <i class="fas fa-calendar-alt"></i>{{ form.year.label }}
+                                                    </label>
+                                                    {{ form.year }}
+                                                </div>
+                                                <div class="col-md-3 mb-4">
+                                                    <label for="{{ form.color.id_for_label }}" class="form-label">
+                                                        <i class="fas fa-palette"></i>{{ form.color.label }}
+                                                    </label>
+                                                    {{ form.color }}
+                                                </div>
+                                                <div class="col-md-12 mb-4">
+                                                    <label for="{{ form.vin.id_for_label }}" class="form-label">
+                                                        <i class="fas fa-file-alt"></i>{{ form.vin.label }}
+                                                    </label>
+                                                    {{ form.vin }}
+                                                    {% if form.vin.errors %}
+                                                        <div class="text-danger mt-1"><small><i class="fas fa-exclamation-circle me-1"></i>{{ form.vin.errors.as_text }}</small></div>
+                                                    {% endif %}
+                                                    <div class="help-text">Número de serie del vehículo (VIN)</div>
+                                                </div>
+                                            </div>
+
+                                            <hr class="my-3">
+                                            <div class="form-section-title">
+                                                <i class="fas fa-building"></i>
+                                                <h6>Asignación</h6>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-12 mb-4">
+                                                    <label class="form-label required-field" for="empresas-checkbox-container">
+                                                        <i class="fas fa-building-user"></i> Asignado a Empresa(s)
+                                                    </label>
+                                                    <div class="empresas-checkboxes" id="empresas-checkbox-container">
+                                                        {% for checkbox in form.empresas %}
+                                                        <div class="form-check">
+                                                            <input type="checkbox" 
+                                                                   name="{{ checkbox.data.name }}" 
+                                                                   id="{{ checkbox.data.attrs.id }}" 
+                                                                   value="{{ checkbox.data.value }}" 
+                                                                   class="form-check-input" 
+                                                                   {% if checkbox.data.selected %}checked{% endif %}>
+                                                            <label class="form-check-label" for="{{ checkbox.data.attrs.id }}">
+                                                                {{ checkbox.choice_label }}
+                                                            </label>
+                                                        </div>
+                                                        {% endfor %}
+                                                        </div>
+                                                    <div class="help-text">Seleccione las empresas asociadas a este activo.</div>
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="secciones-adicionales">
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header" id="headingTwo">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                                                <i class="fas fa-file-signature me-2"></i> <strong>2. Propiedad y Estatus</strong>
+                                            </button>
+                                        </h2>
+                                        <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#assetFormAccordion">
+                                            <div class="accordion-body">
+                                                <div class="form-section-title">
+                                                    <i class="fas fa-chart-line"></i>
+                                                    <h6>Información de Propiedad y Estado Operativo</h6>
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-4 mb-4">
+                                                        <label for="{{ form.ownership.id_for_label }}" class="form-label">
+                                                            <i class="fas fa-hand-holding-usd"></i>{{ form.ownership.label }}
+                                                        </label>
+                                                        {{ form.ownership }}
+                                                    </div>
+                                                    <div class="col-md-4 mb-4">
+                                                        <label for="{{ form.acquisition_date.id_for_label }}" class="form-label">
+                                                            <i class="fas fa-calendar-plus"></i>{{ form.acquisition_date.label }}
+                                                        </label>
+                                                        {{ form.acquisition_date }}
+                                                        <div class="help-text">Fecha de adquisición del activo</div>
+                                                    </div>
+                                                    <div class="col-md-4 mb-4">
+                                                        <label for="{{ form.operational_status.id_for_label }}" class="form-label">
+                                                            <i class="fas fa-toggle-on"></i>{{ form.operational_status.label }}
+                                                        </label>
+                                                        {{ form.operational_status }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header" id="headingThree">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+                                            <i class="fas fa-file-contract me-2"></i> <strong>3. Documentación y Vigencias</strong>
+                                            </button>
+                                        </h2>
+                                        <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#assetFormAccordion">
+                                            <div class="accordion-body">
+                                            <div class="form-section-title">
+                                                    <i class="fas fa-file-invoice"></i>
+                                                    <h6>Documentación Legal y Fechas de Vencimiento</h6>
+                                                </div>
+                                            <div class="row">
+                                                <div class="col-md-6 mb-4">
+                                                        <label for="{{ form.insurance_policy.id_for_label }}" class="form-label">
+                                                            <i class="fas fa-file-medical"></i>{{ form.insurance_policy.label }}
+                                                        </label>
+                                                        {{ form.insurance_policy }}
+                                                        <div class="help-text">Número de póliza de seguro</div>
+                                                </div>
+                                                <div class="col-md-6 mb-4">
+                                                        <label for="{{ form.insurance_due_date.id_for_label }}" class="form-label">
+                                                            <i class="fas fa-calendar-times"></i>{{ form.insurance_due_date.label }}
+                                                        </label>
+                                                        {{ form.insurance_due_date }}
+                                                        <div class="help-text">Fecha de vencimiento de la póliza</div>
+                                                </div>
+                                                <div class="col-md-6 mb-4">
+                                                        <label for="{{ form.circulation_license.id_for_label }}" class="form-label">
+                                                            <i class="fas fa-id-card-alt"></i>{{ form.circulation_license.label }}
+                                                        </label>
+                                                        {{ form.circulation_license }}
+                                                </div>
+                                                <div class="col-md-6 mb-4">
+                                                        <label for="{{ form.license_due_date.id_for_label }}" class="form-label">
+                                                            <i class="fas fa-calendar-check"></i>{{ form.license_due_date.label }}
+                                                        </label>
+                                                        {{ form.license_due_date }}
+                                                        <div class="help-text">Fecha de vencimiento de la licencia</div>
+                                                </div>
+                                            </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header" id="headingFour">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFour" aria-expanded="false" aria-controls="collapseFour">
+                                                <i class="fas fa-paperclip me-2"></i> <strong>4. Archivos y Evidencias</strong>
+                                            </button>
+                                        </h2>
+                                        <div id="collapseFour" class="accordion-collapse collapse" aria-labelledby="headingFour" data-bs-parent="#assetFormAccordion">
+                                            <div class="accordion-body">
+                                                <div class="form-section-title">
+                                                    <i class="fas fa-cloud-upload-alt"></i>
+                                                    <h6>Archivos Multimedia y Documentación</h6>
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-6 mb-4">
+                                                        <label for="{{ form.display_photo.id_for_label }}" class="form-label"><i class="fas fa-camera"></i>{{ form.display_photo.label }}</label>
+                                                        {{ form.display_photo }}
+                                                        {% if object.display_photo %}<div class="file-preview mt-3"><small class="d-block mb-2">Archivo actual:</small><a href="{{ object.display_photo.url }}" target="_blank"><img src="{{ object.display_photo.url }}" class="img-thumbnail"></a></div>{% endif %}
+                                                        <div class="help-text">Imagen principal del activo (Formatos: JPG, PNG, GIF)</div>
+                                                    </div>
+                                                    <div class="col-md-6 mb-4">
+                                                        <label for="{{ form.unit_documents.id_for_label }}" class="form-label"><i class="fas fa-file-pdf"></i>{{ form.unit_documents.label }}</label>
+                                                        {{ form.unit_documents }}
+                                                        {% if object.unit_documents %}<div class="file-preview mt-3"><small class="d-block mb-2">Archivo actual:</small><a href="{{ object.unit_documents.url }}" target="_blank" class="btn btn-form-secondary"><i class="fas fa-file-alt me-2"></i> Ver Documento</a></div>{% endif %}
+                                                        <div class="help-text">Documentación relacionada (Formatos: PDF, DOC, DOCX)</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header" id="headingFive">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFive" aria-expanded="false" aria-controls="collapseFive">
+                                                <i class="fas fa-sticky-note me-2"></i> <strong>5. Notas Adicionales</strong>
+                                            </button>
+                                        </h2>
+                                        <div id="collapseFive" class="accordion-collapse collapse" aria-labelledby="headingFive" data-bs-parent="#assetFormAccordion">
+                                            <div class="accordion-body">
+                                                <div class="form-section-title">
+                                                    <i class="fas fa-edit"></i>
+                                                    <h6>Información Adicional y Comentarios</h6>
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-12 mb-4">
+                                                        <label for="{{ form.notes.id_for_label }}" class="form-label"><i class="fas fa-comment-dots"></i>{{ form.notes.label }}</label>
+                                                        {{ form.notes }}
+                                                        <div class="help-text">Información adicional relevante sobre el activo</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div> </div>
+
+                            <div class="d-flex justify-content-between align-items:center mt-5 pt-3 border-top">
+                                <div><small class="text-muted"><span class="required-field"></span> indica campos obligatorios</small></div>
+                                <div class="d-flex gap-3">
+                                    <a href="{% url 'lista_unidades' %}" class="btn btn-form-secondary"><i class="fas fa-times me-2"></i> Cancelar</a>
+                                    <button type="submit" class="btn btn-form-primary px-4"><i class="fas fa-save me-2"></i> {% if object %}Actualizar{% else %}Registrar{% endif %} Activo</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // === LÓGICA PARA MOSTRAR/OCULTAR SECCIONES ===
+    const tipoPropiedadSelect = document.getElementById('id_tipo_propiedad');
+    const seccionesAdicionales = document.getElementById('secciones-adicionales');
+    
+    function toggleSecciones() {
+        const selectedValue = tipoPropiedadSelect.value;
+        if (selectedValue === 'PERMISIONARIO' || selectedValue === 'OTRA_EMPRESA') {
+            seccionesAdicionales.style.display = 'none';
+        } else {
+            seccionesAdicionales.style.display = 'block';
+        }
+    }
+
+    // Ejecutar al cargar la página
+    toggleSecciones();
+    
+    // Ejecutar cuando cambie la selección
+    tipoPropiedadSelect.addEventListener('change', toggleSecciones);
+
+
+    // === LÓGICA DE VALIDACIÓN DEL FORMULARIO ===
+    const form = document.getElementById('assetForm');
+    const internalIdInput = document.getElementById('{{ form.internal_id.id_for_label }}');
+    const empresasContainer = document.getElementById('empresas-checkbox-container');
+
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            let isValid = true;
+            
+            // 1. Validar Id. Interno (nombre)
+            if (!internalIdInput.value.trim()) {
+                isValid = false;
+                internalIdInput.classList.add('is-invalid');
+                if (!internalIdInput.nextElementSibling || !internalIdInput.nextElementSibling.classList.contains('invalid-feedback')) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'invalid-feedback d-block';
+                    errorDiv.innerHTML = '<i class="fas fa-exclamation-circle me-1"></i>Este campo es obligatorio.';
+                    internalIdInput.parentNode.appendChild(errorDiv);
+                }
+            } else {
+                internalIdInput.classList.remove('is-invalid');
+                const errorDiv = internalIdInput.parentNode.querySelector('.invalid-feedback');
+                if (errorDiv) errorDiv.remove();
+            }
+
+            // 2. Validar que al menos una empresa esté seleccionada
+            const checkedEmpresas = empresasContainer.querySelectorAll('input[type="checkbox"]:checked');
+            if (checkedEmpresas.length === 0) {
+                isValid = false;
+                empresasContainer.classList.add('border-danger');
+                if (!empresasContainer.nextElementSibling || !empresasContainer.nextElementSibling.classList.contains('invalid-feedback')) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'invalid-feedback d-block'; // d-block para hacerlo visible
+                    errorDiv.innerHTML = '<i class="fas fa-exclamation-circle me-1"></i>Debe seleccionar al menos una empresa.';
+                    empresasContainer.parentNode.insertBefore(errorDiv, empresasContainer.nextSibling);
+                }
+            } else {
+                empresasContainer.classList.remove('border-danger');
+                const errorDiv = empresasContainer.parentNode.querySelector('.invalid-feedback');
+                if (errorDiv) errorDiv.remove();
+            }
+
+            if (!isValid) {
+                e.preventDefault();
+                const firstError = form.querySelector('.is-invalid, .border-danger');
+                if (firstError) {
+                    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        });
+    }
+
+    // --- Código de mejoras visuales (sin cambios) ---
+    const dateInputs = form.querySelectorAll('input[type="date"]');
+    dateInputs.forEach(input => { input.classList.add('form-control'); });
+
+    const photoInput = document.getElementById('{{ form.display_photo.id_for_label }}');
+    if (photoInput) {
+        photoInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const existingPreview = photoInput.parentNode.querySelector('.image-preview');
+                    if (existingPreview) { existingPreview.remove(); }
+                    const previewDiv = document.createElement('div');
+                    previewDiv.className = 'file-preview mt-3 image-preview';
+                    previewDiv.innerHTML = `<small class="d-block mb-2">Vista previa:</small><img src="${e.target.result}" class="img-thumbnail" style="max-height: 150px;">`;
+                    photoInput.parentNode.appendChild(previewDiv);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

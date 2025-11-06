@@ -1,0 +1,349 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+
+{% block title %}Detalle de Factura - {{ factura.numero_factura }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-1 text-dark">Detalle de Factura</h1>
+                    <p class="text-muted mb-0">Información completa y gestión de pagos</p>
+                </div>
+                <div>
+                    <a href="{% url 'lista_facturas' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Volver
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Información Principal de la Factura -->
+        <div class="col-lg-8">
+            <!-- Tarjeta de Información General -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0 py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0 text-dark">
+                            <i class="fas fa-file-invoice text-primary me-2"></i>
+                            Información de la Factura
+                        </h5>
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'editar_factura' factura.pk %}" class="btn btn-warning btn-sm">
+                                <i class="fas fa-edit me-1"></i>Editar
+                            </a>
+                            <a href="{% url 'crear_pago' %}?factura={{ factura.pk }}" class="btn btn-success btn-sm">
+                                <i class="fas fa-hand-holding-usd me-1"></i>Registrar Pago
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Columna Izquierda -->
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Número de Factura</label>
+                                <h5 class="text-dark mb-0">{{ factura.numero_factura }}</h5>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Orden de Compra</label>
+                                <p class="mb-0">
+                                    <i class="fas fa-file-contract text-info me-2"></i>
+                                    {{ factura.orden_compra.folio }}
+                                </p>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Proveedor</label>
+                                <p class="mb-0">
+                                    <i class="fas fa-building text-secondary me-2"></i>
+                                    {{ factura.orden_compra.proveedor.razon_social }}
+                                </p>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Fechas</label>
+                                <div class="d-flex gap-3">
+                                    <div>
+                                        <small class="text-muted d-block">Emisión</small>
+                                        <strong>{{ factura.fecha_emision }}</strong>
+                                    </div>
+                                    <div>
+                                        <small class="text-muted d-block">Vencimiento</small>
+                                        <strong class="{% if factura.esta_vencida %}text-danger{% elif factura.esta_por_vencer %}text-warning{% endif %}">
+                                            {{ factura.fecha_vencimiento }}
+                                        </strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Columna Derecha -->
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Estatus</label>
+                                <div>
+                                    <span class="badge {% if factura.estatus == 'PAGADA' %}bg-success{% elif factura.estatus == 'VENCIDA' %}bg-danger{% elif factura.estatus == 'POR_VENCER' %}bg-warning{% else %}bg-primary{% endif %} rounded-pill fs-6">
+                                        {{ factura.get_estatus_display }}
+                                    </span>
+                                    {% if factura.dias_restantes_credito %}
+                                    <small class="text-muted ms-2">
+                                        ({{ factura.dias_restantes_credito }} días)
+                                    </small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Montos</label>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span>Total:</span>
+                                    <strong class="text-dark">${{ factura.monto|floatformat:2|intcomma }}</strong>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span>Pagado:</span>
+                                    <strong class="text-success">${{ factura.monto|floatformat:2|intcomma }}</strong>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>Pendiente:</span>
+                                    <strong class="{% if factura.monto_pendiente > 0 %}text-warning{% else %}text-success{% endif %}">
+                                        ${{ factura.monto_pendiente|floatformat:2|intcomma }}
+                                    </strong>
+                                </div>
+                            </div>
+                            
+                            <!-- Barra de Progreso -->
+                            <div class="mt-3">
+                                <label class="form-label text-muted small mb-2">Progreso de Pago</label>
+                                <div class="progress" style="height: 8px;">
+                                    {% widthratio factura.monto_pendiente factura.monto 100 as progress_percentage %}
+                                    <div class="progress-bar {% if factura.pagada %}bg-success{% else %}bg-primary{% endif %}" 
+                                         role="progressbar" 
+                                         style="width: {% widthratio factura.monto|add:factura.monto_pendiente factura.monto 100 %}%"
+                                         aria-valuenow="{{ progress_percentage }}" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="100">
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between mt-1">
+                                    <small class="text-muted">
+                                        {{ progress_percentage }}% completado
+                                    </small>
+                                    <small class="text-muted">
+                                        {{ factura.pagos.count }} pago{{ factura.pagos.count|pluralize }}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notas -->
+                    {% if factura.notas %}
+                    <div class="mt-4 pt-3 border-top">
+                        <label class="form-label text-muted small mb-2">Notas</label>
+                        <div class="alert alert-light border">
+                            <p class="mb-0">{{ factura.notas }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Lateral - Resumen Rápido -->
+        <div class="col-lg-4">
+            <!-- Tarjeta de Resumen -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0 py-3">
+                    <h6 class="card-title mb-0 text-dark">
+                        <i class="fas fa-chart-pie text-info me-2"></i>
+                        Resumen Rápido
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Estatus</span>
+                            <span class="badge {% if factura.estatus == 'PAGADA' %}bg-success{% elif factura.estatus == 'VENCIDA' %}bg-danger{% elif factura.estatus == 'POR_VENCER' %}bg-warning{% else %}bg-primary{% endif %}">
+                                {{ factura.get_estatus_display }}
+                            </span>
+                        </div>
+                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Días Restantes</span>
+                            <strong class="{% if factura.dias_restantes_credito < 0 %}text-danger{% elif factura.dias_restantes_credito <= 3 %}text-warning{% else %}text-success{% endif %}">
+                                {{ factura.dias_restantes_credito }}
+                            </strong>
+                        </div>
+                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Total Pagos</span>
+                            <strong>{{ factura.pagos.count }}</strong>
+                        </div>
+                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Creado por</span>
+                            <small class="text-muted">{{ factura.creado_por.username|default:"Sistema" }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones Rápidas -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h6 class="card-title mb-0 text-dark">
+                        <i class="fas fa-bolt text-warning me-2"></i>
+                        Acciones Rápidas
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'crear_pago' %}?factura={{ factura.pk }}" class="btn btn-success">
+                            <i class="fas fa-hand-holding-usd me-2"></i>Registrar Pago
+                        </a>
+                        <a href="{% url 'editar_factura' factura.pk %}" class="btn btn-outline-warning">
+                            <i class="fas fa-edit me-2"></i>Editar Factura
+                        </a>
+                        <a href="{% url 'eliminar_factura' factura.pk %}" class="btn btn-outline-danger">
+                            <i class="fas fa-trash-alt me-2"></i>Eliminar Factura
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección de Pagos -->
+    <div class="row mt-2">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0 text-dark">
+                            <i class="fas fa-money-bill-wave text-success me-2"></i>
+                            Pagos Registrados
+                        </h5>
+                        <span class="badge bg-primary rounded-pill">{{ factura.pagos.count }}</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if factura.pagos.all %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="border-0">Fecha</th>
+                                    <th class="border-0 text-end">Monto</th>
+                                    <th class="border-0">Método</th>
+                                    <th class="border-0">Referencia</th>
+                                    <th class="border-0">Registrado por</th>
+                                    <th class="border-0 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pago in factura.pagos.all %}
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-calendar text-muted me-2"></i>
+                                        {{ pago.fecha_pago }}
+                                    </td>
+                                    <td class="text-end">
+                                        <strong class="text-success">${{ pago.monto_pagado|floatformat:2|intcomma }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info rounded-pill">{{ pago.get_metodo_pago_display }}</span>
+                                    </td>
+                                    <td>
+                                        <code class="text-muted">{{ pago.referencia|default:"-" }}</code>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ pago.registrado_por.username|default:"Sistema" }}</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'editar_pago' pago.pk %}" class="btn btn-outline-warning" title="Editar pago">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{% url 'eliminar_pago' pago.pk %}" class="btn btn-outline-danger" title="Eliminar pago">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-money-bill-wave fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No hay pagos registrados</h5>
+                        <p class="text-muted mb-4">Esta factura aún no tiene pagos asociados</p>
+                        <a href="{% url 'crear_pago' %}?factura={{ factura.pk }}" class="btn btn-success">
+                            <i class="fas fa-hand-holding-usd me-2"></i>Registrar Primer Pago
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card {
+        transition: transform 0.2s ease-in-out;
+    }
+    
+    .card:hover {
+        transform: translateY(-1px);
+    }
+    
+    .progress {
+        background-color: #e9ecef;
+        border-radius: 10px;
+    }
+    
+    .progress-bar {
+        border-radius: 10px;
+        transition: width 0.6s ease;
+    }
+    
+    .table th {
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .btn-group .btn {
+        border-radius: 6px;
+        margin: 0 2px;
+    }
+    
+    .list-group-item {
+        border: none;
+        padding: 0.75rem 0;
+    }
+    
+    .badge {
+        font-size: 0.75em;
+    }
+    
+    @media (max-width: 768px) {
+        .d-flex.gap-3 {
+            flex-direction: column;
+            gap: 1rem !important;
+        }
+        
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+    }
+</style>
+{% endblock %}

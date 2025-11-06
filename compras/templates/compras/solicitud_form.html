@@ -1,0 +1,723 @@
+{% extends 'compras/compras_base.html' %}
+
+{% load static %}
+{% load widget_tweaks %}
+{% load humanize %}
+
+{% block compras_content %}
+<div class="container-fluid" style="padding-bottom: 120px;">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 bg-primary rounded px-3 py-3">
+                <div class="mb-3 mb-md-0">
+                    <h3 class="fw-bold text-white mb-0">{{ titulo }}</h3>
+                    <p class="text-white-50 mb-0">Complete los detalles de la solicitud de compra</p>
+                </div>
+                <a href="{% url 'lista_solicitudes' %}" class="btn btn-outline-light d-flex align-items-center">
+                    <i class="fas fa-arrow-left me-2"></i> Volver al listado
+                </a>
+            </div>
+            <div class="alert alert-info bg-opacity-10 p-3 rounded d-flex align-items-center">
+                <i class="fas fa-info-circle text-info me-2 fs-5"></i>
+                <small class="text-info">Los campos marcados con <span class="text-danger">*</span> son obligatorios</small>
+            </div>
+        </div>
+    </div>
+
+    <form method="post" id="solicitudForm" class="needs-validation" novalidate enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <!-- Tarjeta de Datos Generales -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-primary text-white py-3 d-flex align-items-center">
+                <div class="bg-blue bg-opacity-35 p-2 rounded-circle me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <div>
+                    <h5 class="card-title mb-0 text-white">Datos Generales</h5>
+                    <small class="opacity-85 text-white-50">Información básica de la solicitud</small>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for field in form %}
+                    <div class="col-12 col-md-6 mb-3">
+                        <label for="{{ field.id_for_label }}" class="form-label fw-semibold">
+                            {{ field.label }}
+                            {% if field.field.required %} <span class="text-danger">*</span>{% endif %}
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light">
+                                <i class="fas fa-{% if 'empresa' in field.name %}building{% elif 'proveedor' in field.name %}truck-loading{% elif 'fecha' in field.name %}calendar{% else %}pen{% endif %} text-muted"></i>
+                            </span>
+                            {% render_field field class="form-control" %}
+                        </div>
+                        
+                        {% if 'proveedor' in field.name %}
+                        <div id="no-proveedor-mensaje" class="alert alert-warning p-2 mt-2 d-none">
+                            <small>
+                                No hay proveedores disponibles. 
+                                <a href="{% url 'crear_proveedor' %}" target="_blank" class="alert-link">¿Quieres dar de alta uno?</a>
+                            </small>
+                        </div>
+                        {% endif %}
+
+                        {% if field.errors %}
+                        <div class="text-danger small mt-1 d-flex align-items-center">
+                            <i class="fas fa-exclamation-circle me-1"></i> {{ field.errors|first }}
+                        </div>
+                        {% endif %}
+                        {% if field.help_text %}
+                        <div class="form-text">{{ field.help_text }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarjeta de Artículos Solicitados -->
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white py-3 d-flex align-items-center">
+                <div class="bg-blue bg-opacity-20 p-2 rounded-circle me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                    <i class="fas fa-boxes"></i>
+                </div>
+                <div>
+                    <h5 class="card-title mb-0 text-white">Artículos Solicitados</h5>
+                    <small class="opacity-85 text-white-50">Detalle de productos y cantidades</small>
+                </div>
+            </div>
+            <div class="card-body">
+                {{ formset.management_form }}
+                <div id="detalle-forms-container">
+                    {% for form in formset.forms %}
+                    <div class="detalle-form card mb-3 border-light shadow-sm position-relative">
+                        <div class="position-absolute top-0 start-0 h-100 bg-primary rounded-start" style="width: 4px;"></div>
+                        {{ form.id }}
+                        <div class="card-body">
+                            <div class="row g-3 align-items-end">
+                                <!-- Artículo (sin emoji/icono) -->
+                                <div class="col-12 col-lg-4 mb-0">
+                                    <label class="form-label fw-semibold">Artículo <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <!-- Eliminado el icono de caja -->
+                                        {{ form.articulo|add_class:"form-control select2-articulo" }}
+                                    </div>
+                                </div>
+                                
+                                <!-- Cantidad y Unidad de Medida -->
+                                <div class="col-12 col-sm-6 col-lg-3 mb-0">
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-8 mb-0">
+                                            <label class="form-label fw-semibold">Cantidad <span class="text-danger">*</span></label>
+                                            {{ form.cantidad|add_class:"form-control cantidad-input" }}
+                                        </div>
+                                        <div class="col-4 mb-0">
+                                            <label class="form-label fw-semibold">U.M.</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text bg-light" id="unidad-medida-{{ forloop.counter0 }}">
+                                                    <i class="fas fa-ruler text-muted"></i>
+                                                </span>
+                                                <input type="text" class="form-control unidad-medida-display" readonly 
+                                                       id="display-unidad-{{ forloop.counter0 }}"
+                                                       placeholder="U.M.">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Precio Unitario -->
+                                <div class="col-12 col-sm-6 col-lg-3 mb-0">
+                                    <label class="form-label fw-semibold">Precio Unitario <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light">$</span>
+                                        {{ form.precio_unitario|add_class:"form-control precio-input text-end" }}
+                                        <button class="btn btn-outline-success update-catalog-price-btn" type="button" title="Guardar este precio en el Catálogo Maestro">
+                                            <i class="fas fa-save"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Botón Eliminar -->
+                                <div class="col-12 col-lg-2 d-flex align-items-end justify-content-start justify-content-lg-end mb-0">
+                                    <button type="button" class="btn btn-sm btn-outline-danger remove-form d-flex align-items-center w-100 w-lg-auto justify-content-center">
+                                        <i class="fas fa-trash me-1 d-none d-sm-inline"></i> Eliminar
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Información del artículo -->
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <div class="d-flex flex-column flex-sm-row flex-wrap gap-3 text-sm">
+                                        <div class="articulo-info d-flex align-items-center">
+                                            <small class="text-muted">SKU:</small>
+                                            <span class="badge bg-light text-dark ms-1 sku-display">--</span>
+                                        </div>
+                                        <div class="articulo-info d-flex align-items-center">
+                                            <small class="text-muted">Categoría:</small>
+                                            <span class="badge bg-light text-dark ms-1 categoria-display">--</span>
+                                        </div>
+                                        <div class="articulo-info d-flex align-items-center">
+                                            <small class="text-muted">Tipo:</small>
+                                            <span class="badge bg-light text-dark ms-1 tipo-display">--</span>
+                                        </div>
+                                        <div class="articulo-info d-flex align-items-center">
+                                            <small class="text-muted">Impuestos:</small>
+                                            <span class="badge bg-info text-white ms-1 iva-badge d-none">IVA</span>
+                                            <span class="badge bg-warning text-dark ms-1 ret-iva-badge d-none">RET IVA</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Totales de línea -->
+                            <div class="row mt-3 pt-3 border-top">
+                                <div class="col-12">
+                                    <div class="d-flex flex-column flex-md-row flex-wrap justify-content-md-end gap-3 text-end">
+                                        <div class="mb-2">
+                                            <small class="text-muted d-block">Subtotal</small>
+                                            <p class="fw-semibold mb-0 subtotal text-primary">--</p>
+                                        </div>
+                                        <div class="mb-2">
+                                            <small class="text-muted d-block">IVA (16%)</small>
+                                            <p class="fw-semibold mb-0 iva text-info">--</p>
+                                        </div>
+                                        <div class="mb-2">
+                                            <small class="text-muted d-block">Ret. IVA</small>
+                                            <p class="fw-semibold mb-0 ret-iva text-warning">--</p>
+                                        </div>
+                                        <div class="mb-2 ps-md-3 border-start-md">
+                                            <small class="text-muted d-block">Total Línea</small>
+                                            <p class="fw-bold fs-5 mb-0 total-linea text-success">--</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <button type="button" id="add-form" class="btn btn-primary mt-3 d-flex align-items-center">
+                    <i class="fas fa-plus-circle me-2"></i> Añadir Artículo
+                </button>
+                <div id="no-articulos-mensaje" class="alert alert-warning p-2 mt-2 d-none">
+                    <small>
+                        Este proveedor no tiene artículos asociados. Puedes asignarlos desde el
+                        <a href="{% url 'lista_articulos' %}" target="_blank" class="alert-link">catálogo de artículos</a>.
+                    </small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Botones de acción -->
+        <div class="mt-4 d-flex flex-column flex-sm-row justify-content-end gap-2">
+            <a href="{% if solicitud %}{% url 'detalle_solicitud' solicitud.pk %}{% else %}{% url 'lista_solicitudes' %}{% endif %}" class="btn btn-outline-secondary px-4 d-flex align-items-center justify-content-center mb-2 mb-sm-0">
+                <i class="fas fa-times me-2"></i> Cancelar
+            </a>
+            <button type="submit" class="btn btn-success px-4 d-flex align-items-center justify-content-center">
+                <i class="fas fa-save me-2"></i> Guardar Cambios
+            </button>
+        </div>
+    </form>
+    
+    <!-- Template para formulario vacío -->
+    <div id="empty-form" class="d-none">
+        <div class="detalle-form card mb-3 border-light shadow-sm position-relative">
+            <div class="position-absolute top-0 start-0 h-100 bg-primary rounded-start" style="width: 4px;"></div>
+            {{ formset.empty_form.id }}
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-12 col-lg-4 mb-0">
+                        <label class="form-label fw-semibold">Artículo <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <!-- Eliminado el icono de caja -->
+                            {{ formset.empty_form.articulo|add_class:"form-control select2-articulo" }}
+                        </div>
+                    </div>
+                    
+                    <div class="col-12 col-sm-6 col-lg-3 mb-0">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-8 mb-0">
+                                <label class="form-label fw-semibold">Cantidad <span class="text-danger">*</span></label>
+                                {{ formset.empty_form.cantidad|add_class:"form-control cantidad-input" }}
+                            </div>
+                            <div class="col-4 mb-0">
+                                <label class="form-label fw-semibold">U.M.</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light">
+                                        <i class="fas fa-ruler text-muted"></i>
+                                    </span>
+                                    <input type="text" class="form-control unidad-medida-display" readonly 
+                                           placeholder="U.M.">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-12 col-sm-6 col-lg-3 mb-0">
+                        <label class="form-label fw-semibold">Precio Unitario <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light">$</span>
+                            {{ formset.empty_form.precio_unitario|add_class:"form-control precio-input text-end" }}
+                            <button class="btn btn-outline-success update-catalog-price-btn" type="button" title="Guardar este precio en el Catálogo Maestro">
+                                <i class="fas fa-save"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="col-12 col-lg-2 d-flex align-items-end justify-content-start justify-content-lg-end mb-0">
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-form d-flex align-items-center w-100 w-lg-auto justify-content-center">
+                            <i class="fas fa-trash me-1 d-none d-sm-inline"></i> Eliminar
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="d-flex flex-column flex-sm-row flex-wrap gap-3 text-sm">
+                            <div class="articulo-info d-flex align-items-center">
+                                <small class="text-muted">SKU:</small>
+                                <span class="badge bg-light text-dark ms-1 sku-display">--</span>
+                            </div>
+                            <div class="articulo-info d-flex align-items-center">
+                                <small class="text-muted">Categoría:</small>
+                                <span class="badge bg-light text-dark ms-1 categoria-display">--</span>
+                            </div>
+                            <div class="articulo-info d-flex align-items-center">
+                                <small class="text-muted">Tipo:</small>
+                                <span class="badge bg-light text-dark ms-1 tipo-display">--</span>
+                            </div>
+                            <div class="articulo-info d-flex align-items-center">
+                                <small class="text-muted">Impuestos:</small>
+                                <span class="badge bg-info text-white ms-1 iva-badge d-none">IVA</span>
+                                <span class="badge bg-warning text-dark ms-1 ret-iva-badge d-none">RET IVA</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mt-3 pt-3 border-top">
+                    <div class="col-12">
+                        <div class="d-flex flex-column flex-md-row flex-wrap justify-content-md-end gap-3 text-end">
+                            <div class="mb-2">
+                                <small class="text-muted d-block">Subtotal</small>
+                                <p class="fw-semibold mb-0 subtotal text-primary">--</p>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted d-block">IVA (16%)</small>
+                                <p class="fw-semibold mb-0 iva text-info">--</p>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted d-block">Ret. IVA</small>
+                                <p class="fw-semibold mb-0 ret-iva text-warning">--</p>
+                            </div>
+                            <div class="mb-2 ps-md-3 border-start-md">
+                                <small class="text-muted d-block">Total Línea</small>
+                                <p class="fw-bold fs-5 mb-0 total-linea text-success">--</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resumen de totales -->
+<div class="totals-summary-footer card shadow-lg border-0">
+    <div class="card-body py-3">
+        <div class="d-flex flex-column flex-md-row justify-content-md-end align-items-center gap-3">
+            <div class="text-center text-md-end">
+                <small class="text-muted d-block">SUBTOTAL</small>
+                <h4 class="mb-0 text-primary" id="grand-subtotal">$0.00</h4>
+            </div>
+            <div class="text-center text-md-end">
+                <small class="text-muted d-block">IMPUESTOS</small>
+                <h4 class="mb-0 text-info" id="grand-impuestos">$0.00</h4>
+            </div>
+            <div class="text-center text-md-end border-start-md ps-md-4">
+                <small class="text-muted d-block">GRAN TOTAL</small>
+                <h3 class="mb-0 text-success fw-bold" id="grand-total">$0.00</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Contenedor de notificaciones -->
+<div id="toast-container" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1055"></div>
+
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<style>
+    /* Estilos responsivos mejorados */
+    @media (max-width: 768px) {
+        .card-body {
+            padding: 1rem;
+        }
+        
+        .input-group-text {
+            min-width: 45px;
+        }
+        
+        .detalle-form .card-body {
+            padding: 1rem;
+        }
+        
+        .totals-summary-footer .card-body {
+            padding: 1rem;
+        }
+        
+        .totals-summary-footer h3, 
+        .totals-summary-footer h4 {
+            font-size: 1.1rem;
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .btn {
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+        
+        .d-flex.flex-wrap.gap-3 {
+            gap: 1rem !important;
+        }
+        
+        .border-start-md {
+            border-left: none !important;
+            padding-left: 0 !important;
+        }
+        
+        .totals-summary-footer .d-flex {
+            gap: 1rem !important;
+        }
+    }
+    
+    /* Estilos para Select2 en móviles */
+    .select2-container {
+        width: 100% !important;
+    }
+    
+    /* Mejoras visuales generales */
+    .detalle-form {
+        transition: all 0.3s ease;
+    }
+    
+    .detalle-form:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1) !important;
+    }
+    
+    .totals-summary-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 1030;
+        border-radius: 0;
+    }
+    
+    /* Ajustes para mejor legibilidad en móviles */
+    .form-label {
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .articulo-info {
+        margin-bottom: 0.5rem;
+    }
+    
+    /* Alineación vertical de los campos en Artículos Solicitados */
+    .detalle-form .row.g-3.align-items-end > [class^="col-"] {
+        margin-bottom: 0 !important;
+    }
+    .detalle-form .row.g-2.align-items-end > [class^="col-"] {
+        margin-bottom: 0 !important;
+    }
+</style>
+
+<script>
+// El código JavaScript permanece exactamente igual
+document.addEventListener('DOMContentLoaded', function() {
+    const empresaSelect = document.getElementById('id_empresa');
+    const proveedorSelect = document.getElementById('id_proveedor');
+    const formContainer = document.getElementById('detalle-forms-container');
+    const addButton = document.getElementById('add-form');
+    const totalFormsInput = document.getElementById('id_detalles-TOTAL_FORMS');
+    const emptyFormTemplate = document.getElementById('empty-form').innerHTML;
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const noProveedorMsg = document.getElementById('no-proveedor-mensaje');
+    const noArticulosMsg = document.getElementById('no-articulos-mensaje');
+
+    // --- INICIO: Sistema de Notificaciones (Toast) ---
+    const toastContainer = document.getElementById('toast-container');
+    function showToast(message, type = 'success') {
+        const toastId = 'toast-' + Date.now();
+        const toastColor = type === 'success' ? 'bg-success' : 'bg-danger';
+        const toastHtml = `
+            <div id="${toastId}" class="toast show align-items-center text-white ${toastColor} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="d-flex">
+                    <div class="toast-body">${message}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            </div>
+        `;
+        toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+        const toastEl = document.getElementById(toastId);
+        setTimeout(() => {
+            const bsToast = new bootstrap.Toast(toastEl, { autohide: true, delay: 5000 });
+            bsToast.hide();
+            setTimeout(() => toastEl.remove(), 500);
+        }, 5000); // El toast desaparece después de 5 segundos
+    }
+    // --- FIN: Sistema de Notificaciones ---
+
+    function formatCurrency(v) { 
+        return isNaN(v) ? '--' : `$${v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`; 
+    }
+    
+    function calculateAll() {
+        let grandSubtotal = 0, grandImpuestos = 0, grandTotal = 0;
+        document.querySelectorAll('.detalle-form').forEach(form => {
+            const cant = parseFloat(form.querySelector('.cantidad-input').value) || 0;
+            const precioRaw = form.querySelector('.precio-input').value || '0';
+            const precioSanitized = precioRaw.toString().replace(/[^0-9.]/g, '');
+            const precio = parseFloat(precioSanitized) || 0;
+            const articuloSelect = form.querySelector('.select2-articulo');
+            const selectedOption = articuloSelect.options[articuloSelect.selectedIndex];
+            let subtotal = 0, iva = 0, retIVA = 0, totalLinea = 0;
+            
+            if (cant > 0 && precio > 0 && selectedOption && selectedOption.value) {
+                subtotal = cant * precio;
+                if (selectedOption.dataset.iva === 'true') iva = subtotal * 0.16;
+                if (selectedOption.dataset.retIva === 'true') retIVA = subtotal * (2/3) * 0.16;
+                totalLinea = subtotal + iva - retIVA;
+                grandSubtotal += subtotal;
+                grandImpuestos += (iva - retIVA);
+                grandTotal += totalLinea;
+            }
+            form.querySelector('.subtotal').textContent = formatCurrency(subtotal);
+            form.querySelector('.iva').textContent = formatCurrency(iva);
+            form.querySelector('.ret-iva').textContent = formatCurrency(retIVA);
+            form.querySelector('.total-linea').textContent = formatCurrency(totalLinea);
+        });
+        document.getElementById('grand-subtotal').textContent = formatCurrency(grandSubtotal);
+        document.getElementById('grand-impuestos').textContent = formatCurrency(grandImpuestos);
+        document.getElementById('grand-total').textContent = formatCurrency(grandTotal);
+    }
+    
+    function updateArticuloInfo(form, articuloData) {
+        if (!form || !articuloData) return;
+        form.querySelector('.unidad-medida-display').value = articuloData.unidad_medida || 'N/A';
+        form.querySelector('.sku-display').textContent = articuloData.sku || 'N/A';
+        form.querySelector('.categoria-display').textContent = articuloData.categoria || 'N/A';
+        form.querySelector('.tipo-display').textContent = articuloData.tipo || 'N/A';
+        form.querySelector('.iva-badge').classList.toggle('d-none', !articuloData.lleva_iva);
+        form.querySelector('.ret-iva-badge').classList.toggle('d-none', !articuloData.lleva_retencion_iva);
+    }
+
+    function initializeSelect2(el) { $(el).select2({ placeholder: "Seleccione un artículo", allowClear: true, width: '100%'}); }
+
+    function fetchProveedores(empresaId, selectedProveedorId = null) {
+        proveedorSelect.innerHTML = '<option value="">Cargando...</option>';
+        noProveedorMsg.classList.add('d-none');
+        fetch(`/compras/api/proveedores_por_empresa/${empresaId}/`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.proveedores.length > 0) {
+                    let options = '<option value="">---------</option>';
+                    data.proveedores.forEach(p => {
+                        const selected = selectedProveedorId && p.id == selectedProveedorId ? 'selected' : '';
+                        options += `<option value="${p.id}" ${selected}>${p.razon_social}</option>`;
+                    });
+                    proveedorSelect.innerHTML = options;
+                    proveedorSelect.disabled = false;
+                    if (selectedProveedorId) fetchArticulos(selectedProveedorId);
+                } else {
+                    proveedorSelect.innerHTML = '<option value="">No hay proveedores</option>';
+                    proveedorSelect.disabled = true;
+                    noProveedorMsg.classList.remove('d-none');
+                    fetchArticulos(null);
+                }
+            });
+    }
+
+    let articulosActuales = []; // <-- NUEVO: almacena los artículos del proveedor seleccionado
+
+    function fetchArticulos(proveedorId) {
+        const allArticleSelects = document.querySelectorAll('.select2-articulo');
+        allArticleSelects.forEach(s => s.innerHTML = '<option value="">Cargando...</option>');
+        noArticulosMsg.classList.add('d-none');
+        addButton.disabled = true;
+
+        if (!proveedorId) {
+            articulosActuales = []; // <-- Limpiar si no hay proveedor
+            allArticleSelects.forEach(s => s.innerHTML = '<option value="">Seleccione un proveedor</option>');
+            return;
+        }
+
+        fetch(`/compras/api/articulos_por_proveedor/${proveedorId}/`)
+            .then(res => res.json())
+            .then(data => {
+                articulosActuales = data.articulos; // <-- Guardar artículos actuales
+                if (data.articulos.length > 0) {
+                    allArticleSelects.forEach(select => {
+                        const currentArticuloId = select.dataset.selected;
+                        let options = '<option value="">---------</option>';
+                        data.articulos.forEach(a => {
+                            const selected = currentArticuloId && a.id == currentArticuloId ? 'selected' : '';
+                            options += `<option value="${a.id}" ${selected}
+                                data-precio="${a.precio || ''}"
+                                data-iva="${a.lleva_iva}"
+                                data-ret-iva="${a.lleva_retencion_iva}"
+                                data-unidad="${a.unidad_medida || ''}"
+                                data-sku="${a.sku || ''}"
+                                data-categoria="${a.categoria || ''}"
+                                data-tipo="${a.tipo || ''}"
+                            >${a.nombre} (${a.sku || 'N/A'})</option>`;
+                        });
+                        select.innerHTML = options;
+                        if (currentArticuloId) $(select).val(currentArticuloId).trigger('change');
+                    });
+                    addButton.disabled = false;
+                } else {
+                    allArticleSelects.forEach(s => s.innerHTML = '<option value="">No hay artículos</option>');
+                    noArticulosMsg.classList.remove('d-none');
+                }
+            });
+    }
+    
+    // --- INICIO DE LA LÓGICA CORREGIDA ---
+
+    empresaSelect.addEventListener('change', () => fetchProveedores(empresaSelect.value));
+    proveedorSelect.addEventListener('change', () => fetchArticulos(proveedorSelect.value));
+
+    // Usamos jQuery para escuchar los eventos de Select2 de forma fiable
+    $(formContainer).on('select2:select', '.select2-articulo', function(e) {
+        const selectedOption = e.params.data.element;
+        if (!selectedOption) return;
+
+        const form = this.closest('.detalle-form');
+        const precioInput = form.querySelector('.precio-input');
+        
+        precioInput.value = selectedOption.dataset.precio || '';
+
+        const articuloData = {
+            unidad_medida: selectedOption.dataset.unidad,
+            sku: selectedOption.dataset.sku,
+            categoria: selectedOption.dataset.categoria,
+            tipo: selectedOption.dataset.tipo,
+            lleva_iva: selectedOption.dataset.iva === 'true',
+            lleva_retencion_iva: selectedOption.dataset.retIva === 'true'
+        };
+        updateArticuloInfo(form, articuloData);
+        calculateAll();
+    });
+
+    $(formContainer).on('select2:unselect', '.select2-articulo', function(e) {
+        const form = this.closest('.detalle-form');
+        form.querySelector('.precio-input').value = '';
+        updateArticuloInfo(form, {}); // Limpia la info
+        calculateAll();
+    });
+
+    formContainer.addEventListener('input', e => { 
+        if (e.target.matches('.cantidad-input, .precio-input')) {
+            calculateAll(); 
+        }
+    });
+
+    addButton.addEventListener('click', () => {
+        let formNum = parseInt(totalFormsInput.value);
+        const newFormHtml = emptyFormTemplate.replace(/__prefix__/g, formNum);
+        const newForm = document.createElement('div');
+        newForm.innerHTML = newFormHtml;
+        formContainer.appendChild(newForm.firstElementChild);
+        const newSelect = formContainer.lastElementChild.querySelector('.select2-articulo');
+        // --- NUEVO: poblar el select con los artículos actuales ---
+        if (articulosActuales.length > 0) {
+            let options = '<option value="">---------</option>';
+            articulosActuales.forEach(a => {
+                options += `<option value="${a.id}"
+                    data-precio="${a.precio || ''}"
+                    data-iva="${a.lleva_iva}"
+                    data-ret-iva="${a.lleva_retencion_iva}"
+                    data-unidad="${a.unidad_medida || ''}"
+                    data-sku="${a.sku || ''}"
+                    data-categoria="${a.categoria || ''}"
+                    data-tipo="${a.tipo || ''}"
+                >${a.nombre} (${a.sku || 'N/A'})</option>`;
+            });
+            newSelect.innerHTML = options;
+        } else {
+            newSelect.innerHTML = '<option value="">No hay artículos</option>';
+        }
+        initializeSelect2(newSelect);
+        totalFormsInput.value = formNum + 1;
+    });
+
+    formContainer.addEventListener('click', e => {
+        if (e.target.closest('.remove-form')) {
+            e.target.closest('.detalle-form').remove();
+            calculateAll();
+        }
+
+        const updateButton = e.target.closest('.update-catalog-price-btn');
+        if (updateButton) {
+            const form = updateButton.closest('.detalle-form');
+            const articuloId = form.querySelector('.select2-articulo').value;
+            const proveedorId = proveedorSelect.value;
+            const nuevoPrecio = form.querySelector('.precio-input').value;
+
+            if (!articuloId || !proveedorId || nuevoPrecio === '') {
+                showToast('Debe seleccionar un proveedor, un artículo y un precio.', 'danger');
+                return;
+            }
+
+            fetch("{% url 'update_articulo_proveedor_precio' %}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({
+                    articulo_id: articuloId,
+                    proveedor_id: proveedorId,
+                    nuevo_precio: nuevoPrecio
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast(data.message, 'success');
+                    const optionToUpdate = form.querySelector(`.select2-articulo option[value="${articuloId}"]`);
+                    if (optionToUpdate) optionToUpdate.dataset.precio = nuevoPrecio;
+                } else {
+                    showToast(data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Error de conexión con el servidor.', 'danger');
+            });
+        }
+    });
+    
+    function initializeForm() {
+        document.querySelectorAll('.select2-articulo').forEach(el => {
+            // Guardamos el valor inicial del artículo que renderizó Django
+            el.dataset.selected = el.value;
+            initializeSelect2(el);
+        });
+        if (empresaSelect.value) {
+            const initialProveedorId = proveedorSelect.value;
+            fetchProveedores(empresaSelect.value, initialProveedorId);
+        }
+        setTimeout(calculateAll, 500); 
+    }
+
+    initializeForm();
+     // --- FIN DE LA LÓGICA CORREGIDA ---
+});
+</script>
+{% endblock %}

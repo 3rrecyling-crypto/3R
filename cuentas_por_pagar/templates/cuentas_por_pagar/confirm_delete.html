@@ -1,0 +1,190 @@
+{% extends 'ternium/base.html' %}
+
+{% block title %}Confirmar Eliminación - Cuentas por Pagar{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8">
+            <!-- Tarjeta de Confirmación -->
+            <div class="card border-0 shadow-lg">
+                <!-- Header con icono de advertencia -->
+                <div class="card-header bg-light border-0 py-4">
+                    <div class="text-center">
+                        <div class="icon-warning mb-3">
+                            <i class="fas fa-exclamation-triangle fa-3x text-warning"></i>
+                        </div>
+                        <h2 class="h4 text-dark mb-1">Confirmar Eliminación</h2>
+                        <p class="text-muted mb-0">Esta acción es permanente y no se puede deshacer</p>
+                    </div>
+                </div>
+
+                <!-- Contenido de la confirmación -->
+                <div class="card-body py-4">
+                    <div class="text-center">
+                        <!-- Información del objeto a eliminar -->
+                        <div class="alert alert-light border mb-4">
+                            <div class="d-flex align-items-center justify-content-center">
+                                <i class="fas fa-file-invoice text-primary me-3 fa-lg"></i>
+                                <div class="text-start">
+                                    <h5 class="mb-1 text-dark">
+                                        {% if object.numero_factura %}
+                                            Factura: {{ object.numero_factura }}
+                                        {% elif object.factura %}
+                                            Pago para: {{ object.factura.numero_factura }}
+                                        {% else %}
+                                            Elemento seleccionado
+                                        {% endif %}
+                                    </h5>
+                                    <p class="text-muted mb-0 small">
+                                        {% if object.orden_compra %}
+                                            OC: {{ object.orden_compra.folio }} • 
+                                            Proveedor: {{ object.orden_compra.proveedor.razon_social }}
+                                        {% elif object.factura %}
+                                            Monto: ${{ object.monto_pagado }} • 
+                                            Fecha: {{ object.fecha_pago }}
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Advertencias importantes -->
+                        <div class="alert alert-warning border-warning">
+                            <div class="d-flex">
+                                <i class="fas fa-shield-alt text-warning me-3 mt-1"></i>
+                                <div class="text-start">
+                                    <h6 class="alert-heading mb-2">¡Atención!</h6>
+                                    <ul class="list-unstyled mb-0 small">
+                                        <li><i class="fas fa-times-circle text-danger me-2"></i>Esta acción no se puede revertir</li>
+                                        <li><i class="fas fa-database text-info me-2"></i>Los datos serán eliminados permanentemente</li>
+                                        <li><i class="fas fa-history text-secondary me-2"></i>No habrá posibilidad de recuperación</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Formulario de confirmación -->
+                        <form method="post" class="mt-4">
+                            {% csrf_token %}
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                                <button type="submit" class="btn btn-danger btn-lg px-4 py-2">
+                                    <i class="fas fa-trash-alt me-2"></i>
+                                    Sí, Eliminar Permanentemente
+                                </button>
+                                <a href="{% url 'lista_facturas' %}" class="btn btn-outline-secondary btn-lg px-4 py-2">
+                                    <i class="fas fa-times me-2"></i>
+                                    Cancelar
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Footer informativo -->
+                <div class="card-footer bg-light border-0 py-3">
+                    <div class="text-center">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Si no estás seguro, es mejor cancelar y revisar la información
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta adicional de ayuda -->
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-body text-center py-3">
+                    <h6 class="mb-2">¿Necesitas ayuda?</h6>
+                    <p class="text-muted small mb-0">
+                        Contacta al administrador del sistema si tienes dudas sobre esta operación
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card {
+        transition: transform 0.2s ease-in-out;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .icon-warning {
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    
+    .btn-danger {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        border: none;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-danger:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+    }
+    
+    .btn-outline-secondary {
+        transition: all 0.3s ease;
+    }
+    
+    .btn-outline-secondary:hover {
+        transform: translateY(-1px);
+    }
+    
+    .alert-light {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+    }
+    
+    /* Mejoras responsive */
+    @media (max-width: 768px) {
+        .card-header .fa-3x {
+            font-size: 2.5rem;
+        }
+        
+        .btn-lg {
+            padding: 0.75rem 1.5rem;
+            font-size: 0.9rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Efecto de confirmación adicional para el botón de eliminar
+    const deleteButton = document.querySelector('.btn-danger');
+    
+    if (deleteButton) {
+        deleteButton.addEventListener('click', function(e) {
+            const confirmed = confirm('¿Estás absolutamente seguro de que quieres eliminar este elemento? Esta acción es IRREVERSIBLE.');
+            
+            if (!confirmed) {
+                e.preventDefault();
+            }
+        });
+    }
+    
+    // Efecto de hover para las tarjetas
+    const cards = document.querySelectorAll('.card');
+    cards.forEach(card => {
+        card.style.cursor = 'default';
+    });
+});
+</script>
+{% endblock %}

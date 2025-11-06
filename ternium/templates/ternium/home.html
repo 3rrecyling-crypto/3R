@@ -1,0 +1,614 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+{% load humanize %} 
+{% block title %}Inicio - 3R Recycling{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --primary-color: #2c3e50;
+        --secondary-color: #3498db;
+        --accent-color: #e74c3c;
+        --light-color: #f8f9fa;
+        --text-color: #34495e;
+        --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        --hover-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        --success-color: #2ecc71;
+        --warning-color: #f39c12;
+        --danger-color: #e74c3c;
+        --border-radius: 10px;
+        --transition-speed: 0.3s;
+    }
+    
+    .hero-section {
+        background: linear-gradient(135deg, rgba(44, 62, 80, 0.9), rgba(52, 152, 219, 0.9)), 
+                    url('{% static "images/industrial-background.jpg" %}') no-repeat center center/cover;
+        padding: 4rem 0;
+        color: white;
+        border-radius: var(--border-radius);
+        margin-bottom: 2rem;
+        box-shadow: var(--card-shadow);
+        position: relative;
+        overflow: hidden;
+        transition: all var(--transition-speed) ease;
+    }
+    
+    .hero-section:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+    }
+    
+    .hero-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.3);
+        z-index: 1;
+        transition: opacity var(--transition-speed) ease;
+    }
+    
+    .hero-section:hover::before {
+        opacity: 0.8;
+    }
+    
+    .hero-content {
+        position: relative;
+        z-index: 2;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .hero-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+        line-height: 1.2;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .hero-subtitle {
+        font-size: 1.25rem;
+        margin-bottom: 2rem;
+        opacity: 0.9;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+    
+    .hero-btn {
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+        border-radius: 50px;
+        transition: all var(--transition-speed) ease;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .hero-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+    
+    .section-title {
+        color: var(--primary-color);
+        font-size: 1.75rem;
+        font-weight: 600;
+        margin-bottom: 2rem;
+        position: relative;
+        padding-bottom: 0.75rem;
+    }
+    
+    .section-title::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 70px;
+        height: 4px;
+        background: var(--secondary-color);
+        border-radius: 2px;
+    }
+    
+    /* Dashboard de Patios - Versión Mejorada */
+    .patio-dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 2rem;
+        margin-bottom: 3rem;
+    }
+
+    .patio-card {
+        background-color: #fff;
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        box-shadow: var(--card-shadow);
+        border-top: 4px solid var(--primary-color);
+        transition: all var(--transition-speed) ease;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .patio-card:hover {
+        transform: translateY(-8px);
+        box-shadow: var(--hover-shadow);
+    }
+
+    .patio-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1.25rem;
+    }
+    
+    .patio-card-header h4 {
+        color: var(--primary-color);
+        font-weight: 700;
+        font-size: 1.25rem;
+        margin: 0;
+        display: flex;
+        align-items: center;
+    }
+
+    .patio-card-header h4 i {
+        margin-right: 0.75rem;
+        color: var(--secondary-color);
+        font-size: 1.1rem;
+    }
+    
+    .patio-status {
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 0.3rem 0.8rem;
+        border-radius: 50px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .status-ok {
+        background-color: rgba(46, 204, 113, 0.15);
+        color: var(--success-color);
+        border: 1px solid rgba(46, 204, 113, 0.3);
+    }
+
+    .status-warning {
+        background-color: rgba(243, 156, 18, 0.15);
+        color: var(--warning-color);
+        border: 1px solid rgba(243, 156, 18, 0.3);
+    }
+
+    .status-danger {
+        background-color: rgba(231, 76, 60, 0.15);
+        color: var(--danger-color);
+        border: 1px solid rgba(231, 76, 60, 0.3);
+    }
+
+    .material-list {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 1.5rem 0;
+        flex-grow: 1;
+    }
+
+    .material-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        font-size: 0.95rem;
+        transition: all 0.2s ease;
+    }
+    
+    .material-item:hover {
+        background-color: rgba(52, 152, 219, 0.03);
+        transform: translateX(5px);
+    }
+    
+    .material-item:last-child { border-bottom: none; }
+
+    .material-name {
+        color: var(--text-color);
+        display: flex;
+        align-items: center;
+        font-weight: 500;
+    }
+
+    .material-name i {
+        margin-right: 0.75rem;
+        color: #95a5a6;
+        width: 20px;
+        text-align: center;
+        font-size: 1rem;
+    }
+    
+    .material-progress {
+        width: 100%;
+        height: 4px;
+        background-color: #ecf0f1;
+        border-radius: 2px;
+        margin-top: 0.5rem;
+        overflow: hidden;
+    }
+    
+    .material-progress-bar {
+        height: 100%;
+        background-color: var(--secondary-color);
+        border-radius: 2px;
+        transition: width 0.6s ease;
+    }
+    
+    .no-materials {
+        padding: 2rem 0;
+        text-align: center;
+        color: #95a5a6;
+        font-size: 0.95rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .no-materials i {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        color: #bdc3c7;
+    }
+
+    .patio-card-footer {
+        border-top: 1px solid rgba(0, 0, 0, 0.05);
+        padding-top: 1rem;
+        margin-top: auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.9rem;
+    }
+
+    .total-weight {
+        font-weight: 700;
+        color: var(--primary-color);
+        font-size: 1rem;
+    }
+
+    .last-update {
+        color: #95a5a6;
+        font-size: 0.8rem;
+    }
+    
+    /* Accesos Rápidos - Versión Mejorada */
+    .quick-access-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 2rem;
+        margin-bottom: 3rem;
+    }
+    
+    .quick-access-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: #fff;
+        border-radius: var(--border-radius);
+        padding: 2rem 1.5rem;
+        text-align: center;
+        text-decoration: none;
+        color: var(--text-color);
+        box-shadow: var(--card-shadow);
+        transition: all var(--transition-speed) ease;
+        border-top: 4px solid var(--secondary-color);
+        height: 100%;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .quick-access-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: var(--secondary-color);
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform var(--transition-speed) ease;
+    }
+    
+    .quick-access-card:hover {
+        transform: translateY(-8px);
+        box-shadow: var(--hover-shadow);
+        color: var(--primary-color);
+    }
+    
+    .quick-access-card:hover::before {
+        transform: scaleX(1);
+    }
+    
+    .quick-access-card i {
+        font-size: 2.5rem;
+        margin-bottom: 1.5rem;
+        color: var(--secondary-color);
+        transition: all var(--transition-speed) ease;
+    }
+    
+    .quick-access-card:hover i {
+        transform: scale(1.1);
+    }
+    
+    .quick-access-card h5 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        transition: all var(--transition-speed) ease;
+    }
+    
+    .quick-access-card p {
+        font-size: 0.9rem;
+        color: #7f8c8d;
+        margin: 0;
+        transition: all var(--transition-speed) ease;
+    }
+    
+    .quick-access-card:hover h5,
+    .quick-access-card:hover p {
+        color: var(--primary-color);
+    }
+    
+    /* Efectos de animación mejorados */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .animate-fadein {
+        animation: fadeInUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        opacity: 0;
+    }
+    
+    /* Sección de estadísticas */
+    .stats-section {
+        background-color: #f8f9fa;
+        border-radius: var(--border-radius);
+        padding: 2rem;
+        margin-bottom: 3rem;
+        box-shadow: var(--card-shadow);
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+    }
+    
+    .stat-card {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-label {
+        font-size: 0.9rem;
+        color: #7f8c8d;
+    }
+    
+    /* Responsive mejorado */
+    @media (max-width: 992px) {
+        .hero-title {
+            font-size: 2rem;
+        }
+        
+        .hero-subtitle {
+            font-size: 1.1rem;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .hero-section {
+            padding: 3rem 0;
+            border-radius: 0;
+            margin-left: -1rem;
+            margin-right: -1rem;
+        }
+        
+        .hero-title {
+            font-size: 1.8rem;
+        }
+        
+        .hero-subtitle {
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .section-title {
+            font-size: 1.5rem;
+        }
+        
+        .patio-dashboard-grid,
+        .quick-access-grid {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .hero-section {
+            padding: 2rem 0;
+        }
+        
+        .hero-title {
+            font-size: 1.5rem;
+        }
+        
+        .hero-btn {
+            padding: 0.6rem 1.5rem;
+            font-size: 0.9rem;
+        }
+    }
+</style>
+
+<div class="container-fluid px-3 py-4">
+    <div class="hero-section text-center">
+        <div class="hero-content container">
+            <h1 class="hero-title animate-fadein">3R Recycling</h1>
+            <p class="hero-subtitle animate-fadein" style="animation-delay: 0.1s;">Control, Gestión y Análisis de Procesos de Reciclaje</p>
+            <a href="{% url 'lista_entradas' %}" class="btn btn-light hero-btn animate-fadein" style="animation-delay: 0.2s;">
+                <i class="fas fa-play-circle me-2"></i> Comenzar
+            </a>
+        </div>
+    </div>
+
+    {% if stats %}
+    <div class="stats-section animate-fadein">
+        <h2 class="section-title">Resumen Estadístico</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">{{ stats.total_toneladas|floatformat:1|intcomma }}</div>
+                <div class="stat-label">Toneladas procesadas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ stats.patios_activos }}</div>
+                <div class="stat-label">Patios activos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ stats.materiales_diferentes }}</div>
+                <div class="stat-label">Materiales diferentes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ stats.entradas_hoy }}</div>
+                <div class="stat-label">Entradas hoy</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <h2 class="section-title animate-fadein">Inventario en Patios</h2>
+    <div class="patio-dashboard-grid">
+        {% for patio in patios_inventario %}
+        <div class="patio-card animate-fadein">
+            <div class="patio-card-header">
+                <h4><i class="fas fa-warehouse"></i>{{ patio.nombre|upper }}</h4>
+                <span class="patio-status 
+                    {% if patio.estado == 'warning' %}status-warning
+                    {% elif patio.estado == 'danger' %}status-danger
+                    {% else %}status-ok{% endif %}">
+                    {% if patio.estado == 'warning' %}Alerta
+                    {% elif patio.estado == 'danger' %}Crítico
+                    {% else %}Operativo{% endif %}
+                </span>
+            </div>
+            <ul class="material-list">
+                {% for item in patio.materiales %}
+                <li class="material-item">
+                    <div>
+                        <span class="material-name"><i class="fas fa-box-open"></i>{{ item.material_nombre }}</span>
+                        <div class="material-progress">
+                            <div class="material-progress-bar" style="width: {{ item.porcentaje_ocupacion }}%"></div>
+                        </div>
+                    </div>
+                    <span class="material-weight">{{ item.cantidad_toneladas|floatformat:3|intcomma }} Ton</span>
+                </li>
+                {% empty %}
+                <li class="no-materials">
+                    <i class="fas fa-inbox"></i>
+                    No hay materiales en este patio
+                </li>
+                {% endfor %}
+            </ul>
+            <div class="patio-card-footer">
+                <div class="total-weight">Total: {{ patio.total_toneladas|floatformat:3|intcomma }} Ton</div>
+                {% if patio.ultima_actualizacion %}
+                <div class="last-update" title="{{ patio.ultima_actualizacion }}">
+                    Act. hace {{ patio.ultima_actualizacion|naturaltime }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 animate-fadein">
+            <div class="no-materials py-4">
+                <i class="fas fa-warehouse fa-2x"></i>
+                <p class="mt-2">No hay patios de inventario configurados en el sistema.</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <h2 class="section-title animate-fadein">Accesos Rápidos</h2>
+    <div class="quick-access-grid">
+        <a href="{% url 'home_portal' %}" class="quick-access-card animate-fadein" style="animation-delay: 0.1s;">
+            <i class="fas fa-clipboard-list"></i>
+            <h5>Ternium</h5>
+            <p>{{ total_entradas }} registros</p>
+        </a>
+
+        <a href="{% url 'remision_lista' %}" class="quick-access-card animate-fadein" style="animation-delay: 0.2s;">
+            <i class="fas fa-industry"></i>
+            <h5>Reportes Operativos</h5>
+            <p>Trane, Medline</p>
+        </a>
+        
+        <a href="#" class="quick-access-card animate-fadein" style="animation-delay: 0.3s;">
+            <i class="fas fa-chart-bar"></i>
+            <h5>Análisis</h5>
+            <p>Estadísticas y gráficos</p>
+        </a>
+    
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Animación mejorada de elementos
+        const animateElements = () => {
+            const cards = document.querySelectorAll('.animate-fadein');
+            cards.forEach((card, index) => {
+                // Aplicar delay basado en la posición del elemento
+                const delay = index * 0.1;
+                card.style.animationDelay = `${delay}s`;
+                
+                // Escuchar cuando termina la animación
+                card.addEventListener('animationend', () => {
+                    card.style.opacity = 1;
+                });
+            });
+        };
+        
+        animateElements();
+        
+        // Efecto hover mejorado para cards
+        const addHoverEffects = () => {
+            const cards = document.querySelectorAll('.patio-card, .quick-access-card');
+            cards.forEach(card => {
+                card.addEventListener('mouseenter', () => {
+                    card.style.transition = `all ${getComputedStyle(document.documentElement).getPropertyValue('--transition-speed')} ease`;
+                });
+            });
+        };
+        
+        addHoverEffects();
+        
+        // Cargar datos adicionales si es necesario
+        if (typeof loadAdditionalData === 'function') {
+            setTimeout(loadAdditionalData, 1000);
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,327 @@
+{% extends 'ternium/base.html' %}
+
+{% block title %}{{ titulo }} - Cuentas por Pagar{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-xl-6">
+            <!-- Tarjeta del Formulario -->
+            <div class="card border-0 shadow-lg">
+                <!-- Header -->
+                <div class="card-header bg-white border-0 py-4">
+                    <div class="text-center">
+                        <div class="icon-form mb-3">
+                            <i class="fas {% if 'crear' in titulo or 'nuev' in titulo|lower %}fa-plus-circle text-success{% elif 'editar' in titulo|lower %}fa-edit text-warning{% else %}fa-file-alt text-primary{% endif %} fa-3x"></i>
+                        </div>
+                        <h2 class="h4 text-dark mb-1">{{ titulo }}</h2>
+                        <p class="text-muted mb-0">
+                            {% if 'factura' in titulo|lower %}
+                                Complete la información de la factura
+                            {% elif 'pago' in titulo|lower %}
+                                Registre los detalles del pago
+                            {% else %}
+                                Complete el formulario a continuación
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Formulario -->
+                <div class="card-body py-4">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger border-danger">
+                            <div class="d-flex">
+                                <i class="fas fa-exclamation-circle me-3 mt-1"></i>
+                                <div>
+                                    <h6 class="alert-heading mb-2">Errores en el formulario:</h6>
+                                    {{ form.non_field_errors }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="row g-4">
+                            {% for field in form %}
+                            <div class="col-12">
+                                <div class="form-group">
+                                    <label for="{{ field.id_for_label }}" class="form-label fw-semibold">
+                                        {{ field.label }}
+                                        {% if field.field.required %}
+                                        <span class="text-danger">*</span>
+                                        {% endif %}
+                                    </label>
+                                    
+                                    {% if field.field.widget.input_type == 'select' %}
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light border-end-0">
+                                            <i class="fas fa-chevron-down text-muted"></i>
+                                        </span>
+                                        {{ field }}
+                                    </div>
+                                    {% elif field.field.widget.input_type == 'date' %}
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light border-end-0">
+                                            <i class="fas fa-calendar text-muted"></i>
+                                        </span>
+                                        {{ field }}
+                                    </div>
+                                    {% elif field.field.widget.input_type == 'number' %}
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light border-end-0">
+                                            <i class="fas fa-dollar-sign text-muted"></i>
+                                        </span>
+                                        {{ field }}
+                                    </div>
+                                    {% elif field.field.widget.input_type == 'textarea' %}
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light border-end-0 align-items-start pt-3">
+                                            <i class="fas fa-pen text-muted"></i>
+                                        </span>
+                                        {{ field }}
+                                    </div>
+                                    {% else %}
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light border-end-0">
+                                            <i class="fas fa-edit text-muted"></i>
+                                        </span>
+                                        {{ field }}
+                                    </div>
+                                    {% endif %}
+
+                                    {% if field.help_text %}
+                                    <div class="form-text text-muted small mt-1">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        {{ field.help_text }}
+                                    </div>
+                                    {% endif %}
+
+                                    {% if field.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        <i class="fas fa-exclamation-triangle me-1"></i>
+                                        {{ field.errors|striptags }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Botones de Acción -->
+                        <div class="row mt-5 pt-3 border-top">
+                            <div class="col-12">
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <a href="{% url 'lista_facturas' %}" class="btn btn-outline-secondary btn-lg px-4 me-md-2">
+                                        <i class="fas fa-times me-2"></i>
+                                        Cancelar
+                                    </a>
+                                    <button type="submit" class="btn btn-primary btn-lg px-4">
+                                        <i class="fas fa-save me-2"></i>
+                                        {% if 'crear' in titulo or 'nuev' in titulo|lower %}
+                                            Crear
+                                        {% elif 'editar' in titulo|lower %}
+                                            Actualizar
+                                        {% else %}
+                                            Guardar
+                                        {% endif %}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Footer Informativo -->
+                <div class="card-footer bg-light border-0 py-3">
+                    <div class="text-center">
+                        <small class="text-muted">
+                            <i class="fas fa-shield-alt me-1"></i>
+                            Todos los datos están protegidos y encriptados
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información Adicional Contextual -->
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-body text-center py-3">
+                    <h6 class="mb-2">¿Necesitas ayuda?</h6>
+                    <p class="text-muted small mb-0">
+                        {% if 'factura' in titulo|lower %}
+                            Asegúrate de que la información coincida con la factura física
+                        {% elif 'pago' in titulo|lower %}
+                            Verifica los datos del pago antes de guardar
+                        {% else %}
+                            Revisa que todos los campos obligatorios estén completos
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card {
+        transition: transform 0.2s ease-in-out;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .icon-form {
+        animation: subtleBounce 2s infinite;
+    }
+    
+    @keyframes subtleBounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+    }
+    
+    .form-control, .form-select {
+        border-left: none;
+        padding: 0.75rem 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.1);
+        border-left: 1px solid #86b7fe !important;
+    }
+    
+    .input-group-text {
+        background-color: #f8f9fa;
+        border-color: #dee2e6;
+        transition: all 0.3s ease;
+    }
+    
+    .form-control:focus + .input-group-text,
+    .form-select:focus + .input-group-text {
+        border-color: #86b7fe;
+        background-color: #e7f1ff;
+    }
+    
+    .form-label {
+        color: #495057;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #1a73e8 0%, #0d62d1 100%);
+        border: none;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(26, 115, 232, 0.3);
+    }
+    
+    .btn-outline-secondary:hover {
+        transform: translateY(-1px);
+    }
+    
+    textarea.form-control {
+        min-height: 100px;
+        resize: vertical;
+    }
+    
+    /* Mejoras para campos de fecha y número */
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        cursor: pointer;
+        padding: 5px;
+    }
+    
+    input[type="number"] {
+        -moz-appearance: textfield;
+    }
+    
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    
+    /* Estados de error mejorados */
+    .is-invalid {
+        border-color: #dc3545 !important;
+    }
+    
+    .invalid-feedback {
+        font-size: 0.875rem;
+        color: #dc3545;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .card-header .fa-3x {
+            font-size: 2.5rem;
+        }
+        
+        .btn-lg {
+            padding: 0.75rem 1.5rem;
+            font-size: 0.9rem;
+        }
+        
+        .d-md-flex {
+            flex-direction: column;
+        }
+        
+        .me-md-2 {
+            margin-right: 0 !important;
+            margin-bottom: 1rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Agregar clases de Bootstrap a los campos del formulario
+    const formControls = document.querySelectorAll('.form-control, .form-select');
+    formControls.forEach(control => {
+        control.classList.add('form-control-lg');
+        
+        // Agregar validación en tiempo real
+        control.addEventListener('blur', function() {
+            if (this.value.trim() === '' && this.hasAttribute('required')) {
+                this.classList.add('is-invalid');
+            } else {
+                this.classList.remove('is-invalid');
+            }
+        });
+    });
+
+    // Mejorar campos de fecha
+    const dateFields = document.querySelectorAll('input[type="date"]');
+    dateFields.forEach(field => {
+        if (!field.value) {
+            // Establecer fecha actual como valor por defecto si está vacío
+            const today = new Date().toISOString().split('T')[0];
+            field.value = today;
+        }
+    });
+
+    // Auto-focus en el primer campo del formulario
+    const firstInput = document.querySelector('input:not([type="hidden"]), select, textarea');
+    if (firstInput) {
+        setTimeout(() => firstInput.focus(), 300);
+    }
+
+    // Efectos de hover para la tarjeta
+    const card = document.querySelector('.card');
+    if (card) {
+        card.style.cursor = 'default';
+    }
+});
+</script>
+{% endblock %}

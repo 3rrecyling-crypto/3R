@@ -1,0 +1,518 @@
+{% extends "ternium/base.html" %}
+{% load static %}
+
+{% block title %}
+  {{ titulo|default:"Nuevo Registro de Logística" }}
+{% endblock title %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+  <div class="card shadow-lg border-0">
+    <div class="card-header bg-gradient-primary text-white py-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <h4 class="mb-0 font-weight-bold">
+          <i class="fas fa-truck-loading me-2"></i>
+          {{ titulo|default:"Registro de Envío a Ternium" }}
+        </h4>
+        <span class="badge bg-white text-primary fs-6">VERSIÓN 2.1</span>
+      </div>
+    </div>
+    <div class="card-body p-4">
+      <form method="post" enctype="multipart/form-data" id="logisticaForm" class="needs-validation" novalidate>
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+              {% for error in form.non_field_errors %}
+                  <p>{{ error }}</p>
+              {% endfor %}
+          </div>
+        {% endif %}
+
+        <div class="section-card mb-4">
+          <div class="section-header">
+            <span class="section-number">1</span>
+            <h5 class="section-title">Datos Generales del Envío</h5>
+          </div>
+          <div class="section-body">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label for="{{ form.remision.id_for_label }}" class="form-label fw-bold">Número de Remisión*</label>
+                {{ form.remision }}
+                <div class="invalid-feedback">{{ form.remision.errors.as_text }}</div>
+                <div class="form-text ps-2">Este número se usará para nombrar los archivos.</div>
+              </div>
+              
+              <div class="col-md-4">
+                <label for="{{ form.fecha_carga.id_for_label }}" class="form-label fw-bold">Fecha de Carga*</label>
+                {{ form.fecha_carga }}
+                <div class="invalid-feedback">{{ form.fecha_carga.errors.as_text }}</div>
+              </div>
+              
+              <div class="col-md-4">
+                <label for="{{ form.boleta_bascula.id_for_label }}" class="form-label fw-bold"># Boleta Báscula*</label>
+                {{ form.boleta_bascula }}
+                <div class="invalid-feedback">{{ form.boleta_bascula.errors.as_text }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-card mb-4">
+          <div class="section-header">
+            <span class="section-number">2</span>
+            <h5 class="section-title">Información del Transporte</h5>
+          </div>
+          <div class="section-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                  <label for="{{ form.transportista.id_for_label }}" class="form-label fw-bold">Transportista*</label>
+                  {{ form.transportista }}
+                  <div class="invalid-feedback">{{ form.transportista.errors.as_text }}</div>
+              </div>
+              <div class="col-md-6">
+                  <label for="{{ form.chofer.id_for_label }}" class="form-label fw-bold">Nombre del Chofer*</label>
+                  {{ form.chofer }}
+                  <div class="invalid-feedback">{{ form.chofer.errors.as_text }}</div>
+              </div>
+              <div class="col-md-6">
+                  <label for="{{ form.tractor.id_for_label }}" class="form-label fw-bold">Tractor*</label>
+                  {{ form.tractor }}
+                  <div class="invalid-feedback">{{ form.tractor.errors.as_text }}</div>
+              </div>
+              <div class="col-md-6">
+                  <label for="{{ form.tolva.id_for_label }}" class="form-label fw-bold">Tolva/Caja*</label>
+                  {{ form.tolva }}
+                  <div class="invalid-feedback">{{ form.tolva.errors.as_text }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="section-card mb-4">
+          <div class="section-header">
+            <span class="section-number">3</span>
+            <h5 class="section-title">Detalles del Material y Pesos (en Toneladas)</h5>
+          </div>
+          <div class="section-body">
+            <div class="row g-3 align-items-end">
+              <div class="col-md-12">
+                  <label for="{{ form.material.id_for_label }}" class="form-label fw-bold">Descripción del Material*</label>
+                  {{ form.material }}
+                  <div class="invalid-feedback">{{ form.material.errors.as_text }}</div>
+              </div>
+              
+              <div class="col-md-4">
+                <label for="{{ form.toneladas_remisionadas.id_for_label }}" class="form-label fw-bold">Toneladas Remisionadas*</label>
+                {{ form.toneladas_remisionadas }}
+                <div class="invalid-feedback">{{ form.toneladas_remisionadas.errors.as_text }}</div>
+              </div>
+              
+              <div class="col-md-4">
+                <label for="{{ form.toneladas_recibidas.id_for_label }}" class="form-label fw-bold">Toneladas Recibidas Ternium</label>
+                {{ form.toneladas_recibidas }}
+                <div class="invalid-feedback">{{ form.toneladas_recibidas.errors.as_text }}</div>
+              </div>
+              
+              <div class="col-md-4">
+                <div class="form-floating">
+                  <input type="text" id="id_merma" class="form-control bg-light" readonly disabled>
+                  <label for="id_merma" class="fw-bold">Merma (calculado)</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-card mb-4">
+          <div class="section-header">
+            <span class="section-number">4</span>
+            <h5 class="section-title">Documentación y Evidencias Fotográficas</h5>
+          </div>
+          <div class="section-body">
+            <div class="row g-4">
+              <div class="col-md-6">
+                <div class="documentation-section">
+                  <h6 class="section-subtitle">
+                    <i class="fas fa-file-pdf me-2 text-danger"></i>Documentos (PDF)
+                  </h6>
+                  
+                  <div class="file-upload-card mb-3">
+                    <label for="{{ form.pdf_registro_camion_remision.id_for_label }}" class="form-label fw-bold">{{ form.pdf_registro_camion_remision.label }}</label>
+                    {{ form.pdf_registro_camion_remision }}
+                    <div class="file-info mt-2">
+                      {% if object.pdf_registro_camion_remision %}
+                        <small class="text-muted">Archivo actual: 
+                          <a href="{{ object.pdf_registro_camion_remision.url }}" target="_blank">
+                            {{ object.pdf_registro_camion_remision.name|slice:"15:" }}
+                          </a>
+                        </small>
+                      {% endif %}
+                      <small class="text-muted d-block">Se renombrará a: <strong class="file-preview-name"><span class="remision-placeholder">[REMISION]</span>-4.pdf</strong></small>
+                    </div>
+                  </div>
+                  
+                  <div class="file-upload-card mb-3">
+                    <label for="{{ form.pdf_remision_permiso.id_for_label }}" class="form-label fw-bold">{{ form.pdf_remision_permiso.label }}</label>
+                    {{ form.pdf_remision_permiso }}
+                    <div class="file-info mt-2">
+                       {% if object.pdf_remision_permiso %}
+                        <small class="text-muted">Archivo actual: 
+                          <a href="{{ object.pdf_remision_permiso.url }}" target="_blank">
+                             {{ object.pdf_remision_permiso.name|slice:"15:" }}
+                          </a>
+                        </small>
+                      {% endif %}
+                      <small class="text-muted d-block">Se renombrará a: <strong class="file-preview-name"><span class="remision-placeholder">[REMISION]</span>-5.pdf</strong></small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <div class="documentation-section">
+                  <h6 class="section-subtitle">
+                    <i class="fas fa-camera me-2 text-info"></i>Fotografías
+                  </h6>
+                  
+                  <div class="row">
+                    <div class="col-6 mb-3">
+                      <div class="file-upload-card h-100">
+                        <label for="{{ form.foto_superior_vacia.id_for_label }}" class="form-label fw-bold">{{ form.foto_superior_vacia.label }}</label>
+                        {{ form.foto_superior_vacia }}
+                        <div class="image-preview mt-2" id="preview_foto_0" data-existing-image-url="{% if object.foto_superior_vacia %}{{ object.foto_superior_vacia.url }}{% endif %}"></div>
+                        <div class="file-info mt-2">
+                          <small class="text-muted">Nombre: <strong class="file-preview-name"><span class="remision-placeholder">[REMISION]</span>-0</strong></small>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="col-6 mb-3">
+                      <div class="file-upload-card h-100">
+                        <label for="{{ form.foto_frontal.id_for_label }}" class="form-label fw-bold">{{ form.foto_frontal.label }}</label>
+                        {{ form.foto_frontal }}
+                        <div class="image-preview mt-2" id="preview_foto_1" data-existing-image-url="{% if object.foto_frontal %}{{ object.foto_frontal.url }}{% endif %}"></div>
+                        <div class="file-info mt-2">
+                          <small class="text-muted">Nombre: <strong class="file-preview-name"><span class="remision-placeholder">[REMISION]</span>-1</strong></small>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="col-6 mb-3">
+                      <div class="file-upload-card h-100">
+                        <label for="{{ form.foto_superior_llena.id_for_label }}" class="form-label fw-bold">{{ form.foto_superior_llena.label }}</label>
+                        {{ form.foto_superior_llena }}
+                        <div class="image-preview mt-2" id="preview_foto_2" data-existing-image-url="{% if object.foto_superior_llena %}{{ object.foto_superior_llena.url }}{% endif %}"></div>
+                        <div class="file-info mt-2">
+                          <small class="text-muted">Nombre: <strong class="file-preview-name"><span class="remision-placeholder">[REMISION]</span>-2</strong></small>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="col-6 mb-3">
+                      <div class="file-upload-card h-100">
+                        <label for="{{ form.foto_trasera.id_for_label }}" class="form-label fw-bold">{{ form.foto_trasera.label }}</label>
+                        {{ form.foto_trasera }}
+                        <div class="image-preview mt-2" id="preview_foto_3" data-existing-image-url="{% if object.foto_trasera %}{{ object.foto_trasera.url }}{% endif %}"></div>
+                        <div class="file-info mt-2">
+                          <small class="text-muted">Nombre: <strong class="file-preview-name"><span class="remision-placeholder">[REMISION]</span>-3</strong></small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-end mt-4">
+          <a href="{% url 'lista_registros_logistica' %}" class="btn btn-outline-secondary me-3 px-4">
+            <i class="fas fa-times-circle me-2"></i>Cancelar
+          </a>
+          <button type="submit" class="btn btn-primary-gradient px-4">
+            <i class="fas fa-save me-2"></i>Guardar Registro
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --primary-color: #0056b3;
+    --secondary-color: #6c757d;
+    --accent-color: #17a2b8;
+    --light-bg: #f8f9fa;
+  }
+  
+  .card {
+    border-radius: 12px;
+    overflow: hidden;
+    border: none;
+  }
+  
+  .card-header {
+    border-bottom: none;
+  }
+  
+  .bg-gradient-primary {
+    background: linear-gradient(135deg, #0056b3 0%, #003366 100%);
+  }
+  
+  .btn-primary-gradient {
+    background: linear-gradient(135deg, #0056b3 0%, #17a2b8 100%);
+    border: none;
+    box-shadow: 0 2px 5px rgba(0, 86, 179, 0.3);
+    transition: all 0.3s ease;
+  }
+  
+  .btn-primary-gradient:hover {
+    background: linear-gradient(135deg, #004494 0%, #138496 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 86, 179, 0.3);
+  }
+  
+  .section-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    overflow: hidden;
+    background-color: white;
+  }
+  
+  .section-header {
+    background-color: var(--light-bg);
+    padding: 12px 20px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+  }
+  
+  .section-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background-color: var(--primary-color);
+    color: white;
+    border-radius: 50%;
+    font-weight: bold;
+    margin-right: 12px;
+    font-size: 14px;
+  }
+  
+  .section-title {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--primary-color);
+    font-weight: 600;
+  }
+  
+  .section-subtitle {
+    font-size: 1rem;
+    color: var(--secondary-color);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px dashed #dee2e6;
+  }
+  
+  .section-body {
+    padding: 20px;
+  }
+  
+  .file-upload-card {
+    padding: 15px;
+    border-radius: 8px;
+    background-color: #f8fafc;
+    border: 1px dashed #d1d5db;
+    transition: all 0.3s ease;
+  }
+  
+  .file-upload-card:hover {
+    border-color: var(--accent-color);
+    background-color: #f0f7ff;
+  }
+  
+  .file-upload-wrapper {
+    position: relative;
+  }
+  
+  .image-preview {
+    width: 100%;
+    height: 100px;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  
+  .image-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  
+  .preview-btn {
+    min-width: 42px;
+  }
+  
+  .form-floating label {
+    font-weight: 500;
+  }
+  
+  .file-info {
+    padding: 4px 8px;
+    background-color: white;
+    border-radius: 4px;
+    border: 1px solid #e9ecef;
+  }
+  
+  .file-preview-name {
+    color: var(--primary-color);
+    word-break: break-all;
+  }
+  
+  @media (max-width: 768px) {
+    .section-body {
+      padding: 15px;
+    }
+    
+    .file-upload-card {
+      padding: 12px;
+    }
+  }
+</style>
+{% endblock extra_css %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Actualizar nombres de archivo basados en remisión
+    const remisionInput = document.getElementById('id_remision');
+    const placeholders = document.querySelectorAll('.remision-placeholder');
+    const filePreviewNames = document.querySelectorAll('.file-preview-name');
+    
+    function updatePlaceholders() {
+        const remisionValue = remisionInput.value.trim().toUpperCase() || '[REMISION]';
+        
+        placeholders.forEach(span => {
+            span.textContent = remisionValue;
+        });
+        
+        // Esta parte ahora también actualiza el nombre de los PDF dinámicamente
+        document.querySelectorAll('.file-preview-name').forEach(el => {
+            if (el.innerHTML.includes('-4.pdf')) {
+                el.innerHTML = `<span class="remision-placeholder">${remisionValue}</span>-4.pdf`;
+            } else if (el.innerHTML.includes('-5.pdf')) {
+                el.innerHTML = `<span class="remision-placeholder">${remisionValue}</span>-5.pdf`;
+            } else if (el.innerHTML.includes('-0')) {
+                 el.innerHTML = `<span class="remision-placeholder">${remisionValue}</span>-0`;
+            } else if (el.innerHTML.includes('-1')) {
+                 el.innerHTML = `<span class="remision-placeholder">${remisionValue}</span>-1`;
+            } else if (el.innerHTML.includes('-2')) {
+                 el.innerHTML = `<span class="remision-placeholder">${remisionValue}</span>-2`;
+            } else if (el.innerHTML.includes('-3')) {
+                 el.innerHTML = `<span class="remision-placeholder">${remisionValue}</span>-3`;
+            }
+        });
+    }
+    
+    remisionInput.addEventListener('input', updatePlaceholders);
+    updatePlaceholders();
+    
+    // Validación de formulario
+    const form = document.getElementById('logisticaForm');
+    form.addEventListener('submit', function(event) {
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        form.classList.add('was-validated');
+    }, false);
+    
+    // Previsualización de imágenes NUEVAS
+    function handleImagePreview(input, previewId) {
+        const preview = document.getElementById(previewId);
+        preview.innerHTML = ''; 
+        
+        if (!input.files || !input.files[0]) {
+            preview.innerHTML = '<div class="text-muted"><i class="far fa-image fa-2x"></i></div>';
+            return;
+        }
+        
+        const file = input.files[0];
+        if (file && file.type.match('image.*')) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                preview.appendChild(img);
+            }
+            reader.readAsDataURL(file);
+        } else {
+            preview.innerHTML = '<div class="text-muted"><i class="far fa-image fa-2x"></i></div>';
+        }
+    }
+    
+    document.getElementById('id_foto_superior_vacia').addEventListener('change', function() { handleImagePreview(this, 'preview_foto_0'); });
+    document.getElementById('id_foto_frontal').addEventListener('change', function() { handleImagePreview(this, 'preview_foto_1'); });
+    document.getElementById('id_foto_superior_llena').addEventListener('change', function() { handleImagePreview(this, 'preview_foto_2'); });
+    document.getElementById('id_foto_trasera').addEventListener('change', function() { handleImagePreview(this, 'preview_foto_3'); });
+    
+    // INICIALIZAR VISTAS PREVIAS CON IMÁGENES EXISTENTES
+    function initializePreviews() {
+        const previewContainers = document.querySelectorAll('.image-preview');
+        previewContainers.forEach(container => {
+            const existingImageUrl = container.dataset.existingImageUrl;
+            
+            if (existingImageUrl) {
+                container.innerHTML = '';
+                const img = document.createElement('img');
+                img.src = existingImageUrl;
+                container.appendChild(img);
+            } else {
+                container.innerHTML = '<div class="text-muted"><i class="far fa-image fa-2x"></i></div>';
+            }
+        });
+    }
+    
+    initializePreviews();
+
+    // Cálculo de merma
+    const tonRemisionadasInput = document.getElementById('id_toneladas_remisionadas');
+    const tonRecibidasInput = document.getElementById('id_toneladas_recibidas');
+    const mermaOutput = document.getElementById('id_merma');
+    
+    function calcularMerma() {
+        const remisionadas = parseFloat(tonRemisionadasInput.value);
+        const recibidas = parseFloat(tonRecibidasInput.value);
+        
+        if (!isNaN(remisionadas) && !isNaN(recibidas) && remisionadas > 0) {
+            const mermaAbsoluta = remisionadas - recibidas;
+            const mermaPorcentaje = (mermaAbsoluta / remisionadas) * 100;
+            
+            mermaOutput.value = `${mermaAbsoluta.toFixed(3)} Ton. (${mermaPorcentaje.toFixed(2)}%)`;
+        } else {
+            mermaOutput.value = '';
+        }
+    }
+    
+    tonRemisionadasInput.addEventListener('input', calcularMerma);
+    tonRecibidasInput.addEventListener('input', calcularMerma);
+    calcularMerma();
+});
+</script>
+{% endblock extra_js %}

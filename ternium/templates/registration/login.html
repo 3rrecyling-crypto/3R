@@ -1,0 +1,260 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+
+{% block title %}Iniciar Sesión - 3R Recycling{% endblock %}
+
+{% block content %}
+<div class="login-page-container">
+    <div class="row g-0 min-vh-100">
+        <!-- Sección del video sin overlay -->
+        <div class="col-lg-7 d-none d-lg-block p-0">
+            <div class="video-container">
+                <video autoplay muted loop playsinline>
+                    <source src="{% static 'videos/login-video.mp4' %}" type="video/mp4">
+                    Tu navegador no soporta videos.
+                </video>
+                <div class="video-caption">
+                    <div class="video-logo-container">
+                        <img src="{% static 'r3_recycling/img/logo.png' %}" alt="3R Recycling" class="video-logo">
+                        <h1>3R RECYCLING</h1>
+                        <div class="technical-info">
+                            <p>Excelencia en Gestión de Transporte y Reciclaje.</p>
+                            <ul class="tech-specs">
+                                <li><strong>Sistema</strong> Integral De Gestion</li>
+                                <li><strong>Reportes </strong> Automatizados</li>
+                                <li><strong>Inovación</strong> en Procesos</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sección del formulario -->
+        <div class="col-lg-5 d-flex align-items-center justify-content-center p-4 p-sm-5 login-form-section">
+            <div class="login-form-wrapper">
+                <div class="card login-card">
+                    <div class="card-body p-4 p-md-5">
+                        <div class="text-center mb-4">
+                            <img src="{% static 'r3_recycling/img/logo.png' %}" 
+                                 alt="3R Recycling" 
+                                 class="logo-static"
+                                 style="height: 100px;">
+                            <h3 class="card-title text-primary mt-3">BIENVENIDO</h3>
+                            <p class="text-muted">Ingrese sus credenciales para acceder</p>
+                        </div>
+
+                        {% if form.errors %}
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                Credenciales incorrectas. Por favor intente nuevamente.
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endif %}
+
+                        <form method="post" action="{% url 'login' %}">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="{{ form.username.id_for_label }}" class="form-label">Usuario:</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-primary text-white">
+                                        <i class="fas fa-user"></i>
+                                    </span>
+                                    {{ form.username }}
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label for="{{ form.password.id_for_label }}" class="form-label">Contraseña:</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-primary text-white">
+                                        <i class="fas fa-key"></i>
+                                    </span>
+                                    {{ form.password }}
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="rememberMe">
+                                    <label class="form-check-label" for="rememberMe">Recordar sesión</label>
+                                </div>
+                                <a href="#" class="small text-muted">¿Olvidó su contraseña?</a>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary btn-lg w-100 py-2 mb-3">
+                                <i class="fas fa-sign-in-alt me-2"></i> INICIAR SESIÓN
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Ocultar la barra de navegación y footer de base.html */
+    .navbar, .footer {
+        display: none !important;
+    }
+    .main-container {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Estructura principal */
+    .login-page-container {
+        overflow: hidden;
+    }
+    .min-vh-100 {
+        min-height: 100vh;
+    }
+    
+    /* Sección del formulario */
+    .login-form-section {
+        background: linear-gradient(135deg, #f5f9ff 0%, #e8f5e9 100%);
+        position: relative;
+    }
+    
+    /* Sección del video sin overlay */
+    .video-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+    }
+    .video-container video {
+        min-width: 100%;
+        min-height: 100%;
+        width: auto;
+        height: auto;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        object-fit: cover;
+    }
+    .video-caption {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        z-index: 2;
+        text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+        text-align: center;
+        width: 80%;
+    }
+    .video-logo-container {
+        margin-bottom: 2rem;
+    }
+    .video-logo {
+        height: 100px;
+        margin-bottom: 1rem;
+        filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+    }
+    .video-caption h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        text-transform: uppercase;
+    }
+    
+    /* Información técnica */
+    .technical-info {
+        background: rgba(0, 0, 0, 0.6);
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-top: 2rem;
+        text-align: left;
+    }
+    .technical-info p {
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+        font-weight: 500;
+    }
+    .tech-specs {
+        list-style-type: none;
+        padding-left: 0;
+    }
+    .tech-specs li {
+        margin-bottom: 0.5rem;
+        padding-left: 1.5rem;
+        position: relative;
+    }
+    .tech-specs li:before {
+        content: "•";
+        color: var(--accent-color);
+        font-weight: bold;
+        position: absolute;
+        left: 0;
+    }
+    .tech-specs strong {
+        color: var(--accent-color);
+    }
+    
+    /* Formulario */
+    .login-form-wrapper {
+        position: relative;
+        z-index: 10;
+        width: 100%;
+        max-width: 450px;
+    }
+    .login-card {
+        border: none;
+        border-radius: 10px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        background: white;
+    }
+    
+    /* Elementos del formulario */
+    .form-control {
+        height: 45px;
+        border-radius: 0 5px 5px 0 !important;
+    }
+    .input-group-text {
+        border-radius: 5px 0 0 5px !important;
+        width: 45px;
+        justify-content: center;
+    }
+    .form-label {
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* Botón de login */
+    .btn-primary {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+        transition: all 0.2s ease;
+    }
+    .btn-primary:hover {
+        background-color: var(--primary-dark);
+        transform: translateY(-1px);
+        box-shadow: 0 3px 10px rgba(26, 115, 232, 0.3);
+    }
+    .btn-primary:active {
+        transform: translateY(0);
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .login-card {
+            box-shadow: none;
+            background: transparent;
+        }
+        .login-card .card-body {
+            padding: 1.5rem !important;
+        }
+        .video-caption h1 {
+            font-size: 2rem;
+        }
+        .technical-info {
+            padding: 1rem;
+        }
+    }
+</style>
+{% endblock %}

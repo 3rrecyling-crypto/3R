@@ -1,0 +1,577 @@
+{% extends 'ternium/base.html' %}
+
+{% block title %}Dashboard - Cuentas por Pagar{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Dashboard - Cuentas por Pagar</h1>
+            <div>
+                <a href="{% url 'exportar_facturas_excel' %}" class="btn btn-outline-info me-2">
+                    <i class="fas fa-file-excel me-2"></i>Exportar Excel
+                </a>
+                <a href="{% url 'lista_facturas' %}" class="btn btn-primary">
+                    <i class="fas fa-list me-2"></i>Ver Todas las Facturas
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card text-white bg-primary h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ total_facturas }}</h4>
+                        <p class="card-text">Total Facturas</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-file-invoice fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card text-white bg-warning h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ facturas_pendientes_count }}</h4>
+                        <p class="card-text">Pendientes</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-clock fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card text-white bg-danger h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ facturas_vencidas_count }}</h4>
+                        <p class="card-text">Vencidas</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-exclamation-triangle fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card text-white bg-orange h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ facturas_por_vencer_count }}</h4>
+                        <p class="card-text">Por Vencer</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-hourglass-half fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card text-white bg-success h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">${{ total_deuda_general|floatformat:2 }}</h4>
+                        <p class="card-text">Deuda Total</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-money-bill-wave fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card text-white bg-info h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ estadisticas|length }}</h4>
+                        <p class="card-text">Proveedores</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-building fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Deuda por Proveedor</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="deudasChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Distribución de Facturas</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="distribucionChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Facturas por Proveedor</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="facturasProveedorChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Estatus por Proveedor</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="estatusProveedorChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Detalle por Proveedor</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Proveedor</th>
+                                <th class="text-end">Deuda Total</th>
+                                <th class="text-center">Total Facturas</th>
+                                <th class="text-center">Por Vencer</th>
+                                <th class="text-center">Vencidas</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in estadisticas %}
+                            <tr>
+                                <td>
+                                    <strong>{{ stat.proveedor }}</strong>
+                                </td>
+                                <td class="text-end">
+                                    <span class="fw-bold text-primary">${{ stat.total_deuda|floatformat:2 }}</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-primary">{{ stat.cantidad_facturas }}</span>
+                                </td>
+                                <td class="text-center">
+                                    {% if stat.facturas_por_vencer > 0 %}
+                                    <span class="badge bg-warning">{{ stat.facturas_por_vencer }}</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">0</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if stat.facturas_vencidas > 0 %}
+                                    <span class="badge bg-danger">{{ stat.facturas_vencidas }}</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">0</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <a href="{% url 'lista_facturas' %}?q={{ stat.proveedor|urlencode }}" 
+                                       class="btn btn-sm btn-outline-primary" 
+                                       title="Ver facturas de este proveedor">
+                                        <i class="fas fa-search"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4">
+                                    <i class="fas fa-check-circle text-success fa-2x mb-2"></i>
+                                    <p class="mb-0">No hay deudas pendientes</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Alertas Recientes</h5>
+            </div>
+            <div class="card-body">
+                {% if alertas_recientes %}
+                <div class="list-group list-group-flush">
+                    {% for alerta in alertas_recientes %}
+                    <div class="list-group-item px-0">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ alerta.numero_factura }}</h6>
+                            <small class="text-muted">{{ alerta.ultima_alerta_enviada|timesince }}</small>
+                        </div>
+                        <p class="mb-1 small">{{ alerta.orden_compra.proveedor.razon_social }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="badge {% if alerta.estatus == 'VENCIDA' %}bg-danger{% else %}bg-warning{% endif %}">
+                                {{ alerta.get_estatus_display }}
+                            </span>
+                            <small>${{ alerta.monto_pendiente|floatformat:2 }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-3">
+                    <i class="fas fa-bell-slash text-muted fa-2x mb-2"></i>
+                    <p class="text-muted mb-0">No hay alertas recientes</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Acciones Rápidas</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'crear_factura' %}" class="btn btn-success">
+                        <i class="fas fa-plus me-2"></i>Nueva Factura
+                    </a>
+                    <a href="{% url 'crear_pago' %}" class="btn btn-warning">
+                        <i class="fas fa-hand-holding-usd me-2"></i>Registrar Pago
+                    </a>
+                    <a href="{% url 'lista_pagos' %}" class="btn btn-info">
+                        <i class="fas fa-money-bill-wave me-2"></i>Ver Pagos
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .bg-orange {
+        background-color: #fd7e14 !important;
+    }
+    
+    .card {
+        transition: transform 0.2s ease-in-out;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .table th {
+        border-top: none;
+        font-weight: 600;
+    }
+    
+    .list-group-item {
+        border-left: none;
+        border-right: none;
+    }
+    
+    .list-group-item:first-child {
+        border-top: none;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Cargar datos para todas las gráficas
+    fetch("{% url 'api_estadisticas_proveedor' %}")
+        .then(response => response.json())
+        .then(data => {
+            crearGraficaDeudas(data);
+            crearGraficaDistribucion(data);
+            crearGraficaFacturasProveedor(data);
+            crearGraficaEstatusProveedor(data);
+        })
+        .catch(error => console.error('Error loading chart data:', error));
+
+    function crearGraficaDeudas(data) {
+        const ctx = document.getElementById('deudasChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Deuda ($)',
+                    data: data.deudas,
+                    backgroundColor: 'rgba(26, 115, 232, 0.8)',
+                    borderColor: 'rgba(26, 115, 232, 1)',
+                    borderWidth: 1,
+                    borderRadius: 5,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `Deuda: $${context.parsed.y.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
+                            }
+                        }
+                    },
+                    // *** CONFIGURACIÓN DATALABELS: DEUDA ***
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'top',
+                        formatter: function(value) {
+                            // Muestra el valor en formato moneda
+                            return '$' + value.toLocaleString('es-MX', {minimumFractionDigits: 2});
+                        },
+                        color: '#000000',
+                        font: {
+                            weight: 'bold',
+                            size: 10
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toLocaleString('es-MX', {minimumFractionDigits: 2});
+                            }
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function crearGraficaDistribucion(data) {
+        const ctx = document.getElementById('distribucionChart').getContext('2d');
+        
+        // Calcular totales para la gráfica de distribución
+        const totalPendientes = {{ facturas_pendientes_count }};
+        const totalPorVencer = {{ facturas_por_vencer_count }};
+        const totalVencidas = {{ facturas_vencidas_count }};
+        // Asumiendo que las pagadas son el total menos las pendientes, por vencer y vencidas.
+        const totalPagadas = {{ total_facturas }} - totalPendientes - totalPorVencer - totalVencidas;
+        
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Pagadas', 'Pendientes', 'Por Vencer', 'Vencidas'],
+                datasets: [{
+                    data: [totalPagadas, totalPendientes, totalPorVencer, totalVencidas],
+                    backgroundColor: [
+                        'rgba(40, 167, 69, 0.8)',
+                        'rgba(255, 193, 7, 0.8)',
+                        'rgba(253, 126, 20, 0.8)',
+                        'rgba(220, 53, 69, 0.8)'
+                    ],
+                    borderColor: [
+                        'rgba(40, 167, 69, 1)',
+                        'rgba(255, 193, 7, 1)',
+                        'rgba(253, 126, 20, 1)',
+                        'rgba(220, 53, 69, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    },
+                    // *** CONFIGURACIÓN DATALABELS: DISTRIBUCIÓN ***
+                    datalabels: {
+                        formatter: (value, context) => {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = Math.round((value / total) * 100);
+                            // Muestra el valor y el porcentaje
+                            return `${value}\n(${percentage}%)`;
+                        },
+                        color: '#fff',
+                        font: {
+                            weight: 'bold'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function crearGraficaFacturasProveedor(data) {
+        const ctx = document.getElementById('facturasProveedorChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Total Facturas',
+                    data: data.facturas_totales,
+                    backgroundColor: 'rgba(108, 117, 125, 0.8)',
+                    borderColor: 'rgba(108, 117, 125, 1)',
+                    borderWidth: 1,
+                    borderRadius: 3,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    // *** CONFIGURACIÓN DATALABELS: FACTURAS POR PROVEEDOR ***
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'top',
+                        formatter: function(value) {
+                            return value; // Solo el valor numérico
+                        },
+                        color: '#000000',
+                        font: {
+                            weight: 'bold',
+                            size: 10
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function crearGraficaEstatusProveedor(data) {
+        const ctx = document.getElementById('estatusProveedorChart').getContext('2d');
+        
+        // Tomar solo los primeros 5 proveedores para mejor visualización
+        const topProveedores = data.labels.slice(0, 5);
+        const topPorVencer = data.facturas_por_vencer.slice(0, 5);
+        const topVencidas = data.facturas_vencidas.slice(0, 5);
+        
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: topProveedores,
+                datasets: [
+                    {
+                        label: 'Por Vencer',
+                        data: topPorVencer,
+                        backgroundColor: 'rgba(253, 126, 20, 0.8)',
+                        borderColor: 'rgba(253, 126, 20, 1)',
+                        borderWidth: 1,
+                    },
+                    {
+                        label: 'Vencidas',
+                        data: topVencidas,
+                        backgroundColor: 'rgba(220, 53, 69, 0.8)',
+                        borderColor: 'rgba(220, 53, 69, 1)',
+                        borderWidth: 1,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    // *** CONFIGURACIÓN DATALABELS: ESTATUS POR PROVEEDOR ***
+                    datalabels: {
+                        formatter: function(value) {
+                            return value > 0 ? value : ''; // Muestra el valor solo si es > 0
+                        },
+                        color: '#fff',
+                        font: {
+                            weight: 'bold',
+                            size: 10
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

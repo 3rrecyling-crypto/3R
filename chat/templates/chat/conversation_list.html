@@ -1,0 +1,399 @@
+{% extends 'ternium/base.html' %}
+{% load static humanize %}
+
+{% block title %}Bandeja de Entrada - Ternium{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    :root {
+        --primary-color: #3f51b5;
+        --secondary-color: #2196f3;
+        --light-bg: #f8f9fa;
+        --card-bg: #ffffff;
+        --text-dark: #2c3e50;
+        --text-light: #7f8c8d;
+        --border-color: #e0e0e0;
+        --unread-badge: #f44336;
+        --online-status: #4CAF50;
+    }
+    
+    .inbox-container {
+        background-color: var(--light-bg);
+        border-radius: 12px;
+        box-shadow: 0 4px 25px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+    }
+    
+    .inbox-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+        padding: 20px 25px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-radius: 12px 12px 0 0;
+    }
+    
+    .inbox-header h2 {
+        margin: 0;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .inbox-header h2 i {
+        font-size: 1.8rem;
+    }
+    
+    .btn-new-chat {
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 30px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+    }
+    
+    .btn-new-chat:hover {
+        background: rgba(255, 255, 255, 0.25);
+        color: white;
+    }
+    
+    .inbox-tools {
+        padding: 20px;
+        background-color: white;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        gap: 15px;
+    }
+    
+    .search-container {
+        position: relative;
+        flex: 1;
+    }
+    
+    .search-container i {
+        position: absolute;
+        left: 15px;
+        top: 12px;
+        color: var(--text-light);
+    }
+    
+    .search-input {
+        padding-left: 45px;
+        border-radius: 30px;
+        border: 1px solid var(--border-color);
+        height: 46px;
+    }
+    
+    .filter-btn {
+        background-color: white;
+        border: 1px solid var(--border-color);
+        border-radius: 30px;
+        padding: 0 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-dark);
+        transition: all 0.2s;
+    }
+    
+    .filter-btn:hover {
+        background-color: var(--light-bg);
+    }
+    
+    .conversations-list {
+        padding: 0;
+    }
+    
+    .conversation-item {
+        display: flex;
+        align-items: center;
+        padding: 20px;
+        border-bottom: 1px solid var(--border-color);
+        transition: all 0.2s;
+        background-color: var(--card-bg);
+        text-decoration: none;
+        color: inherit;
+    }
+    
+    .conversation-item:hover {
+        background-color: #f5f7ff;
+        transform: translateX(5px);
+    }
+    
+    .conversation-item.unread {
+        background-color: #f0f4ff;
+        border-left: 4px solid var(--primary-color);
+    }
+    
+    .user-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 1.2rem;
+        margin-right: 16px;
+        flex-shrink: 0;
+    }
+    
+    .conversation-content {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .conversation-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+    }
+    
+    .user-name {
+        font-weight: 600;
+        color: var(--text-dark);
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .conversation-time {
+        font-size: 0.85rem;
+        color: var(--text-light);
+        flex-shrink: 0;
+        margin-left: 10px;
+    }
+    
+    .conversation-preview {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .preview-text {
+        color: var(--text-light);
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 0.95rem;
+    }
+    
+    .unread-badge {
+        background-color: var(--unread-badge);
+        color: white;
+        border-radius: 50%;
+        width: 22px;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        font-weight: bold;
+        flex-shrink: 0;
+        margin-left: 10px;
+    }
+    
+    .user-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 4px;
+        font-size: 0.8rem;
+    }
+    
+    .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }
+    
+    .status-online {
+        background-color: var(--online-status);
+    }
+    
+    .status-offline {
+        background-color: var(--text-light);
+    }
+    
+    .empty-inbox {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-light);
+    }
+    
+    .empty-inbox i {
+        font-size: 4rem;
+        margin-bottom: 20px;
+        color: #bdc3c7;
+    }
+    
+    .empty-inbox h3 {
+        color: #95a5a6;
+        margin-bottom: 15px;
+    }
+    
+    .empty-inbox p {
+        margin-bottom: 25px;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .inbox-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 15px;
+        }
+        
+        .inbox-tools {
+            flex-direction: column;
+        }
+        
+        .conversation-item {
+            padding: 15px;
+        }
+        
+        .user-avatar {
+            width: 48px;
+            height: 48px;
+            font-size: 1rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="inbox-container">
+        <div class="inbox-header">
+            <h2><i class="fas fa-inbox"></i> Bandeja de Entrada</h2>
+            <a href="{% url 'user_list' %}" class="btn-new-chat">
+                <i class="fas fa-plus"></i> Nuevo Chat
+            </a>
+        </div>
+        
+        <div class="inbox-tools">
+            <div class="search-container">
+                <i class="fas fa-search"></i>
+                <input type="text" class="form-control search-input" placeholder="Buscar conversaciones...">
+            </div>
+            <button class="filter-btn">
+                <i class="fas fa-filter"></i> Filtrar
+            </button>
+        </div>
+        
+        <div class="conversations-list">
+            {% for conv in conversations %}
+                {% with other_user=conv.other_user %}
+                    {% if other_user %}
+                        <a href="{% url 'chat_detail' conv.id %}" class="conversation-item" data-user-id="{{ other_user.id }}">
+                            <div class="user-avatar">
+                                {{ other_user.username|first|upper }}
+                            </div>
+                            <div class="conversation-content">
+                                <div class="conversation-header">
+                                    <h5 class="user-name">{{ other_user.get_full_name|default:other_user.username }}</h5>
+                                    <span class="conversation-time">{{ conv.updated_at|naturaltime }}</span>
+                                </div>
+                                <div class="conversation-preview">
+                                    <p class="preview-text">
+                                        {% with last_message=conv.get_last_message %}
+                                            {% if last_message %}
+                                                {{ last_message.content|truncatechars:45 }}
+                                            {% else %}
+                                                Inicia la conversación...
+                                            {% endif %}
+                                        {% endwith %}
+                                    </p>
+                                    </div>
+                                <div class="user-status">
+                                    <span class="status-dot {% if other_user.profile.status == 'online' %}status-online{% else %}status-offline{% endif %}"></span>
+                                    <span class="status-text">{% if other_user.profile.status == 'online' %}En línea{% else %}Desconectado{% endif %}</span>
+                                </div>
+                            </div>
+                        </a>
+                    {% endif %}
+                {% endwith %}
+            {% empty %}
+                <div class="empty-inbox">
+                    <i class="fas fa-comments"></i>
+                    <h3>No tienes conversaciones</h3>
+                    <p>Inicia una nueva conversación para comenzar a chatear.</p>
+                    <a href="{% url 'user_list' %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i> Comenzar Chat
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // --- LÓGICA EXISTENTE DE BÚSQUEDA ---
+    const searchInput = document.querySelector('.search-input');
+    const conversationItems = document.querySelectorAll('.conversation-item');
+    
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        
+        conversationItems.forEach(function(item) {
+            const userName = item.querySelector('.user-name').textContent.toLowerCase();
+            item.style.display = userName.includes(searchTerm) ? 'flex' : 'none';
+        });
+    });
+
+    // --- NUEVO: LÓGICA DE PRESENCIA CON WEBSOCKETS ---
+    const presenceSocket = new WebSocket(
+        'ws://' + window.location.host + '/ws/status/'
+    );
+
+    presenceSocket.onopen = function(e) {
+        console.log("Conexión de presencia establecida en la bandeja de entrada.");
+    };
+
+    presenceSocket.onclose = function(e) {
+        console.error('La conexión de presencia se cerró inesperadamente.');
+    };
+
+    presenceSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        if (data.type === 'presence') {
+            updateUserStatus(data.user_id, data.status);
+        }
+    };
+
+    function updateUserStatus(userId, status) {
+        const conversationElement = document.querySelector(`.conversation-item[data-user-id="${userId}"]`);
+        
+        if (conversationElement) {
+            const statusDot = conversationElement.querySelector('.status-dot');
+            const statusText = conversationElement.querySelector('.status-text');
+            
+            if (status === 'online') {
+                statusDot.classList.add('status-online');
+                statusDot.classList.remove('status-offline');
+                statusText.textContent = 'En línea';
+            } else { // 'offline' o 'away'
+                statusDot.classList.add('status-offline');
+                statusDot.classList.remove('status-online');
+                statusText.textContent = 'Desconectado';
+            }
+        }
+    }
+});
+</script>
+{% endblock %}

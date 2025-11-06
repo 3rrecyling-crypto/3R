@@ -1,0 +1,100 @@
+{% extends 'ternium/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ titulo }}</h2>
+        <a href="{% url 'lista_contenedores' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Cancelar
+        </a>
+    </div>
+    
+    <div class="card shadow-sm">
+        <div class="card-body">
+            {% if messages %}
+            <div class="alert alert-dismissible fade show {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %}" role="alert">
+                <ul class="messages mb-0">
+                    {% for message in messages %}
+                    <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                    {% endfor %}
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger" role="alert">
+                    {% for error in form.non_field_errors %}
+                    <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="{{ form.nombre.id_for_label }}" class="form-label">{{ form.nombre.label }}</label>
+                            {{ form.nombre }}
+                            {% if form.nombre.help_text %}
+                                <div class="form-text">{{ form.nombre.help_text|safe }}</div>
+                            {% endif %}
+                            {% if form.nombre.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.nombre.errors %} {{ error }} {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="{{ form.placas.id_for_label }}" class="form-label">{{ form.placas.label }}</label>
+                            {{ form.placas }}
+                            {% if form.placas.help_text %}
+                                <div class="form-text">{{ form.placas.help_text|safe }}</div>
+                            {% endif %}
+                            {% if form.placas.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.placas.errors %} {{ error }} {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">{{ form.empresas.label }}</label>
+                    
+                    <div class="p-3 border rounded" style="max-height: 250px; overflow-y: auto;">
+                        {% for check in form.empresas %}
+                        <div class="form-check">
+                            {{ check.tag }}
+                            <label class="form-check-label" for="{{ check.id_for_label }}">
+                                {{ check.choice_label }}
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    {% if form.empresas.help_text %}
+                        <div class="form-text">{{ form.empresas.help_text|safe }}</div>
+                    {% endif %}
+                    {% if form.empresas.errors %}
+                        <div class="invalid-feedback d-block">
+                            {% for error in form.empresas.errors %} {{ error }} {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Guardar Contenedor
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

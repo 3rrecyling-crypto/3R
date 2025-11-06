@@ -1,0 +1,235 @@
+{% extends 'compras/compras_base.html' %}
+
+{% load static %}
+
+{% block compras_content %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 mt-2">
+        <div>
+            <h2 class="mb-0"><i class="fas fa-truck me-2 text-primary"></i>Catálogo de Proveedores</h2>
+            <p class="text-muted mb-0">Gestión de proveedores del sistema</p>
+        </div>
+        <a href="{% url 'crear_proveedor' %}" class="btn btn-primary d-flex align-items-center">
+            <i class="fas fa-plus-circle me-2"></i> Nuevo Proveedor
+        </a>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
+        <div class="card-header bg-primary text-white py-3">
+            <h5 class="card-title mb-0 d-flex align-items-center">
+                <i class="fas fa-list me-2"></i>Lista de Proveedores
+                <span class="badge bg-white text-primary ms-2">{{ proveedores|length }} registros</span>
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <form method="get" class="search-form">
+                        <div class="input-group">
+                            <span class="input-group-text bg-transparent border-end-0">
+                                <i class="fas fa-search text-muted"></i>
+                            </span>
+                            <input type="text" name="q" class="form-control border-start-0" 
+                                   placeholder="Buscar por Razón Social, RFC o Contacto..." 
+                                   value="{{ request.GET.q }}">
+                            <button class="btn btn-outline-primary" type="submit">Buscar</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-secondary active">
+                            <i class="fas fa-list"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary">
+                            <i class="fas fa-th"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Razón Social</th>
+                            <th>RFC</th>
+                            <th>Empresa</th>
+                            <th>Contacto</th>
+                            <th>Teléfono</th>
+                            <th>Estatus</th>
+                            <th class="text-center pe-4">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for proveedor in proveedores %}
+                        <tr class="border-bottom">
+                            <td class="ps-4">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                        <i class="fas fa-building text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <strong class="d-block">{{ proveedor.razon_social }}</strong>
+                                        <small class="text-muted">{{ proveedor.email|default:"Sin email" }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark font-monospace">{{ proveedor.rfc }}</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-info bg-opacity-10 text-info">{{ proveedor.empresa.nombre }}</span>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-user text-muted me-2"></i>
+                                    <span>{{ proveedor.contacto_principal|default:"--" }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-phone text-muted me-2"></i>
+                                    <span>{{ proveedor.telefono_contacto|default:"--" }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                {% if proveedor.activo %}
+                                    <span class="badge bg-success bg-opacity-15 text-white">
+                                        <i class="fas fa-check-circle me-1"></i> Activo
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-danger bg-opacity-15 text-white">
+                                        <i class="fas fa-times-circle me-1"></i> Inactivo
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center pe-4">
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'detalle_proveedor' proveedor.pk %}" class="btn btn-sm btn-outline-info rounded-start" title="Ver Detalles">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'editar_proveedor' proveedor.pk %}" class="btn btn-sm btn-outline-warning rounded-end" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5">
+                                <div class="py-4">
+                                    <i class="fas fa-truck fa-3x text-muted mb-3"></i>
+                                    <h5 class="text-muted">No se encontraron proveedores</h5>
+                                    <p class="text-muted">Intente ajustar los términos de búsqueda o crear un nuevo proveedor</p>
+                                    <a href="{% url 'crear_proveedor' %}" class="btn btn-primary mt-2">
+                                        <i class="fas fa-plus me-1"></i> Agregar primer proveedor
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if is_paginated %}
+            <div class="card-footer bg-white pt-3">
+                <nav aria-label="Navegación de proveedores">
+                    <ul class="pagination justify-content-center mb-0">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" aria-label="Anterior">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">&laquo;</span>
+                            </li>
+                        {% endif %}
+                        
+                        {% for i in paginator.page_range %}
+                            {% if page_obj.number == i %}
+                                <li class="page-item active"><span class="page-link">{{ i }}</span></li>
+                            {% else %}
+                                <li class="page-item"><a class="page-link" href="?page={{ i }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">{{ i }}</a></li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" aria-label="Siguiente">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">&raquo;</span>
+                            </li>
+                        {% endif %}
+                    </ul>
+                    <div class="text-center text-muted small mt-2">
+                        Mostrando página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                    </div>
+                </nav>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    }
+    
+    .table th {
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+        border-top: 1px solid #dee2e6;
+        padding: 0.75rem 0.5rem;
+    }
+    
+    .table td {
+        padding: 1rem 0.5rem;
+        vertical-align: middle;
+    }
+    
+    .btn {
+        border-radius: 0.35rem;
+        font-weight: 500;
+    }
+    
+    .badge {
+        font-weight: 500;
+        padding: 0.35em 0.65em;
+    }
+    
+    .search-form .form-control:focus {
+        box-shadow: none;
+        border-color: #ced4da;
+    }
+    
+    .page-link {
+        border-radius: 0.25rem;
+        margin: 0 0.15rem;
+    }
+    
+    .btn-group .btn {
+        border-radius: 0;
+    }
+    
+    .btn-group .btn:first-child {
+        border-top-left-radius: 0.35rem;
+        border-bottom-left-radius: 0.35rem;
+    }
+    
+    .btn-group .btn:last-child {
+        border-top-right-radius: 0.35rem;
+        border-bottom-right-radius: 0.35rem;
+    }
+</style>
+{% endblock %}

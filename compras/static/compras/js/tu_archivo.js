@@ -1,0 +1,468 @@
+{% extends 'compras/compras_base.html' %}
+
+{% load static %}
+{% load humanize %}
+{% load custom_filters %}
+
+{% block compras_content %}
+<div class="container-fluid px-4 py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb" class="mb-2">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a href="{% url 'lista_solicitudes' %}" class="text-decoration-none text-primary">
+                            <i class="fas fa-arrow-left me-1"></i> Volver a Solicitudes
+                        </a>
+                    </li>
+                    <li class="breadcrumb-item active" aria-current="page">Detalle de Solicitud</li>
+                </ol>
+            </nav>
+            <div class="d-flex align-items-center">
+                <div class="bg-primary bg-opacity-10 p-3 rounded-circle me-3">
+                    <i class="fas fa-file-alt text-primary fs-2"></i>
+                </div>
+                <div>
+                    <h2 class="mb-0 fw-bold">Solicitud: {{ solicitud.folio }}</h2>
+                    <p class="text-muted mb-0">Creada el {{ solicitud.creado_en|date:"d/m/Y H:i" }}</p>
+                </div>
+            </div>
+        </div>
+        <div>
+            {% if solicitud.estatus == 'PENDIENTE_APROBACION' %}
+                <span class="badge bg-warning bg-opacity-90 text-white fw-bold fs-6 px-3 py-2">
+                    <i class="fas fa-clock me-1"></i> Pendiente de Aprobación
+                </span>
+            {% elif solicitud.estatus == 'APROBADA' %}
+                <span class="badge bg-success bg-opacity-90 text-white fw-bold fs-6 px-3 py-2">
+                    <i class="fas fa-check-circle me-1"></i> Aprobada
+                </span>
+            {% elif solicitud.estatus == 'RECHAZADA' %}
+                <span class="badge bg-danger bg-opacity-90 text-white fw-bold fs-6 px-3 py-2">
+                    <i class="fas fa-times-circle me-1"></i> Rechazada
+                </span>
+            {% else %}
+                <span class="badge bg-secondary bg-opacity-90 text-white fw-bold fs-6 px-3 py-2">
+                    {{ solicitud.get_estatus_display }}
+                </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-primary bg-opacity-10 py-3 border-bottom">
+                    <h5 class="card-title mb-0 d-flex align-items-center fw-bold text-primary">
+                        <i class="fas fa-info-circle me-2"></i>Información de la Solicitud
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-4">
+                                <label class="form-label text-muted small mb-1">Empresa</label>
+                                <p class="mb-0 fw-semibold fs-6">{{ solicitud.empresa.nombre }}</p>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label text-muted small mb-1">Solicitante</label>
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                        <i class="fas fa-user text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <span class="fw-semibold d-block">{{ solicitud.solicitante.get_full_name|default:solicitud.solicitante.username }}</span>
+                                        <small class="text-muted">{{ solicitud.solicitante.email }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-4">
+                                <label class="form-label text-muted small mb-1">Fecha de Creación</label>
+                                <p class="mb-0 fw-semibold fs-6">{{ solicitud.creado_en|date:"d/m/Y H:i" }}</p>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label text-muted small mb-1">Prioridad</label>
+                                <div>
+                                    <span class="badge fs-6 py-2 px-3 rounded fw-bold
+                                        {% if solicitud.prioridad == 'URGENTE' %} 
+                                            bg-danger text-white
+                                        {% elif solicitud.prioridad == 'PROGRAMADO' %} 
+                                            bg-warning text-dark
+                                        {% else %} 
+                                            bg-secondary text-white
+                                        {% endif %}">
+                                        <i class="fas 
+                                            {% if solicitud.prioridad == 'URGENTE' %} 
+                                                fa-exclamation-circle 
+                                            {% elif solicitud.prioridad == 'PROGRAMADO' %} 
+                                                fa-calendar-check 
+                                            {% else %} 
+                                                fa-clock 
+                                            {% endif %} me-1">
+                                        </i>
+                                        {{ solicitud.get_prioridad_display }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <label class="form-label text-muted small mb-1">Motivo de la solicitud</label>
+                        <div class="border-start border-3 border-primary ps-3 py-2 bg-light bg-opacity-10 rounded-end">
+                            <p class="mb-0">{{ solicitud.motivo|linebreaks }}</p>
+                        </div>
+                    </div>
+                    
+                    {% if solicitud.estatus == 'APROBADA' %}
+                    <div class="row mt-4 pt-3 border-top">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small mb-1">Aprobado por</label>
+                            <div class="d-flex align-items-center">
+                                <div class="bg-success bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                    <i class="fas fa-user-check text-success"></i>
+                                </div>
+                                <div>
+                                    <span class="fw-semibold d-block">{{ solicitud.aprobado_por.get_full_name|default:solicitud.aprobado_por.username }}</span>
+                                    <small class="text-muted">{{ solicitud.fecha_aprobacion|date:"d/m/Y H:i" }}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-primary bg-opacity-10 py-3 border-bottom">
+                    <h5 class="card-title mb-0 d-flex align-items-center fw-bold text-primary">
+                        <i class="fas fa-chart-pie me-2"></i>Resumen Estimado
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="text-muted">Total de artículos</span>
+                        <span class="fw-bold fs-5 text-primary">{{ solicitud.detalles.count }}</span>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Subtotal:</span>
+                        <span id="summary-subtotal" class="fw-bold fs-5 text-dark">$0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">IVA:</span>
+                        <span id="summary-iva" class="fw-bold fs-5 text-dark">$0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center border-top pt-2 mt-2">
+                        <span class="text-muted fw-bold">Total:</span>
+                        <span id="summary-total" class="fw-bold fs-4 text-success">$0.00</span>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="mt-3">
+                        {% if solicitud.orden_de_compra %}
+                            {% if solicitud.orden_de_compra.estatus == 'BORRADOR' %}
+                                <a href="{% url 'generar_orden_de_compra' solicitud.pk %}" class="btn btn-primary w-100 mb-2 d-flex align-items-center justify-content-center fw-semibold">
+                                    <i class="fas fa-check-double me-2"></i> Finalizar Orden de Compra
+                                </a>
+                                <div class="form-text text-center small">
+                                    Confirme que los datos son correctos para aprobar la OC.
+                                </div>
+                            {% else %}
+                                <a href="{% url 'detalle_orden_compra' solicitud.orden_de_compra.pk %}" class="btn btn-info w-100 mb-2 d-flex align-items-center justify-content-center fw-semibold">
+                                    <i class="fas fa-file-invoice-dollar me-2"></i> Ver Orden {{ solicitud.orden_de_compra.folio }}
+                                </a>
+                            {% endif %}
+                        {% elif solicitud.estatus == 'APROBADA' %}
+                             <a href="{% url 'generar_orden_de_compra' solicitud.pk %}" class="btn btn-warning w-100 mb-2 d-flex align-items-center justify-content-center fw-semibold">
+                                <i class="fas fa-plus-circle me-2"></i> Generar Borrador de OC
+                            </a>
+                        {% endif %}
+                        {% if solicitud.estatus != 'APROBADA' and solicitud.estatus != 'CERRADA' and solicitud.estatus != 'RECHAZADA' %}
+                        <a href="{% url 'editar_solicitud' solicitud.pk %}" class="btn btn-outline-primary w-100 d-flex align-items-center justify-content-center fw-semibold mt-2">
+                            <i class="fas fa-pencil-alt me-2"></i> Editar Solicitud
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-primary bg-opacity-10 py-3 border-bottom d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0 d-flex align-items-center fw-bold text-primary">
+                <i class="fas fa-list-ul me-2"></i>Artículos Solicitados
+            </h5>
+            <span class="badge bg-primary text-white rounded-pill fs-6 py-2 px-3 fw-semibold">{{ solicitud.detalles.count }} items</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4 py-3 fw-semibold">Artículo</th>
+                            <th class="py-3 fw-semibold">SKU</th>
+                            <th class="text-end py-3 fw-semibold">Cantidad</th>
+                            <th class="py-3 fw-semibold">U.M.</th>
+                            <th class="text-end py-3 fw-semibold">Precio Unitario</th>
+                            <th class="text-end py-3 fw-semibold">IVA</th>
+                            <th class="text-end pe-4 py-3 fw-semibold">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for detalle in solicitud.detalles.all %}
+                        {% with primer_proveedor=detalle.articulo.articuloproveedor_set.first %}
+                        <tr data-iva="{{ detalle.articulo.lleva_iva|yesno:'true,false' }}">
+                            <td class="ps-4">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-light rounded p-2 me-3">
+                                        <i class="fas fa-cube text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <span class="fw-semibold d-block">{{ detalle.articulo.nombre }}</span>
+                                        <small class="text-muted">Categoría: {{ detalle.articulo.categoria|default:"N/A" }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark fs-6 fw-semibold">{{ detalle.articulo.sku|default:"N/A" }}</span>
+                            </td>
+                            <td class="text-end fw-bold fs-6">{{ detalle.cantidad|floatformat:2|intcomma }}</td>
+                            <td>
+                                <span class="badge bg-light text-dark fs-6 fw-semibold">{{ detalle.articulo.unidad_medida.abreviatura }}</span>
+                            </td>
+                            <td class="text-end">
+                                {% if primer_proveedor %}
+                                    <span class="fw-semibold">${{ primer_proveedor.precio_unitario|floatformat:2|intcomma }}</span>
+                                    {% if detalle.articulo.lleva_iva %}
+                                        <span class="badge bg-info bg-opacity-25 text-info-emphasis ms-1">IVA</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end fw-semibold item-iva">
+                                {% if primer_proveedor and detalle.articulo.lleva_iva %}
+                                    ${{ primer_proveedor.precio_unitario|multiply:detalle.cantidad|multiply:0.16|floatformat:2|intcomma }}
+                                {% else %}
+                                    $0.00
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-4 fw-bold text-primary item-total">
+                                {% if primer_proveedor %}
+                                    {% if detalle.articulo.lleva_iva %}
+                                        ${{ primer_proveedor.precio_unitario|multiply:detalle.cantidad|multiply:1.16|floatformat:2|intcomma }}
+                                    {% else %}
+                                        ${{ primer_proveedor.precio_unitario|multiply:detalle.cantidad|floatformat:2|intcomma }}
+                                    {% endif %}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endwith %}
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <td colspan="6" class="text-end fw-bold ps-4 border-0">Subtotal:</td>
+                            <td id="footer-subtotal" class="text-end fw-semibold pe-4 border-0">$0.00</td>
+                        </tr>
+                        <tr>
+                            <td colspan="6" class="text-end fw-bold ps-4 border-0">IVA:</td>
+                            <td id="footer-iva" class="text-end fw-semibold pe-4 border-0">$0.00</td>
+                        </tr>
+                        <tr class="table-light">
+                            <td colspan="6" class="text-end fw-bold ps-4">Total:</td>
+                            <td id="footer-total" class="text-end fw-bold fs-5 text-primary pe-4">$0.00</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if solicitud.estatus == 'PENDIENTE_APROBACION' %}
+    <div class="card border-0 shadow-sm mt-4">
+        <div class="card-header bg-primary bg-opacity-10 py-3 border-bottom">
+            <h5 class="card-title mb-0 d-flex align-items-center fw-bold text-primary">
+                <i class="fas fa-tasks me-2"></i>Acciones de Aprobación
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="d-flex gap-2 justify-content-end">
+                <a href="{% url 'editar_solicitud' solicitud.pk %}" class="btn btn-outline-secondary px-4 d-flex align-items-center fw-semibold">
+                    <i class="fas fa-pencil-alt me-2"></i> Modificar
+                </a>
+                <form action="{% url 'rechazar_solicitud' solicitud.pk %}" method="post" onsubmit="return confirm('¿Estás seguro de que deseas rechazar esta solicitud?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger px-4 d-flex align-items-center fw-semibold">
+                        <i class="fas fa-times-circle me-2"></i> Rechazar
+                    </button>
+                </form>
+                <form action="{% url 'aprobar_solicitud' solicitud.pk %}" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success px-4 d-flex align-items-center fw-semibold">
+                        <i class="fas fa-check-circle me-2"></i> Aprobar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function formatCurrency(value) {
+        return '$' + value.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    function parseCurrency(text) {
+        if (!text || typeof text !== 'string') return 0;
+        return parseFloat(text.replace(/[$,\s]/g, '')) || 0;
+    }
+
+    let totalSubtotal = 0;
+    let totalIva = 0;
+    let granTotal = 0;
+
+    document.querySelectorAll('tbody tr').forEach(row => {
+        const subtotalEl = row.querySelector('.item-subtotal'); // no longer used
+        const ivaEl = row.querySelector('.item-iva');
+        const totalEl = row.querySelector('.item-total');
+
+        // Calcular subtotal sin IVA (precio unitario * cantidad)
+        let subtotalValue = 0;
+        let ivaValue = 0;
+        let totalValue = 0;
+
+        // Obtener el valor total (con IVA si aplica)
+        if (totalEl) {
+            totalValue = parseCurrency(totalEl.textContent.trim());
+            granTotal += totalValue;
+        }
+
+        // Obtener el IVA por artículo
+        if (ivaEl) {
+            ivaValue = parseCurrency(ivaEl.textContent.trim());
+            totalIva += ivaValue;
+        }
+
+        // El subtotal es el total menos el IVA
+        if (totalEl && ivaEl) {
+            subtotalValue = totalValue - ivaValue;
+            totalSubtotal += subtotalValue;
+        }
+    });
+
+    document.getElementById('summary-subtotal').textContent = formatCurrency(totalSubtotal);
+    document.getElementById('summary-iva').textContent = formatCurrency(totalIva);
+    document.getElementById('summary-total').textContent = formatCurrency(granTotal);
+
+    document.getElementById('footer-subtotal').textContent = formatCurrency(totalSubtotal);
+    document.getElementById('footer-iva').textContent = formatCurrency(totalIva);
+    document.getElementById('footer-total').textContent = formatCurrency(granTotal);
+});
+</script>
+<style>
+    .card {
+        border-radius: 0.75rem;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.08) !important;
+    }
+    
+    .card-header {
+        background: linear-gradient(to right, rgba(13, 110, 253, 0.05), rgba(13, 110, 253, 0.1));
+    }
+    
+    .table th {
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        letter-spacing: 0.5px;
+        padding: 0.75rem 0.5rem;
+        color: #6c757d;
+        border-top: 1px solid #dee2e6;
+    }
+    
+    .table td {
+        padding: 1rem 0.5rem;
+        vertical-align: middle;
+        border-top: 1px solid #f1f1f1;
+    }
+    
+    .table tbody tr:hover {
+        background-color: rgba(13, 110, 253, 0.03);
+    }
+    
+    .breadcrumb {
+        background-color: transparent;
+        padding: 0;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .btn {
+        border-radius: 0.5rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+    
+    .badge {
+        font-weight: 500;
+        padding: 0.5em 0.8em;
+    }
+    
+    .progress {
+        border-radius: 1rem;
+        overflow: hidden;
+    }
+    
+    .bg-opacity-10 {
+        background-color: rgba(var(--bs-primary-rgb), 0.1) !important;
+    }
+    
+    /* Mejoras adicionales para un aspecto más profesional */
+    .text-primary {
+        color: #0d6efd !important;
+    }
+    
+    .text-success {
+        color: #198754 !important;
+    }
+    
+    .text-danger {
+        color: #dc3545 !important;
+    }
+    
+    .text-warning {
+        color: #ffc107 !important;
+    }
+    
+    .table-light {
+        --bs-table-bg: #f8f9fa;
+        --bs-table-striped-bg: #e9ecef;
+        --bs-table-striped-color: #000;
+        --bs-table-active-bg: #dfe2e6;
+        --bs-table-active-color: #000;
+        --bs-table-hover-bg: #e3e6ea;
+        --bs-table-hover-color: #000;
+        color: #000;
+        border-color: #dfe2e6;
+    }
+</style>
+{% endblock %}

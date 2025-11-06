@@ -1,0 +1,83 @@
+{% extends 'ternium/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Catálogo de Orígenes y Destinos</h2>
+        <a href="{% url 'crear_lugar' %}" class="btn btn-primary btn-lg shadow-sm">
+            <i class="fas fa-plus me-2"></i>Añadir Nuevo Lugar
+        </a>
+    </div>
+    
+    {% if messages %}
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <ul class="messages mb-0">
+            {% for message in messages %}
+                <li>{{ message }}</li>
+            {% endfor %}
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            {% if lugares %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Nombre del Lugar</th>
+                            <th>Empresa Asociada</th>
+                            <th>Tipo</th>
+                            <th class="text-center">Es Patio</th>
+                            <th class="text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for lugar in lugares %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'detalle_lugar' lugar.pk %}" class="text-decoration-none fw-bold">
+                                    {{ lugar.nombre }}
+                                </a>
+                            </td>
+                            <td>
+                                {% if lugar.empresa %}
+                                    <span class="badge bg-secondary">{{ lugar.empresa.nombre }}</span>
+                                {% else %}
+                                    <span class="badge bg-light text-muted">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-success">{{ lugar.get_tipo_display }}</span>
+                            </td>
+                            <td class="text-center">
+                                {% if lugar.es_patio %}
+                                    <i class="fas fa-check-circle text-success"></i>
+                                {% else %}
+                                    <i class="fas fa-times-circle text-danger"></i>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group" role="group" aria-label="Acciones del Lugar">
+                                    <a href="{% url 'detalle_lugar' lugar.pk %}" class="btn btn-sm btn-outline-info" title="Ver Detalle">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'editar_lugar' lugar.pk %}" class="btn btn-sm btn-outline-primary" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-center text-muted p-4">No hay lugares registrados. <a href="{% url 'crear_lugar' %}">Añade el primero</a>.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

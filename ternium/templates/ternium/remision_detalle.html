@@ -1,0 +1,499 @@
+{% extends 'ternium/base.html' %}
+{% load math_filters %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-color: #2c3e50;
+        --secondary-color: #3498db;
+        --accent-color: #e74c3c; /* Pérdida */
+        --gain-color: #2980b9; /* Ganancia, usando un tono de azul */
+        --success-color: #27ae60; /* Auditoría */
+        --light-bg: #f8fafc;
+        --text-dark: #2d3748;
+        --text-muted: #718096;
+        --border-color: #e2e8f0;
+    }
+    
+    body {
+        background-color: var(--light-bg);
+        font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    
+    .remision-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+    }
+    
+    .header-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    
+    .title-group h1 {
+        font-size: 1.8rem;
+        font-weight: 600;
+        color: var(--primary-color);
+        margin-bottom: 0.25rem;
+    }
+    
+    .title-group p {
+        color: var(--text-muted);
+        font-size: 1rem;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 0.75rem;
+    }
+    
+    .btn {
+        padding: 0.6rem 1.25rem;
+        border-radius: 6px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid transparent;
+    }
+    
+    .btn i {
+        margin-right: 0.5rem;
+    }
+    
+    .btn-back {
+        background-color: white;
+        color: var(--primary-color);
+        border-color: var(--border-color);
+    }
+    
+    .btn-back:hover {
+        background-color: #f0f4f8;
+        border-color: #cbd5e0;
+    }
+    
+    .btn-edit {
+        background-color: var(--secondary-color);
+        color: white;
+    }
+
+    .btn-edit.disabled {
+        background-color: #bdc3c7;
+        cursor: not-allowed;
+    }
+    
+    .btn-edit:hover:not(.disabled) {
+        background-color: #2980b9;
+    }
+
+    .btn-audit {
+        background-color: var(--success-color);
+        color: white;
+    }
+
+    .btn-audit:hover {
+        background-color: #219d52;
+    }
+    
+    .info-section {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+    }
+    
+    .section-header {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        background-color: #f7fafc;
+    }
+    
+    .section-header h2 {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--primary-color);
+        display: flex;
+        align-items: center;
+    }
+    
+    .section-header i {
+        margin-right: 0.75rem;
+        color: var(--secondary-color);
+    }
+    
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 1.5rem;
+        padding: 1.5rem;
+    }
+    
+    .info-item {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .info-label {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        margin-bottom: 0.25rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .info-value {
+        font-size: 1rem;
+        font-weight: 500;
+        color: var(--text-dark);
+        line-height: 1.5;
+    }
+    
+    .info-value.empty {
+        color: var(--text-muted);
+        font-style: italic;
+    }
+
+    .status-badge {
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: .4em .8em;
+        border-radius: 50rem;
+        text-transform: uppercase;
+        display: inline-block;
+    }
+    .status-PENDIENTE { background-color: #f39c122e; color: #d35400; }
+    .status-TERMINADO { background-color: #3498db2e; color: #2980b9; }
+    .status-AUDITADO { background-color: #27ae602e; color: #27ae60; }
+    
+    .audit-info {
+        grid-column: 1 / -1;
+        background-color: #f7fafc;
+        border: 1px solid #e2e8f0;
+        border-left: 4px solid var(--success-color);
+        padding: 1rem 1.5rem;
+        border-radius: 6px;
+        margin-top: 0.5rem;
+        font-size: 0.95rem;
+    }
+    
+    /* Estilos para detalles de materiales */
+    .material-details-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .material-details-table th, .material-details-table td {
+        padding: 0.8rem 1.5rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .material-details-table thead {
+        background-color: #f7fafc;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+    }
+    .material-details-table td {
+        font-size: 0.95rem;
+        color: var(--text-dark);
+    }
+    .material-details-table tr:last-child td {
+        border-bottom: none;
+    }
+    .text-loss { color: var(--accent-color); font-weight: 600; }
+    .text-gain { color: var(--gain-color); font-weight: 600; }
+
+    /* Estilos para comparación de pesos */
+    .weight-comparison-container {
+        display: flex;
+        align-items: stretch;
+        padding: 1.5rem;
+        gap: 1.5rem;
+        background-color: #f7fafc;
+    }
+    .weight-card {
+        flex: 1; background-color: white; padding: 1.5rem; border-radius: 8px; border: 1px solid var(--border-color);
+    }
+    .weight-card-title {
+        font-size: 1.1rem; font-weight: 600; color: var(--primary-color); margin-bottom: 1.5rem; display: flex; align-items: center;
+    }
+    .weight-card-title i { margin-right: 0.75rem; }
+    .load-title { color: var(--success-color); }
+    .unload-title { color: var(--secondary-color); }
+    .weight-details .info-item:not(:last-child) { margin-bottom: 1rem; }
+    .weight-difference-card {
+        flex: 0 0 250px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background-color: white; border-radius: 8px; border: 1px solid var(--border-color); padding: 1.5rem;
+    }
+    .weight-difference-card .info-label { font-size: 1rem; }
+    .difference-value { font-size: 2.5rem; font-weight: 700; margin: 0.5rem 0; line-height: 1.2; }
+    .difference-value.loss { color: var(--accent-color); }
+    .difference-value.gain { color: var(--gain-color); }
+    .difference-value.neutral { color: var(--text-muted); }
+
+    @media (max-width: 992px) {
+        .weight-comparison-container { flex-direction: column; }
+        .weight-difference-card { order: 1; }
+        .weight-card { order: 2; }
+    }
+
+    @media (max-width: 768px) {
+        .header-section { flex-direction: column; align-items: flex-start; }
+        .info-grid { grid-template-columns: 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="remision-container">
+    <div class="header-section">
+        <div class="title-group">
+            <h1>{{ titulo }}</h1>
+            <p>Detalle completo de la remisión.</p>
+        </div>
+        <div class="action-buttons">
+            <a href="{% url 'remision_lista' %}" class="btn btn-back">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+            
+            {% if remision.status == 'TERMINADO' and perms.ternium.puede_auditar %}
+            <button type="button" class="btn btn-audit" data-bs-toggle="modal" data-bs-target="#auditModal">
+                <i class="fas fa-check-double"></i> Auditar
+            </button>
+            {% endif %}
+
+            {% if remision.status != 'AUDITADO' %}
+            <a href="{% url 'editar_remision' pk=remision.pk %}" class="btn btn-edit">
+                <i class="fas fa-edit"></i> Editar
+            </a>
+            {% else %}
+            <a href="#" class="btn btn-edit disabled" data-bs-toggle="tooltip" title="No se puede editar una remisión auditada.">
+                <i class="fas fa-edit"></i> Editar
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="info-section">
+        <div class="section-header">
+            <h2><i class="fas fa-info-circle"></i> Información Básica</h2>
+        </div>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Número de Remisión</span>
+                <span class="info-value">{{ remision.remision }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Fecha</span>
+                <span class="info-value">{{ remision.fecha|date:"d/m/Y" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Unidad de Negocio</span>
+                <span class="info-value">{{ remision.empresa.nombre|default:"-" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Estatus del Viaje</span>
+                <span class="info-value">
+                    <span class="status-badge status-{{ remision.status }}">{{ remision.get_status_display }}</span>
+                </span>
+            </div>
+
+            {% if remision.status == 'AUDITADO' %}
+            <div class="audit-info">
+                <p class="mb-0">
+                    <i class="fas fa-user-check" style="color: var(--success-color);"></i>
+                    Auditado por <strong>{{ remision.auditado_por.get_full_name|default:remision.auditado_por.username }}</strong>
+                    el <strong>{{ remision.auditado_en|date:"d/m/Y" }}</strong> a las <strong>{{ remision.auditado_en|date:"H:i" }} hrs.</strong>
+                </p>
+                <p class="text-muted small mt-1 mb-0">Este registro ha sido verificado y está bloqueado contra modificaciones.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="info-section">
+        <div class="section-header">
+            <h2><i class="fas fa-truck"></i> Transporte</h2>
+        </div>
+        <div class="info-grid">
+            <div class="info-item"><span class="info-label">Línea de Transporte</span><span class="info-value {% if not remision.linea_transporte %}empty{% endif %}">{{ remision.linea_transporte.nombre|default:"No especificado" }}</span></div>
+            <div class="info-item"><span class="info-label">Operador</span><span class="info-value {% if not remision.operador %}empty{% endif %}">{{ remision.operador.nombre|default:"No especificado" }}</span></div>
+            <div class="info-item"><span class="info-label">Unidad (Tractor)</span><span class="info-value {% if not remision.unidad %}empty{% endif %}">{{ remision.unidad|default:"No especificado" }}</span></div>
+            <div class="info-item"><span class="info-label">Contenedor</span><span class="info-value {% if not remision.contenedor %}empty{% endif %}">{{ remision.contenedor|default:"No especificado" }}</span></div>
+        </div>
+    </div>
+
+    <div class="info-section">
+        <div class="section-header">
+            <h2><i class="fas fa-route"></i> Ruta y Operación</h2>
+        </div>
+        <div class="info-grid">
+            <div class="info-item"><span class="info-label">Origen</span><span class="info-value {% if not remision.origen %}empty{% endif %}">{{ remision.origen.nombre|default:"No especificado" }}</span></div>
+            <div class="info-item"><span class="info-label">Destino</span><span class="info-value {% if not remision.destino %}empty{% endif %}">{{ remision.destino.nombre|default:"No especificado" }}</span></div>
+        </div>
+    </div>
+    
+    <div class="info-section">
+        <div class="section-header">
+            <h2><i class="fas fa-boxes"></i> Detalle de Materiales</h2>
+        </div>
+        <div class="table-responsive">
+            <table class="material-details-table">
+                <thead>
+                    <tr>
+                        <th>Material</th>
+                        <th>Cliente Destino</th>
+                        <th class="text-end">Peso Carga (Ton)</th>
+                        <th class="text-end">Peso Descarga (Ton)</th>
+                        <th class="text-end">Diferencia (Ton)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for detalle in remision.detalles.all %}
+                    <tr>
+                        <td>{{ detalle.material.nombre }}</td>
+                        <td>{{ detalle.cliente.nombre|default:"N/A" }}</td>
+                        <td class="text-end">{{ detalle.peso_ld|floatformat:3 }}</td>
+                        <td class="text-end">{{ detalle.peso_dlv|floatformat:3 }}</td>
+                        {% with diff=detalle.peso_dlv|sub:detalle.peso_ld %}
+                        <td class="text-end {% if diff < 0 %}text-loss{% elif diff > 0 %}text-gain{% endif %}">
+                            {{ diff|floatformat:3 }}
+                        </td>
+                        {% endwith %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">No hay materiales registrados en esta remisión.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="info-section">
+        <div class="section-header">
+            <h2><i class="fas fa-balance-scale"></i> Resumen de Pesos y Tiempos</h2>
+        </div>
+        <div class="weight-comparison-container">
+            <div class="weight-card">
+                <h3 class="weight-card-title load-title"><i class="fas fa-arrow-up"></i> Carga en Origen</h3>
+                <div class="weight-details">
+                    <div class="info-item"><span class="info-label">Peso Total Registrado</span><span class="info-value">{{ remision.total_peso_ld|floatformat:3|default:"N/A" }} Toneladas</span></div>
+                    <div class="info-item"><span class="info-label">Folio de Carga</span><span class="info-value {% if not remision.folio_ld %}empty{% endif %}">{{ remision.folio_ld|default:"No especificado" }}</span></div>
+                    <div class="info-item"><span class="info-label">Inicio Carga</span><span class="info-value">{{ remision.inicia_ld|date:"d/m/Y H:i"|default:"N/A" }}</span></div>
+                    <div class="info-item"><span class="info-label">Fin Carga</span><span class="info-value">{{ remision.termina_ld|date:"d/m/Y H:i"|default:"N/A" }}</span></div>
+                </div>
+            </div>
+
+            <div class="weight-difference-card">
+                <span class="info-label">Diferencia Total</span>
+                {% with total_diff=remision.total_peso_dlv|sub:remision.total_peso_ld %}
+                    {% if total_diff > 0 %}
+                        <div class="difference-value gain">+{{ total_diff|floatformat:3 }}</div>
+                        <p class="text-muted small">Ganancia de peso</p>
+                    {% elif total_diff < 0 %}
+                        <div class="difference-value loss">{{ total_diff|floatformat:3 }}</div>
+                        <p class="text-muted small">Pérdida de peso</p>
+                    {% else %}
+                        <div class="difference-value neutral">{{ total_diff|floatformat:3 }}</div>
+                        <p class="text-muted small">Sin diferencias</p>
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            <div class="weight-card">
+                <h3 class="weight-card-title unload-title"><i class="fas fa-arrow-down"></i> Descarga en Destino</h3>
+                <div class="weight-details">
+                    <div class="info-item"><span class="info-label">Peso Total Registrado</span><span class="info-value">{{ remision.total_peso_dlv|floatformat:3|default:"N/A" }} Toneladas</span></div>
+                    <div class="info-item"><span class="info-label">Folio Descarga</span><span class="info-value {% if not remision.folio_dlv %}empty{% endif %}">{{ remision.folio_dlv|default:"No especificado" }}</span></div>
+                    <div class="info-item"><span class="info-label">Inicio Descarga</span><span class="info-value">{{ remision.inicia_dlv|date:"d/m/Y H:i"|default:"N/A" }}</span></div>
+                    <div class="info-item"><span class="info-label">Fin Descarga</span><span class="info-value">{{ remision.termina_dlv|date:"d/m/Y H:i"|default:"N/A" }}</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="info-section">
+        <div class="section-header">
+            <h2><i class="fas fa-file-alt"></i> Información Adicional y Evidencias</h2>
+        </div>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Evidencia de Carga</span>
+                <span class="info-value">
+                    {% if remision.evidencia_carga %}
+                        <a href="{{ remision.evidencia_carga.url }}" target="_blank" class="file-link"><i class="fas fa-file-pdf"></i> Ver evidencia de carga</a>
+                    {% else %}
+                        <span class="empty">No adjuntada</span>
+                    {% endif %}
+                </span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Evidencia de Descarga</span>
+                <span class="info-value">
+                    {% if remision.evidencia_descarga %}
+                        <a href="{{ remision.evidencia_descarga.url }}" target="_blank" class="file-link"><i class="fas fa-file-image"></i> Ver evidencia de descarga</a>
+                    {% else %}
+                        <span class="empty">No adjuntada</span>
+                    {% endif %}
+                </span>
+            </div>
+            <div class="info-item" style="grid-column: 1 / -1;">
+                <span class="info-label">Descripción General</span>
+                <span class="info-value {% if not remision.descripcion %}empty{% endif %}">
+                    {{ remision.descripcion|default:"Sin descripción."|linebreaksbr }}
+                </span>
+            </div>
+            <div class="info-item" style="grid-column: 1 / -1;">
+                <span class="info-label">Comentarios</span>
+                <span class="info-value {% if not remision.comentario %}empty{% endif %}">
+                    {{ remision.comentario|default:"Sin comentarios."|linebreaksbr }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="auditModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header text-white" style="background-color: var(--success-color);">
+                    <h5 class="modal-title">Confirmar Auditoría</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Está a punto de auditar y bloquear la remisión <strong>{{ remision.remision }}</strong>.</p>
+                    <p class="text-danger"><strong>Atención:</strong> Una vez auditada, esta remisión <strong>no podrá ser modificada ni eliminada</strong>.</p>
+                    <p>¿Confirma que toda la información es correcta y desea proceder?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <form method="post" action="{% url 'auditar_remision' pk=remision.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-audit">Sí, Auditar y Bloquear</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+});
+</script>
+{% endblock %}
