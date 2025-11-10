@@ -486,7 +486,41 @@ def aprobar_solicitud(request, pk):
                         descuento=0
                     )
                 
-                messages.success(request, f"Solicitud {solicitud.folio} aprobada. Se ha generado el borrador de la OC {orden.folio}.")
+                # --- NUEVO: CREAR FACTURA AUTOMÁTICA EN CXP ---
+                try:
+                    from cuentas_por_pagar.models import Factura
+                    from datetime import datetime
+                    
+                    # Verificar si ya existe factura para evitar duplicados
+                    if not hasattr(orden, 'factura_cxp'):
+                        # Generar número de factura único
+                        numero_factura = f"FAC-{orden.folio}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                        
+                        # Calcular fecha de vencimiento (usar días de crédito del proveedor si existe)
+                        dias_credito = getattr(orden.proveedor, 'dias_credito', 30)
+                        fecha_vencimiento = timezone.now().date() + timezone.timedelta(days=dias_credito)
+                        
+                        # Crear la factura en CXP
+                        factura = Factura.objects.create(
+                            orden_compra=orden,
+                            numero_factura=numero_factura,
+                            fecha_emision=timezone.now().date(),
+                            fecha_vencimiento=fecha_vencimiento,
+                            monto=orden.total_general,
+                            creado_por=request.user
+                        )
+                        
+                        messages.success(request, f"Solicitud {solicitud.folio} aprobada. Se ha generado el borrador de la OC {orden.folio} y la factura {factura.numero_factura} en CXP.")
+                    else:
+                        messages.success(request, f"Solicitud {solicitud.folio} aprobada. Se ha generado el borrador de la OC {orden.folio}.")
+                        
+                except ImportError:
+                    # Si no se puede importar el modelo de CXP, continuar sin crear factura
+                    messages.success(request, f"Solicitud {solicitud.folio} aprobada. Se ha generado el borrador de la OC {orden.folio}. (No se pudo crear factura en CXP)")
+                except Exception as e:
+                    # Si hay error al crear factura, continuar pero mostrar advertencia
+                    messages.warning(request, f"Solicitud {solicitud.folio} aprobada. Se ha generado el borrador de la OC {orden.folio}. (Error al crear factura: {e})")
+                # --- FIN NUEVO ---
         
         except Exception as e:
             messages.error(request, f"Ocurrió un error al aprobar la solicitud y generar la OC: {e}")
@@ -637,7 +671,20 @@ def generar_orden_de_compra(request, pk):
                 oc.save()
                 formset.save()
                 
-                messages.success(request, f"Orden de Compra {oc.folio} ha sido finalizada y aprobada exitosamente.")
+                # --- NUEVO: ACTUALIZAR FACTURA EN CXP SI EXISTE ---
+                try:
+                    from cuentas_por_pagar.models import Factura
+                    if hasattr(oc, 'factura_cxp'):
+                        factura = oc.factura_cxp
+                        factura.monto = oc.total_general  # Actualizar monto por si cambió
+                        factura.save()
+                        messages.success(request, f"Orden de Compra {oc.folio} ha sido finalizada y aprobada exitosamente. Factura {factura.numero_factura} actualizada en CXP.")
+                    else:
+                        messages.success(request, f"Orden de Compra {oc.folio} ha sido finalizada y aprobada exitosamente.")
+                except Exception as e:
+                    messages.success(request, f"Orden de Compra {oc.folio} ha sido finalizada y aprobada exitosamente. (No se pudo actualizar factura en CXP: {e})")
+                # --- FIN NUEVO ---
+                
                 return redirect('detalle_orden_compra', pk=oc.pk)
         else:
             messages.error(request, "El formulario no es válido. Revisa los errores.")
