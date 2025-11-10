@@ -24,22 +24,14 @@
 
     <!-- Tarjetas de Resumen -->
     <div class="row mb-4">
-<<<<<<< HEAD
         <div class="col-xl-2 col-md-4 mb-3">
             <div class="card border-0 bg-light h-100">
                 <div class="card-body text-center py-3">
                     <h4 class="text-primary mb-1">{{ total_pagos_count|default:0|intcomma }}</h4>
-=======
-        <div class="col-xl-3 col-md-6 mb-3">
-            <div class="card border-0 bg-light h-100">
-                <div class="card-body text-center py-3">
-                    <h4 class="text-primary mb-1">{{ pagos.paginator.count|intcomma }}</h4>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     <p class="text-muted small mb-0">Total Pagos</p>
                 </div>
             </div>
         </div>
-<<<<<<< HEAD
         <div class="col-xl-2 col-md-4 mb-3">
             <div class="card border-0 bg-light h-100">
                 <div class="card-body text-center py-3">
@@ -53,28 +45,14 @@
                 <div class="card-body text-center py-3">
                     <h4 class="text-info mb-1">{{ metodos_count|default:"-" }}</h4>
                     <p class="text-muted small mb-0">Métodos</p>
-=======
-        <div class="col-xl-3 col-md-6 mb-3">
-            <div class="card border-0 bg-light h-100">
-                <div class="card-body text-center py-3">
-                    <h4 class="text-success mb-1">${{ total_pagado|default:0|floatformat:2|intcomma }}</h4>
-                    <p class="text-muted small mb-0">Monto Total Pagado</p>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                 </div>
             </div>
         </div>
         <div class="col-xl-3 col-md-6 mb-3">
-<<<<<<< HEAD
             <div class="card border-0 bg-success text-white h-100">
                 <div class="card-body text-center py-3">
                     <h4 class="mb-1">{{ pagos_con_comprobante|default:0|intcomma }}</h4>
                     <p class="small mb-0 opacity-75">Con Comprobante</p>
-=======
-            <div class="card border-0 bg-light h-100">
-                <div class="card-body text-center py-3">
-                    <h4 class="text-info mb-1">{{ metodos_count|default:"-" }}</h4>
-                    <p class="text-muted small mb-0">Métodos de Pago</p>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                 </div>
             </div>
         </div>
@@ -82,13 +60,8 @@
             <div class="card border-0 bg-light h-100">
                 <div class="card-body text-center py-3">
                     <p class="text-muted small mb-0">
-<<<<<<< HEAD
                         <i class="fas fa-sync-alt me-1 text-success"></i>
                         Los comprobantes se sincronizan con Compras
-=======
-                        <i class="fas fa-search me-1"></i>
-                        Usa el buscador para filtrar pagos
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     </p>
                 </div>
             </div>
@@ -105,11 +78,7 @@
         </div>
         <div class="card-body">
             <form method="get" class="row g-3 align-items-end">
-<<<<<<< HEAD
                 <div class="col-md-6">
-=======
-                <div class="col-md-8">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     <label class="form-label small text-muted mb-1">Buscar por factura o referencia</label>
                     <div class="input-group">
                         <span class="input-group-text bg-light border-end-0">
@@ -120,7 +89,6 @@
                                value="{{ request.GET.q }}">
                     </div>
                 </div>
-<<<<<<< HEAD
                 <div class="col-md-3">
                     <label class="form-label small text-muted mb-1">Comprobante</label>
                     <select name="comprobante" class="form-select">
@@ -134,9 +102,6 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-=======
-                <div class="col-md-4">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary flex-fill">
                             <i class="fas fa-search me-2"></i>Buscar
@@ -172,11 +137,8 @@
                             <th class="border-0 text-center">Fecha Pago</th>
                             <th class="border-0 text-end">Monto</th>
                             <th class="border-0 text-center">Método</th>
-<<<<<<< HEAD
                             <th class="border-0 text-center">Comprobante</th>
                             <th class="border-0 text-center">Estado OC</th>
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             <th class="border-0 text-center">Referencia</th>
                             <th class="border-0 text-center">Registrado por</th>
                             <th class="border-0 text-center pe-4">Acciones</th>
@@ -235,7 +197,6 @@
                                 </span>
                             </td>
 
-<<<<<<< HEAD
                             <!-- NUEVA COLUMNA: Comprobante -->
                             <td class="text-center">
                                 {% if pago.archivo_comprobante %}
@@ -269,8 +230,6 @@
                                 {% endif %}
                             </td>
 
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             <!-- Referencia -->
                             <td class="text-center">
                                 {% if pago.referencia %}
@@ -290,15 +249,9 @@
                             <!-- Acciones -->
                             <td class="text-center pe-4">
                                 <div class="btn-group btn-group-sm" role="group">
-<<<<<<< HEAD
                                     <a href="{% url 'detalle_pago' pago.pk %}" 
                                        class="btn btn-outline-warning" 
                                        title="Ver detalle">
-=======
-                                    <a href="{% url 'editar_pago' pago.pk %}" 
-                                       class="btn btn-outline-warning" 
-                                       title="Editar pago">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                         <i class="fas fa-edit"></i>
                                     </a>
                                     <a href="{% url 'eliminar_pago' pago.pk %}" 
@@ -345,11 +298,7 @@
                     <ul class="pagination pagination-sm mb-0">
                         {% if page_obj.has_previous %}
                         <li class="page-item">
-<<<<<<< HEAD
                             <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.comprobante %}&comprobante={{ request.GET.comprobante }}{% endif %}">
-=======
-                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 <i class="fas fa-chevron-left"></i>
                             </a>
                         </li>
@@ -362,11 +311,7 @@
                             </li>
                             {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
                             <li class="page-item">
-<<<<<<< HEAD
                                 <a class="page-link" href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.comprobante %}&comprobante={{ request.GET.comprobante }}{% endif %}">
-=======
-                                <a class="page-link" href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     {{ num }}
                                 </a>
                             </li>
@@ -375,11 +320,7 @@
 
                         {% if page_obj.has_next %}
                         <li class="page-item">
-<<<<<<< HEAD
                             <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.comprobante %}&comprobante={{ request.GET.comprobante }}{% endif %}">
-=======
-                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 <i class="fas fa-chevron-right"></i>
                             </a>
                         </li>
@@ -405,23 +346,15 @@
     
     .table th {
         font-weight: 600;
-<<<<<<< HEAD
         font-size: 0.8rem;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         color: #6c757d;
         white-space: nowrap;
-=======
-        font-size: 0.875rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #6c757d;
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     }
     
     .table td {
         vertical-align: middle;
-<<<<<<< HEAD
         padding: 1rem 0.5rem;
     }
     
@@ -433,19 +366,6 @@
     
     .badge {
         font-size: 0.7em;
-=======
-        padding: 1rem 0.75rem;
-    }
-    
-    .btn-group .btn {
-        border-radius: 6px;
-        margin: 0 1px;
-        padding: 0.375rem 0.5rem;
-    }
-    
-    .badge {
-        font-size: 0.75em;
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         font-weight: 500;
     }
     
@@ -459,11 +379,7 @@
     }
     
     code {
-<<<<<<< HEAD
         font-size: 0.75em;
-=======
-        font-size: 0.8em;
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         color: #6c757d;
     }
     
@@ -474,7 +390,6 @@
     .bg-secondary { background-color: #6c757d !important; }
     
     /* Responsive */
-<<<<<<< HEAD
     @media (max-width: 1200px) {
         .table-responsive {
             font-size: 0.8rem;
@@ -489,8 +404,6 @@
         }
     }
     
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     @media (max-width: 768px) {
         .btn-group {
             display: flex;
@@ -500,7 +413,6 @@
         
         .btn-group .btn {
             margin: 0;
-<<<<<<< HEAD
             border-radius: 3px;
         }
         
@@ -510,17 +422,6 @@
         
         .d-flex.flex-column small {
             font-size: 0.7rem;
-=======
-            border-radius: 4px;
-        }
-        
-        .table-responsive {
-            font-size: 0.875rem;
-        }
-        
-        .d-flex.flex-column small {
-            font-size: 0.75rem;
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         }
     }
 </style>

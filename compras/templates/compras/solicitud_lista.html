@@ -35,18 +35,11 @@
                         <label for="folio" class="form-label fw-semibold small text-uppercase text-muted">Folio</label>
                         <input type="text" name="folio" id="folio" class="form-control form-control-sm" value="{{ filtros_aplicados.folio|default:'' }}" placeholder="Ej: SC-1-00001">
                     </div>
-<<<<<<< HEAD
                     
                     <div class="col-md-3 col-sm-6">
                         <label for="empresa" class="form-label fw-semibold small text-uppercase text-muted">Operación</label>
                         <select name="empresa" id="empresa" class="form-select form-select-sm">
                             <option value="">Todas las operaciones</option>
-=======
-                    <div class="col-md-3 col-sm-6">
-                        <label for="empresa" class="form-label fw-semibold small text-uppercase text-muted">Empresa</label>
-                        <select name="empresa" id="empresa" class="form-select form-select-sm">
-                            <option value="">Todas las empresas</option>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             {% for empresa in empresas %}
                                 <option value="{{ empresa.id }}" {% if filtros_aplicados.empresa == empresa.id|stringformat:"s" %}selected{% endif %}>
                                     {{ empresa.nombre }}
@@ -54,7 +47,6 @@
                             {% endfor %}
                         </select>
                     </div>
-<<<<<<< HEAD
 
                     <div class="col-md-3 col-sm-6">
                         <label for="lugar" class="form-label fw-semibold small text-uppercase text-muted">Empresa</label>
@@ -68,8 +60,6 @@
                         </select>
                     </div>
                     
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     <div class="col-md-3 col-sm-6">
                         <label for="solicitante" class="form-label fw-semibold small text-uppercase text-muted">Solicitante</label>
                         <select name="solicitante" id="solicitante" class="form-select form-select-sm">
@@ -115,11 +105,8 @@
                         <button type="submit" class="btn btn-primary btn-sm w-100 me-2 d-flex align-items-center justify-content-center">
                             <i class="fas fa-search me-1"></i> Aplicar Filtros
                         </button>
-<<<<<<< HEAD
                     </div>
                     <div class="col-md-3 col-sm-6 d-flex align-items-end">
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                         <a href="{% url 'lista_solicitudes' %}" class="btn btn-outline-secondary btn-sm w-100 d-flex align-items-center justify-content-center">
                             <i class="fas fa-times me-1"></i> Limpiar
                         </a>
@@ -132,13 +119,9 @@
     <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
         <div class="card-header bg-primary text-white py-3 d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0 fw-semibold"><i class="fas fa-list me-2"></i>Registros de solicitudes</h5>
-<<<<<<< HEAD
             {% if page_obj %}
             <span class="badge bg-white text-primary rounded-pill">{{ page_obj.paginator.count }} registros</span>
             {% endif %}
-=======
-            <span class="badge bg-white text-primary rounded-pill">{{ solicitudes|length }} registros</span>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -146,12 +129,7 @@
                     <thead class="table-light">
                         <tr>
                             <th class="ps-4 py-3 text-uppercase fw-semibold small text-muted">Folio</th>
-<<<<<<< HEAD
                             <th class="py-3 text-uppercase fw-semibold small text-muted">Operación</th> <th class="py-3 text-uppercase fw-semibold small text-muted">Empresa</th>   <th class="py-3 text-uppercase fw-semibold small text-muted">Solicitante</th>
-=======
-                            <th class="py-3 text-uppercase fw-semibold small text-muted">Empresa</th>
-                            <th class="py-3 text-uppercase fw-semibold small text-muted">Solicitante</th>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             <th class="py-3 text-uppercase fw-semibold small text-muted">Fecha</th>
                             <th class="py-3 text-uppercase fw-semibold small text-muted">Prioridad</th>
                             <th class="py-3 text-uppercase fw-semibold small text-muted">Estatus</th>
@@ -165,7 +143,6 @@
                             <td>
                                 <div class="d-flex align-items-center">
                                     <div class="bg-light rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 28px; height: 28px;">
-<<<<<<< HEAD
                                         <i class="fas fa-sitemap text-primary small"></i> </div>
                                     <span class="fw-medium">{{ solicitud.empresa.nombre }}</span>
                                 </div>
@@ -176,11 +153,6 @@
                                         <i class="fas fa-building text-secondary small"></i>
                                     </div>
                                     <span class="fw-medium">{{ solicitud.lugar.nombre|default:"N/A" }}</span>
-=======
-                                        <i class="fas fa-building text-primary small"></i>
-                                    </div>
-                                    <span class="fw-medium">{{ solicitud.empresa.nombre }}</span>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 </div>
                             </td>
                             <td>
@@ -224,11 +196,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-<<<<<<< HEAD
                             <td colspan="8" class="text-center py-5">
-=======
-                            <td colspan="7" class="text-center py-5">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 <div class="py-4">
                                     <i class="fas fa-search-minus fa-3x text-muted mb-3 opacity-50"></i>
                                     <h5 class="text-muted fw-semibold">No se encontraron solicitudes</h5>

@@ -1,6 +1,5 @@
 from django.db import models
 from django.contrib.auth.models import User
-<<<<<<< HEAD
 from datetime import timedelta
 from django.db.models import Sum  # AÑADE ESTA IMPORTACIÓN
 import logging
@@ -9,30 +8,6 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-=======
-from django.utils import timezone
-from datetime import timedelta
-import logging
-
-
-logger = logging.getLogger(__name__)
-
-# Importación condicional para evitar problemas de importación circular
-try:
-    from compras.models import OrdenCompra
-except ImportError:
-    # Fallback para cuando la app compras no esté disponible
-    OrdenCompra = None
-    logger.warning("No se pudo importar OrdenCompra desde compras.models")
-
-try:
-    from ternium.models import Empresa
-except ImportError:
-    # Fallback para cuando la app ternium no esté disponible
-    Empresa = None
-    logger.warning("No se pudo importar Empresa desde ternium.models")
-
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 class Factura(models.Model):
     ESTATUS_CHOICES = (
         ('PENDIENTE', 'Pendiente de Pago'),
@@ -41,15 +16,11 @@ class Factura(models.Model):
         ('POR_VENCER', 'Por Vencer'),
     )
     
-<<<<<<< HEAD
     orden_compra = models.OneToOneField(
         'compras.OrdenCompra',
         on_delete=models.CASCADE, 
         related_name='factura_cxp'
     )
-=======
-    orden_compra = models.OneToOneField(OrdenCompra, on_delete=models.CASCADE, related_name='factura_cxp')
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     numero_factura = models.CharField(max_length=50, unique=True)
     fecha_emision = models.DateField()
     fecha_vencimiento = models.DateField()
@@ -65,7 +36,6 @@ class Factura(models.Model):
     ultima_alerta_enviada = models.DateTimeField(null=True, blank=True)
     alertas_enviadas = models.IntegerField(default=0)
     
-<<<<<<< HEAD
     # Campos para sincronización con Compras
     archivo_factura = models.FileField(
         upload_to='facturas_cxp/%Y/%m/', 
@@ -74,25 +44,17 @@ class Factura(models.Model):
         verbose_name="Archivo de Factura"
     )
     
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     def save(self, *args, **kwargs):
         # Primero guardar para obtener un ID si es nuevo
         is_new = self.pk is None
         super().save(*args, **kwargs)
         
-<<<<<<< HEAD
         # Sincronizar con la Orden de Compra en Compras
         self._sincronizar_con_compras()
         
         # Solo calcular total_pagado si la factura ya tiene ID (no es nueva)
         if not is_new:
             total_pagado = self.monto_pagado  # Usa la propiedad
-=======
-        # Solo calcular total_pagado si la factura ya tiene ID (no es nueva)
-        if not is_new:
-            total_pagado = sum(pago.monto_pagado for pago in self.pagos.all())
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             
             # Actualizar estatus basado en pagos
             if total_pagado >= self.monto:
@@ -114,7 +76,6 @@ class Factura(models.Model):
             # Guardar nuevamente si hubo cambios
             super().save(update_fields=['pagada', 'estatus', 'dias_restantes_credito'])
     
-<<<<<<< HEAD
     def _sincronizar_con_compras(self):
         """Sincroniza la factura con la Orden de Compra en el módulo de Compras"""
         try:
@@ -183,12 +144,6 @@ class Factura(models.Model):
         if self.monto > 0:
             return (self.monto_pagado / self.monto) * 100
         return 0
-=======
-    @property
-    def monto_pendiente(self):
-        total_pagado = sum(pago.monto_pagado for pago in self.pagos.all())
-        return self.monto - total_pagado
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     
     @property
     def esta_por_vencer(self):
@@ -200,7 +155,6 @@ class Factura(models.Model):
     
     def __str__(self):
         return f"Factura {self.numero_factura} - OC {self.orden_compra.folio}"
-<<<<<<< HEAD
     
     # En models.py de CXP - Añadir al modelo Factura
     @property
@@ -283,8 +237,6 @@ class Factura(models.Model):
             else:
                 return 'PENDIENTE'
 
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
 class Pago(models.Model):
     METODO_CHOICES = (
@@ -298,7 +250,6 @@ class Pago(models.Model):
     fecha_pago = models.DateField()
     monto_pagado = models.DecimalField(max_digits=12, decimal_places=2)
     metodo_pago = models.CharField(max_length=20, choices=METODO_CHOICES)
-<<<<<<< HEAD
     referencia = models.CharField(max_length=100, blank=True)
     notas = models.TextField(blank=True)
     registrado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
@@ -329,37 +280,3 @@ class Pago(models.Model):
 
     class Meta:
         ordering = ['factura', 'numero_plazo']
-=======
-    referencia = models.CharField(max_length=100, blank=True)  # Ej. número de cheque
-    notas = models.TextField(blank=True)
-    registrado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    creado_en = models.DateTimeField(auto_now_add=True)
-    
-    def __str__(self):
-        return f"Pago de {self.monto_pagado} para Factura {self.factura.numero_factura}"
-
-# Signal para crear factura automáticamente
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-
-@receiver(post_save, sender=OrdenCompra)
-def crear_factura_automatica(sender, instance, created, **kwargs):
-    if instance.estatus == 'APROBADA' and not hasattr(instance, 'factura_cxp'):
-        # Calcular fecha de vencimiento basada en días de crédito del proveedor
-        dias_credito = instance.proveedor.dias_credito
-        fecha_vencimiento = instance.fecha_emision + timedelta(days=dias_credito)
-        
-        # Generar número de factura único
-        numero_factura = f"FACT-{instance.folio}-{instance.fecha_emision.strftime('%Y%m%d')}"
-        
-        Factura.objects.create(
-            orden_compra=instance,
-            numero_factura=numero_factura,
-            fecha_emision=instance.fecha_emision,
-            fecha_vencimiento=fecha_vencimiento,
-            monto=instance.total_general,
-            notas=f"Factura generada automáticamente para OC {instance.folio}. Días crédito: {dias_credito}",
-            creado_por=instance.creado_por,
-        )
-        logger.info(f"Factura automática creada para OC {instance.folio}")
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b

@@ -12,11 +12,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     # Ruta para el panel de administración de Django
     path('admin/', admin.site.urls),
-<<<<<<< HEAD
     path('compras/', include('compras.urls')),   
-=======
-    path('compras/', include('compras.urls')),
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     path('chat/', include('chat.urls')), # Make sure this line exists
     path('', include('ternium.urls')),
     path('cuentas-por-pagar/', include('cuentas_por_pagar.urls')),

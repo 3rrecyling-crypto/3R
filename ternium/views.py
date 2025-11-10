@@ -44,13 +44,9 @@ from .forms import (
     MaterialForm, UnidadForm, ContenedorForm, DescargaForm,
     RegistroLogisticoForm
 )
-<<<<<<< HEAD
 from .models import Lugar, Empresa, Origen # <-- ¡Asegúrate de que Empresa esté importada!
 from .forms import LugarForm, EmpresaOrigenesForm # <-- ¡Importa el nuevo form!
 from django.contrib.auth.mixins import LoginRequiredMixin
-=======
-
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 # ==============================================================================
 # === NUEVAS FUNCIONES AUXILIARES PARA GESTIONAR ARCHIVOS EN S3 MANUALMENTE ===
 # ==============================================================================
@@ -427,7 +423,6 @@ class RemisionListView(ListView):
         ).order_by('-fecha', '-creado_en')
         
         search_params = self.request.GET
-<<<<<<< HEAD
         
         # --- INICIO DE LA MODIFICACIÓN ---
         # Filtros actualizados según tu solicitud.
@@ -442,20 +437,6 @@ class RemisionListView(ListView):
             'fecha__lte': search_params.get('q_fecha_hasta'),
         }
         # --- FIN DE LA MODIFICACIÓN ---
-=======
-        # --- MODIFICACIÓN AQUÍ ---
-        # Se añade el filtro por 'remision__icontains'
-        filters = {
-            'remision__icontains': search_params.get('q_remision'), # <-- AÑADIDO
-            'empresa_id': search_params.get('q_empresa'),
-            'detalles__material_id': search_params.get('q_material'),
-            'origen_id': search_params.get('q_origen'),
-            'destino_id': search_params.get('q_destino'),
-            'status': search_params.get('q_status'),
-            'fecha__gte': search_params.get('q_fecha_desde'),
-            'fecha__lte': search_params.get('q_fecha_hasta'),
-        }
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         
         for key, value in filters.items():
             if value:
@@ -469,14 +450,10 @@ class RemisionListView(ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['search_params'] = self.request.GET
-<<<<<<< HEAD
         # --- INICIO DE LA MODIFICACIÓN ---
         # Se cambia 'empresas' por 'prefijos'
         context['prefijos'] = Empresa.objects.exclude(prefijo__isnull=True).exclude(prefijo='').values_list('prefijo', flat=True).distinct().order_by('prefijo')
         # --- FIN DE LA MODIFICACIÓN ---
-=======
-        context['empresas'] = Empresa.objects.all().order_by('nombre')
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         context['materiales'] = Material.objects.all().order_by('nombre')
         context['origenes'] = Lugar.objects.filter(tipo__in=['ORIGEN', 'AMBOS']).order_by('nombre')
         context['destinos'] = Lugar.objects.filter(tipo__in=['DESTINO', 'AMBOS']).order_by('nombre')
@@ -565,11 +542,7 @@ def crear_remision(request):
         if form.is_valid() and formset.is_valid():
             try:
                 with transaction.atomic():
-<<<<<<< HEAD
                     remision = form.save()
-=======
-                    remision = form.save() 
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     formset.instance = remision
                     formset.save()
                     remision.save()
@@ -587,7 +560,6 @@ def crear_remision(request):
             form_kwargs={'material_queryset': Material.objects.none(), 'lugar_queryset': Lugar.objects.none()}
         )
 
-<<<<<<< HEAD
     # --- MODIFICACIÓN INICIA (Basada en nuestra conversación) ---
     context = {
         'form': form, 
@@ -596,10 +568,6 @@ def crear_remision(request):
         'is_editing': False  # <-- AÑADE ESTA LÍNEA
     }
     return render(request, 'ternium/remision_formulario.html', context)
-=======
-    return render(request, 'ternium/remision_formulario.html', {'form': form, 'formset': formset, 'titulo': 'Nueva Remisión'})
-
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
 @login_required
 def editar_remision(request, pk):
@@ -620,11 +588,7 @@ def editar_remision(request, pk):
             try:
                 empresa_para_form = Empresa.objects.get(pk=empresa_id)
             except (Empresa.DoesNotExist, ValueError):
-<<<<<<< HEAD
                 pass
-=======
-                empresa_para_form = None
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         
         # Pasamos la empresa (la nueva o la original) para una validación correcta
         form = RemisionForm(request.POST, request.FILES, instance=remision_original, empresa=empresa_para_form)
@@ -681,7 +645,6 @@ def editar_remision(request, pk):
             form_kwargs={'material_queryset': material_qs, 'lugar_queryset': lugar_qs}
         )
 
-<<<<<<< HEAD
     # --- MODIFICACIÓN INICIA (Basada en nuestra conversación) ---
     context = {
         'form': form,
@@ -692,10 +655,6 @@ def editar_remision(request, pk):
     }
     return render(request, 'ternium/remision_formulario.html', context)
     # --- MODIFICACIÓN TERMINA ---
-=======
-    return render(request, 'ternium/remision_formulario.html', {'form': form, 'formset': formset, 'remision': remision_original, 'titulo': f'Editar Remisión {remision_original.remision}'})
-
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
     
 @login_required
@@ -1521,7 +1480,6 @@ def asistente_ia(request):
     # Si es una petición GET, solo muestra la página
     return render(request, 'ternium/asistente_ia.html')
 
-<<<<<<< HEAD
 
 @method_decorator(login_required, name='dispatch')
 class UnidadListView(CatalogoListView): # <-- MODIFICADO: Hereda de CatalogoListView
@@ -1564,59 +1522,6 @@ class UnidadListView(CatalogoListView): # <-- MODIFICADO: Hereda de CatalogoList
         # 4. Pasamos todos los filtros aplicados para mantener el estado del form
         context['filtros_aplicados'] = self.request.GET
         return context
-=======
-@method_decorator(login_required, name='dispatch')
-class UnidadListView(ListView): 
-    """
-    Vista para listar TODOS los activos (Unidades).
-    NO hereda de CatalogoListView para evitar filtros automáticos y 
-    asegurar que siempre se muestren todos los registros.
-    """
-    model = Unidad
-    template_name = 'ternium/unidad_list.html'
-    context_object_name = 'unidades' # Define el nombre de la variable en el template
-    paginate_by = 20                   # Opcional: añade paginación a la lista
-
-    def get_queryset(self):
-        # Esta es la parte clave:
-        # Se devuelve SIEMPRE la lista completa de unidades sin ningún filtro.
-        # Se ordena por el más reciente para que los nuevos aparezcan primero.
-        return Unidad.objects.all().order_by('-id')
-
-@login_required
-def crear_unidad(request):
-    if request.method == 'POST':
-        form = UnidadForm(request.POST, request.FILES)
-        if form.is_valid():
-            unidad = form.save(commit=False)
-            unidad_id_folder = form.cleaned_data.get('internal_id', 'sin_id').strip()
-
-            # Lógica para subir foto
-            if 'display_photo' in request.FILES:
-                archivo = request.FILES['display_photo']
-                s3_path = f"activos_unidades/{unidad_id_folder}/foto_{archivo.name}"
-                ruta_guardada = _subir_archivo_a_s3(archivo, s3_path)
-                if ruta_guardada:
-                    unidad.display_photo = ruta_guardada
-            
-            # Lógica para subir documentos
-            if 'unit_documents' in request.FILES:
-                archivo = request.FILES['unit_documents']
-                s3_path = f"activos_unidades/{unidad_id_folder}/doc_{archivo.name}"
-                ruta_guardada = _subir_archivo_a_s3(archivo, s3_path)
-                if ruta_guardada:
-                    unidad.unit_documents = ruta_guardada
-            
-            unidad.save()
-            form.save_m2m() # Importante para guardar la relación con Empresas
-            messages.success(request, f'Activo "{unidad.internal_id}" creado exitosamente.')
-            return redirect('lista_unidades')
-    else:
-        form = UnidadForm()
-        
-    context = {'form': form, 'titulo': 'Registrar Nuevo Activo'}
-    return render(request, 'ternium/unidad_form.html', context) # Usa un template genérico
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
 @login_required
 def editar_unidad(request, pk):
@@ -1737,7 +1642,6 @@ def vista_perfil(request):
     }
     return render(request, 'ternium/perfil.html', context)
 
-<<<<<<< HEAD
 
 class EmpresaVincularOrigenesView(LoginRequiredMixin, UpdateView):
     model = Empresa
@@ -1754,5 +1658,3 @@ class EmpresaVincularOrigenesView(LoginRequiredMixin, UpdateView):
         # (Ajusta 'lista_lugares' si tienes una lista de empresas)
         return reverse_lazy('lista_lugares')
     
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b

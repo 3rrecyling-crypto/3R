@@ -2,43 +2,30 @@ from django import forms
 from .models import Factura, Pago
 from compras.models import OrdenCompra
 from django.utils import timezone  # Añadido para cálculo de fecha
-<<<<<<< HEAD
 from django.db.models import Max
 
 # cuentas_por_pagar/forms.py
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
 class FacturaForm(forms.ModelForm):
     class Meta:
         model = Factura
-<<<<<<< HEAD
         fields = [
             'orden_compra', 'numero_factura', 'fecha_emision', 
             'fecha_vencimiento', 'monto', 'archivo_factura', 'notas'
         ]
-=======
-        fields = ['orden_compra', 'numero_factura', 'fecha_emision', 'fecha_vencimiento', 'monto', 'notas']
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         widgets = {
             'orden_compra': forms.Select(attrs={'class': 'form-select'}),
             'numero_factura': forms.TextInput(attrs={'class': 'form-control'}),
             'fecha_emision': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'fecha_vencimiento': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'monto': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-<<<<<<< HEAD
             'archivo_factura': forms.FileInput(attrs={'class': 'form-control'}),
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             'notas': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-<<<<<<< HEAD
         # Importación local para evitar circular imports
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         try:
             from compras.models import OrdenCompra
             # Filtra OCs auditadas o aprobadas que no tengan factura
@@ -56,7 +43,6 @@ class FacturaForm(forms.ModelForm):
             self.fields['orden_compra'].help_text = "No se pudo cargar las órdenes de compra"
 
 class PagoForm(forms.ModelForm):
-<<<<<<< HEAD
     numero_plazo = forms.IntegerField(
         required=False,
         initial=1,
@@ -141,21 +127,3 @@ class PagoForm(forms.ModelForm):
                 )
         
         return cleaned_data
-=======
-    class Meta:
-        model = Pago
-        fields = ['factura', 'fecha_pago', 'monto_pagado', 'metodo_pago', 'referencia', 'notas']
-        widgets = {
-            'factura': forms.Select(attrs={'class': 'form-select'}),
-            'fecha_pago': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'monto_pagado': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'metodo_pago': forms.Select(attrs={'class': 'form-select'}),
-            'referencia': forms.TextInput(attrs={'class': 'form-control'}),
-            'notas': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-        }
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Filtra facturas pendientes
-        self.fields['factura'].queryset = Factura.objects.filter(pagada=False)
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b

@@ -104,12 +104,8 @@ path('lineas-transporte/<int:pk>/editar/', views.LineaTransporteUpdateView.as_vi
     # === AÑADE ESTA LÍNEA PARA EL ASISTENTE DE IA ===
     path('asistente-ia/', views.asistente_ia, name='asistente_ia'),
     path('api/get-next-remision/<int:empresa_id>/', views.get_next_remision_number, name='get_next_remision_number'),
-<<<<<<< HEAD
     path('empresas/<int:pk>/vincular-origenes/', 
          views.EmpresaVincularOrigenesView.as_view(), 
          name='vincular_origenes_empresa'),
-=======
-
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 ]
 

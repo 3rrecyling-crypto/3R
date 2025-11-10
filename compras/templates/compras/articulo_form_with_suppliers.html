@@ -3,10 +3,6 @@
 
 {% block compras_content %}
 <div class="container-fluid">
-<<<<<<< HEAD
-=======
-    <!-- Encabezado mejorado -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     <div class="row mb-4">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
@@ -27,10 +23,6 @@
     <form method="post" id="articulo-form" class="needs-validation" novalidate>
         {% csrf_token %}
 
-<<<<<<< HEAD
-=======
-        <!-- Tarjeta de Datos del Artículo - Mejorada -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-primary text-white py-3">
                 <h5 class="card-title mb-0 fw-bold">
@@ -38,15 +30,12 @@
                 </h5>
             </div>
             <div class="card-body p-4">
-<<<<<<< HEAD
                 {% if form.non_field_errors %}
                     <div class="alert alert-danger" role="alert">
                         {{ form.non_field_errors }}
                     </div>
                 {% endif %}
                 
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                 <div class="row">
                     {% for field in form %}
                         {% if field.field.widget_type != 'checkbox' %}
@@ -76,10 +65,6 @@
                     {% endfor %}
                 </div>
                 
-<<<<<<< HEAD
-=======
-                {% if form.checkbox_fields %}
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                 <hr class="my-4">
                 
                 <div class="row">
@@ -100,17 +85,9 @@
                         {% endif %}
                     {% endfor %}
                 </div>
-<<<<<<< HEAD
             </div>
         </div>
 
-=======
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Tarjeta de Proveedores y Precios - Mejorada -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-primary text-white py-3 d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0 fw-bold">
@@ -121,15 +98,12 @@
             <div class="card-body p-4">
                 {{ formset.management_form }}
                 
-<<<<<<< HEAD
                 {% if formset.non_form_errors %}
                     <div class="alert alert-danger" role="alert">
                         {{ formset.non_form_errors }}
                     </div>
                 {% endif %}
 
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                 <div class="alert alert-info d-flex align-items-center mb-4" role="alert">
                     <i class="fas fa-info-circle me-2"></i>
                     <div>
@@ -143,7 +117,6 @@
                         <div class="row align-items-center proveedor-form mb-3 p-3 bg-light rounded border position-relative" 
                              data-form-index="{{ forloop.counter0 }}">
    
-<<<<<<< HEAD
                             {% if proveedor_form.id.value %}
                                 {{ proveedor_form.id }}
                             {% endif %}
@@ -155,12 +128,6 @@
                                     </div>
                                 </div>
                             {% endif %}
-=======
-                            
-                            <div class="d-none">
-                                {{ proveedor_form.id }}
-                            </div>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             
                             <div class="col-lg-5 mb-2">
                                 <label for="{{ proveedor_form.proveedor.id_for_label }}" class="form-label fw-semibold">
@@ -206,10 +173,6 @@
             </div>
         </div>
 
-<<<<<<< HEAD
-=======
-        <!-- Botones de acción mejorados -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         <div class="card shadow-sm border-0 mt-4">
             <div class="card-body py-3">
                 <div class="d-flex justify-content-between align-items-center">
@@ -231,7 +194,6 @@
     </form>
 </div>
 
-<<<<<<< HEAD
 <div id="empty-form-template" class="d-none">
     <div class="row align-items-center proveedor-form mb-3 p-3 bg-light rounded border position-relative" id="form-__prefix__">
         
@@ -247,30 +209,6 @@
         </div>
         <div class="col-lg-5 mb-2">
             <label for="id_proveedores-__prefix__-precio_unitario" class="form-label fw-semibold">Precio Unitario ($) <span class="text-danger">*</span></label>
-=======
-<!-- Template para formularios vacíos -->
-<div id="empty-form-template" class="d-none">
-    <div class="row align-items-center proveedor-form mb-3 p-3 bg-light rounded border position-relative" id="form-__prefix__">
-        {% if formset.can_delete %}
-            <div class="position-absolute top-0 end-0 mt-2 me-2">
-                <div class="form-check">
-                    {{ formset.empty_form.DELETE|add_class:"form-check-input delete-checkbox" }}
-                    <label class="form-check-label small">Eliminar</label>
-                </div>
-            </div>
-        {% endif %}
-        
-        <div class="d-none">
-            {{ formset.empty_form.id }}
-        </div>
-        
-        <div class="col-lg-5 mb-2">
-            <label class="form-label fw-semibold">Proveedor <span class="text-danger">*</span></label>
-            {% render_field formset.empty_form.proveedor class="form-select" %}
-        </div>
-        <div class="col-lg-5 mb-2">
-            <label class="form-label fw-semibold">Precio Unitario ($) <span class="text-danger">*</span></label>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             <div class="input-group">
                 <span class="input-group-text bg-white border-end-0">$</span>
                 {% render_field formset.empty_form.precio_unitario class="form-control border-start-0" placeholder="0.00" min="0" step="0.01" %}
@@ -294,7 +232,6 @@ const ArticuloFormManager = (function() {
         totalFormsInput: document.querySelector('input[name="proveedores-TOTAL_FORMS"]'),
         proveedorCount: document.getElementById('proveedor-count'),
         emptyFormTemplate: document.getElementById('empty-form-template').innerHTML,
-<<<<<<< HEAD
         mainForm: document.getElementById('articulo-form'),
         
         // --- INICIO DE LA MODIFICACIÓN ---
@@ -302,9 +239,6 @@ const ArticuloFormManager = (function() {
         empresaSelect: document.getElementById('id_empresa'),
         origenSelect: document.getElementById('id_origen')
         // --- FIN DE LA MODIFICACIÓN ---
-=======
-        mainForm: document.getElementById('articulo-form')
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     };
     
     // Estado
@@ -317,7 +251,6 @@ const ArticuloFormManager = (function() {
         init: function() {
             this.bindEvents();
             this.updateProveedorCount();
-<<<<<<< HEAD
             
             // --- INICIO DE LA MODIFICACIÓN ---
             // Deshabilita el dropdown de origen si no hay empresa seleccionada al cargar
@@ -325,8 +258,6 @@ const ArticuloFormManager = (function() {
                  elements.origenSelect.disabled = !elements.empresaSelect.value;
             }
             // --- FIN DE LA MODIFICACIÓN ---
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         },
         
         bindEvents: function() {
@@ -348,7 +279,6 @@ const ArticuloFormManager = (function() {
                     e.target.classList.remove('is-invalid');
                 }
             });
-<<<<<<< HEAD
             
             // --- INICIO DE LA MODIFICACIÓN ---
             // Evento para actualizar orígenes cuando cambia la empresa
@@ -406,43 +336,24 @@ const ArticuloFormManager = (function() {
         },
         // --- FIN DE LA NUEVA FUNCIÓN ---
         
-=======
-        },
-        
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         addForm: function() {
             const newFormHtml = elements.emptyFormTemplate.replace(/__prefix__/g, state.formCounter);
             
             // Si no hay formularios, reemplazar el mensaje vacío
-<<<<<<< HEAD
             const emptyState = elements.formContainer.querySelector('#empty-state');
             if (emptyState) {
                 emptyState.remove();
             }
             
             elements.formContainer.insertAdjacentHTML('beforeend', newFormHtml);
-=======
-            if (elements.formContainer.querySelector('#empty-state')) {
-                elements.formContainer.innerHTML = newFormHtml;
-            } else {
-                elements.formContainer.insertAdjacentHTML('beforeend', newFormHtml);
-            }
-            
-            state.formCounter++;
-            elements.totalFormsInput.value = state.formCounter;
-            this.updateProveedorCount();
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             
             // Animar el nuevo formulario
             const newForm = elements.formContainer.lastElementChild;
             this.animateFormAppearance(newForm);
-<<<<<<< HEAD
 
             state.formCounter++;
             elements.totalFormsInput.value = state.formCounter;
             this.updateProveedorCount();
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         },
         
         removeForm: function(removeButton) {

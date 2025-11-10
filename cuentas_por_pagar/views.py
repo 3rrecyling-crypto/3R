@@ -10,7 +10,6 @@ from compras.models import OrdenCompra
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required  # <-- AÑADE ESTE IMPORT
 from openpyxl import Workbook  # Para exportar Excel
-<<<<<<< HEAD
 # cuentas_por_pagar/views.py - AGREGA AL INICIO DEL ARCHIVO
 from django import forms  # ← Agrega este import
 import boto3
@@ -73,8 +72,6 @@ def _eliminar_archivo_de_s3(ruta_completa_s3):
         )
     except (BotoCoreError, NoCredentialsError, Exception) as e:
         print(f"Error al eliminar archivo antiguo de S3: {e}")
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
 class FacturaListView(LoginRequiredMixin, ListView):
     model = Factura
@@ -107,7 +104,6 @@ class FacturaListView(LoginRequiredMixin, ListView):
         return context
 
 class FacturaCreateView(LoginRequiredMixin, CreateView):
-<<<<<<< HEAD
     def get(self, request, *args, **kwargs):
         messages.warning(request, "La creación manual de facturas está deshabilitada. Las facturas se generan automáticamente cuando se aprueban las órdenes de compra.")
         return redirect('lista_facturas')
@@ -115,21 +111,6 @@ class FacturaCreateView(LoginRequiredMixin, CreateView):
     def post(self, request, *args, **kwargs):
         messages.warning(request, "La creación manual de facturas está deshabilitada.")
         return redirect('lista_facturas')
-=======
-    model = Factura
-    form_class = FacturaForm
-    template_name = 'cuentas_por_pagar/generic_form.html'
-    success_url = reverse_lazy('lista_facturas')
-    
-    def form_valid(self, form):
-        form.instance.creado_por = self.request.user
-        return super().form_valid(form)
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['titulo'] = "Crear Nueva Factura"
-        return context
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
 class FacturaUpdateView(LoginRequiredMixin, UpdateView):
     model = Factura
@@ -137,7 +118,6 @@ class FacturaUpdateView(LoginRequiredMixin, UpdateView):
     template_name = 'cuentas_por_pagar/generic_form.html'
     success_url = reverse_lazy('lista_facturas')
     
-<<<<<<< HEAD
     def form_valid(self, form):
         factura_original = self.get_object()
         self.object = form.save(commit=False)
@@ -164,18 +144,11 @@ class FacturaUpdateView(LoginRequiredMixin, UpdateView):
         self.object.save()
         messages.success(self.request, "Factura actualizada correctamente.")
         return super().form_valid(form)
-=======
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['titulo'] = f"Editar Factura {self.object.numero_factura}"
-        return context
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
 class FacturaDetailView(LoginRequiredMixin, DetailView):
     model = Factura
     template_name = 'cuentas_por_pagar/factura_detail.html'
 
-<<<<<<< HEAD
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         factura = self.object
@@ -189,8 +162,6 @@ class FacturaDetailView(LoginRequiredMixin, DetailView):
         
         return context
 
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 class FacturaDeleteView(LoginRequiredMixin, DeleteView):
     model = Factura
     template_name = 'compras/_confirm_delete.html'  # Reusa template de compras
@@ -204,21 +175,15 @@ class PagoListView(LoginRequiredMixin, ListView):
     paginate_by = 10
     
     def get_queryset(self):
-<<<<<<< HEAD
         queryset = super().get_queryset().select_related('factura__orden_compra__proveedor')
         query = self.request.GET.get('q')
         comprobante = self.request.GET.get('comprobante')
         
-=======
-        queryset = super().get_queryset().select_related('factura__orden_compra')
-        query = self.request.GET.get('q')
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         if query:
             queryset = queryset.filter(
                 Q(factura__numero_factura__icontains=query) |
                 Q(referencia__icontains=query)
             )
-<<<<<<< HEAD
         
         # Filtro por comprobante
         if comprobante == 'con_comprobante':
@@ -249,9 +214,6 @@ class PagoListView(LoginRequiredMixin, ListView):
         print(f"DEBUG - Paginator count: {pagos.paginator.count if hasattr(pagos, 'paginator') else 'N/A'}")
         
         return context
-=======
-        return queryset
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
 class PagoCreateView(LoginRequiredMixin, CreateView):
     model = Pago
@@ -261,7 +223,6 @@ class PagoCreateView(LoginRequiredMixin, CreateView):
     
     def form_valid(self, form):
         form.instance.registrado_por = self.request.user
-<<<<<<< HEAD
         
         # Guardar primero para obtener el ID
         self.object = form.save(commit=False)
@@ -291,17 +252,6 @@ class PagoCreateView(LoginRequiredMixin, CreateView):
         
         messages.success(self.request, f"Pago del plazo #{self.object.numero_plazo} registrado correctamente.")
         return super().form_valid(form)
-=======
-        # Actualiza la factura después del pago
-        factura = form.instance.factura
-        factura.save()  # Esto dispara el save de Factura para recalcular estatus
-        return super().form_valid(form)
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['titulo'] = "Registrar Nuevo Pago"
-        return context
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
 class PagoUpdateView(LoginRequiredMixin, UpdateView):
     model = Pago
@@ -309,7 +259,6 @@ class PagoUpdateView(LoginRequiredMixin, UpdateView):
     template_name = 'cuentas_por_pagar/generic_form.html'
     success_url = reverse_lazy('lista_pagos')
     
-<<<<<<< HEAD
     def form_valid(self, form):
         pago_original = self.get_object()
         self.object = form.save(commit=False)
@@ -354,18 +303,10 @@ class PagoDetailView(LoginRequiredMixin, DetailView):
         
         return context
     
-=======
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['titulo'] = f"Editar Pago para Factura {self.object.factura.numero_factura}"
-        return context
-
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 class PagoDeleteView(LoginRequiredMixin, DeleteView):
     model = Pago
     template_name = 'compras/_confirm_delete.html'
     success_url = reverse_lazy('lista_pagos')
-<<<<<<< HEAD
     
     def delete(self, request, *args, **kwargs):
         pago = self.get_object()
@@ -375,8 +316,6 @@ class PagoDeleteView(LoginRequiredMixin, DeleteView):
             _eliminar_archivo_de_s3(pago.archivo_comprobante.name)
         
         return super().delete(request, *args, **kwargs)
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
 # Nuevas vistas funcionales
 @login_required
@@ -395,12 +334,8 @@ def dashboard_cuentas_por_pagar(request):
                 'total_deuda': 0,
                 'cantidad_facturas': 0,
                 'facturas_por_vencer': 0,
-<<<<<<< HEAD
                 'facturas_vencidas': 0,
                 'facturas_sincronizadas': 0
-=======
-                'facturas_vencidas': 0
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             }
         
         estadisticas_proveedor[proveedor_nombre]['total_deuda'] += float(factura.monto_pendiente)
@@ -410,15 +345,11 @@ def dashboard_cuentas_por_pagar(request):
             estadisticas_proveedor[proveedor_nombre]['facturas_por_vencer'] += 1
         elif factura.esta_vencida:
             estadisticas_proveedor[proveedor_nombre]['facturas_vencidas'] += 1
-<<<<<<< HEAD
             
         # Contar facturas sincronizadas (con archivo)
         if factura.archivo_factura:
             estadisticas_proveedor[proveedor_nombre]['facturas_sincronizadas'] += 1
 
-=======
-    
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     # Convertir a lista ordenada por deuda
     estadisticas = [
         {
@@ -426,12 +357,8 @@ def dashboard_cuentas_por_pagar(request):
             'total_deuda': data['total_deuda'],
             'cantidad_facturas': data['cantidad_facturas'],
             'facturas_por_vencer': data['facturas_por_vencer'],
-<<<<<<< HEAD
             'facturas_vencidas': data['facturas_vencidas'],
             'facturas_sincronizadas': data['facturas_sincronizadas']
-=======
-            'facturas_vencidas': data['facturas_vencidas']
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         }
         for proveedor, data in estadisticas_proveedor.items()
     ]
@@ -444,7 +371,6 @@ def dashboard_cuentas_por_pagar(request):
     facturas_por_vencer_count = Factura.objects.filter(estatus='POR_VENCER').count()
     total_deuda_general = sum(float(factura.monto_pendiente) for factura in facturas_pendientes)
     
-<<<<<<< HEAD
     # NUEVAS MÉTRICAS DE SINCRONIZACIÓN
     facturas_con_archivo = Factura.objects.filter(archivo_factura__isnull=False).count()
     pagos_con_comprobante = Pago.objects.filter(archivo_comprobante__isnull=False).count()
@@ -469,8 +395,6 @@ def dashboard_cuentas_por_pagar(request):
     total_pagos = Pago.objects.count()
     porcentaje_pagos_sincronizados = round((pagos_con_comprobante / total_pagos * 100), 2) if total_pagos > 0 else 0
     
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     # Alertas recientes
     alertas_recientes = Factura.objects.filter(
         ultima_alerta_enviada__isnull=False
@@ -484,7 +408,6 @@ def dashboard_cuentas_por_pagar(request):
         'facturas_por_vencer_count': facturas_por_vencer_count,
         'total_deuda_general': total_deuda_general,
         'alertas_recientes': alertas_recientes,
-<<<<<<< HEAD
         
         # Nuevas métricas de sincronización
         'facturas_con_archivo': facturas_con_archivo,
@@ -496,8 +419,6 @@ def dashboard_cuentas_por_pagar(request):
         'total_ocs_sincronizadas': total_ocs_sincronizadas,
         'porcentaje_facturas_sincronizadas': porcentaje_facturas_sincronizadas,
         'porcentaje_pagos_sincronizados': porcentaje_pagos_sincronizados,
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     }
     return render(request, 'cuentas_por_pagar/dashboard.html', context)
 
@@ -591,7 +512,6 @@ def exportar_facturas_excel(request):
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = 'attachment; filename=facturas_cuentas_por_pagar.xlsx'
     wb.save(response)
-<<<<<<< HEAD
     return response
 
 # En views.py de CXP - Mejorar la vista existente
@@ -686,6 +606,3 @@ def gestionar_plazos_oc_redirect(request, pk):
     
     # Redirige a la gestión de plazos de la factura
     return redirect('gestionar_plazos_factura', pk=orden_compra.factura_cxp.pk)
-=======
-    return response
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b

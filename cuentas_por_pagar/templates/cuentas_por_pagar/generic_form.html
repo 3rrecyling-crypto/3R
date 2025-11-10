@@ -29,11 +29,7 @@
 
                 <!-- Formulario -->
                 <div class="card-body py-4">
-<<<<<<< HEAD
                     <form method="post" novalidate enctype="multipart/form-data">
-=======
-                    <form method="post" novalidate>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                         {% csrf_token %}
                         
                         {% if form.non_field_errors %}
@@ -87,7 +83,6 @@
                                         </span>
                                         {{ field }}
                                     </div>
-<<<<<<< HEAD
                                     {% elif field.field.widget.input_type == 'file' %}
                                     <!-- CAMPO DE ARCHIVO MEJORADO -->
                                     <div class="file-input-wrapper">
@@ -106,8 +101,6 @@
                                         </div>
                                         {% endif %}
                                     </div>
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     {% else %}
                                     <div class="input-group">
                                         <span class="input-group-text bg-light border-end-0">
@@ -135,7 +128,6 @@
                             {% endfor %}
                         </div>
 
-<<<<<<< HEAD
                         <!-- SECCIÓN NUEVA: Información de Sincronización -->
                         {% if 'factura' in titulo|lower or 'pago' in titulo|lower %}
                         <div class="row mt-4">
@@ -161,8 +153,6 @@
                         </div>
                         {% endif %}
 
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                         <!-- Botones de Acción -->
                         <div class="row mt-5 pt-3 border-top">
                             <div class="col-12">
@@ -211,7 +201,6 @@
                             Revisa que todos los campos obligatorios estén completos
                         {% endif %}
                     </p>
-<<<<<<< HEAD
                     
                     <!-- NUEVA: Información específica de sincronización -->
                     {% if 'factura' in titulo|lower %}
@@ -235,8 +224,6 @@
                         </p>
                     </div>
                     {% endif %}
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                 </div>
             </div>
         </div>
@@ -313,7 +300,6 @@
         resize: vertical;
     }
     
-<<<<<<< HEAD
     /* NUEVO: Estilos para campos de archivo */
     .file-input-wrapper .form-control[type="file"] {
         padding: 0.75rem;
@@ -333,8 +319,6 @@
         background-color: #e9ecef;
     }
     
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     /* Mejoras para campos de fecha y número */
     input[type="date"]::-webkit-calendar-picker-indicator {
         cursor: pointer;
@@ -361,15 +345,12 @@
         color: #dc3545;
     }
     
-<<<<<<< HEAD
     /* NUEVO: Estilos para alertas de sincronización */
     .alert-info {
         background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
         border: 1px solid #b8daff;
     }
     
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     /* Responsive */
     @media (max-width: 768px) {
         .card-header .fa-3x {
@@ -421,7 +402,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-<<<<<<< HEAD
     // NUEVO: Mejorar campos de archivo
     const fileFields = document.querySelectorAll('input[type="file"]');
     fileFields.forEach(field => {
@@ -454,8 +434,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     // Auto-focus en el primer campo del formulario
     const firstInput = document.querySelector('input:not([type="hidden"]), select, textarea');
     if (firstInput) {

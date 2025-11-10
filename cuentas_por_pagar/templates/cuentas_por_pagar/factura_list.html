@@ -17,12 +17,6 @@
                     <a href="{% url 'exportar_facturas_excel' %}" class="btn btn-outline-info">
                         <i class="fas fa-file-excel me-2"></i>Exportar Excel
                     </a>
-<<<<<<< HEAD
-=======
-                    <a href="{% url 'crear_factura' %}" class="btn btn-success">
-                        <i class="fas fa-plus me-2"></i>Nueva Factura
-                    </a>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                 </div>
             </div>
         </div>
@@ -30,11 +24,7 @@
 
     <!-- Tarjetas de Resumen -->
     <div class="row mb-4">
-<<<<<<< HEAD
         <div class="col-xl-2 col-md-3 mb-3">
-=======
-        <div class="col-xl-3 col-md-4 mb-3">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             <div class="card border-0 bg-primary text-white h-100">
                 <div class="card-body text-center py-3">
                     <h4 class="mb-1">{{ total_facturas_count|default:0|intcomma }}</h4>
@@ -42,11 +32,7 @@
                 </div>
             </div>
         </div>
-<<<<<<< HEAD
         <div class="col-xl-2 col-md-3 mb-3">
-=======
-        <div class="col-xl-3 col-md-4 mb-3">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             <div class="card border-0 bg-warning text-white h-100">
                 <div class="card-body text-center py-3">
                     <h4 class="mb-1">{{ facturas_filtradas_count|default:0|intcomma }}</h4>
@@ -54,7 +40,6 @@
                 </div>
             </div>
         </div>
-<<<<<<< HEAD
         <div class="col-xl-2 col-md-3 mb-3">
             <div class="card border-0 bg-success text-white h-100">
                 <div class="card-body text-center py-3">
@@ -72,17 +57,6 @@
                         Mostrando {{ facturas_filtradas_count|default:0 }} facturas filtradas
                         {% else %}
                         Las facturas se sincronizan automáticamente con Compras
-=======
-        <div class="col-xl-6 col-md-4 mb-3">
-            <div class="card border-0 bg-light h-100">
-                <div class="card-body text-center py-3">
-                    <p class="text-muted small mb-0">
-                        <i class="fas fa-info-circle me-1"></i>
-                        {% if request.GET.q or request.GET.estatus %}
-                        Mostrando {{ facturas_filtradas_count|default:0 }} facturas filtradas
-                        {% else %}
-                        Usa los filtros para encontrar facturas específicas
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                         {% endif %}
                     </p>
                 </div>
@@ -90,10 +64,6 @@
         </div>
     </div>
 
-<<<<<<< HEAD
-=======
-    <!-- El resto del template se mantiene igual -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     <!-- Filtros -->
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white border-0 py-3">
@@ -104,11 +74,7 @@
         </div>
         <div class="card-body">
             <form method="get" class="row g-3 align-items-end">
-<<<<<<< HEAD
                 <div class="col-md-3">
-=======
-                <div class="col-md-4">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     <label class="form-label small text-muted mb-1">Búsqueda por texto</label>
                     <div class="input-group">
                         <span class="input-group-text bg-light border-end-0">
@@ -118,11 +84,7 @@
                                placeholder="Número de factura, OC..." value="{{ request.GET.q }}">
                     </div>
                 </div>
-<<<<<<< HEAD
                 <div class="col-md-3">
-=======
-                <div class="col-md-4">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     <label class="form-label small text-muted mb-1">Filtrar por estatus</label>
                     <select name="estatus" class="form-select">
                         <option value="">Todos los estatus</option>
@@ -133,7 +95,6 @@
                         {% endfor %}
                     </select>
                 </div>
-<<<<<<< HEAD
                 <div class="col-md-3">
                     <label class="form-label small text-muted mb-1">Sincronización</label>
                     <select name="sincronizacion" class="form-select">
@@ -147,9 +108,6 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-=======
-                <div class="col-md-4">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary flex-fill">
                             <i class="fas fa-search me-2"></i>Aplicar Filtros
@@ -185,11 +143,8 @@
                             <th class="border-0">Proveedor</th>
                             <th class="border-0 text-end">Monto Total</th>
                             <th class="border-0 text-end">Pendiente</th>
-<<<<<<< HEAD
                             <th class="border-0 text-center">Archivo</th>
                             <th class="border-0 text-center">Estado OC</th>
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             <th class="border-0 text-center">Estatus</th>
                             <th class="border-0 text-center">Vencimiento</th>
                             <th class="border-0 text-center pe-4">Acciones</th>
@@ -209,7 +164,6 @@
                                         <small class="text-muted">
                                             {{ factura.fecha_emision }}
                                         </small>
-<<<<<<< HEAD
                                         <!-- NUEVO: Indicador de pago a plazos -->
                                         {% if factura.es_pago_plazos %}
                                         <div class="mt-1">
@@ -223,8 +177,6 @@
                                             {% endif %}
                                         </div>
                                         {% endif %}
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     </div>
                                 </div>
                             </td>
@@ -253,7 +205,6 @@
                                 </strong>
                             </td>
 
-<<<<<<< HEAD
                             <!-- Archivo de Factura -->
                             <td class="text-center">
                                 {% if factura.archivo_factura %}
@@ -275,8 +226,6 @@
                                 </span>
                             </td>
 
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             <!-- Estatus -->
                             <td class="text-center">
                                 <span class="badge {% if factura.estatus == 'PAGADA' %}bg-success{% elif factura.estatus == 'VENCIDA' %}bg-danger{% elif factura.estatus == 'POR_VENCER' %}bg-warning{% else %}bg-primary{% endif %} rounded-pill">
@@ -310,7 +259,6 @@
                                        title="Editar factura">
                                         <i class="fas fa-edit"></i>
                                     </a>
-<<<<<<< HEAD
                                     <!-- NUEVO: Botón específico para gestión de plazos -->
                                     {% if factura.es_pago_plazos %}
                                     <a href="{% url 'gestionar_plazos_factura' factura.pk %}" 
@@ -319,22 +267,12 @@
                                         <i class="fas fa-calendar-alt"></i>
                                     </a>
                                     {% else %}
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     <a href="{% url 'crear_pago' %}?factura={{ factura.pk }}" 
                                        class="btn btn-outline-success" 
                                        title="Registrar pago">
                                         <i class="fas fa-hand-holding-usd"></i>
                                     </a>
-<<<<<<< HEAD
                                     {% endif %}
-=======
-                                    <a href="{% url 'eliminar_factura' factura.pk %}" 
-                                       class="btn btn-outline-danger" 
-                                       title="Eliminar factura">
-                                        <i class="fas fa-trash-alt"></i>
-                                    </a>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 </div>
                             </td>
                         </tr>
@@ -354,12 +292,6 @@
                     No hay facturas registradas en el sistema
                     {% endif %}
                 </p>
-<<<<<<< HEAD
-=======
-                <a href="{% url 'crear_factura' %}" class="btn btn-success">
-                    <i class="fas fa-plus me-2"></i>Crear Primera Factura
-                </a>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             </div>
             {% endif %}
         </div>
@@ -377,11 +309,7 @@
                     <ul class="pagination pagination-sm mb-0">
                         {% if page_obj.has_previous %}
                         <li class="page-item">
-<<<<<<< HEAD
                             <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.estatus %}&estatus={{ request.GET.estatus }}{% endif %}{% if request.GET.sincronizacion %}&sincronizacion={{ request.GET.sincronizacion }}{% endif %}">
-=======
-                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.estatus %}&estatus={{ request.GET.estatus }}{% endif %}">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 <i class="fas fa-chevron-left"></i>
                             </a>
                         </li>
@@ -394,11 +322,7 @@
                             </li>
                             {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
                             <li class="page-item">
-<<<<<<< HEAD
                                 <a class="page-link" href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.estatus %}&estatus={{ request.GET.estatus }}{% endif %}{% if request.GET.sincronizacion %}&sincronizacion={{ request.GET.sincronizacion }}{% endif %}">
-=======
-                                <a class="page-link" href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.estatus %}&estatus={{ request.GET.estatus }}{% endif %}">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     {{ num }}
                                 </a>
                             </li>
@@ -407,11 +331,7 @@
 
                         {% if page_obj.has_next %}
                         <li class="page-item">
-<<<<<<< HEAD
                             <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.estatus %}&estatus={{ request.GET.estatus }}{% endif %}{% if request.GET.sincronizacion %}&sincronizacion={{ request.GET.sincronizacion }}{% endif %}">
-=======
-                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.estatus %}&estatus={{ request.GET.estatus }}{% endif %}">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 <i class="fas fa-chevron-right"></i>
                             </a>
                         </li>
@@ -423,7 +343,6 @@
         {% endif %}
     </div>
 </div>
-<<<<<<< HEAD
 {% endblock %}
 
 {% block extra_css %}
@@ -461,6 +380,4 @@
         }
     }
 </style>
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 {% endblock %}

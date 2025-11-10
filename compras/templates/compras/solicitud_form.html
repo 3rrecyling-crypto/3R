@@ -27,10 +27,6 @@
     <form method="post" id="solicitudForm" class="needs-validation" novalidate enctype="multipart/form-data">
         {% csrf_token %}
         
-<<<<<<< HEAD
-=======
-        <!-- Tarjeta de Datos Generales -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-primary text-white py-3 d-flex align-items-center">
                 <div class="bg-blue bg-opacity-35 p-2 rounded-circle me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
@@ -51,13 +47,8 @@
                         </label>
                         <div class="input-group">
                             <span class="input-group-text bg-light">
-<<<<<<< HEAD
                                 <i class="fas fa-{% if field.name == 'empresa' %}sitemap{% elif field.name == 'lugar' %}building{% elif 'proveedor' in field.name %}truck-loading{% elif 'fecha' in field.name %}calendar{% else %}pen{% endif %} text-muted"></i>
                                 </span>
-=======
-                                <i class="fas fa-{% if 'empresa' in field.name %}building{% elif 'proveedor' in field.name %}truck-loading{% elif 'fecha' in field.name %}calendar{% else %}pen{% endif %} text-muted"></i>
-                            </span>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             {% render_field field class="form-control" %}
                         </div>
                         
@@ -70,7 +61,6 @@
                         </div>
                         {% endif %}
 
-<<<<<<< HEAD
                         {% if field.name == 'lugar' %}
                         <div id="no-lugar-mensaje" class="alert alert-warning p-2 mt-2 d-none">
                             <small>
@@ -78,8 +68,6 @@
                             </small>
                         </div>
                         {% endif %}
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                         {% if field.errors %}
                         <div class="text-danger small mt-1 d-flex align-items-center">
                             <i class="fas fa-exclamation-circle me-1"></i> {{ field.errors|first }}
@@ -94,10 +82,6 @@
             </div>
         </div>
 
-<<<<<<< HEAD
-=======
-        <!-- Tarjeta de Artículos Solicitados -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         <div class="card shadow-sm border-0">
             <div class="card-header bg-primary text-white py-3 d-flex align-items-center">
                 <div class="bg-blue bg-opacity-20 p-2 rounded-circle me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
@@ -117,25 +101,13 @@
                         {{ form.id }}
                         <div class="card-body">
                             <div class="row g-3 align-items-end">
-<<<<<<< HEAD
                                 <div class="col-12 col-lg-4 mb-0">
                                     <label class="form-label fw-semibold">Artículo <span class="text-danger">*</span></label>
                                     <div class="input-group">
-=======
-                                <!-- Artículo (sin emoji/icono) -->
-                                <div class="col-12 col-lg-4 mb-0">
-                                    <label class="form-label fw-semibold">Artículo <span class="text-danger">*</span></label>
-                                    <div class="input-group">
-                                        <!-- Eliminado el icono de caja -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                         {{ form.articulo|add_class:"form-control select2-articulo" }}
                                     </div>
                                 </div>
                                 
-<<<<<<< HEAD
-=======
-                                <!-- Cantidad y Unidad de Medida -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 <div class="col-12 col-sm-6 col-lg-3 mb-0">
                                     <div class="row g-2 align-items-end">
                                         <div class="col-8 mb-0">
@@ -156,10 +128,6 @@
                                     </div>
                                 </div>
                                 
-<<<<<<< HEAD
-=======
-                                <!-- Precio Unitario -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 <div class="col-12 col-sm-6 col-lg-3 mb-0">
                                     <label class="form-label fw-semibold">Precio Unitario <span class="text-danger">*</span></label>
                                     <div class="input-group">
@@ -171,10 +139,6 @@
                                     </div>
                                 </div>
                                 
-<<<<<<< HEAD
-=======
-                                <!-- Botón Eliminar -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 <div class="col-12 col-lg-2 d-flex align-items-end justify-content-start justify-content-lg-end mb-0">
                                     <button type="button" class="btn btn-sm btn-outline-danger remove-form d-flex align-items-center w-100 w-lg-auto justify-content-center">
                                         <i class="fas fa-trash me-1 d-none d-sm-inline"></i> Eliminar
@@ -182,10 +146,6 @@
                                 </div>
                             </div>
                             
-<<<<<<< HEAD
-=======
-                            <!-- Información del artículo -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             <div class="row mt-3">
                                 <div class="col-12">
                                     <div class="d-flex flex-column flex-sm-row flex-wrap gap-3 text-sm">
@@ -210,10 +170,6 @@
                                 </div>
                             </div>
                             
-<<<<<<< HEAD
-=======
-                            <!-- Totales de línea -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             <div class="row mt-3 pt-3 border-top">
                                 <div class="col-12">
                                     <div class="d-flex flex-column flex-md-row flex-wrap justify-content-md-end gap-3 text-end">
@@ -253,10 +209,6 @@
             </div>
         </div>
         
-<<<<<<< HEAD
-=======
-        <!-- Botones de acción -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         <div class="mt-4 d-flex flex-column flex-sm-row justify-content-end gap-2">
             <a href="{% if solicitud %}{% url 'detalle_solicitud' solicitud.pk %}{% else %}{% url 'lista_solicitudes' %}{% endif %}" class="btn btn-outline-secondary px-4 d-flex align-items-center justify-content-center mb-2 mb-sm-0">
                 <i class="fas fa-times me-2"></i> Cancelar
@@ -267,10 +219,6 @@
         </div>
     </form>
     
-<<<<<<< HEAD
-=======
-    <!-- Template para formulario vacío -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     <div id="empty-form" class="d-none">
         <div class="detalle-form card mb-3 border-light shadow-sm position-relative">
             <div class="position-absolute top-0 start-0 h-100 bg-primary rounded-start" style="width: 4px;"></div>
@@ -280,10 +228,6 @@
                     <div class="col-12 col-lg-4 mb-0">
                         <label class="form-label fw-semibold">Artículo <span class="text-danger">*</span></label>
                         <div class="input-group">
-<<<<<<< HEAD
-=======
-                            <!-- Eliminado el icono de caja -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             {{ formset.empty_form.articulo|add_class:"form-control select2-articulo" }}
                         </div>
                     </div>
@@ -376,10 +320,6 @@
     </div>
 </div>
 
-<<<<<<< HEAD
-=======
-<!-- Resumen de totales -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 <div class="totals-summary-footer card shadow-lg border-0">
     <div class="card-body py-3">
         <div class="d-flex flex-column flex-md-row justify-content-md-end align-items-center gap-3">
@@ -399,10 +339,6 @@
     </div>
 </div>
 
-<<<<<<< HEAD
-=======
-<!-- Contenedor de notificaciones -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 <div id="toast-container" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1055"></div>
 
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -497,7 +433,6 @@
 </style>
 
 <script>
-<<<<<<< HEAD
 document.addEventListener('DOMContentLoaded', function() {
     
     // --- INICIO DE SECCIÓN MODIFICADA ---
@@ -506,27 +441,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const lugarSelect = document.getElementById('id_empresa_lugar'); // Nuevo
     const proveedorSelect = document.getElementById('id_proveedor');
     
-=======
-// El código JavaScript permanece exactamente igual
-document.addEventListener('DOMContentLoaded', function() {
-    const empresaSelect = document.getElementById('id_empresa');
-    const proveedorSelect = document.getElementById('id_proveedor');
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     const formContainer = document.getElementById('detalle-forms-container');
     const addButton = document.getElementById('add-form');
     const totalFormsInput = document.getElementById('id_detalles-TOTAL_FORMS');
     const emptyFormTemplate = document.getElementById('empty-form').innerHTML;
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-<<<<<<< HEAD
     
     const noLugarMsg = document.getElementById('no-lugar-mensaje'); // Nuevo
     const noProveedorMsg = document.getElementById('no-proveedor-mensaje');
     const noArticulosMsg = document.getElementById('no-articulos-mensaje');
     // --- FIN DE SECCIÓN MODIFICADA ---
-=======
-    const noProveedorMsg = document.getElementById('no-proveedor-mensaje');
-    const noArticulosMsg = document.getElementById('no-articulos-mensaje');
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
     // --- INICIO: Sistema de Notificaciones (Toast) ---
     const toastContainer = document.getElementById('toast-container');
@@ -544,10 +468,7 @@ document.addEventListener('DOMContentLoaded', function() {
         toastContainer.insertAdjacentHTML('beforeend', toastHtml);
         const toastEl = document.getElementById(toastId);
         setTimeout(() => {
-<<<<<<< HEAD
             // Usamos new bootstrap.Toast() para compatibilidad
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             const bsToast = new bootstrap.Toast(toastEl, { autohide: true, delay: 5000 });
             bsToast.hide();
             setTimeout(() => toastEl.remove(), 500);
@@ -573,14 +494,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (cant > 0 && precio > 0 && selectedOption && selectedOption.value) {
                 subtotal = cant * precio;
                 if (selectedOption.dataset.iva === 'true') iva = subtotal * 0.16;
-<<<<<<< HEAD
                 // --- CORRECCIÓN CÁLCULO RETENCIÓN ---
                 // La retención es 2/3 del IVA (10.6667% del subtotal)
                 if (selectedOption.dataset.retIva === 'true') retIVA = iva * (2/3);
                 // --- FIN CORRECCIÓN ---
-=======
-                if (selectedOption.dataset.retIva === 'true') retIVA = subtotal * (2/3) * 0.16;
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                 totalLinea = subtotal + iva - retIVA;
                 grandSubtotal += subtotal;
                 grandImpuestos += (iva - retIVA);
@@ -608,7 +525,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function initializeSelect2(el) { $(el).select2({ placeholder: "Seleccione un artículo", allowClear: true, width: '100%'}); }
 
-<<<<<<< HEAD
     // --- INICIO DE LÓGICA DE API MODIFICADA ---
 
     // NUEVA FUNCIÓN: Carga Empresas (Lugares) basado en la Operación
@@ -641,12 +557,6 @@ document.addEventListener('DOMContentLoaded', function() {
         noProveedorMsg.classList.add('d-none');
         
         fetch(`/compras/api/proveedores_por_empresa/${operacionId}/`) 
-=======
-    function fetchProveedores(empresaId, selectedProveedorId = null) {
-        proveedorSelect.innerHTML = '<option value="">Cargando...</option>';
-        noProveedorMsg.classList.add('d-none');
-        fetch(`/compras/api/proveedores_por_empresa/${empresaId}/`)
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             .then(res => res.json())
             .then(data => {
                 if (data.proveedores.length > 0) {
@@ -659,26 +569,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     proveedorSelect.disabled = false;
                     if (selectedProveedorId) fetchArticulos(selectedProveedorId);
                 } else {
-<<<<<<< HEAD
                     proveedorSelect.innerHTML = '<option value="">No hay proveedores</M>';
                     proveedorSelect.disabled = true;
                     noProveedorMsg.classList.remove('d-none');
                     fetchArticulos(null); // Limpia los artículos
-=======
-                    proveedorSelect.innerHTML = '<option value="">No hay proveedores</option>';
-                    proveedorSelect.disabled = true;
-                    noProveedorMsg.classList.remove('d-none');
-                    fetchArticulos(null);
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                 }
             });
     }
 
-<<<<<<< HEAD
     let articulosActuales = []; 
-=======
-    let articulosActuales = []; // <-- NUEVO: almacena los artículos del proveedor seleccionado
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
     function fetchArticulos(proveedorId) {
         const allArticleSelects = document.querySelectorAll('.select2-articulo');
@@ -687,11 +586,7 @@ document.addEventListener('DOMContentLoaded', function() {
         addButton.disabled = true;
 
         if (!proveedorId) {
-<<<<<<< HEAD
             articulosActuales = [];
-=======
-            articulosActuales = []; // <-- Limpiar si no hay proveedor
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             allArticleSelects.forEach(s => s.innerHTML = '<option value="">Seleccione un proveedor</option>');
             return;
         }
@@ -699,11 +594,7 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch(`/compras/api/articulos_por_proveedor/${proveedorId}/`)
             .then(res => res.json())
             .then(data => {
-<<<<<<< HEAD
                 articulosActuales = data.articulos;
-=======
-                articulosActuales = data.articulos; // <-- Guardar artículos actuales
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                 if (data.articulos.length > 0) {
                     allArticleSelects.forEach(select => {
                         const currentArticuloId = select.dataset.selected;
@@ -731,7 +622,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
     
-<<<<<<< HEAD
     // --- INICIO DE EVENT LISTENERS MODIFICADOS ---
 
     // Elige Operación -> Carga Lugares Y Proveedores
@@ -750,11 +640,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Elige Proveedor -> Carga Artículos
-=======
-    // --- INICIO DE LA LÓGICA CORREGIDA ---
-
-    empresaSelect.addEventListener('change', () => fetchProveedores(empresaSelect.value));
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     proveedorSelect.addEventListener('change', () => fetchArticulos(proveedorSelect.value));
 
     // Usamos jQuery para escuchar los eventos de Select2 de forma fiable
@@ -799,11 +684,7 @@ document.addEventListener('DOMContentLoaded', function() {
         newForm.innerHTML = newFormHtml;
         formContainer.appendChild(newForm.firstElementChild);
         const newSelect = formContainer.lastElementChild.querySelector('.select2-articulo');
-<<<<<<< HEAD
         
-=======
-        // --- NUEVO: poblar el select con los artículos actuales ---
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         if (articulosActuales.length > 0) {
             let options = '<option value="">---------</option>';
             articulosActuales.forEach(a => {
@@ -869,17 +750,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-<<<<<<< HEAD
     // FUNCIÓN DE INICIALIZACIÓN MODIFICADA
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     function initializeForm() {
         document.querySelectorAll('.select2-articulo').forEach(el => {
             // Guardamos el valor inicial del artículo que renderizó Django
             el.dataset.selected = el.value;
             initializeSelect2(el);
         });
-<<<<<<< HEAD
         
         // Si hay una Operación seleccionada al cargar la página (ej. al editar)
         if (operacionSelect.value) {
@@ -891,12 +768,6 @@ document.addEventListener('DOMContentLoaded', function() {
             fetchProveedores(operacionSelect.value, initialProveedorId);
         }
         
-=======
-        if (empresaSelect.value) {
-            const initialProveedorId = proveedorSelect.value;
-            fetchProveedores(empresaSelect.value, initialProveedorId);
-        }
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         setTimeout(calculateAll, 500); 
     }
 

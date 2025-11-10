@@ -4,10 +4,6 @@
 
 {% block compras_content %}
 <div class="container-fluid">
-<<<<<<< HEAD
-=======
-    <!-- Header Section -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2 class="h4 fw-bold text-primary mb-0">Catálogo de Artículos</h2>
@@ -18,25 +14,16 @@
         </a>
     </div>
 
-<<<<<<< HEAD
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body p-3">
             <form method="get" class="row g-3 align-items-end">
                 <div class="col-md-6 col-lg-5">
-=======
-    <!-- Filters Card -->
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body p-3">
-            <form method="get" class="row g-3 align-items-end">
-                <div class="col-md-5">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     <label class="form-label fw-semibold small text-muted mb-1">Buscar artículo</label>
                     <div class="input-group">
                         <span class="input-group-text bg-transparent border-end-0">
                             <i class="fas fa-search text-muted"></i>
                         </span>
                         <input type="text" name="q" class="form-control border-start-0" 
-<<<<<<< HEAD
                                placeholder="Nombre, SKU o descripción..." value="{{ filtros_aplicados.q|default:'' }}">
                     </div>
                 </div>
@@ -46,23 +33,11 @@
                         <option value="">Todas las Operaciones</option>
                         {% for empresa in empresas %}
                             <option value="{{ empresa.id }}" {% if filtros_aplicados.empresa == empresa.id|stringformat:"s" %}selected{% endif %}>
-=======
-                               placeholder="Nombre, SKU o descripción..." value="{{ request.GET.q }}">
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold small text-muted mb-1">Filtrar por empresa</label>
-                    <select name="empresa" class="form-select">
-                        <option value="">Todas las empresas</option>
-                        {% for empresa in empresas %}
-                            <option value="{{ empresa.id }}" {% if request.GET.empresa == empresa.id|stringformat:"s" %}selected{% endif %}>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 {{ empresa.nombre }}
                             </option>
                         {% endfor %}
                     </select>
                 </div>
-<<<<<<< HEAD
                 
                 <div class="col-md-4 col-lg-3">
                     <label class="form-label fw-semibold small text-muted mb-1">Origen (Lugar)</label>
@@ -124,40 +99,15 @@
             </form>
         </div>
     </div>
-=======
-                <div class="col-md-3">
-                    <button class="btn btn-primary w-100" type="submit">
-                        <i class="fas fa-filter me-2"></i> Aplicar Filtros
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Results Card -->
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0 text-dark">
                 <i class="fas fa-boxes me-2 text-primary"></i>Resultados
-<<<<<<< HEAD
                 {% if page_obj %}
                 <span class="badge bg-primary bg-opacity-10 text-primary ms-2">{{ page_obj.paginator.count }} artículo(s) encontrados</span>
                 {% endif %}
             </h5>
             </div>
-=======
-                {% if articulos %}
-                <span class="badge bg-primary bg-opacity-10 text-primary ms-2">{{ articulos|length }} artículo(s)</span>
-                {% endif %}
-            </h5>
-            {% if request.GET.q or request.GET.empresa %}
-            <a href="{% url 'lista_articulos' %}" class="btn btn-sm btn-outline-secondary">
-                <i class="fas fa-times me-1"></i> Limpiar filtros
-            </a>
-            {% endif %}
-        </div>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -165,12 +115,8 @@
                     <thead class="table-light">
                         <tr>
                             <th class="ps-4">SKU / Nombre</th>
-<<<<<<< HEAD
                             <th>Operación</th>
                             <th>Empresa (Origen)</th> <th>Proveedores</th>
-=======
-                            <th>Empresa</th>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             <th>Categoría</th>
                             <th>Tipo</th>
                             <th>Unidad</th>
@@ -179,11 +125,7 @@
                         </tr>
                     </thead>
                     <tbody>
-<<<<<<< HEAD
                         {% for articulo in articulos %} 
-=======
-                        {% for articulo in articulos %}
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                         <tr class="border-top">
                             <td class="ps-4">
                                 <div class="d-flex align-items-center">
@@ -202,7 +144,6 @@
                                 </span>
                             </td>
                             <td>
-<<<<<<< HEAD
                                 <span class="badge bg-light text-dark border">
                                     {{ articulo.origen.nombre|default:"N/A" }}
                                 </span>
@@ -221,27 +162,17 @@
                                 {% endfor %}
                             </td>
                             <td>
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 <span class="badge bg-info bg-opacity-10 text-info">
                                     {{ articulo.categoria|default:"Sin categoría" }}
                                 </span>
                             </td>
                             <td>
-<<<<<<< HEAD
                                 {% if articulo.tipo == 'PRODUCTO' %}
-=======
-                                {% if articulo.tipo == 'producto' %}
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     <span class="badge bg-success bg-opacity-15 text-white fw-bold">
                                         <i class="fas fa-cube me-1"></i> Producto
                                     </span>
                                 {% else %}
-<<<<<<< HEAD
                                 <span class="badge bg-warning bg-opacity-15 text-white fw-bold">
-=======
-                                    <span class="badge bg-warning bg-opacity-15 text-white fw-bold">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                         <i class="fas fa-cogs me-1"></i> Servicio
                                     </span>
                                 {% endif %}
@@ -253,19 +184,11 @@
                             </td>
                             <td>
                                 {% if articulo.activo %}
-<<<<<<< HEAD
                                     <span class="badge bg-success bg-opacity-15 text-withe fw-bold py-2">
                                         <i class="fas fa-check-circle me-1"></i> Activo
                                     </span>
                                 {% else %}
                                 <span class="badge bg-danger bg-opacity-15 text-withe fw-bold py-2">
-=======
-                                    <span class="badge bg-success bg-opacity-15 text-white fw-bold py-2">
-                                        <i class="fas fa-check-circle me-1"></i> Activo
-                                    </span>
-                                {% else %}
-                                    <span class="badge bg-danger bg-opacity-15 text-white fw-bold py-2">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                         <i class="fas fa-times-circle me-1"></i> Inactivo
                                     </span>
                                 {% endif %}
@@ -278,11 +201,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-<<<<<<< HEAD
                             <td colspan="9" class="text-center py-5">
-=======
-                            <td colspan="7" class="text-center py-5">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 <div class="py-4">
                                     <i class="fas fa-search text-muted" style="font-size: 3rem;"></i>
                                     <h5 class="mt-3 text-muted">No se encontraron artículos</h5>
@@ -298,7 +217,6 @@
                 </table>
             </div>
 
-<<<<<<< HEAD
             {% if is_paginated %}
             <div class="card-footer bg-white border-0 py-3">
                 <nav aria-label="Navegación de páginas">
@@ -310,16 +228,6 @@
                         {% if page_obj.has_previous %}
                             <li class="page-item">
                                 <a class="page-link" href="{{ base_url }}?{{ all_filters }}&page={{ page_obj.previous_page_number }}" aria-label="Anterior">
-=======
-            <!-- Pagination -->
-            {% if is_paginated %}
-            <div class="card-footer bg-white border-0 py-3">
-                <nav aria-label="Navegación de páginas">
-                    <ul class="pagination justify-content-center mb-0">
-                        {% if page_obj.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.empresa %}&empresa={{ request.GET.empresa }}{% endif %}" aria-label="Anterior">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     <i class="fas fa-chevron-left"></i>
                                 </a>
                             </li>
@@ -336,22 +244,14 @@
                                 </li>
                             {% else %}
                                 <li class="page-item">
-<<<<<<< HEAD
                                     <a class="page-link" href="{{ base_url }}?{{ all_filters }}&page={{ i }}">{{ i }}</a>
-=======
-                                    <a class="page-link" href="?page={{ i }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.empresa %}&empresa={{ request.GET.empresa }}{% endif %}">{{ i }}</a>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 </li>
                             {% endif %}
                         {% endfor %}
 
                         {% if page_obj.has_next %}
                             <li class="page-item">
-<<<<<<< HEAD
                                 <a class="page-link" href="{{ base_url }}?{{ all_filters }}&page={{ page_obj.next_page_number }}" aria-label="Siguiente">
-=======
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.empresa %}&empresa={{ request.GET.empresa }}{% endif %}" aria-label="Siguiente">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     <i class="fas fa-chevron-right"></i>
                                 </a>
                             </li>
@@ -361,34 +261,22 @@
                             </li>
                         {% endif %}
                     </ul>
-<<<<<<< HEAD
 
                     {% endwith %}
 
                     <div class="text-center text-muted small mt-2">
                         Mostrando página {{ page_obj.number }} de {{ paginator.num_pages }}
                         (Total: {{ page_obj.paginator.count }} artículos)
-=======
-                    <div class="text-center text-muted small mt-2">
-                        Mostrando página {{ page_obj.number }} de {{ paginator.num_pages }}
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     </div>
                 </nav>
             </div>
             {% endif %}
-<<<<<<< HEAD
             </div>
-=======
-        </div>
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     </div>
 </div>
 
 <style>
-<<<<<<< HEAD
     /* ... (El CSS es el mismo, no es necesario cambiarlo) ... */
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     .card {
         border-radius: 12px;
         overflow: hidden;

@@ -104,11 +104,7 @@
             <form method="get" action="" class="needs-validation" novalidate id="filterForm">
                 <div class="row g-3">
                     
-<<<<<<< HEAD
                     <div class="col-md-4">
-=======
-                    <div class="col-md-3">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                         <label for="q_remision" class="form-label small fw-bold">N° Remisión</label>
                         <input type="text" name="q_remision" id="q_remision" class="form-control form-control-sm" placeholder="Buscar por número" value="{{ search_params.q_remision|default:'' }}" list="remision-list">
                         <datalist id="remision-list">
@@ -118,7 +114,6 @@
                         </datalist>
                     </div>
 
-<<<<<<< HEAD
                     <div class="col-md-4">
                         <label for="q_prefijo" class="form-label small fw-bold">Operación</label>
                         <select name="q_prefijo" id="q_prefijo" class="form-select form-select-sm searchable-select">
@@ -130,26 +125,6 @@
                     </div>
 
                     <div class="col-md-4">
-=======
-                    <div class="col-md-3">
-                        <label for="q_prefijo" class="form-label small fw-bold">Prefijo Remisión</label>
-                        <select name="q_prefijo" id="q_prefijo" class="form-select form-select-sm">
-                            <option value="" {% if not search_params.q_prefijo %}selected{% endif %}>Todos</option>
-                            <option value="NLD-" {% if search_params.q_prefijo == 'NLD-' %}selected{% endif %}>NLD (Medline)</option>
-                            <option value="MTY-" {% if search_params.q_prefijo == 'MTY-' %}selected{% endif %}>MTY (Trane)</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="q_empresa" class="form-label small fw-bold">Unidad de Negocio</label>
-                        <select name="q_empresa" id="q_empresa" class="form-select form-select-sm searchable-select">
-                            <option value="">Todas</option>
-                            {% for empresa in empresas %}
-                                <option value="{{ empresa.id }}" {% if search_params.q_empresa == empresa.id|stringformat:"s" %}selected{% endif %}>{{ empresa.nombre }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-3">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                         <label for="q_material" class="form-label small fw-bold">Material</label>
                         <select name="q_material" id="q_material" class="form-select form-select-sm searchable-select">
                             <option value="">Todos</option>
@@ -158,12 +133,8 @@
                             {% endfor %}
                         </select>
                     </div>
-<<<<<<< HEAD
 
                     <div class="col-md-4">
-=======
-                    <div class="col-md-3">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                         <label for="q_status" class="form-label small fw-bold">Estatus</label>
                         <select name="q_status" id="q_status" class="form-select form-select-sm searchable-select">
                             <option value="">Todos</option>
@@ -172,12 +143,8 @@
                             {% endfor %}
                         </select>
                     </div>
-<<<<<<< HEAD
 
                     <div class="col-md-4">
-=======
-                    <div class="col-md-3">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                         <label for="q_origen" class="form-label small fw-bold">Origen</label>
                         <select name="q_origen" id="q_origen" class="form-select form-select-sm searchable-select">
                             <option value="">Todos</option>
@@ -186,12 +153,8 @@
                             {% endfor %}
                         </select>
                     </div>
-<<<<<<< HEAD
 
                     <div class="col-md-4">
-=======
-                    <div class="col-md-3">
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                         <label for="q_destino" class="form-label small fw-bold">Destino</label>
                         <select name="q_destino" id="q_destino" class="form-select form-select-sm searchable-select">
                             <option value="">Todos</option>
@@ -200,10 +163,7 @@
                             {% endfor %}
                         </select>
                     </div>
-<<<<<<< HEAD
                     
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     <div class="col-md-3"><label for="q_fecha_desde" class="form-label small fw-bold">Fecha desde</label><input type="date" name="q_fecha_desde" id="q_fecha_desde" class="form-control form-control-sm" value="{{ search_params.q_fecha_desde|default:'' }}"></div>
                     <div class="col-md-3"><label for="q_fecha_hasta" class="form-label small fw-bold">Fecha hasta</label><input type="date" name="q_fecha_hasta" id="q_fecha_hasta" class="form-control form-control-sm" value="{{ search_params.q_fecha_hasta|default:'' }}"></div>
                 </div>
@@ -320,54 +280,10 @@ $(document).ready(function() {
         width: $(this).data('width') ? $(this).data('width') : $(this).hasClass('w-100') ? '100%' : 'style'
     });
 
-<<<<<<< HEAD
     // --- LÓGICA PARA EXPORTACIÓN A EXCEL ---
     // Nota: La lógica de filtros dinámicos por empresa se ha eliminado ya que
     // el filtro principal ahora es 'Operación' (prefijo), que es más directo.
     
-=======
-    // --- FILTROS DINÁMICOS POR UNIDAD DE NEGOCIO ---
-    const empresaSelect = $('#q_empresa');
-    const materialSelect = $('#q_material');
-    const origenSelect = $('#q_origen');
-    const destinoSelect = $('#q_destino');
-    
-    // Almacenar los valores seleccionados actualmente
-    const currentMaterial = "{{ search_params.q_material|default:'' }}";
-    const currentOrigen = "{{ search_params.q_origen|default:'' }}";
-    const currentDestino = "{{ search_params.q_destino|default:'' }}";
-
-    empresaSelect.on('change', function() {
-        const empresaId = $(this).val();
-        
-        function updateSelect(selectElement, items, currentValue, placeholder) {
-            selectElement.empty().append(`<option value="">${placeholder}</option>`);
-            if (items) {
-                items.forEach(item => {
-                    const selected = item.id.toString() === currentValue ? ' selected' : '';
-                    selectElement.append(`<option value="${item.id}"${selected}>${item.nombre}</option>`);
-                });
-            }
-            selectElement.trigger('change.select2');
-        }
-
-        if (empresaId) {
-            fetch(`/api/catalogos/${empresaId}/`)
-                .then(response => response.json())
-                .then(data => {
-                    updateSelect(materialSelect, data.materiales, currentMaterial, 'Todos los Materiales');
-                    updateSelect(origenSelect, data.lugares_origen, currentOrigen, 'Todos los Orígenes');
-                    updateSelect(destinoSelect, data.lugares_destino, currentDestino, 'Todos los Destinos');
-                });
-        }
-    });
-    
-    if (empresaSelect.val()) {
-        empresaSelect.trigger('change');
-    }
-
-    // --- LÓGICA PARA EXPORTACIÓN A EXCEL ---
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     function updateExportUrl() {
         const form = $('#filterForm');
         const params = new URLSearchParams(new FormData(form[0])).toString();

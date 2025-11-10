@@ -156,18 +156,11 @@
                         <div class="col-12 col-md-3">{{ form.cliente }}<div class="form-error">{{ form.cliente.errors }}</div></div>
                         <div class="col-6 col-md-2">{{ form.peso_dlv }}<div class="form-error">{{ form.peso_dlv.errors }}</div></div>
                         <div class="col-6 col-md-1 text-center"><span class="perdida-calculada-label">PÉRDIDA</span><span class="perdida-calculada-valor text-danger">0.000</span></div>
-<<<<<<< HEAD
                         
                         <div class="col-12 col-md-1 text-center delete-widget-cell">
                             {{ form.DELETE }} <button type="button" class="btn btn-danger btn-sm btn-delete-row w-100"><i class="fas fa-trash"></i></button>
                         </div>
                         {{ form.id }}
-=======
-                        <div class="col-12 col-md-1 text-center delete-widget-cell">
-                            {% if form.instance.pk %}<div class="form-check pt-2">{{ form.DELETE }} <label for="{{ form.DELETE.id_for_label }}">Eliminar</label></div>
-                            {% else %}{{ form.DELETE }}<button type="button" class="btn btn-danger btn-sm btn-delete-row w-100"><i class="fas fa-trash"></i></button>{% endif %}
-                        </div>{{ form.id }}
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     </div></div>{% endfor %}
                 </div>
                 <div id="empty-form-template" style="display: none;"><div class="detalle-form-row"><div class="row g-3 align-items-center">
@@ -222,15 +215,12 @@
 $(document).ready(function() {
     
     // --- Variables y selectores ---
-<<<<<<< HEAD
     
     // --- INICIO: MODIFICACIÓN PARA OBTENER EL ESTADO DE EDICIÓN ---
     // Esta variable 'IS_EDITING' viene del contexto de Django que añadimos en las vistas.
     const IS_EDITING = {{ is_editing|yesno:"true,false" }};
     // --- FIN: MODIFICACIÓN ---
     
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     let cachedCatalogData = { materiales: [], lugares: [] };
     const formContainer = $('#form-container');
     const addButton = $('#add-form');
@@ -244,10 +234,7 @@ $(document).ready(function() {
         $(context).find('select:not([data-select2-id])').select2({
             theme: 'bootstrap-5', width: '100%', placeholder: 'Seleccione una opción', allowClear: true
         });
-<<<<<<< HEAD
         // Esta línea OCULTA los checkboxes "DELETE" para que solo se vea el botón de basura
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         $(context).find('input[type="checkbox"][name$="-DELETE"]').hide();
     }
     
@@ -268,7 +255,6 @@ $(document).ready(function() {
         addButton.prop('disabled', true);
 
         if (empresaId) {
-<<<<<<< HEAD
             
             // --- INICIO: MODIFICACIÓN PARA EVITAR AUTO-INCREMENTO AL EDITAR ---
             // Si NO estamos editando (IS_EDITING es false), entonces sí buscamos el folio.
@@ -294,28 +280,6 @@ $(document).ready(function() {
             // --- FIN: MODIFICACIÓN ---
 
             // Lógica para cargar catálogos (Esta se ejecuta siempre)
-=======
-            // --- INICIO: LÓGICA CORREGIDA PARA GENERAR REMISIÓN AUTOMÁTICA ---
-            fetch(`/api/get-next-remision/${empresaId}/`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.is_manual) {
-                        remisionInput.prop('readonly', false);
-                        remisionInput.val('');
-                        remisionInput.attr('placeholder', 'Ingrese folio manualmente');
-                    } else if (data.next_remision) {
-                        remisionInput.val(data.next_remision);
-                        remisionInput.prop('readonly', true);
-                        remisionInput.attr('placeholder', '');
-                    }
-                }).catch(error => {
-                    console.error("Error al obtener el número de remisión:", error);
-                    remisionInput.prop('readonly', false);
-                });
-            // --- FIN: LÓGICA CORREGIDA ---
-
-            // Lógica para cargar catálogos
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             fetch(`/api/get-catalogos/${empresaId}/`)
                 .then(response => response.json())
                 .then(data => {
@@ -359,11 +323,8 @@ $(document).ready(function() {
         totalFormsInput.val(formIndex + 1);
     });
     
-<<<<<<< HEAD
     // Este JS maneja el clic en el botón de basura
     // Oculta la fila Y marca el checkbox 'DELETE' para que Django la borre al guardar.
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     formContainer.on('click', '.btn-delete-row', function() {
         $(this).closest('.detalle-form-row').find('input[type="checkbox"][name$="-DELETE"]').prop('checked', true).end().hide();
     });
@@ -372,11 +333,7 @@ $(document).ready(function() {
         const row = $(this).closest('.row');
         const carga = parseFloat(row.find('.peso-carga').val()) || 0;
         const descarga = parseFloat(row.find('.peso-descarga').val()) || 0;
-<<<<<<< HEAD
         const diferencia = descarga - carga; // Cambiado a Descarga - Carga para 'Ganancia'
-=======
-        const diferencia = descarga - carga;
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         const labelSpan = row.find('.perdida-calculada-label');
         const valorSpan = row.find('.perdida-calculada-valor');
 
@@ -433,12 +390,9 @@ $(document).ready(function() {
     // --- EJECUCIÓN INICIAL AL CARGAR LA PÁGINA ---
     initializePreviews();
 
-<<<<<<< HEAD
     // Si la página se carga y ya hay una empresa seleccionada (como en 'editar'),
     // dispara el evento 'change' para cargar todos los catálogos.
     // El folio de remisión no se cambiará gracias al 'if (!IS_EDITING)'.
-=======
->>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     if (empresaSelect.val()) {
         empresaSelect.trigger('change');
     } else {
