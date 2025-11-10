@@ -23,7 +23,7 @@ class Profile(models.Model):
     # --- ¡SOLUCIÓN AL ERROR ORIGINAL! ---
     # Al poner null=True y blank=True, permites que la base de datos
     # cree el registro con este campo vacío, evitando el IntegrityError.
-    last_seen = models.DateTimeField(null=True, blank=True)
+    last_seen = models.DateTimeField(default=timezone.now, null=False, blank=False)
     
     # The 'status' field uses the correctly formatted choices.
     status = models.CharField(
