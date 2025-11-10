@@ -5,7 +5,10 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
+<<<<<<< HEAD
 from django.views.decorators.http import require_POST
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 from django.forms import inlineformset_factory
 from django.db import transaction
 from django.db.models import Q
@@ -34,7 +37,10 @@ from ternium.models import Empresa
 from django.http import HttpResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
+<<<<<<< HEAD
 from ternium.models import Empresa, Origen # Asegúrate que Origen esté importado
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
 # --- DASHBOARD ---
 
@@ -60,6 +66,7 @@ class ProveedorListView(LoginRequiredMixin, ListView):
     paginate_by = 10
 
     def get_queryset(self):
+<<<<<<< HEAD
         # --- MODIFICACIÓN: Optimizar consulta ---
         queryset = super().get_queryset().select_related('empresa', 'lugar')
         
@@ -67,12 +74,17 @@ class ProveedorListView(LoginRequiredMixin, ListView):
         operador_id = self.request.GET.get('operador') # <-- Nuevo
         lugar_id = self.request.GET.get('lugar')       # <-- Nuevo
         
+=======
+        queryset = super().get_queryset()
+        query = self.request.GET.get('q')
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         if query:
             queryset = queryset.filter(
                 Q(razon_social__icontains=query) |
                 Q(rfc__icontains=query) |
                 Q(contacto_principal__icontains=query)
             )
+<<<<<<< HEAD
         
         # --- NUEVOS FILTROS ---
         if operador_id:
@@ -95,6 +107,9 @@ class ProveedorListView(LoginRequiredMixin, ListView):
         context['filtros_aplicados'] = self.request.GET
         
         return context
+=======
+        return queryset
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
 class ProveedorCreateView(LoginRequiredMixin, CreateView):
     model = Proveedor
@@ -137,6 +152,7 @@ class ArticuloListView(LoginRequiredMixin, ListView):
     paginate_by = 10
 
     def get_queryset(self):
+<<<<<<< HEAD
         queryset = super().get_queryset().select_related(
             'empresa', 'categoria', 'unidad_medida', 'origen'
         ).prefetch_related(
@@ -223,6 +239,33 @@ def crear_articulo(request):
         'titulo': "Crear Nuevo Artículo/Servicio"
     }
     return render(request, 'compras/articulo_form_with_suppliers.html', context)
+=======
+        queryset = super().get_queryset().select_related('empresa', 'categoria', 'unidad_medida')
+        query = self.request.GET.get('q')
+        empresa_id = self.request.GET.get('empresa')
+        if query:
+            queryset = queryset.filter(Q(nombre__icontains=query) | Q(sku__icontains=query))
+        if empresa_id:
+            queryset = queryset.filter(empresa_id=empresa_id)
+        return queryset
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['empresas'] = Empresa.objects.all()
+        return context
+
+class ArticuloCreateView(LoginRequiredMixin, CreateView):
+    model = Articulo
+    form_class = ArticuloForm
+    template_name = 'compras/generic_form.html'
+    success_url = reverse_lazy('lista_articulos')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['titulo'] = "Crear Nuevo Artículo/Servicio"
+        return context
+
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 @login_required
 def editar_articulo(request, pk):
     articulo = get_object_or_404(Articulo, pk=pk)
@@ -266,17 +309,24 @@ class SolicitudCompraListView(LoginRequiredMixin, ListView):
         Sobrescribimos este método para añadir la lógica de filtrado
         basada en los parámetros GET de la URL.
         """
+<<<<<<< HEAD
         # --- INICIO MODIFICACIÓN ---
         # Añadimos 'lugar' al select_related para optimizar
         queryset = super().get_queryset().select_related(
             'empresa', 'lugar', 'solicitante', 'aprobado_por'
         )
         # --- FIN MODIFICACIÓN ---
+=======
+        queryset = super().get_queryset().select_related('empresa', 'solicitante', 'aprobado_por')
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         
         # Obtener parámetros del formulario de filtros
         folio = self.request.GET.get('folio')
         empresa_id = self.request.GET.get('empresa')
+<<<<<<< HEAD
         lugar_id = self.request.GET.get('lugar') # <-- AÑADIDO
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         solicitante_id = self.request.GET.get('solicitante')
         estatus = self.request.GET.get('estatus')
         prioridad = self.request.GET.get('prioridad')
@@ -288,12 +338,15 @@ class SolicitudCompraListView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(folio__icontains=folio)
         if empresa_id:
             queryset = queryset.filter(empresa_id=empresa_id)
+<<<<<<< HEAD
         
         # --- FILTRO AÑADIDO ---
         if lugar_id:
             queryset = queryset.filter(lugar_id=lugar_id)
         # --- FIN FILTRO AÑADIDO ---
             
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         if solicitante_id:
             queryset = queryset.filter(solicitante_id=solicitante_id)
         if estatus:
@@ -316,11 +369,14 @@ class SolicitudCompraListView(LoginRequiredMixin, ListView):
         
         # Datos para los dropdowns del formulario de filtros
         context['empresas'] = Empresa.objects.all().order_by('nombre')
+<<<<<<< HEAD
         
         # --- LÍNEA AÑADIDA ---
         context['lugares'] = Lugar.objects.filter(tipo='ORIGEN').order_by('nombre')
         # --- FIN LÍNEA AÑADIDA ---
         
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         solicitantes_ids = SolicitudCompra.objects.values_list('solicitante', flat=True).distinct()
         context['solicitantes'] = User.objects.filter(id__in=solicitantes_ids).order_by('username')
         context['estatus_choices'] = SolicitudCompra.ESTATUS_CHOICES
@@ -523,6 +579,7 @@ class OrdenCompraListView(LoginRequiredMixin, ListView):
         Sobrescribe el método para añadir la lógica de filtrado
         basada en los parámetros GET de la URL.
         """
+<<<<<<< HEAD
         # --- INICIO MODIFICACIÓN ---
         # Añadimos 'solicitud_origen__lugar' para poder filtrar por el lugar
         # de la solicitud de origen.
@@ -531,12 +588,21 @@ class OrdenCompraListView(LoginRequiredMixin, ListView):
             'solicitud_origen__lugar' # <-- AÑADIDO
         )
         # --- FIN MODIFICACIÓN ---
+=======
+        # Inicia con el queryset base y optimiza las consultas a la BD
+        queryset = super().get_queryset().select_related(
+            'empresa', 'proveedor', 'solicitud_origen', 'creado_por'
+        )
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
         # --- Obtiene parámetros del formulario de filtros ---
         folio = self.request.GET.get('folio', '').strip()
         proveedor_id = self.request.GET.get('proveedor')
         empresa_id = self.request.GET.get('empresa')
+<<<<<<< HEAD
         lugar_id = self.request.GET.get('lugar') # <-- AÑADIDO
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         estatus = self.request.GET.get('estatus')
         start_date = self.request.GET.get('start_date')
         end_date = self.request.GET.get('end_date')
@@ -548,6 +614,7 @@ class OrdenCompraListView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(proveedor_id=proveedor_id)
         if empresa_id:
             queryset = queryset.filter(empresa_id=empresa_id)
+<<<<<<< HEAD
         
         # --- FILTRO AÑADIDO ---
         # Filtra por el 'lugar' de la solicitud de origen.
@@ -556,6 +623,8 @@ class OrdenCompraListView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(solicitud_origen__lugar_id=lugar_id)
         # --- FIN FILTRO AÑADIDO ---
             
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         if estatus:
             queryset = queryset.filter(estatus=estatus)
         if start_date:
@@ -577,11 +646,16 @@ class OrdenCompraListView(LoginRequiredMixin, ListView):
         context['proveedores'] = Proveedor.objects.filter(activo=True).order_by('razon_social')
         context['estatus_choices'] = OrdenCompra.ESTATUS_CHOICES
         
+<<<<<<< HEAD
         # --- LÍNEA AÑADIDA ---
         context['lugares'] = Lugar.objects.filter(tipo='ORIGEN').order_by('nombre')
         # --- FIN LÍNEA AÑADIDA ---
 
         # --- Mantiene el estado del formulario ---
+=======
+        # --- Mantiene el estado del formulario ---
+        # Pasa los filtros aplicados de vuelta al template
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         context['filtros_aplicados'] = self.request.GET
         
         return context
@@ -589,6 +663,7 @@ class OrdenCompraListView(LoginRequiredMixin, ListView):
 class OrdenCompraDetailView(LoginRequiredMixin, DetailView):
     model = OrdenCompra
     template_name = 'compras/orden_compra_detail.html'
+<<<<<<< HEAD
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -611,6 +686,8 @@ class OrdenCompraDetailView(LoginRequiredMixin, DetailView):
         }
         
         return context
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
 
 @login_required
@@ -751,6 +828,7 @@ class CategoriaListView(LoginRequiredMixin, ListView):
         # Obtenemos solo las categorías principales (las que no tienen padre)
         context['categorias_principales'] = Categoria.objects.filter(parent__isnull=True).prefetch_related('subcategorias')
         return context
+<<<<<<< HEAD
     
 @login_required
 @require_POST
@@ -830,6 +908,8 @@ def eliminar_documento_oc(request, pk, tipo):
     
     return redirect('detalle_orden_compra', pk=pk)
 
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
 class CategoriaCreateView(LoginRequiredMixin, CreateView):
     model = Categoria
@@ -1056,6 +1136,7 @@ def redirigir_a_generar_oc(request, pk):
         return redirect('lista_ordenes_compra')
 
     return redirect('generar_orden_de_compra', pk=orden.solicitud_origen.pk)
+<<<<<<< HEAD
 from ternium.models import Empresa, Origen, Lugar
 @login_required
 def get_origenes_por_empresa(request, empresa_id):
@@ -1122,3 +1203,6 @@ def get_empresas_por_operacion(request, operacion_id):
         return JsonResponse({'empresas': []}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+=======
+
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b

@@ -1,6 +1,11 @@
 {% extends 'compras/compras_base.html' %}
 {% load humanize %}
+<<<<<<< HEAD
 {% load static %} {% block compras_content %}
+=======
+
+{% block compras_content %}
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 <div class="container-fluid">
     <div class="row mb-4 align-items-center">
         <div class="col-md-6">
@@ -21,6 +26,7 @@
             </a>
         </div>
     </div>
+<<<<<<< HEAD
 
     <!-- NUEVA SECCIÓN: Proceso de Auditoría Visual -->
     <div class="row mb-4">
@@ -270,6 +276,8 @@
         </div>
     </div>
 
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     <div class="row">
         <div class="col-lg-8">
             <div class="card shadow-sm border-0 mb-4">
@@ -279,6 +287,7 @@
                             <h6 class="text-muted">PROVEEDOR</h6>
                             <p class="fw-bold fs-5">{{ object.proveedor.razon_social }}</p>
                             <p class="mb-1"><i class="fas fa-id-card fa-fw me-2 text-muted"></i>{{ object.proveedor.rfc }}</p>
+<<<<<<< HEAD
                             <p class="mb-0"><i class="fas fa-envelope fa-fw me-2 text-muted"></i>{{ object.proveedor.email_contacto|default:"N/A" }}</p>
                         </div>
                         
@@ -304,6 +313,18 @@
                                     {% endif %}
                                 </p>
                             </div>
+=======
+                            <p class="mb-0"><i class="fas fa-envelope fa-fw me-2 text-muted"></i>{{ object.proveedor.email_contacto }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-muted">EMPRESA</h6>
+                            <p class="fw-bold fs-5">{{ object.empresa.nombre }}</p>
+                            {% if object.solicitud_origen %}
+                                <a href="{% url 'detalle_solicitud' object.solicitud_origen.pk %}" class="text-decoration-none">
+                                    <i class="fas fa-file-alt fa-fw me-2 text-muted"></i>Solicitud Origen: {{ object.solicitud_origen.folio }}
+                                </a>
+                            {% endif %}
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                         </div>
                         <div class="col-md-4 text-md-end">
                             <h6 class="text-muted">ESTATUS</h6>
@@ -311,13 +332,19 @@
                                 {% if object.estatus == 'APROBADA' %} bg-success text-white
                                 {% elif object.estatus == 'CANCELADA' %} bg-danger text-white
                                 {% elif object.estatus == 'AUDITADA' %} bg-primary text-white
+<<<<<<< HEAD
                                 {% elif object.estatus == 'LISTA_PARA_AUDITAR' %} bg-warning text-dark
                                 {% else %} bg-secondary text-white {% endif %}">
                                 <i class="fas {% if object.estatus == 'APROBADA' %}fa-check-circle{% elif object.estatus == 'CANCELADA' %}fa-times-circle{% elif object.estatus == 'AUDITADA' %}fa-gavel{% elif object.estatus == 'LISTA_PARA_AUDITAR' %}fa-clipboard-check{% else %}fa-pencil-alt{% endif %} me-1"></i>
+=======
+                                {% else %} bg-secondary text-white {% endif %}">
+                                <i class="fas {% if object.estatus == 'APROBADA' %}fa-check-circle{% elif object.estatus == 'CANCELADA' %}fa-times-circle{% elif object.estatus == 'AUDITADA' %}fa-gavel{% else %}fa-pencil-alt{% endif %} me-1"></i>
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 {{ object.get_estatus_display }}
                             </span>
                             <p class="mt-2 mb-0"><strong class="text-muted">Fecha Emisión:</strong> {{ object.fecha_emision|date:"d/m/Y" }}</p>
                             <p class="mb-0"><strong class="text-muted">Entrega Esperada:</strong> {{ object.fecha_entrega_esperada|date:"d/m/Y" }}</p>
+<<<<<<< HEAD
                             
                             <!-- Recordatorio de Modalidad de Pago -->
                             {% if object.es_pago_plazos %}
@@ -334,6 +361,8 @@
                                     <i class="fas fa-file-alt fa-fw me-2 text-muted"></i>Solicitud: {{ object.solicitud_origen.folio }}
                                 </a>
                             {% endif %}
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                         </div>
                     </div>
                 </div>
@@ -359,12 +388,19 @@
                             </thead>
                             <tbody>
                                 {% for detalle in object.detalles.all %}
+<<<<<<< HEAD
                                 <tr data-subtotal="{{ detalle.subtotal }}" data-has-iva="{{ detalle.articulo.lleva_iva|yesno:'true,false' }}">
+=======
+                                <tr data-subtotal="{{ detalle.subtotal }}" data-has-iva="{{ detalle.articulo.lleva_iva }}">
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 <td class="ps-4">{{ detalle.articulo.sku|default:"N/A" }}</td>
                                     <td>
                                         {{ detalle.articulo.nombre }}
                                         {% if detalle.articulo.lleva_iva %}<span class="badge bg-light text-dark ms-1">IVA</span>{% endif %}
+<<<<<<< HEAD
                                         {% if detalle.articulo.lleva_retencion_iva %}<span class="badge bg-light text-warning ms-1">RET</span>{% endif %}
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     </td>
                                     <td class="text-end">{{ detalle.cantidad|floatformat:2|intcomma }}</td>
                                     <td>{{ detalle.articulo.unidad_medida.abreviatura }}</td>
@@ -394,16 +430,20 @@
                                     <span>IVA (16%):</span>
                                     <span class="fw-semibold">${{ object.total_iva|floatformat:2|intcomma }}</span>
                                 </li>
+<<<<<<< HEAD
                                 {% if object.total_retenciones > 0 %}
                                 <li class="list-group-item d-flex justify-content-between">
                                     <span>Retenciones:</span>
                                     <span class="fw-semibold text-danger">-${{ object.total_retenciones|floatformat:2|intcomma }}</span>
                                 </li>
                                 {% endif %}
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 <li class="list-group-item d-flex justify-content-between bg-light fs-5">
                                     <strong class="text-primary">Total General:</strong>
                                     <strong class="text-primary">${{ object.total_general|floatformat:2|intcomma }}</strong>
                                 </li>
+<<<<<<< HEAD
                                 <!-- Información de Modalidad de Pago en el Resumen -->
                                 {% if object.es_pago_plazos %}
                                 <li class="list-group-item d-flex justify-content-between bg-light">
@@ -416,12 +456,15 @@
                                     </small>
                                 </li>
                                 {% endif %}
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             </ul>
                         </div>
                     </div>
                 </div>
             </div>
             </div>
+<<<<<<< HEAD
 
         <!-- PANEL LATERAL ACTUALIZADO -->
         <div class="col-lg-4">
@@ -515,21 +558,95 @@
                                 <button type="button" class="btn btn-primary w-100 fw-bold py-2" disabled 
                                         data-bs-toggle="tooltip" title="Debe completar todos los documentos para auditar">
                                     <i class="fas fa-gavel me-2"></i> Pendiente de Documentos
+=======
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 sticky-top" style="top: 20px;">
+                <div class="card-header bg-light py-3 border-0 d-flex align-items-center">
+                    <i class="fas fa-folder-open me-2 text-primary"></i>
+                    <h5 class="card-title mb-0">Administración y Acciones</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <span><i class="fas fa-file-invoice fa-fw me-2 text-muted"></i>Factura</span>
+                            {% if object.factura %}
+                                <a href="{{ object.factura.url }}" target="_blank" class="btn btn-sm btn-outline-success">Ver Archivo</a>
+                            {% else %}
+                                <span class="badge bg-danger text-white">Requerido</span>
+                            {% endif %}
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <span><i class="fas fa-money-check-alt fa-fw me-2 text-muted"></i>Comprobante Pago</span>
+                             {% if object.comprobante_pago %}
+                                <a href="{{ object.comprobante_pago.url }}" target="_blank" class="btn btn-sm btn-outline-success">Ver Archivo</a>
+                            {% else %}
+                                <span class="badge bg-danger text-white">Requerido</span>
+                            {% endif %}
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center bg-light mt-2 px-2 rounded">
+                            <strong class="text-primary"><i class="fas fa-tasks fa-fw me-2"></i>Siguiente Paso</strong>
+                            {% if object.estatus == 'BORRADOR' %}
+                                {% if object.factura and object.comprobante_pago %}
+                                    <span class="badge bg-success fs-6"><i class="fas fa-check-circle me-1"></i> Lista para Aprobar</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark fs-6"><i class="fas fa-exclamation-triangle me-1"></i> Cargar archivos requeridos</span>
+                                {% endif %}
+                            {% elif object.estatus == 'APROBADA' %}
+                                {% if object.lista_para_auditoria %}
+                                    <span class="badge bg-success fs-6"><i class="fas fa-check-circle me-1"></i> Lista para Auditar</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark fs-6"><i class="fas fa-exclamation-triangle me-1"></i> Faltan archivos para auditar</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge bg-light text-dark border">Proceso Finalizado</span>
+                            {% endif %}
+                        </li>
+                    </ul>
+                    
+                    <div class="d-grid gap-2 pt-3">
+                        {% if object.estatus == 'BORRADOR' and object.factura and object.comprobante_pago %}
+                        <form action="{% url 'aprobar_orden_compra' object.pk %}" method="post">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-success w-100 fw-bold" aria-label="Aprobar esta Orden de Compra">
+                                <i class="fas fa-check-circle me-2"></i> Aprobar Orden
+                            </button>
+                        </form>
+                        {% endif %}
+
+                        {% if object.estatus == 'APROBADA' %}
+                            {% if object.lista_para_auditoria %}
+                                <form action="{% url 'iniciar_auditoria_oc' object.pk %}" method="post">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-primary w-100 fw-bold" aria-label="Auditar esta Orden de Compra">
+                                        <i class="fas fa-gavel me-2"></i> Auditar
+                                    </button>
+                                </form>
+                            {% else %}
+                                <button type="button" class="btn btn-primary w-100 fw-bold" disabled data-bs-toggle="tooltip" title="Debe cargar Factura y Comprobante para poder auditar." aria-label="Botón para auditar (deshabilitado)">
+                                    <i class="fas fa-gavel me-2"></i> Auditar
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 </button>
                             {% endif %}
                         {% endif %}
                         
                         {% if object.estatus == 'BORRADOR' or object.estatus == 'APROBADA' %}
+<<<<<<< HEAD
                         <form action="{% url 'cancelar_orden_compra' object.pk %}" method="post" 
                               onsubmit="return confirm('¿Estás seguro de que deseas cancelar esta orden de compra?');">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-outline-danger w-100 py-2">
+=======
+                        <form action="{% url 'cancelar_orden_compra' object.pk %}" method="post" onsubmit="return confirm('¿Estás seguro de que deseas cancelar esta orden de compra?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-danger w-100" aria-label="Cancelar esta Orden de Compra">
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 <i class="fas fa-ban me-2"></i> Cancelar Orden
                             </button>
                         </form>
                         {% endif %}
 
                         {% if object.estatus == 'AUDITADA' or object.estatus == 'CANCELADA' %}
+<<<<<<< HEAD
                         <div class="alert alert-info text-center py-2" role="alert">
                             <i class="fas fa-info-circle me-2"></i>
                             <small>Orden finalizada</small>
@@ -649,6 +766,20 @@
     }
 </style>
 
+=======
+                        <div class="alert alert-info text-center" role="alert">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Esta orden está finalizada y no admite más acciones.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+</div>
+
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         // Inicializar tooltips de Bootstrap
@@ -670,24 +801,37 @@
 
         itemRows.forEach(row => {
             const subtotal = parseFloat(row.dataset.subtotal) || 0;
+<<<<<<< HEAD
             const hasIva = row.dataset.hasIva === 'true'; // 'True' o 'False' desde Python
+=======
+            const hasIva = row.dataset.hasIva === 'True';
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             
             const ivaCell = row.querySelector('.iva-item-cell');
             const totalCell = row.querySelector('.total-item-cell');
 
             let ivaAmount = 0;
             if (hasIva) {
+<<<<<<< HEAD
                 ivaAmount = subtotal * 0.16; // 16% de IVA
             }
 
             // El total de la línea SÍ incluye el IVA
+=======
+                ivaAmount = subtotal * 0.16;
+            }
+
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             const totalAmount = subtotal + ivaAmount;
 
             if (ivaCell) {
                 ivaCell.textContent = formatCurrency(ivaAmount);
             }
             if (totalCell) {
+<<<<<<< HEAD
                 // El total SÍ debe incluir el IVA
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                 totalCell.textContent = formatCurrency(totalAmount);
             }
         });

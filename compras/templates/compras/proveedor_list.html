@@ -18,6 +18,7 @@
         <div class="card-header bg-primary text-white py-3">
             <h5 class="card-title mb-0 d-flex align-items-center">
                 <i class="fas fa-list me-2"></i>Lista de Proveedores
+<<<<<<< HEAD
                 {% if page_obj %}
                 <span class="badge bg-white text-primary ms-2">{{ page_obj.paginator.count }} registros</span>
                 {% endif %}
@@ -75,13 +76,51 @@
                     </div>
                 </div>
             </form>
+=======
+                <span class="badge bg-white text-primary ms-2">{{ proveedores|length }} registros</span>
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <form method="get" class="search-form">
+                        <div class="input-group">
+                            <span class="input-group-text bg-transparent border-end-0">
+                                <i class="fas fa-search text-muted"></i>
+                            </span>
+                            <input type="text" name="q" class="form-control border-start-0" 
+                                   placeholder="Buscar por Razón Social, RFC o Contacto..." 
+                                   value="{{ request.GET.q }}">
+                            <button class="btn btn-outline-primary" type="submit">Buscar</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-secondary active">
+                            <i class="fas fa-list"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary">
+                            <i class="fas fa-th"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>
                             <th class="ps-4">Razón Social</th>
                             <th>RFC</th>
+<<<<<<< HEAD
                             <th>Operaciones</th> <th>Empresa</th> <th>Contacto</th>
+=======
+                            <th>Empresa</th>
+                            <th>Contacto</th>
+                            <th>Teléfono</th>
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             <th>Estatus</th>
                             <th class="text-center pe-4">Acciones</th>
                         </tr>
@@ -96,7 +135,11 @@
                                     </div>
                                     <div>
                                         <strong class="d-block">{{ proveedor.razon_social }}</strong>
+<<<<<<< HEAD
                                         <small class="text-muted">{{ proveedor.email_contacto|default:"Sin email" }}</small>
+=======
+                                        <small class="text-muted">{{ proveedor.email|default:"Sin email" }}</small>
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     </div>
                                 </div>
                             </td>
@@ -107,21 +150,39 @@
                                 <span class="badge bg-info bg-opacity-10 text-info">{{ proveedor.empresa.nombre }}</span>
                             </td>
                             <td>
+<<<<<<< HEAD
                                 <span class="badge bg-light text-dark border">{{ proveedor.lugar.nombre|default:"N/A" }}</span>
                             </td>
                             <td>
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 <div class="d-flex align-items-center">
                                     <i class="fas fa-user text-muted me-2"></i>
                                     <span>{{ proveedor.contacto_principal|default:"--" }}</span>
                                 </div>
                             </td>
                             <td>
+<<<<<<< HEAD
                                 {% if proveedor.activo %}
                                     <span class="badge bg-success bg-opacity-15 text-withe">
                                         <i class="fas fa-check-circle me-1"></i> Activo
                                     </span>
                                 {% else %}
                                     <span class="badge bg-danger bg-opacity-15 text-whithe">
+=======
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-phone text-muted me-2"></i>
+                                    <span>{{ proveedor.telefono_contacto|default:"--" }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                {% if proveedor.activo %}
+                                    <span class="badge bg-success bg-opacity-15 text-white">
+                                        <i class="fas fa-check-circle me-1"></i> Activo
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-danger bg-opacity-15 text-white">
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                         <i class="fas fa-times-circle me-1"></i> Inactivo
                                     </span>
                                 {% endif %}
@@ -139,7 +200,12 @@
                         </tr>
                         {% empty %}
                         <tr>
+<<<<<<< HEAD
                             <td colspan="8" class="text-center py-5"> <div class="py-4">
+=======
+                            <td colspan="7" class="text-center py-5">
+                                <div class="py-4">
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     <i class="fas fa-truck fa-3x text-muted mb-3"></i>
                                     <h5 class="text-muted">No se encontraron proveedores</h5>
                                     <p class="text-muted">Intente ajustar los términos de búsqueda o crear un nuevo proveedor</p>
@@ -157,6 +223,7 @@
             {% if is_paginated %}
             <div class="card-footer bg-white pt-3">
                 <nav aria-label="Navegación de proveedores">
+<<<<<<< HEAD
                     
                     {% url 'lista_proveedores' as base_url %}
                     {% with all_filters=request.GET.urlencode %}
@@ -165,6 +232,12 @@
                         {% if page_obj.has_previous %}
                             <li class="page-item">
                                 <a class="page-link" href="{{ base_url }}?{{ all_filters }}&page={{ page_obj.previous_page_number }}" aria-label="Anterior">
+=======
+                    <ul class="pagination justify-content-center mb-0">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" aria-label="Anterior">
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     <span aria-hidden="true">&laquo;</span>
                                 </a>
                             </li>
@@ -178,13 +251,21 @@
                             {% if page_obj.number == i %}
                                 <li class="page-item active"><span class="page-link">{{ i }}</span></li>
                             {% else %}
+<<<<<<< HEAD
                                 <li class="page-item"><a class="page-link" href="{{ base_url }}?{{ all_filters }}&page={{ i }}">{{ i }}</a></li>
+=======
+                                <li class="page-item"><a class="page-link" href="?page={{ i }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">{{ i }}</a></li>
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             {% endif %}
                         {% endfor %}
                         
                         {% if page_obj.has_next %}
                             <li class="page-item">
+<<<<<<< HEAD
                                 <a class="page-link" href="{{ base_url }}?{{ all_filters }}&page={{ page_obj.next_page_number }}" aria-label="Siguiente">
+=======
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" aria-label="Siguiente">
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     <span aria-hidden="true">&raquo;</span>
                                 </a>
                             </li>
@@ -194,16 +275,23 @@
                             </li>
                         {% endif %}
                     </ul>
+<<<<<<< HEAD
                     
                     {% endwith %}
 
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     <div class="text-center text-muted small mt-2">
                         Mostrando página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
                     </div>
                 </nav>
             </div>
             {% endif %}
+<<<<<<< HEAD
             </div>
+=======
+        </div>
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     </div>
 </div>
 
@@ -236,6 +324,7 @@
         padding: 0.35em 0.65em;
     }
     
+<<<<<<< HEAD
     /* Estilos para el nuevo formulario de filtro */
     .form-label {
         font-size: 0.85rem;
@@ -245,12 +334,34 @@
     .form-control:focus, .form-select:focus {
         border-color: #0d6efd;
         box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+=======
+    .search-form .form-control:focus {
+        box-shadow: none;
+        border-color: #ced4da;
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     }
     
     .page-link {
         border-radius: 0.25rem;
         margin: 0 0.15rem;
     }
+<<<<<<< HEAD
 
+=======
+    
+    .btn-group .btn {
+        border-radius: 0;
+    }
+    
+    .btn-group .btn:first-child {
+        border-top-left-radius: 0.35rem;
+        border-bottom-left-radius: 0.35rem;
+    }
+    
+    .btn-group .btn:last-child {
+        border-top-right-radius: 0.35rem;
+        border-bottom-right-radius: 0.35rem;
+    }
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 </style>
 {% endblock %}

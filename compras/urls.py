@@ -16,8 +16,12 @@ urlpatterns = [
     
     # Artículos
     path('articulos/', views.ArticuloListView.as_view(), name='lista_articulos'),
+<<<<<<< HEAD
     # --- MODIFICADO --- (Apunta a la vista de función)
     path('articulos/nuevo/', views.crear_articulo, name='crear_articulo'),
+=======
+    path('articulos/nuevo/', views.ArticuloCreateView.as_view(), name='crear_articulo'),
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     path('articulos/<int:pk>/editar/', views.editar_articulo, name='editar_articulo'),
     
     # Solicitudes de Compra
@@ -43,11 +47,14 @@ urlpatterns = [
     path('ordenes/<int:pk>/cancelar/', views.cancelar_orden_compra, name='cancelar_orden_compra'),
     path('api/update_articulo_precio/', views.update_articulo_proveedor_precio, name='update_articulo_proveedor_precio'),
 
+<<<<<<< HEAD
     # URLs para gestión de documentos de OC
     path('ordenes/<int:pk>/subir-factura/', views.subir_factura_oc, name='subir_factura_oc'),
     path('ordenes/<int:pk>/subir-comprobante/', views.subir_comprobante_oc, name='subir_comprobante_oc'),
     path('ordenes/<int:pk>/eliminar-documento/<str:tipo>/', views.eliminar_documento_oc, name='eliminar_documento_oc'),
 
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
     # Categorías
     path('categorias/', views.CategoriaListView.as_view(), name='lista_categorias'),
@@ -56,11 +63,17 @@ urlpatterns = [
     path('categorias/<int:pk>/eliminar/', views.CategoriaDeleteView.as_view(), name='eliminar_categoria'),
 
     # API para filtrar artículos dinámicamente
+<<<<<<< HEAD
     # --- RUTA NUEVA AÑADIDA ---
     path('api/origenes_por_empresa/<int:empresa_id>/', views.get_origenes_por_empresa, name='api_origenes_por_empresa'),
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     path('api/articulos_por_empresa/<int:empresa_id>/', views.get_articulos_por_empresa, name='api_articulos_por_empresa'),
     path('api/proveedores_por_empresa/<int:empresa_id>/', views.get_proveedores_por_empresa, name='api_proveedores_por_empresa'),
     path('api/articulos_por_proveedor/<int:proveedor_id>/', views.get_articulos_por_proveedor, name='api_articulos_por_proveedor'),
     path('api/update-articulo-precio/', views.update_articulo_proveedor_precio, name='api_update_articulo_precio'),
+<<<<<<< HEAD
     path('api/empresas-por-operacion/<int:operacion_id>/', views.get_empresas_por_operacion, name='api_empresas_por_operacion'),
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 ]

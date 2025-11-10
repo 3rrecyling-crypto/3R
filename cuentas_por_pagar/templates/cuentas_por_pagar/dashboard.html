@@ -1,5 +1,8 @@
 {% extends 'ternium/base.html' %}
+<<<<<<< HEAD
 {% load humanize %}
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
 {% block title %}Dashboard - Cuentas por Pagar{% endblock %}
 
@@ -20,7 +23,10 @@
     </div>
 </div>
 
+<<<<<<< HEAD
 <!-- Resto del template se mantiene igual -->
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 <div class="row mb-4">
     <div class="col-xl-2 col-md-4 mb-3">
         <div class="card text-white bg-primary h-100">
@@ -87,7 +93,11 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
+<<<<<<< HEAD
                         <h4 class="card-title">${{ total_deuda_general|floatformat:2|intcomma }}</h4>
+=======
+                        <h4 class="card-title">${{ total_deuda_general|floatformat:2 }}</h4>
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                         <p class="card-text">Deuda Total</p>
                     </div>
                     <div class="align-self-center">
@@ -186,7 +196,11 @@
                                     <strong>{{ stat.proveedor }}</strong>
                                 </td>
                                 <td class="text-end">
+<<<<<<< HEAD
                                     <span class="fw-bold text-primary">${{ stat.total_deuda|floatformat:2|intcomma }}</span>
+=======
+                                    <span class="fw-bold text-primary">${{ stat.total_deuda|floatformat:2 }}</span>
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 </td>
                                 <td class="text-center">
                                     <span class="badge bg-primary">{{ stat.cantidad_facturas }}</span>
@@ -247,7 +261,11 @@
                             <span class="badge {% if alerta.estatus == 'VENCIDA' %}bg-danger{% else %}bg-warning{% endif %}">
                                 {{ alerta.get_estatus_display }}
                             </span>
+<<<<<<< HEAD
                             <small>${{ alerta.monto_pendiente|floatformat:2|intcomma }}</small>
+=======
+                            <small>${{ alerta.monto_pendiente|floatformat:2 }}</small>
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                         </div>
                     </div>
                     {% endfor %}
@@ -267,15 +285,24 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
+<<<<<<< HEAD
+=======
+                    <a href="{% url 'crear_factura' %}" class="btn btn-success">
+                        <i class="fas fa-plus me-2"></i>Nueva Factura
+                    </a>
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     <a href="{% url 'crear_pago' %}" class="btn btn-warning">
                         <i class="fas fa-hand-holding-usd me-2"></i>Registrar Pago
                     </a>
                     <a href="{% url 'lista_pagos' %}" class="btn btn-info">
                         <i class="fas fa-money-bill-wave me-2"></i>Ver Pagos
                     </a>
+<<<<<<< HEAD
                     <a href="{% url 'lista_facturas' %}" class="btn btn-outline-primary">
                         <i class="fas fa-file-invoice me-2"></i>Gestionar Facturas
                     </a>
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                 </div>
             </div>
         </div>
@@ -310,6 +337,7 @@
     .list-group-item:first-child {
         border-top: none;
     }
+<<<<<<< HEAD
 
     /* Estilos para los números en las gráficas */
     .chart-data-label {
@@ -317,10 +345,13 @@
         font-size: 12px;
         text-shadow: 1px 1px 2px white;
     }
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 </style>
 {% endblock %}
 
 {% block extra_js %}
+<<<<<<< HEAD
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
@@ -388,6 +419,26 @@ document.addEventListener('DOMContentLoaded', function() {
     function crearGraficaDeudas(data) {
         const ctx = document.getElementById('deudasChart').getContext('2d');
         const chart = new Chart(ctx, {
+=======
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Cargar datos para todas las gráficas
+    fetch("{% url 'api_estadisticas_proveedor' %}")
+        .then(response => response.json())
+        .then(data => {
+            crearGraficaDeudas(data);
+            crearGraficaDistribucion(data);
+            crearGraficaFacturasProveedor(data);
+            crearGraficaEstatusProveedor(data);
+        })
+        .catch(error => console.error('Error loading chart data:', error));
+
+    function crearGraficaDeudas(data) {
+        const ctx = document.getElementById('deudasChart').getContext('2d');
+        new Chart(ctx, {
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             type: 'bar',
             data: {
                 labels: data.labels,
@@ -408,9 +459,29 @@ document.addEventListener('DOMContentLoaded', function() {
                     tooltip: {
                         callbacks: {
                             label: function(context) {
+<<<<<<< HEAD
                                 return `Deuda: ${formatoMoneda(context.parsed.y)}`;
                             }
                         }
+=======
+                                return `Deuda: $${context.parsed.y.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
+                            }
+                        }
+                    },
+                    // *** CONFIGURACIÓN DATALABELS: DEUDA ***
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'top',
+                        formatter: function(value) {
+                            // Muestra el valor en formato moneda
+                            return '$' + value.toLocaleString('es-MX', {minimumFractionDigits: 2});
+                        },
+                        color: '#000000',
+                        font: {
+                            weight: 'bold',
+                            size: 10
+                        }
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     }
                 },
                 scales: {
@@ -418,7 +489,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         beginAtZero: true,
                         ticks: {
                             callback: function(value) {
+<<<<<<< HEAD
                                 return formatoMoneda(value);
+=======
+                                return '$' + value.toLocaleString('es-MX', {minimumFractionDigits: 2});
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             }
                         }
                     },
@@ -431,6 +506,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
+<<<<<<< HEAD
 
         // AGREGAR NÚMEROS MANUALMENTE - ESTILO POWER BI
         chart.canvas.parentNode.style.position = 'relative';
@@ -479,18 +555,47 @@ document.addEventListener('DOMContentLoaded', function() {
         const total = data.reduce((a, b) => a + b, 0);
         
         const chart = new Chart(ctx, {
+=======
+    }
+
+    function crearGraficaDistribucion(data) {
+        const ctx = document.getElementById('distribucionChart').getContext('2d');
+        
+        // Calcular totales para la gráfica de distribución
+        const totalPendientes = {{ facturas_pendientes_count }};
+        const totalPorVencer = {{ facturas_por_vencer_count }};
+        const totalVencidas = {{ facturas_vencidas_count }};
+        // Asumiendo que las pagadas son el total menos las pendientes, por vencer y vencidas.
+        const totalPagadas = {{ total_facturas }} - totalPendientes - totalPorVencer - totalVencidas;
+        
+        new Chart(ctx, {
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             type: 'doughnut',
             data: {
                 labels: ['Pagadas', 'Pendientes', 'Por Vencer', 'Vencidas'],
                 datasets: [{
+<<<<<<< HEAD
                     data: data,
+=======
+                    data: [totalPagadas, totalPendientes, totalPorVencer, totalVencidas],
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     backgroundColor: [
                         'rgba(40, 167, 69, 0.8)',
                         'rgba(255, 193, 7, 0.8)',
                         'rgba(253, 126, 20, 0.8)',
                         'rgba(220, 53, 69, 0.8)'
                     ],
+<<<<<<< HEAD
                     borderWidth: 2
+=======
+                    borderColor: [
+                        'rgba(40, 167, 69, 1)',
+                        'rgba(255, 193, 7, 1)',
+                        'rgba(253, 126, 20, 1)',
+                        'rgba(220, 53, 69, 1)'
+                    ],
+                    borderWidth: 1
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                 }]
             },
             options: {
@@ -499,10 +604,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 plugins: {
                     legend: {
                         position: 'bottom'
+<<<<<<< HEAD
+=======
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    },
+                    // *** CONFIGURACIÓN DATALABELS: DISTRIBUCIÓN ***
+                    datalabels: {
+                        formatter: (value, context) => {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = Math.round((value / total) * 100);
+                            // Muestra el valor y el porcentaje
+                            return `${value}\n(${percentage}%)`;
+                        },
+                        color: '#fff',
+                        font: {
+                            weight: 'bold'
+                        }
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     }
                 }
             }
         });
+<<<<<<< HEAD
 
         // AGREGAR NÚMEROS MANUALMENTE - ESTILO POWER BI
         chart.canvas.parentNode.style.position = 'relative';
@@ -541,11 +674,17 @@ document.addEventListener('DOMContentLoaded', function() {
             centerLabel.textContent = labelText.trim();
             labelsContainer.appendChild(centerLabel);
         }, 100);
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     }
 
     function crearGraficaFacturasProveedor(data) {
         const ctx = document.getElementById('facturasProveedorChart').getContext('2d');
+<<<<<<< HEAD
         const chart = new Chart(ctx, {
+=======
+        new Chart(ctx, {
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             type: 'bar',
             data: {
                 labels: data.labels,
@@ -562,7 +701,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
+<<<<<<< HEAD
                     legend: { display: false }
+=======
+                    legend: { display: false },
+                    // *** CONFIGURACIÓN DATALABELS: FACTURAS POR PROVEEDOR ***
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'top',
+                        formatter: function(value) {
+                            return value; // Solo el valor numérico
+                        },
+                        color: '#000000',
+                        font: {
+                            weight: 'bold',
+                            size: 10
+                        }
+                    }
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                 },
                 scales: {
                     y: {
@@ -580,6 +736,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
+<<<<<<< HEAD
 
         // AGREGAR NÚMEROS MANUALMENTE - ESTILO POWER BI
         chart.canvas.parentNode.style.position = 'relative';
@@ -614,16 +771,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }, 100);
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     }
 
     function crearGraficaEstatusProveedor(data) {
         const ctx = document.getElementById('estatusProveedorChart').getContext('2d');
         
+<<<<<<< HEAD
+=======
+        // Tomar solo los primeros 5 proveedores para mejor visualización
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         const topProveedores = data.labels.slice(0, 5);
         const topPorVencer = data.facturas_por_vencer.slice(0, 5);
         const topVencidas = data.facturas_vencidas.slice(0, 5);
         
+<<<<<<< HEAD
         const chart = new Chart(ctx, {
+=======
+        new Chart(ctx, {
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             type: 'bar',
             data: {
                 labels: topProveedores,
@@ -648,8 +815,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
+<<<<<<< HEAD
                     legend: {
                         position: 'top'
+=======
+                    // *** CONFIGURACIÓN DATALABELS: ESTATUS POR PROVEEDOR ***
+                    datalabels: {
+                        formatter: function(value) {
+                            return value > 0 ? value : ''; // Muestra el valor solo si es > 0
+                        },
+                        color: '#fff',
+                        font: {
+                            weight: 'bold',
+                            size: 10
+                        }
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     }
                 },
                 scales: {
@@ -670,6 +850,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
+<<<<<<< HEAD
 
         // AGREGAR NÚMEROS MANUALMENTE - ESTILO POWER BI
         chart.canvas.parentNode.style.position = 'relative';
@@ -725,6 +906,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }, 100);
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     }
 });
 </script>

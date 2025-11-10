@@ -39,6 +39,7 @@ def get_entrada_maquila_upload_path(instance, filename):
     folder_name = instance.c_id_remito or "sin_remito"
     return os.path.join('entradas_maquila', folder_name, filename)
 
+<<<<<<< HEAD
 # --- INICIO DE LA MODIFICACIÓN ---
 # 1. HEMOS AÑADIDO EL MODELO 'ORIGEN' AQUÍ
 # -----------------------------------
@@ -59,6 +60,8 @@ class Origen(models.Model):
         ordering = ['nombre']
 # --- FIN DE LA MODIFICACIÓN ---
 
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
 # --- MODELOS ---
 
@@ -87,6 +90,7 @@ class Empresa(models.Model):
     
     creado_en = models.DateTimeField(auto_now_add=True)
 
+<<<<<<< HEAD
     # --- INICIO DE LA MODIFICACIÓN ---
     # 2. HEMOS AÑADIDO EL CAMPO 'ORIGENES' (Many-to-Many)
     # -----------------------------------
@@ -98,6 +102,8 @@ class Empresa(models.Model):
     )
     # --- FIN DE LA MODIFICACIÓN ---
 
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     def __str__(self):
         # Actualizamos esto para que no falle si el prefijo es nulo
         return f"{self.nombre} ({self.prefijo or 'Sin Prefijo'})"
@@ -728,3 +734,8 @@ def save_user_profile(sender, instance, **kwargs):
     if hasattr(instance, 'ternium_profile'):
         instance.ternium_profile.save()
         
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b

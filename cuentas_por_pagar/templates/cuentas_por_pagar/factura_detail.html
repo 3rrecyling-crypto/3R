@@ -25,6 +25,7 @@
     <div class="row">
         <!-- Información Principal de la Factura -->
         <div class="col-lg-8">
+<<<<<<< HEAD
             <!-- NUEVA SECCIÓN: Sincronización con Compras -->
             <div class="card border-0 shadow-sm mb-4 border-info">
                 <div class="card-header bg-info text-white border-0 py-3">
@@ -129,6 +130,8 @@
                 </div>
             </div>
 
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             <!-- Tarjeta de Información General -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white border-0 py-3">
@@ -209,7 +212,11 @@
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span>Pagado:</span>
+<<<<<<< HEAD
                                     <strong class="text-success">${{ factura.monto_pagado|floatformat:2|intcomma }}</strong>
+=======
+                                    <strong class="text-success">${{ factura.monto|floatformat:2|intcomma }}</strong>
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span>Pendiente:</span>
@@ -219,6 +226,7 @@
                                 </div>
                             </div>
                             
+<<<<<<< HEAD
                             <!-- Barra de Progreso MEJORADA -->
                             <div class="mt-3">
                                 <label class="form-label text-muted small mb-2">Progreso de Pago</label>
@@ -231,11 +239,28 @@
                                         aria-valuenow="{{ factura.porcentaje_pagado|floatformat:0 }}" 
                                         aria-valuemin="0" 
                                         aria-valuemax="100">
+=======
+                            <!-- Barra de Progreso -->
+                            <div class="mt-3">
+                                <label class="form-label text-muted small mb-2">Progreso de Pago</label>
+                                <div class="progress" style="height: 8px;">
+                                    {% widthratio factura.monto_pendiente factura.monto 100 as progress_percentage %}
+                                    <div class="progress-bar {% if factura.pagada %}bg-success{% else %}bg-primary{% endif %}" 
+                                         role="progressbar" 
+                                         style="width: {% widthratio factura.monto|add:factura.monto_pendiente factura.monto 100 %}%"
+                                         aria-valuenow="{{ progress_percentage }}" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="100">
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     </div>
                                 </div>
                                 <div class="d-flex justify-content-between mt-1">
                                     <small class="text-muted">
+<<<<<<< HEAD
                                         {{ factura.porcentaje_pagado|floatformat:1 }}% completado
+=======
+                                        {{ progress_percentage }}% completado
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     </small>
                                     <small class="text-muted">
                                         {{ factura.pagos.count }} pago{{ factura.pagos.count|pluralize }}
@@ -245,6 +270,7 @@
                         </div>
                     </div>
 
+<<<<<<< HEAD
                     <!-- NUEVA: Información de Archivos -->
                     <div class="row mt-4 pt-3 border-top">
                         <div class="col-md-6">
@@ -284,6 +310,8 @@
                         </div>
                     </div>
 
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     <!-- Notas -->
                     {% if factura.notas %}
                     <div class="mt-4 pt-3 border-top">
@@ -333,6 +361,7 @@
                 </div>
             </div>
 
+<<<<<<< HEAD
             <!-- NUEVA: Tarjeta de Documentos Sincronizados -->
             <div class="card border-0 shadow-sm mb-4 border-success">
                 <div class="card-header bg-success text-white border-0 py-3">
@@ -361,6 +390,8 @@
                 </div>
             </div>
 
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
             <!-- Acciones Rápidas -->
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white border-0 py-3">
@@ -409,7 +440,10 @@
                                     <th class="border-0 text-end">Monto</th>
                                     <th class="border-0">Método</th>
                                     <th class="border-0">Referencia</th>
+<<<<<<< HEAD
                                     <th class="border-0">Comprobante</th>
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     <th class="border-0">Registrado por</th>
                                     <th class="border-0 text-center">Acciones</th>
                                 </tr>
@@ -431,6 +465,7 @@
                                         <code class="text-muted">{{ pago.referencia|default:"-" }}</code>
                                     </td>
                                     <td>
+<<<<<<< HEAD
                                         {% if pago.archivo_comprobante %}
                                         <a href="{{ pago.archivo_comprobante.url }}" target="_blank" class="btn btn-sm btn-outline-success">
                                             <i class="fas fa-file-download me-1"></i>Descargar
@@ -440,6 +475,8 @@
                                         {% endif %}
                                     </td>
                                     <td>
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                         <small class="text-muted">{{ pago.registrado_por.username|default:"Sistema" }}</small>
                                     </td>
                                     <td class="text-center">
@@ -515,6 +552,7 @@
         font-size: 0.75em;
     }
     
+<<<<<<< HEAD
     /* NUEVOS ESTILOS PARA SINCRONIZACIÓN */
     .border-info {
         border: 1px solid #0dcaf0 !important;
@@ -529,6 +567,8 @@
         border-color: #198754;
     }
     
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
     @media (max-width: 768px) {
         .d-flex.gap-3 {
             flex-direction: column;

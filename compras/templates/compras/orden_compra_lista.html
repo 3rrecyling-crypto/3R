@@ -38,7 +38,11 @@
                     </div>
 
                     <div class="col-md-4 col-lg-3">
+<<<<<<< HEAD
                         <label for="empresa" class="form-label fw-semibold">Operación</label>
+=======
+                        <label for="empresa" class="form-label fw-semibold">Empresa</label>
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                         <select class="form-select" id="empresa" name="empresa">
                             <option value="">Todas</option>
                             {% for e in empresas %}
@@ -48,6 +52,7 @@
                             {% endfor %}
                         </select>
                     </div>
+<<<<<<< HEAD
                     
                     <div class="col-md-4 col-lg-3">
                         <label for="lugar" class="form-label fw-semibold">Empresa (Lugar)</label>
@@ -60,6 +65,8 @@
                             {% endfor %}
                         </select>
                     </div>
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
                     <div class="col-md-4 col-lg-3">
                         <label for="estatus" class="form-label fw-semibold">Estatus</label>
@@ -82,11 +89,19 @@
                         </div>
                     </div>
 
+<<<<<<< HEAD
                     <div class="col-md-4 col-lg-3 d-flex align-items-end">
                         <button type="submit" class="btn btn-primary me-2 w-100">
                             <i class="fas fa-search me-1"></i> Filtrar
                         </button>
                         <a href="{% url 'lista_ordenes_compra' %}" class="btn btn-outline-secondary w-100">
+=======
+                    <div class="col-md-4 col-lg-6 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="fas fa-search me-1"></i> Filtrar
+                        </button>
+                        <a href="{% url 'lista_ordenes_compra' %}" class="btn btn-outline-secondary">
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             <i class="fas fa-eraser me-1"></i> Limpiar
                         </a>
                     </div>
@@ -107,7 +122,12 @@
                         <tr>
                             <th class="ps-4">Folio OC</th>
                             <th>Proveedor</th>
+<<<<<<< HEAD
                             <th>Operación</th> <th>Empresa (Lugar)</th> <th>Emisión</th>
+=======
+                            <th>Emisión</th>
+                            <th>Entrega Esperada</th>
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             <th>Estatus</th>
                             <th>Solicitud Origen</th>
                             <th class="text-end pe-4">Acciones</th>
@@ -136,6 +156,7 @@
                                     </div>
                                 </div>
                             </td>
+<<<<<<< HEAD
                             
                             <td>
                                 <span class="badge bg-light text-dark border">
@@ -155,6 +176,8 @@
                                 </span>
                             </td>
                             
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                             <td>
                                 <div class="text-nowrap">
                                     <i class="far fa-calendar-alt text-muted me-1"></i>
@@ -162,6 +185,15 @@
                                 </div>
                             </td>
                             <td>
+<<<<<<< HEAD
+=======
+                                <div class="text-nowrap">
+                                    <i class="far fa-calendar-check text-muted me-1"></i>
+                                    {{ orden.fecha_entrega_esperada|date:"d/m/Y" }}
+                                </div>
+                            </td>
+                            <td>
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 {% with estatus_display=orden.get_estatus_display %}
                                     {% if orden.estatus == 'BORRADOR' %}
                                         <span class="badge bg-secondary text-white fw-bold py-2 px-3"><i class="fas fa-pencil-alt me-1"></i> {{ estatus_display }}</span>
@@ -210,7 +242,11 @@
                         </tr>
                         {% empty %}
                         <tr>
+<<<<<<< HEAD
                             <td colspan="9" class="text-center py-5">
+=======
+                            <td colspan="7" class="text-center py-5">
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 <div class="py-4">
                                     <i class="fas fa-file-invoice text-muted" style="font-size: 3rem;"></i>
                                     <h5 class="mt-3 text-muted">No se encontraron órdenes con los filtros actuales</h5>
@@ -227,12 +263,19 @@
             {% if is_paginated %}
             <div class="card-footer bg-white border-0 py-3">
                 <nav aria-label="Navegación de páginas">
+<<<<<<< HEAD
                     {% url 'lista_ordenes_compra' as base_url %}
                     {% with all_filters=request.GET.urlencode %}
                     <ul class="pagination justify-content-center mb-0">
                         {% if page_obj.has_previous %}
                             <li class="page-item">
                                 <a class="page-link" href="{{ base_url }}?{{ all_filters }}&page={{ page_obj.previous_page_number }}" aria-label="Anterior">
+=======
+                    <ul class="pagination justify-content-center mb-0">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{{ request.GET.urlencode }}&page={{ page_obj.previous_page_number }}" aria-label="Anterior">
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     <span aria-hidden="true">&laquo;</span>
                                 </a>
                             </li>
@@ -249,14 +292,22 @@
                                 </li>
                             {% else %}
                                 <li class="page-item">
+<<<<<<< HEAD
                                     <a class="page-link" href="{{ base_url }}?{{ all_filters }}&page={{ i }}">{{ i }}</a>
+=======
+                                    <a class="page-link" href="?{{ request.GET.urlencode }}&page={{ i }}">{{ i }}</a>
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                 </li>
                             {% endif %}
                         {% endfor %}
 
                         {% if page_obj.has_next %}
                             <li class="page-item">
+<<<<<<< HEAD
                                 <a class="page-link" href="{{ base_url }}?{{ all_filters }}&page={{ page_obj.next_page_number }}" aria-label="Siguiente">
+=======
+                                <a class="page-link" href="?{{ request.GET.urlencode }}&page={{ page_obj.next_page_number }}" aria-label="Siguiente">
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                                     <span aria-hidden="true">&raquo;</span>
                                 </a>
                             </li>
@@ -266,7 +317,10 @@
                             </li>
                         {% endif %}
                     </ul>
+<<<<<<< HEAD
                     {% endwith %}
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
                     <div class="text-center text-muted small mt-2">
                         Mostrando página {{ page_obj.number }} de {{ paginator.num_pages }}
                     </div>

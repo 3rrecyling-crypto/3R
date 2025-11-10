@@ -9,7 +9,10 @@ from .models import (
     Operador, Material, Unidad, Contenedor, DetalleRemision, Descarga,
     RegistroLogistico
 )
+<<<<<<< HEAD
 from .models import Empresa, Origen
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
 
 
 class OperadorForm(forms.ModelForm):
@@ -153,6 +156,7 @@ class RemisionForm(forms.ModelForm):
         # por lo que muestra todos los operadores disponibles.
         self.fields['operador'].queryset = Operador.objects.all()
 
+<<<<<<< HEAD
         # --- MODIFICACIÓN INICIA (Basada en nuestra conversación) ---
         # Si la instancia ya existe (es un formulario de edición),
         # solo bloqueamos el campo 'remision' para que no se pueda escribir.
@@ -160,6 +164,8 @@ class RemisionForm(forms.ModelForm):
             self.fields['remision'].widget.attrs['readonly'] = True
         # --- MODIFICACIÓN TERMINA ---
 
+=======
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
         if self.instance and self.instance.pk and self.instance.status == 'AUDITADO':
             for field in self.fields:
                 self.fields[field].disabled = True
@@ -430,6 +436,7 @@ class RegistroLogisticoForm(forms.ModelForm):
                 else:
                     uploaded_file.name = new_name
         
+<<<<<<< HEAD
         return cleaned_data
     
 class EmpresaOrigenesForm(forms.ModelForm):
@@ -454,3 +461,6 @@ class EmpresaOrigenesForm(forms.ModelForm):
         self.fields['origenes'].queryset = Origen.objects.all().order_by('nombre')
         self.fields['origenes'].label = "Orígenes Vinculados a esta Empresa"
         self.fields['origenes'].help_text = "Selecciona todos los orígenes que esta empresa puede usar."
+=======
+        return cleaned_data
+>>>>>>> 400f8621cdea2163e4302d5550344851c937f99b
