@@ -1,0 +1,701 @@
+{% extends 'ternium/base.html' %}
+
+{% block title %}Asistente de Datos IA{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #3498db, #2c3e50);
+        --secondary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --ai-bubble: #f8f9fa;
+        --user-bubble: linear-gradient(135deg, #4a6bdf, #6a11cb);
+        --shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+        --shadow-hover: 0 12px 40px rgba(0, 0, 0, 0.15);
+    }
+    
+    body {
+        background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ed 100%);
+        font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    
+    #chat-container {
+        max-width: 1200px;
+        margin: 2rem auto;
+        box-shadow: var(--shadow);
+        border-radius: 20px;
+        background: white;
+        overflow: hidden;
+        height: calc(100vh - 120px);
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .chat-header {
+        background: var(--secondary-gradient);
+        color: white;
+        padding: 1.5rem 2rem;
+        border-radius: 20px 20px 0 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .header-content {
+        display: flex;
+        align-items: center;
+    }
+    
+    .header-badge {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 16px;
+        padding: 0.25rem 0.75rem;
+        font-size: 0.8rem;
+        margin-left: 1rem;
+    }
+    
+    #chat-log {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.5rem;
+        background-color: #fafbfc;
+        scroll-behavior: smooth;
+    }
+    
+    .chat-message {
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: flex-start;
+        animation: fadeIn 0.3s ease-in-out;
+    }
+    
+    .user-message {
+        flex-direction: row-reverse;
+    }
+    
+    .avatar {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 12px;
+        flex-shrink: 0;
+        box-shadow: var(--shadow);
+    }
+    
+    .user-avatar {
+        background: linear-gradient(135deg, #6a11cb 0%, #4a6bdf 100%);
+        color: white;
+    }
+    
+    .ai-avatar {
+        background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+        color: white;
+    }
+    
+    .message-bubble {
+        max-width: 75%;
+        padding: 1rem 1.5rem;
+        border-radius: 20px;
+        position: relative;
+        box-shadow: var(--shadow);
+        line-height: 1.5;
+    }
+    
+    .user-message .message-bubble {
+        background: var(--user-bubble);
+        color: white;
+        border-bottom-right-radius: 6px;
+    }
+    
+    .ai-message .message-bubble {
+        background-color: var(--ai-bubble);
+        color: #2d3748;
+        border-bottom-left-radius: 6px;
+    }
+    
+    .message-time {
+        font-size: 0.7rem;
+        opacity: 0.7;
+        margin-top: 0.5rem;
+        text-align: right;
+    }
+    
+    .ai-message .message-time {
+        text-align: left;
+    }
+    
+    /* MEJORAS PARA LAS TABLAS */
+    .table-responsive-container {
+        margin-top: 1rem;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        max-width: 100%;
+        overflow-x: auto;
+    }
+    
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        min-width: 600px; /* Ancho mínimo para evitar que se comprima demasiado */
+    }
+    
+    .data-table th {
+        background: linear-gradient(135deg, #4a6bdf, #6a11cb);
+        color: white;
+        padding: 0.75rem;
+        text-align: left;
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .data-table td {
+        padding: 0.6rem 0.75rem;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    
+    .data-table tr:nth-child(even) {
+        background-color: #f8fafc;
+    }
+    
+    .data-table tr:hover {
+        background-color: #f1f5f9;
+    }
+    
+    .table-scroll-info {
+        position: sticky;
+        left: 0;
+        background: #f1f5f9;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        color: #64748b;
+        display: none;
+    }
+    
+    .table-responsive-container:hover .table-scroll-info {
+        display: block;
+    }
+    
+    #loading-indicator {
+        display: none;
+        padding: 1rem;
+        text-align: center;
+    }
+    
+    .typing-animation {
+        display: flex;
+        justify-content: center;
+        padding: 1rem;
+    }
+    
+    .typing-dot {
+        width: 10px;
+        height: 10px;
+        margin: 0 4px;
+        background: linear-gradient(135deg, #3498db, #2c3e50);
+        border-radius: 50%;
+        display: inline-block;
+        animation: typingAnimation 1.4s infinite ease-in-out both;
+    }
+    
+    .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+    
+    @keyframes typingAnimation {
+        0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+        40% { transform: scale(1); opacity: 1; }
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .suggestions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1.5rem;
+    }
+    
+    .suggestion-chip {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 24px;
+        padding: 0.6rem 1.2rem;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    
+    .suggestion-chip:hover {
+        background: linear-gradient(135deg, #4a6bdf, #6a11cb);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-hover);
+        border-color: transparent;
+    }
+    
+    .chat-input-container {
+        padding: 1.5rem;
+        border-top: 1px solid #e2e8f0;
+        background: white;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #a0aec0;
+    }
+    
+    .empty-state-icon {
+        font-size: 4rem;
+        margin-bottom: 1.5rem;
+        opacity: 0.7;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .message-actions {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+    }
+    
+    .action-btn {
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid #e2e8f0;
+        color: #4a5568;
+        font-size: 0.8rem;
+        cursor: pointer;
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    
+    .action-btn:hover {
+        background: #f7fafc;
+        color: #2d3748;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .input-group {
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+    
+    #pregunta-input {
+        border: none;
+        padding: 1rem 1.5rem;
+        font-size: 1rem;
+    }
+    
+    #pregunta-input:focus {
+        box-shadow: none;
+        border-color: #e2e8f0;
+    }
+    
+    #clear-chat, #send-button {
+        border: none;
+        padding: 0.75rem 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    #send-button {
+        background: linear-gradient(135deg, #4a6bdf, #6a11cb);
+        transition: all 0.3s;
+    }
+    
+    #send-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 15px rgba(106, 17, 203, 0.4);
+    }
+    
+    .examples-label {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #718096;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* Scrollbar personalizado */
+    #chat-log::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    #chat-log::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+    
+    #chat-log::-webkit-scrollbar-thumb {
+        background: #cbd5e0;
+        border-radius: 10px;
+    }
+    
+    #chat-log::-webkit-scrollbar-thumb:hover {
+        background: #a0aec0;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        #chat-container {
+            margin: 0;
+            border-radius: 0;
+            height: 100vh;
+        }
+        
+        .chat-header {
+            border-radius: 0;
+            padding: 1rem;
+        }
+        
+        .message-bubble {
+            max-width: 85%;
+        }
+        
+        .suggestions {
+            gap: 0.5rem;
+        }
+        
+        .suggestion-chip {
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+        }
+        
+        .data-table {
+            font-size: 0.8rem;
+        }
+        
+        .data-table th,
+        .data-table td {
+            padding: 0.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-11 col-xl-10">
+            <div id="chat-container">
+                <div class="chat-header">
+                    <div class="header-content">
+                        <div class="me-3">
+                            <i class="fas fa-robot fa-2x"></i>
+                        </div>
+                        <div>
+                            <h2 class="h4 mb-1">Asistente de Datos IA</h2>
+                            <p class="mb-0 opacity-85">Consulta información sobre remisiones, entradas, inventario y más</p>
+                        </div>
+                        <span class="header-badge">Beta</span>
+                    </div>
+                    <div class="connection-status">
+                        <span class="badge bg-success">
+                            <i class="fas fa-circle me-1" style="font-size: 0.5rem;"></i> Conectado
+                        </span>
+                    </div>
+                </div>
+
+                <div id="chat-log">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <i class="fas fa-comments"></i>
+                        </div>
+                        <h4 class="mt-2 mb-3">Inicia una conversación</h4>
+                        <p class="text-muted mb-4">Haz una pregunta o selecciona una sugerencia para comenzar</p>
+                        
+                        <div class="suggestions justify-content-center">
+                            <div class="suggestion-chip" data-prompt="¿Cuál es el peso neto total de todas las entradas de maquila?">
+                                <i class="fas fa-weight me-1"></i> Peso total de entradas
+                            </div>
+                            <div class="suggestion-chip" data-prompt="Muestra las remisiones de los últimos 7 días">
+                                <i class="fas fa-truck-loading me-1"></i> Remisiones recientes
+                            </div>
+                            <div class="suggestion-chip" data-prompt="¿Cuántas toneladas se han remisionado este mes?">
+                                <i class="fas fa-chart-line me-1"></i> Toneladas mensuales
+                            </div>
+                            <div class="suggestion-chip" data-prompt="Genera un reporte de inventario actual">
+                                <i class="fas fa-boxes me-1"></i> Reporte de inventario
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="loading-indicator">
+                    <div class="typing-animation">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                    <p class="text-muted mt-2">Procesando tu consulta...</p>
+                </div>
+
+                <div class="chat-input-container">
+                    <form id="chat-form">
+                        {% csrf_token %}
+                        <div class="input-group">
+                            <button class="btn btn-outline-secondary" type="button" id="clear-chat" title="Limpiar conversación">
+                                <i class="fas fa-broom"></i>
+                            </button>
+                            <input type="text" id="pregunta-input" class="form-control form-control-lg" 
+                                   placeholder="Escribe tu pregunta aquí..." autocomplete="off" required>
+                            <button class="btn btn-primary" type="submit" id="send-button">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div class="mt-3">
+                        <div class="examples-label">Preguntas de ejemplo:</div>
+                        <div class="suggestions">
+                            <div class="suggestion-chip" data-prompt="Top 5 materiales más remisionados">
+                                Desglosa las ordenes de compras de el dia de Hoy
+                            </div>
+                            <div class="suggestion-chip" data-prompt="Entradas por proveedor este mes">
+                               ¿ Cuantas remisiones hay pendientes ?
+                            </div>
+                            <div class="suggestion-chip" data-prompt="Resumen de remisiones por semana">
+                                ¿Cuantas cuentas por pagar hay pendientes hasta hoy y que provedores son desglosalos?
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const chatForm = document.getElementById('chat-form');
+    const preguntaInput = document.getElementById('pregunta-input');
+    const chatLog = document.getElementById('chat-log');
+    const loadingIndicator = document.getElementById('loading-indicator');
+    const clearChatBtn = document.getElementById('clear-chat');
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    let chatHistory = JSON.parse(localStorage.getItem('ia_chat_history')) || [];
+    
+    if (chatHistory.length > 0) {
+        renderChatHistory();
+    }
+    
+    document.querySelectorAll('.suggestion-chip').forEach(chip => {
+        chip.addEventListener('click', function() {
+            preguntaInput.value = this.getAttribute('data-prompt');
+            chatForm.dispatchEvent(new Event('submit'));
+        });
+    });
+    
+    clearChatBtn.addEventListener('click', function() {
+        if (confirm('¿Estás seguro de que quieres limpiar toda la conversación?')) {
+            chatHistory = [];
+            localStorage.removeItem('ia_chat_history');
+            chatLog.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <i class="fas fa-comments"></i>
+                    </div>
+                    <h4 class="mt-2 mb-3">Conversación limpiada</h4>
+                    <p class="text-muted">Haz una pregunta o selecciona una sugerencia para comenzar</p>
+                </div>
+            `;
+        }
+    });
+    
+    preguntaInput.focus();
+    
+    chatForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const pregunta = preguntaInput.value.trim();
+        if (!pregunta) return;
+
+        addMessage(pregunta, 'user');
+        preguntaInput.value = '';
+        loadingIndicator.style.display = 'block';
+        chatLog.scrollTop = chatLog.scrollHeight;
+
+        chatHistory.push({
+            type: 'user',
+            content: pregunta,
+            timestamp: new Date().toISOString()
+        });
+        localStorage.setItem('ia_chat_history', JSON.stringify(chatHistory));
+
+        fetch("{% url 'asistente_ia' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': csrfToken
+            },
+            body: `pregunta=${encodeURIComponent(pregunta)}`
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Error HTTP: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            const aiResponse = data.error ? `Error: ${data.error}` : data.respuesta;
+            addMessage(aiResponse, 'ai', data.tabla_html, data.url_excel);
+            
+            chatHistory.push({
+                type: 'ai',
+                content: aiResponse,
+                tableHtml: data.tabla_html,
+                excelUrl: data.url_excel,
+                timestamp: new Date().toISOString()
+            });
+            localStorage.setItem('ia_chat_history', JSON.stringify(chatHistory));
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            const errorMsg = "Lo siento, ha ocurrido un error al procesar tu solicitud. Por favor, intenta nuevamente.";
+            addMessage(errorMsg, 'ai');
+            
+            chatHistory.push({
+                type: 'ai',
+                content: errorMsg,
+                timestamp: new Date().toISOString()
+            });
+            localStorage.setItem('ia_chat_history', JSON.stringify(chatHistory));
+        })
+        .finally(() => {
+            loadingIndicator.style.display = 'none';
+        });
+    });
+
+    function addMessage(content, sender, tableHtml = null, excelUrl = null) {
+        const emptyState = document.querySelector('.empty-state');
+        if (emptyState) {
+            chatLog.innerHTML = '';
+        }
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${sender}-message`;
+        
+        const avatar = document.createElement('div');
+        avatar.className = `avatar ${sender}-avatar`;
+        avatar.innerHTML = sender === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+        
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+        
+        const contentElement = document.createElement('div');
+        contentElement.innerHTML = content.replace(/\n/g, '<br>');
+        bubble.appendChild(contentElement);
+        
+        if (tableHtml) {
+            // MEJORA: Reemplazar la tabla básica por una versión mejorada
+            const tableContainer = document.createElement('div');
+            tableContainer.className = 'table-responsive-container mt-3';
+            
+            // Crear un wrapper para la tabla con información de scroll
+            const tableWrapper = document.createElement('div');
+            tableWrapper.style.overflowX = 'auto';
+            tableWrapper.style.maxHeight = '400px';
+            tableWrapper.style.overflowY = 'auto';
+            
+            // Convertir la tabla básica en una tabla mejorada
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = tableHtml;
+            const originalTable = tempDiv.querySelector('table');
+            
+            if (originalTable) {
+                originalTable.className = 'data-table';
+                tableWrapper.appendChild(originalTable);
+                tableContainer.appendChild(tableWrapper);
+                
+                // Añadir indicador de scroll (solo visible en dispositivos móviles)
+                const scrollInfo = document.createElement('div');
+                scrollInfo.className = 'table-scroll-info';
+                scrollInfo.innerHTML = '<i class="fas fa-arrows-alt-h me-1"></i> Desliza para ver más columnas';
+                tableContainer.appendChild(scrollInfo);
+            } else {
+                tableContainer.innerHTML = tableHtml;
+            }
+            
+            bubble.appendChild(tableContainer);
+        }
+        
+        if (excelUrl) {
+            const actions = document.createElement('div');
+            actions.className = 'message-actions';
+            actions.innerHTML = `
+                <a href="${excelUrl}" class="action-btn" download>
+                    <i class="fas fa-file-excel"></i> Descargar Excel
+                </a>
+                <button class="action-btn copy-btn" data-content="${content.replace(/"/g, '&quot;')}">
+                    <i class="fas fa-copy"></i> Copiar
+                </button>
+            `;
+            bubble.appendChild(actions);
+        } else {
+            const actions = document.createElement('div');
+            actions.className = 'message-actions';
+            actions.innerHTML = `
+                <button class="action-btn copy-btn" data-content="${content.replace(/"/g, '&quot;')}">
+                    <i class="fas fa-copy"></i> Copiar texto
+                </button>
+            `;
+            bubble.appendChild(actions);
+        }
+        
+        const timestamp = document.createElement('div');
+        timestamp.className = 'message-time';
+        timestamp.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        bubble.appendChild(timestamp);
+        
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(bubble);
+        
+        chatLog.appendChild(messageDiv);
+        chatLog.scrollTop = chatLog.scrollHeight;
+        
+        // Add event listeners for copy buttons
+        setTimeout(() => {
+            document.querySelectorAll('.copy-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const textToCopy = this.getAttribute('data-content');
+                    navigator.clipboard.writeText(textToCopy).then(() => {
+                        const originalHtml = this.innerHTML;
+                        this.innerHTML = '<i class="fas fa-check"></i> Copiado';
+                        setTimeout(() => {
+                            this.innerHTML = originalHtml;
+                        }, 2000);
+                    });
+                });
+            });
+        }, 100);
+    }
+
+    function renderChatHistory() {
+        chatLog.innerHTML = '';
+        
+        chatHistory.forEach(item => {
+            addMessage(item.content, item.type, item.tableHtml, item.excelUrl);
+        });
+    }
+});
+</script>
+{% endblock %}

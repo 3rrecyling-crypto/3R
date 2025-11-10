@@ -1,0 +1,76 @@
+{% extends 'compras/compras_base.html' %}
+
+{% block compras_content %}
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-warning">
+            <h3 class="mb-0">{{ titulo }}</h3>
+        </div>
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+
+                <h5 class="mb-3">Datos Generales de la Orden</h5>
+                <p class="text-muted">Revisa y completa los datos de la orden de compra antes de aprobarla.</p>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">{{ form.proveedor.label }}</label>
+                        {{ form.proveedor }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">{{ form.fecha_entrega_esperada.label }}</label>
+                        {{ form.fecha_entrega_esperada }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">{{ form.moneda.label }}</label>
+                        {{ form.moneda }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">{{ form.tipo_cambio.label }}</label>
+                        {{ form.tipo_cambio }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">{{ form.condiciones_pago.label }}</label>
+                        {{ form.condiciones_pago }}
+                    </div>
+                </div>
+
+                <hr class="my-4">
+                
+                <h5 class="mb-3">Artículos de la Orden</h5>
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Artículo</th>
+                                <th class="text-end">Cantidad</th>
+                                <th class="text-end">Precio Unitario</th>
+                                <th class="text-end">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for detalle in detalles %}
+                            <tr>
+                                <td>{{ detalle.articulo.nombre }}</td>
+                                <td class="text-end">{{ detalle.cantidad|floatformat:2 }}</td>
+                                <td class="text-end">${{ detalle.precio_unitario|floatformat:2 }}</td>
+                                <td class="text-end">${{ detalle.subtotal|floatformat:2 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-4 d-flex justify-content-end">
+                    <a href="{% url 'lista_ordenes_compra' %}" class="btn btn-secondary me-2">Cancelar</a>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-check-circle me-1"></i>
+                        Terminar y Aprobar OC
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

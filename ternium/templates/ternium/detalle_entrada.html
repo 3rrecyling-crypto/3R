@@ -1,0 +1,99 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+
+{% block title %}Detalle de Entrada: {{ entrada.c_id_remito }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center p-3">
+            <div>
+                <h4 class="mb-0"><i class="fas fa-file-invoice me-2"></i>Detalle de Entrada: <span class="text-primary">{{ entrada.c_id_remito }}</span></h4>
+                <p class="text-muted mb-0">Registrado el {{ entrada.fecha_ingreso|date:"d \d\e F, Y" }}</p>
+            </div>
+            <div>
+                {% if entrada.status == 'PENDIENTE' %}
+                    <span class="badge bg-warning text-dark p-2 fs-6"><i class="fas fa-clock me-1"></i>Pendiente</span>
+                {% elif entrada.status == 'TERMINADO' %}
+                    <span class="badge bg-info p-2 fs-6"><i class="fas fa-hourglass-half me-1"></i>Terminado</span>
+                {% elif entrada.status == 'AUDITADO' %}
+                    <span class="badge bg-success p-2 fs-6"><i class="fas fa-check-double me-1"></i>Auditado</span>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card-body p-4">
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <h5><i class="fas fa-truck text-secondary me-2"></i>Datos de la Entrada</h5>
+                    <table class="table table-sm table-borderless">
+                        <tr><th style="width: 40%;">ID Remito:</th><td>{{ entrada.c_id_remito }}</td></tr>
+                        <tr><th>No. Boleta de Báscula:</th><td>{{ entrada.num_boleta_remision }}</td></tr>
+                        <tr><th>Fecha Ingreso:</th><td>{{ entrada.fecha_ingreso|date:"d/m/Y" }}</td></tr>
+                        <tr><th>Línea de Transporte:</th><td>{{ entrada.transporte|default:"No especificado" }}</td></tr>
+                        <tr><th>Calidad del Material:</th><td><span class="badge bg-secondary">{{ entrada.calidad }}</span></td></tr>
+                        <tr><th>Fecha Entrega a Ternium:</th><td><span class="fw-bold">{{ entrada.fecha_entrega_ternium|date:"d/m/Y"|default:"No especificada" }}</span></td></tr>
+                    </table>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <h5><i class="fas fa-weight-scale text-secondary me-2"></i>Detalles del Pesaje (Toneladas)</h5>
+                    <table class="table table-sm table-hover">
+                        <tbody>
+                            <tr><th>Peso según Remisión:</th><td class="text-end">{{ entrada.peso_remision|floatformat:3|intcomma }}</td></tr>
+                            <tr><th>Peso Bruto:</th><td class="text-end">{{ entrada.peso_bruto|floatformat:3|intcomma }}</td></tr>
+                            <tr><th>Peso Tara:</th><td class="text-end">{{ entrada.peso_tara|floatformat:3|intcomma }}</td></tr>
+                            <tr class="table-primary fw-bold"><th>Peso Neto Registrado:</th><td class="text-end">{{ entrada.peso_neto|floatformat:3|intcomma }}</td></tr>
+                            <tr>
+                                <th>Diferencia de Peso:</th>
+                                <td class="text-end fw-bold {% if entrada.alerta %}text-danger{% else %}text-success{% endif %}">
+                                    {{ entrada.diferencia_toneladas|floatformat:3|intcomma }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <hr>
+            
+            <h5><i class="fas fa-folder-open me-2"></i>Documentos y Fotos Adjuntas</h5>
+            <div class="row g-3">
+                {% with file=entrada.foto_frontal name="1. Foto Frontal" %}
+                <div class="col-md-4"><div class="card h-100"><div class="card-header small">{{name}}</div><div class="card-body text-center p-2 d-flex align-items-center justify-content-center">{% if file %}<a href="{{ file.url }}" target="_blank"><img src="{{ file.url }}" style="max-height: 120px;" class="img-fluid rounded" alt="Foto Frontal"></a>{% else %}<span class="text-muted small">No disponible</span>{% endif %}</div></div></div>
+                {% endwith %}
+
+                {% with file=entrada.foto_superior_cargada name="2. Foto Superior (Carga)" %}
+                <div class="col-md-4"><div class="card h-100"><div class="card-header small">{{name}}</div><div class="card-body text-center p-2 d-flex align-items-center justify-content-center">{% if file %}<a href="{{ file.url }}" target="_blank"><img src="{{ file.url }}" style="max-height: 120px;" class="img-fluid rounded" alt="Foto Superior con Carga"></a>{% else %}<span class="text-muted small">No disponible</span>{% endif %}</div></div></div>
+                {% endwith %}
+
+                {% with file=entrada.foto_trasera name="3. Foto Trasera" %}
+                <div class="col-md-4"><div class="card h-100"><div class="card-header small">{{name}}</div><div class="card-body text-center p-2 d-flex align-items-center justify-content-center">{% if file %}<a href="{{ file.url }}" target="_blank"><img src="{{ file.url }}" style="max-height: 120px;" class="img-fluid rounded" alt="Foto Trasera"></a>{% else %}<span class="text-muted small">No disponible</span>{% endif %}</div></div></div>
+                {% endwith %}
+
+                {% with file=entrada.foto_superior_vacia name="4. Foto Superior (Vacía)" %}
+                <div class="col-md-6 mt-3"><div class="card h-100"><div class="card-header small">{{name}}</div><div class="card-body text-center p-2 d-flex align-items-center justify-content-center">{% if file %}<a href="{{ file.url }}" target="_blank"><img src="{{ file.url }}" style="max-height: 120px;" class="img-fluid rounded" alt="Foto Superior Vacía"></a>{% else %}<span class="text-muted small">No disponible</span>{% endif %}</div></div></div>
+                {% endwith %}
+
+                {% with file=entrada.documento_remision_clientes name="5. Remisión a Clientes" %}
+                <div class="col-md-6 mt-3"><div class="card h-100"><div class="card-header small">{{name}}</div><div class="card-body text-center p-2 d-flex align-items-center justify-content-center">{% if file %}<a href="{{ file.url }}" target="_blank" class="btn btn-outline-danger"><i class="fas fa-file-pdf me-2"></i>Ver Documento</a>{% else %}<span class="text-muted small">No disponible</span>{% endif %}</div></div></div>
+                {% endwith %}
+            </div>
+        </div>
+
+        <div class="card-footer bg-light text-end p-3">
+            <a href="{% url 'lista_entradas' %}" class="btn btn-secondary"><i class="fas fa-arrow-left me-2"></i>Volver a la Lista</a>
+            
+            {% if entrada.status != 'AUDITADO' %}
+                <a href="{% url 'editar_entrada' pk=entrada.pk %}" class="btn btn-primary"><i class="fas fa-edit me-2"></i>Editar</a>
+                <a href="{% url 'eliminar_entrada' pk=entrada.pk %}" class="btn btn-danger"><i class="fas fa-trash me-2"></i>Eliminar</a>
+            {% endif %}
+
+            {% if entrada.status == 'TERMINADO' %}
+            <form method="post" action="{% url 'auditar_entrada' entrada.pk %}" class="d-inline" onsubmit="return confirm('¿Está seguro de que desea auditar este registro? Esta acción es irreversible.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-success"><i class="fas fa-check-double me-2"></i>Auditar Registro</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

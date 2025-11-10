@@ -1,0 +1,407 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<style>
+    :root {
+        --primary-color: #2c3e50;
+        --secondary-color: #34495e;
+        --accent-color: #3498db;
+        --light-color: #ecf0f1;
+        --success-color: #27ae60;
+        --danger-color: #e74c3c;
+        --border-radius: 8px;
+        --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+    .card {
+        border: none;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+    }
+    .card-header {
+        background-color: var(--primary-color);
+        color: white;
+        border-radius: var(--border-radius) var(--border-radius) 0 0 !important;
+    }
+    .form-label {
+        font-weight: 500;
+        color: var(--secondary-color);
+    }
+    .form-select, .form-control {
+        border-radius: var(--border-radius) !important;
+    }
+    .detalle-form-row {
+        padding: 0.75rem;
+        background-color: #fafafa;
+        border-bottom: 1px solid #eee;
+    }
+    .detalle-form-row:last-of-type {
+        border-bottom: none;
+    }
+    .perdida-calculada-label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: bold;
+    }
+    .perdida-calculada-valor {
+        font-weight: bold;
+        font-size: 1rem;
+    }
+    .text-success { color: var(--success-color) !important; }
+    .text-danger { color: var(--danger-color) !important; }
+    .formset-header {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #555;
+        padding: 0.5rem 0.75rem;
+        background-color: #f8f9fa;
+    }
+    .file-upload-card {
+        padding: 1rem;
+        border-radius: var(--border-radius);
+        background-color: #f8fafc;
+        border: 1px dashed #d1d5db;
+        transition: all 0.3s ease;
+    }
+    .image-preview {
+        width: 100%;
+        height: 150px;
+        background-color: #e9ecef;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        margin-top: 0.75rem;
+    }
+    .image-preview img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+    .form-error {
+        color: var(--danger-color);
+        font-size: 0.8rem;
+        margin-top: 0.25rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ titulo }}</h2>
+        <a href="{% url 'remision_lista' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Volver a la Lista
+        </a>
+    </div>
+    
+    <form method="post" enctype="multipart/form-data" novalidate id="remisionForm">
+        {% csrf_token %}
+
+        {% if form.non_field_errors or formset.non_form_errors %}
+        <div class="alert alert-danger">
+            {{ form.non_field_errors }}
+            {{ formset.non_form_errors }}
+        </div>
+        {% endif %}
+
+        <div class="card mb-4">
+            <div class="card-header"><h5><i class="fas fa-file-alt me-2"></i>Información General</h5></div>
+            <div class="card-body"><div class="row g-3">
+                <div class="col-md-4"><label for="{{ form.empresa.id_for_label }}" class="form-label">{{ form.empresa.label }}</label>{{ form.empresa }}<div class="form-error">{{ form.empresa.errors }}</div></div>
+                <div class="col-md-4"><label for="{{ form.remision.id_for_label }}" class="form-label">{{ form.remision.label }}</label>{{ form.remision }}<div class="form-error">{{ form.remision.errors }}</div></div>
+                <div class="col-md-4"><label for="{{ form.fecha.id_for_label }}" class="form-label">{{ form.fecha.label }}</label>{{ form.fecha }}<div class="form-error">{{ form.fecha.errors }}</div></div>
+            </div></div>
+        </div>
+        <div class="card mb-4">
+            <div class="card-header"><h5><i class="fas fa-truck me-2"></i>Transporte</h5></div>
+            <div class="card-body"><div class="row g-3">
+                <div class="col-md-6"><label for="{{ form.linea_transporte.id_for_label }}" class="form-label">{{ form.linea_transporte.label }}</label>{{ form.linea_transporte }}<div class="form-error">{{ form.linea_transporte.errors }}</div></div>
+                <div class="col-md-6"><label for="{{ form.operador.id_for_label }}" class="form-label">{{ form.operador.label }}</label>{{ form.operador }}<div class="form-error">{{ form.operador.errors }}</div></div>
+                <div class="col-md-6"><label for="{{ form.unidad.id_for_label }}" class="form-label">{{ form.unidad.label }}</label>{{ form.unidad }}<div class="form-error">{{ form.unidad.errors }}</div></div>
+                <div class="col-md-6"><label for="{{ form.contenedor.id_for_label }}" class="form-label">{{ form.contenedor.label }}</label>{{ form.contenedor }}<div class="form-error">{{ form.contenedor.errors }}</div></div>
+            </div></div>
+        </div>
+        <div class="card mb-4">
+            <div class="card-header"><h5><i class="fas fa-route me-2"></i>Ruta y Operación</h5></div>
+            <div class="card-body"><div class="row g-3">
+                <div class="col-md-6"><label for="{{ form.origen.id_for_label }}" class="form-label">{{ form.origen.label }}</label>{{ form.origen }}<div class="form-error">{{ form.origen.errors }}</div></div>
+                <div class="col-md-6"><label for="{{ form.destino.id_for_label }}" class="form-label">{{ form.destino.label }}</label>{{ form.destino }}<div class="form-error">{{ form.destino.errors }}</div></div>
+                <hr class="my-3">
+                <div class="col-md-3"><label for="{{ form.inicia_ld.id_for_label }}" class="form-label">{{ form.inicia_ld.label }}</label>{{ form.inicia_ld }}<div class="form-error">{{ form.inicia_ld.errors }}</div></div>
+                <div class="col-md-3"><label for="{{ form.termina_ld.id_for_label }}" class="form-label">{{ form.termina_ld.label }}</label>{{ form.termina_ld }}<div class="form-error">{{ form.termina_ld.errors }}</div></div>
+                <div class="col-md-3"><label for="{{ form.inicia_dlv.id_for_label }}" class="form-label">{{ form.inicia_dlv.label }}</label>{{ form.inicia_dlv }}<div class="form-error">{{ form.inicia_dlv.errors }}</div></div>
+                <div class="col-md-3"><label for="{{ form.termina_dlv.id_for_label }}" class="form-label">{{ form.termina_dlv.label }}</label>{{ form.termina_dlv }}<div class="form-error">{{ form.termina_dlv.errors }}</div></div>
+            </div></div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-balance-scale me-2"></i>Materiales y Pesos</h5>
+                <button type="button" id="add-form" class="btn btn-success btn-sm"><i class="fas fa-plus me-1"></i> Añadir Material</button>
+            </div>
+            <div class="card-body p-0">
+                {{ formset.management_form }}
+                <div class="row g-3 formset-header align-items-center d-none d-md-flex">
+                    <div class="col-md-3">MATERIAL</div><div class="col-md-2 text-end">CARGA (Ton)</div><div class="col-md-3">CLIENTE</div><div class="col-md-2 text-end">DESCARGA (Ton)</div><div class="col-md-1 text-center">+/-</div><div class="col-md-1"></div>
+                </div>
+                <div id="form-container">
+                    {% for form in formset %}<div class="detalle-form-row"><div class="row g-3 align-items-center">
+                        <div class="col-12 col-md-3">{{ form.material }}<div class="form-error">{{ form.material.errors }}</div></div>
+                        <div class="col-6 col-md-2">{{ form.peso_ld }}<div class="form-error">{{ form.peso_ld.errors }}</div></div>
+                        <div class="col-12 col-md-3">{{ form.cliente }}<div class="form-error">{{ form.cliente.errors }}</div></div>
+                        <div class="col-6 col-md-2">{{ form.peso_dlv }}<div class="form-error">{{ form.peso_dlv.errors }}</div></div>
+                        <div class="col-6 col-md-1 text-center"><span class="perdida-calculada-label">PÉRDIDA</span><span class="perdida-calculada-valor text-danger">0.000</span></div>
+                        
+                        <div class="col-12 col-md-1 text-center delete-widget-cell">
+                            {{ form.DELETE }} <button type="button" class="btn btn-danger btn-sm btn-delete-row w-100"><i class="fas fa-trash"></i></button>
+                        </div>
+                        {{ form.id }}
+                    </div></div>{% endfor %}
+                </div>
+                <div id="empty-form-template" style="display: none;"><div class="detalle-form-row"><div class="row g-3 align-items-center">
+                    <div class="col-12 col-md-3">{{ formset.empty_form.material }}</div><div class="col-6 col-md-2">{{ formset.empty_form.peso_ld }}</div><div class="col-12 col-md-3">{{ formset.empty_form.cliente }}</div><div class="col-6 col-md-2">{{ formset.empty_form.peso_dlv }}</div>
+                    <div class="col-6 col-md-1 text-center"><span class="perdida-calculada-label">PÉRDIDA</span><span class="perdida-calculada-valor text-danger">0.000</span></div>
+                    <div class="col-12 col-md-1 text-center delete-widget-cell">{{ formset.empty_form.DELETE }}<button type="button" class="btn btn-danger btn-sm btn-delete-row w-100"><i class="fas fa-trash"></i></button></div>
+                </div></div></div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header"><h5><i class="fas fa-folder-open me-2"></i>Documentación y Evidencias</h5></div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6"><label for="{{ form.folio_ld.id_for_label }}" class="form-label">{{ form.folio_ld.label }}</label>{{ form.folio_ld }}<div class="form-error">{{ form.folio_ld.errors }}</div></div>
+                    <div class="col-md-6"><label for="{{ form.folio_dlv.id_for_label }}" class="form-label">{{ form.folio_dlv.label }}</label>{{ form.folio_dlv }}<div class="form-error">{{ form.folio_dlv.errors }}</div></div>
+                    
+                    <div class="col-md-6">
+                        <div class="file-upload-card h-100">
+                            <label for="{{ form.evidencia_carga.id_for_label }}" class="form-label">{{ form.evidencia_carga.label }}</label>
+                            {{ form.evidencia_carga }}
+                            <div class="form-error">{{ form.evidencia_carga.errors }}</div>
+                            <div class="image-preview" id="preview_evidencia_carga" data-existing-url="{% if form.instance.evidencia_carga %}{{ form.instance.evidencia_carga.url }}{% endif %}"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="file-upload-card h-100">
+                            <label for="{{ form.evidencia_descarga.id_for_label }}" class="form-label">{{ form.evidencia_descarga.label }}</label>
+                            {{ form.evidencia_descarga }}
+                            <div class="form-error">{{ form.evidencia_descarga.errors }}</div>
+                            <div class="image-preview" id="preview_evidencia_descarga" data-existing-url="{% if form.instance.evidencia_descarga %}{{ form.instance.evidencia_descarga.url }}{% endif %}"></div>
+                        </div>
+                    </div>
+
+                    <div class="col-12"><label for="{{ form.comentario.id_for_label }}" class="form-label">{{ form.comentario.label }}</label>{{ form.comentario }}</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+            <a href="{% url 'remision_lista' %}" class="btn btn-secondary me-md-2">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Guardar Remisión</button>
+        </div>
+    </form>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+$(document).ready(function() {
+    
+    // --- Variables y selectores ---
+    
+    // --- INICIO: MODIFICACIÓN PARA OBTENER EL ESTADO DE EDICIÓN ---
+    // Esta variable 'IS_EDITING' viene del contexto de Django que añadimos en las vistas.
+    const IS_EDITING = {{ is_editing|yesno:"true,false" }};
+    // --- FIN: MODIFICACIÓN ---
+    
+    let cachedCatalogData = { materiales: [], lugares: [] };
+    const formContainer = $('#form-container');
+    const addButton = $('#add-form');
+    const totalFormsInput = $('#id_detalles-TOTAL_FORMS');
+    const empresaSelect = $('#id_empresa');
+    const remisionInput = $('#id_remision'); // <-- Selector para el campo de remisión
+    const emptyFormTemplate = $('#empty-form-template').html();
+
+    // --- Funciones auxiliares ---
+    function initializeSelect2(context) {
+        $(context).find('select:not([data-select2-id])').select2({
+            theme: 'bootstrap-5', width: '100%', placeholder: 'Seleccione una opción', allowClear: true
+        });
+        // Esta línea OCULTA los checkboxes "DELETE" para que solo se vea el botón de basura
+        $(context).find('input[type="checkbox"][name$="-DELETE"]').hide();
+    }
+    
+    function populateSelect(selectElement, options) {
+        const currentVal = $(selectElement).val();
+        $(selectElement).empty().append('<option value=""></option>');
+        if (options) {
+            options.forEach(i => $(selectElement).append(new Option(i.nombre || i.placas, i.id)));
+        }
+        $(selectElement).val(currentVal).trigger('change');
+    }
+
+    initializeSelect2(document);
+
+    // --- LÓGICA PRINCIPAL AL CAMBIAR LA EMPRESA ---
+    empresaSelect.on('change', function() {
+        const empresaId = $(this).val();
+        addButton.prop('disabled', true);
+
+        if (empresaId) {
+            
+            // --- INICIO: MODIFICACIÓN PARA EVITAR AUTO-INCREMENTO AL EDITAR ---
+            // Si NO estamos editando (IS_EDITING es false), entonces sí buscamos el folio.
+            // Si estamos editando, este bloque se omite y el folio no se toca.
+            if (!IS_EDITING) {
+                fetch(`/api/get-next-remision/${empresaId}/`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.is_manual) {
+                            remisionInput.prop('readonly', false);
+                            remisionInput.val('');
+                            remisionInput.attr('placeholder', 'Ingrese folio manualmente');
+                        } else if (data.next_remision) {
+                            remisionInput.val(data.next_remision);
+                            remisionInput.prop('readonly', true);
+                            remisionInput.attr('placeholder', '');
+                        }
+                    }).catch(error => {
+                        console.error("Error al obtener el número de remisión:", error);
+                        remisionInput.prop('readonly', false);
+                    });
+            }
+            // --- FIN: MODIFICACIÓN ---
+
+            // Lógica para cargar catálogos (Esta se ejecuta siempre)
+            fetch(`/api/get-catalogos/${empresaId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    cachedCatalogData.materiales = data.materiales || [];
+                    const lugares = [...(data.lugares_origen || []), ...(data.lugares_destino || [])];
+                    cachedCatalogData.lugares = Array.from(new Set(lugares.map(l => l.id))).map(id => lugares.find(l => l.id === id));
+                    
+                    populateSelect($('#id_linea_transporte'), data.lineas_transporte);
+                    populateSelect($('#id_unidad'), data.unidades);
+                    populateSelect($('#id_contenedor'), data.contenedores);
+                    populateSelect($('#id_origen'), data.lugares_origen);
+                    populateSelect($('#id_destino'), data.lugares_destino);
+                    
+                    formContainer.find('.detalle-form-row').each(function() {
+                        populateSelect($(this).find('.material-select'), cachedCatalogData.materiales);
+                        populateSelect($(this).find('.cliente-select'), cachedCatalogData.lugares);
+                    });
+                }).finally(() => { addButton.prop('disabled', false); });
+        } else {
+            // Si no hay empresa, se vacían los catálogos y se habilita la remisión manual
+            cachedCatalogData = { materiales: [], lugares: [] };
+            addButton.prop('disabled', true);
+            remisionInput.prop('readonly', false);
+            remisionInput.val('');
+            remisionInput.attr('placeholder', 'Seleccione empresa primero');
+        }
+    });
+
+    // --- LÓGICA DEL FORMSET (Añadir/Eliminar/Calcular) ---
+    addButton.on('click', function() {
+        if (!empresaSelect.val()) {
+            alert('Por favor, seleccione una Unidad de Negocio (Empresa) primero.'); return;
+        }
+        const formIndex = parseInt(totalFormsInput.val());
+        const newRowHtml = emptyFormTemplate.replace(/__prefix__/g, formIndex);
+        const newRow = $(newRowHtml);
+        formContainer.append(newRow);
+        populateSelect(newRow.find('.material-select'), cachedCatalogData.materiales);
+        populateSelect(newRow.find('.cliente-select'), cachedCatalogData.lugares);
+        initializeSelect2(newRow);
+        totalFormsInput.val(formIndex + 1);
+    });
+    
+    // Este JS maneja el clic en el botón de basura
+    // Oculta la fila Y marca el checkbox 'DELETE' para que Django la borre al guardar.
+    formContainer.on('click', '.btn-delete-row', function() {
+        $(this).closest('.detalle-form-row').find('input[type="checkbox"][name$="-DELETE"]').prop('checked', true).end().hide();
+    });
+
+    formContainer.on('input', '.peso-carga, .peso-descarga', function() {
+        const row = $(this).closest('.row');
+        const carga = parseFloat(row.find('.peso-carga').val()) || 0;
+        const descarga = parseFloat(row.find('.peso-descarga').val()) || 0;
+        const diferencia = descarga - carga; // Cambiado a Descarga - Carga para 'Ganancia'
+        const labelSpan = row.find('.perdida-calculada-label');
+        const valorSpan = row.find('.perdida-calculada-valor');
+
+        valorSpan.text(diferencia.toFixed(3));
+        if (diferencia >= 0) {
+            labelSpan.text('GANANCIA').removeClass('text-danger').addClass('text-success');
+            valorSpan.removeClass('text-danger').addClass('text-success');
+        } else {
+            labelSpan.text('PÉRDIDA').removeClass('text-success').addClass('text-danger');
+            valorSpan.removeClass('text-success').addClass('text-danger');
+        }
+    });
+    
+    // --- LÓGICA PARA VISTA PREVIA DE IMÁGENES ---
+    function handleImagePreview(inputElement, previewId) {
+        const previewContainer = document.getElementById(previewId);
+        if (!previewContainer) return;
+
+        previewContainer.innerHTML = '';
+        const file = inputElement.files[0];
+
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                previewContainer.appendChild(img);
+            };
+            reader.readAsDataURL(file);
+        } else if (file) {
+            previewContainer.innerHTML = '<div class="text-muted p-3"><i class="fas fa-file-alt fa-2x"></i><br><small>'+ file.name +'</small></div>';
+        } else {
+             previewContainer.innerHTML = '<div class="text-muted p-3"><i class="fas fa-file-alt fa-2x"></i></div>';
+        }
+    }
+
+    function initializePreviews() {
+        document.querySelectorAll('.image-preview').forEach(preview => {
+            const existingUrl = preview.dataset.existingUrl;
+            if (existingUrl) {
+                const img = document.createElement('img');
+                img.src = existingUrl;
+                preview.innerHTML = '';
+                preview.appendChild(img);
+            } else {
+                preview.innerHTML = '<div class="text-muted p-3"><i class="fas fa-file-alt fa-2x"></i></div>';
+            }
+        });
+    }
+    
+    $('#id_evidencia_carga').on('change', function() { handleImagePreview(this, 'preview_evidencia_carga'); });
+    $('#id_evidencia_descarga').on('change', function() { handleImagePreview(this, 'preview_evidencia_descarga'); });
+
+    // --- EJECUCIÓN INICIAL AL CARGAR LA PÁGINA ---
+    initializePreviews();
+
+    // Si la página se carga y ya hay una empresa seleccionada (como en 'editar'),
+    // dispara el evento 'change' para cargar todos los catálogos.
+    // El folio de remisión no se cambiará gracias al 'if (!IS_EDITING)'.
+    if (empresaSelect.val()) {
+        empresaSelect.trigger('change');
+    } else {
+        addButton.prop('disabled', true);
+    }
+    
+    $('.detalle-form-row').each(function() {
+        $(this).find('.peso-carga').trigger('input');
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,648 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+
+{% block title %}
+    Multi-Catálogo de {{ verbose_name_plural|capfirst }} | Sistema 3R RECYCLING
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+        --secondary-gradient: linear-gradient(135deg, #34a853 0%, #0d8040 100%);
+        --accent-gradient: linear-gradient(135deg, #fbbc05 0%, #f57c00 100%);
+        --dark-gradient: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
+        --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        --hover-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    .catalog-premium-header {
+        background: var(--primary-gradient) !important;
+        color: white;
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 8px 25px rgba(26, 115, 232, 0.3);
+        padding: 2rem !important;
+    }
+
+    .premium-search-container {
+        background: var(--dark-gradient);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        border-left: 5px solid var(--primary-color);
+        box-shadow: var(--card-shadow);
+    }
+
+    .search-input-premium {
+        background: rgba(255, 255, 255, 0.95);
+        border: 2px solid #e3f2fd;
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .search-input-premium:focus {
+        background: white;
+        border-color: #1a73e8;
+        box-shadow: 0 6px 20px rgba(26, 115, 232, 0.2);
+        transform: translateY(-2px);
+    }
+
+    .table-premium {
+        border-collapse: separate;
+        border-spacing: 0;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: var(--card-shadow);
+    }
+
+    .table-premium th {
+        background: var(--dark-gradient);
+        color: white;
+        font-weight: 600;
+        padding: 1.2rem;
+        font-size: 0.95rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border: none;
+    }
+
+    .table-premium td {
+        padding: 1.2rem;
+        border-bottom: 1px solid #f0f0f0;
+        vertical-align: middle;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .table-premium tr {
+        transition: all 0.3s ease;
+    }
+
+    .table-premium tr:hover {
+        background: linear-gradient(90deg, rgba(26, 115, 232, 0.05) 0%, transparent 100%);
+        transform: translateX(4px);
+    }
+
+    .table-premium tr:last-child td {
+        border-bottom: none;
+    }
+
+    .btn-premium {
+        padding: 0.6rem 1.2rem;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        border: none;
+    }
+
+    .btn-premium-primary {
+        background: var(--primary-gradient);
+        color: white;
+    }
+
+    .btn-premium-primary:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(26, 115, 232, 0.3);
+        color: white;
+    }
+
+    .btn-premium-outline {
+        background: transparent;
+        border: 2px solid #1a73e8;
+        color: #1a73e8;
+    }
+
+    .btn-premium-outline:hover {
+        background: #1a73e8;
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .premium-card {
+        border: none;
+        border-radius: 20px;
+        box-shadow: var(--card-shadow);
+        overflow: hidden;
+        transition: all 0.4s ease;
+        background: white;
+    }
+
+    .premium-card:hover {
+        transform: translateY(-8px);
+        box-shadow: var(--hover-shadow);
+    }
+
+    .empty-state-premium {
+        padding: 4rem 2rem;
+        text-align: center;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 20px;
+        margin: 2rem 0;
+    }
+
+    .empty-state-premium i {
+        font-size: 4rem;
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 1.5rem;
+        animation: pulse 2s infinite;
+    }
+
+    .loading-overlay-premium {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.95);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        border-radius: 12px;
+        backdrop-filter: blur(5px);
+    }
+
+    .filter-badge {
+        background: var(--accent-gradient);
+        color: white;
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-left: 0.5rem;
+    }
+
+    .modal-premium .modal-content {
+        border-radius: 20px;
+        border: none;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+    }
+
+    .modal-premium .modal-header {
+        background: var(--primary-gradient);
+        color: white;
+        border-radius: 20px 20px 0 0;
+        padding: 1.5rem 2rem;
+        border: none;
+    }
+
+    .modal-premium .modal-body {
+        padding: 2rem;
+        background: #fafafa;
+    }
+
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 1rem 0;
+        border-bottom: 1px solid #eee;
+    }
+
+    .detail-item:last-child {
+        border-bottom: none;
+    }
+
+    .detail-label {
+        font-weight: 600;
+        color: #5f6368;
+    }
+
+    .detail-value {
+        font-weight: 500;
+        color: #202124;
+        text-align: right;
+    }
+
+    @media (max-width: 768px) {
+        .premium-search-container {
+            padding: 1rem;
+        }
+        
+        .search-input-premium {
+            padding: 0.8rem 1rem;
+            font-size: 1rem;
+        }
+        
+        .table-premium th,
+        .table-premium td {
+            padding: 0.8rem;
+            font-size: 0.9rem;
+        }
+        
+        .btn-group-premium {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .btn-premium {
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+    }
+
+    /* Animaciones premium */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .animate-fade-in-up {
+        animation: fadeInUp 0.6s ease-out;
+    }
+
+    .animate-slide-in-right {
+        animation: slideInRight 0.6s ease-out;
+    }
+
+    .staggered-animation > * {
+        opacity: 0;
+        animation: fadeInUp 0.6s ease-out forwards;
+    }
+
+    .staggered-animation > *:nth-child(1) { animation-delay: 0.1s; }
+    .staggered-animation > *:nth-child(2) { animation-delay: 0.2s; }
+    .staggered-animation > *:nth-child(3) { animation-delay: 0.3s; }
+    .staggered-animation > *:nth-child(4) { animation-delay: 0.4s; }
+    .staggered-animation > *:nth-child(5) { animation-delay: 0.5s; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5 animate-fade-in-up">
+    <div class="premium-card">
+        <div class="card-header catalog-premium-header">
+            <div class="d-flex flex-wrap justify-content-between align-items-center">
+                <div class="animate-slide-in-right">
+                    <h4 class="mb-2 text-white">
+                        <i class="fas fa-star me-2"></i>
+                        Multi-Catálogo: {{ verbose_name_plural|capfirst }}
+                    </h4>
+                    <p class="mb-0 text-white-80">Gestión avanzada de {{ verbose_name_plural }} con búsqueda inteligente</p>
+                </div>
+                
+                {% with 'crear_'|add:model_name as create_url_name %}
+                    <a href="{% url create_url_name %}" class="btn btn-light btn-lg rounded-pill px-4 animate-slide-in-right">
+                        <i class="fas fa-plus-circle me-2"></i>Nuevo {{ verbose_name|capfirst }}
+                    </a>
+                {% endwith %}
+            </div>
+        </div>
+        
+        <div class="card-body premium-search-container position-relative">
+            <form method="get" class="row g-3 align-items-center" id="premiumSearchForm">
+                
+                <div class="col-lg-4 col-md-12 position-relative">
+                    <div class="input-group input-group-lg">
+                        <span class="input-group-text bg-white border-end-0 ps-3">
+                            <i class="fas fa-search text-primary"></i>
+                        </span>
+                        <input type="text" class="form-control search-input-premium border-start-0" 
+                               name="q" value="{{ search_query }}" 
+                               placeholder="Buscar en {{ verbose_name_plural }}..." 
+                               aria-label="Buscar" id="premiumSearchInput">
+                    </div>
+                </div>
+                {% if has_empresa_filter %}
+                <div class="col-lg-4 col-md-12">
+                    <div class="input-group input-group-lg">
+                        <span class="input-group-text bg-white border-end-0 ps-3">
+                            <i class="fas fa-building text-primary"></i>
+                        </span>
+                        <select name="empresa" class="form-select search-input-premium border-start-0" onchange="this.form.submit()">
+                            <option value="">-- Filtrar por Empresa --</option>
+                            {% for empresa in empresas %}
+                                <option value="{{ empresa.id }}" {% if selected_empresa == empresa.id %}selected{% endif %}>
+                                    {{ empresa.nombre }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                {% endif %}
+                <div class="col-lg-2 col-md-6">
+                    <button type="submit" class="btn btn-premium btn-premium-primary w-100 h-100" id="premiumSearchButton">
+                        <i class="fas fa-search me-1"></i> Buscar
+                    </button>
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <a href="{% url request.resolver_match.url_name %}" class="btn btn-premium btn-premium-outline w-100 h-100">
+                        <i class="fas fa-sync-alt me-1"></i> Limpiar
+                    </a>
+                </div>
+            </form>
+            
+            {% if search_query %}
+            <div class="mt-3">
+                <small class="text-white-60">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Buscando: "<strong>{{ search_query }}</strong>" 
+                    <span class="filter-badge">Todos los campos</span>
+                </small>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="card-body p-0 position-relative">
+            <div class="loading-overlay-premium" id="premiumLoadingOverlay">
+                <div class="text-center">
+                    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Buscando en todos los campos...</p>
+                </div>
+            </div>
+            
+            {% if object_list %}
+            <div class="table-responsive">
+                <table class="table table-premium mb-0">
+                    <thead>
+                        <tr class="staggered-animation">
+                            <th scope="col" class="ps-4">Nombre</th>
+                            {% if model_name in "lineatransporte,material,unidad,contenedor,lugar" %}
+                            <th scope="col">Empresas</th> {% endif %}
+                            {% if model_name == "empresa" %}
+                            <th scope="col">RFC</th>
+                            <th scope="col">Contacto</th>
+                            {% endif %}
+                            {% if model_name == "operador" %}
+                            <th scope="col">Licencia</th>
+                            <th scope="col">Teléfono</th>
+                            {% endif %}
+                            {% if model_name == "unidad" or model_name == "contenedor" %}
+                            <th scope="col">Placas</th>
+                            {% endif %}
+                            <th scope="col" class="text-center pe-4">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for object in object_list %}
+                        <tr class="animate-fade-in-up" style="animation-delay: {{ forloop.counter0|add:1|divisibleby:2 }}0ms">
+                            <td class="ps-4 fw-semibold">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas 
+                                        {% if model_name == 'empresa' %}fa-building
+                                        {% elif model_name == 'material' %}fa-cube
+                                        {% elif model_name == 'unidad' %}fa-truck
+                                        {% elif model_name == 'contenedor' %}fa-box
+                                        {% elif model_name == 'operador' %}fa-id-card
+                                        {% elif model_name == 'lugar' %}fa-map-marker-alt
+                                        {% elif model_name == 'lineatransporte' %}fa-route
+                                        {% else %}fa-list{% endif %} 
+                                        text-primary me-2"></i>
+                                    {{ object.nombre }}
+                                </div>
+                            </td>
+                            
+                            {% if model_name in "lineatransporte,material,unidad,contenedor,lugar" %}
+                            <td>
+                                {% if object.empresas.all %}
+                                    {% for empresa in object.empresas.all %}
+                                    <span class="badge bg-primary bg-opacity-10 text-primary me-1">
+                                        {{ empresa.nombre }}
+                                    </span>
+                                    {% endfor %}
+                                {% else %}
+                                <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </td>
+                            {% endif %}
+                            {% if model_name == "empresa" %}
+                            <td><code>{{ object.rfc|default:"N/A" }}</code></td>
+                            <td>{{ object.contacto_principal|default:"N/A" }}</td>
+                            {% endif %}
+                            
+                            {% if model_name == "operador" %}
+                            <td><code>{{ object.licencia|default:"N/A" }}</code></td>
+                            <td>
+                                {% if object.telefono %}
+                                <a href="tel:{{ object.telefono }}" class="text-decoration-none">
+                                    <i class="fas fa-phone me-1 text-success"></i>{{ object.telefono }}
+                                </a>
+                                {% else %}N/A{% endif %}
+                            </td>
+                            {% endif %}
+                            
+                            {% if model_name == "unidad" or model_name == "contenedor" %}
+                            <td>
+                                {% if object.placas %}
+                                <span class="badge bg-dark">{{ object.placas }}</span>
+                                {% else %}N/A{% endif %}
+                            </td>
+                            {% endif %}
+                            
+                            <td class="text-center pe-4">
+                                <div class="btn-group btn-group-premium" role="group">
+                                    {% with 'editar_'|add:model_name as edit_url_name %}
+                                        <a href="{% url edit_url_name object.pk %}" 
+                                           class="btn btn-premium btn-premium-outline"
+                                           data-bs-toggle="tooltip" title="Editar {{ verbose_name }}">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    {% endwith %}
+                                    
+                                    <button type="button" 
+                                            class="btn btn-premium btn-premium-outline view-details-btn" 
+                                            data-object-id="{{ object.pk }}"
+                                            data-bs-toggle="tooltip" title="Ver detalles">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="pagination-container bg-light p-3">
+                <div class="results-count fw-semibold">
+                    <i class="fas fa-chart-bar me-2 text-primary"></i>
+                    Mostrando {{ page_obj.start_index }} - {{ page_obj.end_index }} de {{ page_obj.paginator.count }} resultados
+                </div>
+                
+                {% if is_paginated %}
+                <nav aria-label="Navegación de páginas">
+                    <ul class="pagination justify-content-center mb-0">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">
+                                    <i class="fas fa-chevron-left"></i>
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link"><i class="fas fa-chevron-left"></i></span>
+                            </li>
+                        {% endif %}
+                        
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}{% if search_query %}&q={{ search_query }}{% endif %}">{{ num }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">
+                                    <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link"><i class="fas fa-chevron-right"></i></span>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+            </div>
+            
+            {% else %}
+                <div class="empty-state-premium">
+                    <i class="fas fa-search"></i>
+                    <h4>No se encontraron resultados</h4>
+                    <p class="mb-4">No hay {{ verbose_name_plural }} que coincidan con tu búsqueda o el catálogo está vacío.</p>
+                    <div class="d-flex justify-content-center gap-3 flex-wrap">
+                        {% with 'crear_'|add:model_name as create_url_name %}
+                            <a href="{% url create_url_name %}" class="btn btn-premium btn-premium-primary">
+                                <i class="fas fa-plus me-2"></i> Agregar {{ verbose_name }}
+                            </a>
+                        {% endwith %}
+                        <a href="{% url request.resolver_match.url_name %}" class="btn btn-premium btn-premium-outline">
+                            <i class="fas fa-sync-alt me-2"></i> Limpiar búsqueda
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="modal fade modal-premium" id="premiumDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Detalles Completos
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="premiumModalBody">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando detalles...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Cargando información completa...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Cerrar
+                </button>
+                <a href="#" class="btn btn-premium btn-premium-primary" id="premiumModalEditBtn">
+                    <i class="fas fa-edit me-2"></i> Editar
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // --- Elementos DOM ---
+    const searchForm = document.getElementById('premiumSearchForm');
+    const loadingOverlay = document.getElementById('premiumLoadingOverlay');
+    const detailModal = new bootstrap.Modal(document.getElementById('premiumDetailModal'));
+    const modalBody = document.getElementById('premiumModalBody');
+    const modalEditBtn = document.getElementById('premiumModalEditBtn');
+    
+    // *** Ocultar el overlay al cargar la página ***
+    loadingOverlay.style.display = 'none';
+    
+    // --- Inicializar tooltips ---
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // --- LÓGICA DE FILTROS ELIMINADA ---
+    
+    // --- Envío del formulario de búsqueda principal ---
+    searchForm.addEventListener('submit', function(e) {
+        // Muestra el overlay solo cuando se envía el formulario
+        loadingOverlay.style.display = 'flex';
+        
+        // --- LÓGICA DE AÑADIR FILTRO OCULTO ELIMINADA ---
+    });
+    
+    // --- Lógica para mostrar detalles en el modal ---
+    document.querySelectorAll('.view-details-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const objectId = this.getAttribute('data-object-id');
+            loadObjectDetails(objectId);
+        });
+    });
+
+    function loadObjectDetails(objectId) {
+        modalBody.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div><p class="mt-3 text-muted">Cargando detalles...</p></div>`;
+        detailModal.show();
+        
+        const detailsUrl = `/catalogo/{{ model_name }}/${objectId}/detalles/`;
+        
+        fetch(detailsUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(response => {
+                if (!response.ok) throw new Error('Error al cargar detalles');
+                return response.text();
+            })
+            .then(html => {
+                modalBody.innerHTML = html;
+                
+                // --- CORRECCIÓN: Generar la URL de edición de forma robusta ---
+                // Usamos el tag 'url' de Django para crear una URL plantilla
+                // y reemplazamos el '999' con el ID real.
+                const editUrl = "{% url 'editar_'|add:model_name 999 %}".replace('999', objectId);
+                modalEditBtn.href = editUrl;
+            })
+            .catch(error => {
+                console.error('Error loading details:', error);
+                modalBody.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error al cargar los detalles.</div>`;
+            });
+    }
+
+    // --- CÓDIGO DE BÚSQUEDA EN TIEMPO REAL ELIMINADO ---
+    
+});
+</script>
+{% endblock extra_js %}

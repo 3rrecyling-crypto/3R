@@ -1,0 +1,41 @@
+{% extends 'ternium/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Líneas de Transporte</h2>
+        <a href="{% url 'crear_linea_transporte' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Añadir Nueva Línea
+        </a>
+    </div>
+    
+    <div class="card">
+        <div class="card-body">
+            {% if lineas_transporte %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Nombre de la Línea de Transporte</th>
+                            <th>Unidad de Negocio (Empresa)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for linea in lineas_transporte %}
+                        <tr>
+                            <td>{{ linea.nombre }}</td>
+                            <td>
+                                <span class="badge bg-info text-dark">{{ linea.empresa.nombre }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-center">No hay líneas de transporte registradas. <a href="{% url 'crear_linea_transporte' %}">Añade la primera</a>.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

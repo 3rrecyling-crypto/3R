@@ -1,0 +1,404 @@
+{% extends "ternium/base.html" %}
+{% load humanize static %}
+
+{% block title %}Mis Chats{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-color: #4e73df;
+        --secondary-color: #f8f9fc;
+        --accent-color: #36b9cc;
+        --text-primary: #3a3b45;
+        --text-secondary: #858796;
+        --border-color: #e3e6f0;
+        --unread-badge: #e74a3b;
+        --online-status: #1cc88a;
+        --offline-status: #858796;
+        --hover-bg: #f8f9fc;
+    }
+
+    .chat-container {
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+        border: none;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .chat-header {
+        background-color: var(--secondary-color);
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .search-container {
+        position: relative;
+        margin: 1rem 1.5rem;
+    }
+
+    .search-input {
+        border-radius: 20px;
+        padding: 0.5rem 1rem 0.5rem 2.5rem;
+        border: 1px solid var(--border-color);
+        width: 100%;
+        transition: all 0.3s;
+    }
+
+    .search-input:focus {
+        outline: none;
+        box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+        border-color: #a1b4ee;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-secondary);
+    }
+
+    .chat-list {
+        max-height: 65vh;
+        overflow-y: auto;
+    }
+
+    .chat-item {
+        display: flex;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        transition: background-color 0.2s;
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .chat-item:hover {
+        background-color: var(--hover-bg);
+    }
+
+    .chat-item:last-child {
+        border-bottom: none;
+    }
+
+    .avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 1.2rem;
+        position: relative;
+        flex-shrink: 0;
+    }
+
+    .status-indicator {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 2px solid white;
+        position: absolute;
+        bottom: 0;
+        right: 0;
+    }
+
+    .online {
+        background-color: var(--online-status);
+    }
+
+    .offline {
+        background-color: var(--offline-status);
+    }
+
+    .chat-content {
+        flex: 1;
+        margin-left: 1rem;
+        min-width: 0; /* Para que el texto no desborde */
+    }
+
+    .chat-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.25rem;
+    }
+
+    .chat-name {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .chat-time {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        flex-shrink: 0;
+        margin-left: 0.5rem;
+    }
+
+    .chat-bottom {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .chat-message {
+        color: var(--text-secondary);
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 0.9rem;
+    }
+
+    .unread-badge {
+        background-color: var(--unread-badge);
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        font-weight: bold;
+        flex-shrink: 0;
+        margin-left: 0.5rem;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: var(--text-secondary);
+    }
+
+    .empty-icon {
+        font-size: 3.5rem;
+        margin-bottom: 1rem;
+        color: #d1d3e2;
+    }
+
+    .new-chat-btn {
+        border-radius: 30px;
+        padding: 0.5rem 1.5rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+    }
+
+    .new-chat-btn i {
+        margin-right: 0.5rem;
+    }
+
+    /* Scrollbar personalizado */
+    .chat-list::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .chat-list::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+
+    .chat-list::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 10px;
+    }
+
+    .chat-list::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+
+    /* Filtros de chat */
+    .chat-filters {
+        display: flex;
+        padding: 0 1.5rem;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .filter-btn {
+        background: none;
+        border: none;
+        padding: 0.75rem 1rem;
+        margin-right: 0.5rem;
+        color: var(--text-secondary);
+        position: relative;
+        cursor: pointer;
+        font-size: 0.9rem;
+    }
+
+    .filter-btn.active {
+        color: var(--primary-color);
+        font-weight: 600;
+    }
+
+    .filter-btn.active::after {
+        content: '';
+        position: absolute;
+        bottom: -1px;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background-color: var(--primary-color);
+        border-radius: 3px 3px 0 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 576px) {
+        .chat-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .chat-header h3 {
+            margin-bottom: 1rem;
+        }
+        
+        .new-chat-btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card chat-container">
+        <div class="chat-header">
+            <h3 class="mb-0">Bandeja de Entrada</h3>
+            <a href="{% url 'user_list' %}" class="new-chat-btn btn btn-primary">
+                <i class="fas fa-plus"></i> Nuevo Chat
+            </a>
+        </div>
+
+        <div class="search-container">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" class="form-control search-input" placeholder="Buscar conversaciones...">
+        </div>
+
+        <div class="chat-filters">
+            <button class="filter-btn active" data-filter="all">Todos</button>
+            <button class="filter-btn" data-filter="unread">No leídos</button>
+            <button class="filter-btn" data-filter="groups">Grupos</button>
+        </div>
+
+        <div class="chat-list">
+            {% for conv in conversations %}
+                {% with other_user=conv.participants.all|slice:":2"|last %}
+                    {% if other_user != request.user %}
+                    <a href="{% url 'chat_detail' conv.id %}" class="chat-item">
+                        {% with user_initials=other_user.username|slice:":2"|upper %}
+                        <div class="avatar" style="background-color: {% cycle '#4e73df' '#36b9cc' '#1cc88a' '#f6c23e' '#e74a3b' as avatarcolors %};">
+                            {{ user_initials }}
+                            <span class="status-indicator {% cycle 'online' 'offline' as status %}"></span>
+                        </div>
+                        {% endwith %}
+                        
+                        <div class="chat-content">
+                            <div class="chat-top">
+                                <h5 class="chat-name">
+                                    {% for p in conv.participants.all %}
+                                        {% if p != request.user %}{{ p.username }}{% endif %}
+                                    {% endfor %}
+                                </h5>
+                                <span class="chat-time">{{ conv.updated_at|naturaltime }}</span>
+                            </div>
+                            <div class="chat-bottom">
+                                <p class="chat-message">
+                                    {% if conv.messages.last %}
+                                        {{ conv.messages.last.content|truncatechars:50 }}
+                                    {% else %}
+                                        Aún no hay mensajes.
+                                    {% endif %}
+                                </p>
+                                {% if forloop.counter|divisibleby:2 %}
+                                <span class="unread-badge">3</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </a>
+                    {% endif %}
+                {% endwith %}
+            {% empty %}
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-comments"></i>
+                </div>
+                <h4>No hay conversaciones</h4>
+                <p class="mb-3">Inicia una nueva conversación para comenzar a chatear.</p>
+                <a href="{% url 'user_list' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i> Nuevo Chat
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Búsqueda en tiempo real
+        const searchInput = document.querySelector('.search-input');
+        const chatItems = document.querySelectorAll('.chat-item');
+        
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            
+            chatItems.forEach(item => {
+                const userName = item.querySelector('.chat-name').textContent.toLowerCase();
+                const lastMessage = item.querySelector('.chat-message').textContent.toLowerCase();
+                
+                if (userName.includes(searchTerm) || lastMessage.includes(searchTerm)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+        
+        // Filtros de chat
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        
+        filterButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Quitar clase active de todos los botones
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                
+                // Añadir clase active al botón clickeado
+                this.classList.add('active');
+                
+                // Aquí iría la lógica para filtrar las conversaciones
+                // Por simplicidad, en este ejemplo solo mostramos un mensaje
+                const filterType = this.getAttribute('data-filter');
+                console.log(`Filtrando por: ${filterType}`);
+                // En una implementación real, aquí se filtrarían las conversaciones
+            });
+        });
+        
+        // Simular estados de conexión cambiantes
+        setInterval(() => {
+            const statusIndicators = document.querySelectorAll('.status-indicator');
+            statusIndicators.forEach(indicator => {
+                if (Math.random() > 0.7) {
+                    indicator.classList.toggle('online');
+                    indicator.classList.toggle('offline');
+                }
+            });
+        }, 10000);
+    });
+</script>
+{% endblock %}

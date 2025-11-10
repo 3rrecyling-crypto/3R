@@ -1,0 +1,397 @@
+{% extends 'compras/compras_base.html' %}
+{% load widget_tweaks %}
+{% load humanize %}
+
+{% block compras_content %}
+
+{% if messages %}
+<div class="container-fluid pt-4">
+    {% for message in messages %}
+    <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-{{ message.tags }}{% endif %} alert-dismissible fade show shadow-sm rounded-lg" role="alert">
+        <div class="d-flex align-items-center">
+            <i class="{% if message.tags == 'error' %}fas fa-exclamation-circle{% elif message.tags == 'warning' %}fas fa-exclamation-triangle{% elif message.tags == 'success' %}fas fa-check-circle{% else %}fas fa-info-circle{% endif %} me-3 fs-5"></i>
+            <span class="fs-6">{{ message }}</span>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="container-fluid">
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 class="fw-bold text-primary mb-2 fs-2">{{ titulo }}</h3>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item"><a href="{% url 'detalle_solicitud' solicitud.pk %}" class="text-decoration-none text-muted">Solicitud</a></li>
+                            <li class="breadcrumb-item active text-primary fw-medium" aria-current="page">Crear Orden de Compra</li>
+                        </ol>
+                    </nav>
+                </div>
+                <div class="d-flex gap-3">
+                    <button class="btn btn-outline-info d-flex align-items-center px-4 py-2 rounded-pill" data-bs-toggle="modal" data-bs-target="#helpModal">
+                        <i class="fas fa-question-circle me-2 fs-6"></i>Ayuda
+                    </button>
+                    <a href="{% url 'detalle_solicitud' solicitud.pk %}" class="btn btn-outline-secondary d-flex align-items-center px-4 py-2 rounded-pill">
+                        <i class="fas fa-arrow-left me-2 fs-6"></i>Volver
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form method="post" id="ordenCompraForm" class="needs-validation" novalidate>
+        {% csrf_token %}
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card mb-5 shadow-sm border-0 rounded-3">
+                    <div class="card-header bg-white border-bottom py-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0 text-dark fw-bold fs-5">
+                                <i class="fas fa-file-alt me-3 text-primary"></i>Información de la Solicitud
+                            </h5>
+                            <span class="badge bg-primary fs-6 px-4 py-2 rounded-pill">{{ solicitud.folio }}</span>
+                        </div>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold text-secondary mb-3 fs-6">Solicitante</label>
+                                <div class="bg-light p-4 rounded-3 border">
+                                    <i class="fas fa-user me-3 text-primary fs-5"></i>
+                                    <span class="fs-6 fw-medium">{{ solicitud.solicitante.get_full_name|default:solicitud.solicitante.username }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold text-secondary mb-3 fs-6">Fecha de Solicitud</label>
+                                <div class="bg-light p-4 rounded-3 border">
+                                    <i class="fas fa-calendar me-3 text-primary fs-5"></i>
+                                    <span class="fs-6 fw-medium">{{ solicitud.creado_en|date:"d/m/Y H:i" }}</span>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold text-secondary mb-3 fs-6">Motivo</label>
+                                <div class="bg-light p-4 rounded-3 border">
+                                    <i class="fas fa-file-alt me-3 text-primary fs-5"></i>
+                                    <span class="fs-6 fw-medium">{{ solicitud.motivo }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-5 shadow-sm border-0 rounded-3">
+                    <div class="card-header bg-primary text-white border-0 py-4">
+                        <h5 class="card-title mb-0 fw-bold fs-5">
+                            <i class="fas fa-file-invoice me-3"></i>Datos de la Orden de Compra
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold fs-6 mb-3">{{ form.proveedor.label }} <span class="text-danger">*</span></label>
+                                {% render_field form.proveedor class="form-select form-select-lg py-3 rounded-2" %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold fs-6 mb-3">{{ form.fecha_entrega_esperada.label }} <span class="text-danger">*</span></label>
+                                {% render_field form.fecha_entrega_esperada class="form-control form-control-lg py-3 rounded-2" type="date" min=today_str %}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold fs-6 mb-3">{{ form.moneda.label }} <span class="text-danger">*</span></label>
+                                {% render_field form.moneda class="form-select form-select-lg py-3 rounded-2" %}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold fs-6 mb-3">{{ form.tipo_cambio.label }}</label>
+                                <div class="input-group input-group-lg">
+                                    <span class="input-group-text bg-light border-end-0 py-3 rounded-start-2"><i class="fas fa-exchange-alt text-primary fs-5"></i></span>
+                                    {% render_field form.tipo_cambio class="form-control border-start-0 py-3 rounded-end-2" type="number" step="0.0001" min="0" placeholder="0.0000" %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold fs-6 mb-3">Días de Crédito</label>
+                                <div class="input-group input-group-lg">
+                                    <input type="number" class="form-control py-3 rounded-start-2" id="dias_credito" min="0" value="{{ form.instance.proveedor.dias_credito|default:0 }}">
+                                    <span class="input-group-text bg-light py-3 rounded-end-2">días</span>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold fs-6 mb-3">{{ form.condiciones_pago.label }}</label>
+                                {% render_field form.condiciones_pago class="form-control py-3 rounded-2" rows="3" placeholder="Especificar condiciones de pago..." %}
+                            </div>
+                            <!-- NUEVOS CAMPOS -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold fs-6 mb-3">{{ form.modalidad_pago.label }} <span class="text-danger">*</span></label>
+                                {% render_field form.modalidad_pago class="form-select form-select-lg py-3 rounded-2" %}
+                            </div>
+                            <div class="col-md-6" id="plazos-container" style="display: none;">
+                                <label class="form-label fw-semibold fs-6 mb-3">{{ form.cantidad_plazos.label }}</label>
+                                {% render_field form.cantidad_plazos class="form-control form-control-lg py-3 rounded-2" min="1" placeholder="Ej: 3" %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm border-0 rounded-3">
+                    <div class="card-header bg-primary text-white border-0 py-4">
+                        <h5 class="card-title mb-0 fw-bold fs-5">
+                            <i class="fas fa-shopping-cart me-3"></i>Artículos a Comprar
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        {{ formset.management_form }}
+                        <div id="detalle-forms-container">
+                            {% for detalle_form, articulo in zipped_forms_and_articles %}
+                            <div class="detalle-form border-bottom bg-white" data-iva="{{ articulo.lleva_iva|yesno:'true,false' }}" data-retencion-iva="{{ articulo.lleva_retencion_iva|yesno:'true,false' }}">
+                                {{ detalle_form.articulo }}{{ detalle_form.id }}
+                                <div class="p-5">
+                                    <div class="row align-items-center mb-4">
+                                        <div class="col-md-8">
+                                            <h5 class="fw-bold text-dark mb-3 fs-5">{{ articulo.nombre }}</h5>
+                                            <div class="d-flex flex-wrap gap-3 mb-3">
+                                                <span class="badge bg-light text-dark border py-2 px-3 rounded-2 fs-6"><strong>SKU:</strong> {{ articulo.sku|default:"N/A" }}</span>
+                                                <span class="badge bg-light text-dark border py-2 px-3 rounded-2 fs-6"><strong>Categoría:</strong> {{ articulo.categoria|default:"N/A" }}</span>
+                                            </div>
+                                            <div class="d-flex gap-2">
+                                                <span class="badge bg-secondary py-2 px-3 rounded-2 fs-6">{{ articulo.get_tipo_display }}</span>
+                                                {% if articulo.lleva_iva %}<span class="badge bg-info py-2 px-3 rounded-2 fs-6">IVA 16%</span>{% endif %}
+                                                {% if articulo.lleva_retencion_iva %}<span class="badge bg-danger py-2 px-3 rounded-2 fs-6">RET IVA 10.67%</span>{% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4 text-end">
+                                            <button class="btn btn-outline-primary toggle-details d-flex align-items-center py-2 px-4 rounded-pill" type="button" data-bs-toggle="collapse" data-bs-target="#details-{{ forloop.counter }}">
+                                                <i class="fas fa-chevron-down me-2 fs-6"></i>Detalles
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="collapse" id="details-{{ forloop.counter }}">
+                                        <div class="bg-light p-4 rounded-3 mb-4">
+                                            <p class="mb-0 fs-6"><strong>Descripción:</strong> {{ articulo.descripcion|default:"Sin descripción" }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="row g-4 align-items-end">
+                                        <div class="col-md-2">
+                                            <label class="form-label fw-semibold text-secondary mb-3 fs-6">Cantidad</label>
+                                            {% render_field detalle_form.cantidad class="form-control form-control-lg py-3 rounded-2 cantidad-input" %}
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label fw-semibold text-secondary mb-3 fs-6">Precio Unit.</label>
+                                            <div class="input-group input-group-lg">
+                                                <span class="input-group-text bg-light py-3 rounded-start-2">$</span>
+                                                {% render_field detalle_form.precio_unitario class="form-control py-3 rounded-end-2 precio-input" %}
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label fw-semibold text-secondary mb-3 fs-6">Desc. %</label>
+                                            <div class="input-group input-group-lg">
+                                                {% render_field detalle_form.descuento class="form-control py-3 rounded-start-2 descuento-input" %}
+                                                <span class="input-group-text bg-light py-3 rounded-end-2">%</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label fw-semibold text-secondary mb-3 fs-6">IVA</label>
+                                            <input type="text" class="form-control form-control-lg py-3 rounded-2 iva-display bg-light" readonly value="0.00">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label fw-semibold text-secondary mb-3 fs-6">Subtotal</label>
+                                            <input type="text" class="form-control form-control-lg py-3 rounded-2 subtotal-display bg-light fw-bold text-dark" readonly value="0.00">
+                                        </div>
+                                        <div class="col-md-1">
+                                            <label class="form-label fw-semibold text-secondary mb-3 fs-6 opacity-0">Acción</label>
+                                            <button class="btn btn-outline-danger remove-item w-100 py-3 rounded-2" disabled>
+                                                <i class="fas fa-trash fs-6"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0 rounded-3 sticky-top" style="top: 30px;">
+                    <div class="card-header bg-primary text-white border-0 py-4">
+                        <h5 class="card-title mb-0 fw-bold fs-5">
+                            <i class="fas fa-chart-bar me-3"></i>Resumen
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <span class="fw-semibold fs-6">Artículos:</span>
+                            <span id="summary-items" class="badge bg-primary fs-6 px-3 py-2 rounded-pill">0</span>
+                        </div>
+                        
+                        <div class="list-group list-group-flush mb-4">
+                            <div class="list-group-item d-flex justify-content-between align-items-center px-0 py-3">
+                                <span class="fw-semibold fs-6">Subtotal:</span>
+                                <span id="summary-subtotal" class="fw-bold text-dark fs-6">$0.00</span>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center px-0 py-3">
+                                <span class="fw-semibold fs-6">Descuentos:</span>
+                                <span id="summary-descuentos" class="fw-bold text-danger fs-6">-$0.00</span>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center px-0 py-3">
+                                <span class="fw-semibold fs-6">IVA:</span>
+                                <span id="summary-iva" class="fw-bold text-success fs-6">$0.00</span>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center px-0 py-3">
+                                <span class="fw-semibold fs-6">Ret IVA:</span>
+                                <span id="summary-retencion-iva" class="fw-bold text-danger fs-6">-$0.00</span>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-gradient-light p-4 rounded-3 border mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong class="fs-5 text-dark fw-bold">Total:</strong>
+                                <span id="summary-total" class="fs-4 fw-bold text-primary">$0.00</span>
+                            </div>
+                            <small id="summary-total-mxn" class="text-muted fs-6">$0.00 MXN</small>
+                        </div>
+                        
+                        <div class="form-check mt-4 p-4 bg-light rounded-3 border">
+                            <input class="form-check-input me-3" type="checkbox" id="confirmacion" required style="width: 1.2em; height: 1.2em;">
+                            <label class="form-check-label fw-semibold fs-6" for="confirmacion">
+                                Confirmo que los datos son correctos
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mt-5 shadow-sm border-0 rounded-3">
+                    <div class="card-body p-4">
+                        <button type="submit" class="btn btn-success btn-lg w-100 d-flex align-items-center justify-content-center py-3 rounded-2 mb-3 fs-6 fw-bold">
+                            <i class="fas fa-check-circle me-3 fs-5"></i>Aprobar Orden de Compra
+                        </button>
+                        <a href="{% url 'detalle_solicitud' solicitud.pk %}" class="btn btn-outline-secondary btn-lg w-100 d-flex align-items-center justify-content-center py-3 rounded-2 fs-6 fw-bold">
+                            <i class="fas fa-times me-3 fs-5"></i>Cancelar
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-3">
+            <div class="modal-header bg-primary text-white border-0 py-4 rounded-top-3">
+                <h5 class="modal-title fw-bold fs-5" id="helpModalLabel">
+                    <i class="fas fa-question-circle me-3"></i>Ayuda - Crear Orden de Compra
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item d-flex align-items-start px-0 py-3">
+                        <i class="fas fa-check-circle text-success mt-1 me-3 fs-5"></i>
+                        <div>
+                            <strong class="fs-6">Complete los datos de la OC</strong>
+                            <p class="mb-0 text-muted fs-6">Seleccione proveedor, fechas y condiciones de pago</p>
+                        </div>
+                    </div>
+                    <div class="list-group-item d-flex align-items-start px-0 py-3">
+                        <i class="fas fa-money-bill-wave text-info mt-1 me-3 fs-5"></i>
+                        <div>
+                            <strong class="fs-6">Modalidad de pago</strong>
+                            <p class="mb-0 text-muted fs-6">Si es a plazos, ingrese la cantidad de plazos requeridos</p>
+                        </div>
+                    </div>
+                    <div class="list-group-item d-flex align-items-start px-0 py-3">
+                        <i class="fas fa-shopping-cart text-warning mt-1 me-3 fs-5"></i>
+                        <div>
+                            <strong class="fs-6">Ajuste artículos</strong>
+                            <p class="mb-0 text-muted fs-6">Revise cantidades, precios y confirme los datos</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 py-4 rounded-bottom-3">
+                <button type="button" class="btn btn-primary px-4 py-2 rounded-2 fw-semibold" data-bs-dismiss="modal">Entendido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('detalle-forms-container');
+    const ordenCompraForm = document.getElementById('ordenCompraForm');
+    const confirmacionCheckbox = document.getElementById('confirmacion');
+    
+    // Toggle plazos
+    document.getElementById('id_modalidad_pago').addEventListener('change', function() {
+        const container = document.getElementById('plazos-container');
+        const input = document.getElementById('id_cantidad_plazos');
+        if (this.value === 'A_PLAZOS') {
+            container.style.display = 'block';
+            input.required = true;
+        } else {
+            container.style.display = 'none';
+            input.required = false;
+            input.value = '';
+        }
+    });
+    
+    // Formateo
+    function formatCurrency(value) {
+        return isNaN(value) ? '0.00' : value.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    
+    // Cálculos
+    function calculateTotals() {
+        let totalSubtotal = 0, totalDescuentos = 0, totalIva = 0, totalRetencionIva = 0, itemsCount = 0;
+        document.querySelectorAll('.detalle-form').forEach(form => {
+            const cantidad = parseFloat(form.querySelector('.cantidad-input').value) || 0;
+            const precio = parseFloat(form.querySelector('.precio-input').value) || 0;
+            const descuento = parseFloat(form.querySelector('.descuento-input').value) || 0;
+            const aplicaIva = form.dataset.iva === 'true';
+            const aplicaRetencionIva = form.dataset.retencionIva === 'true';
+            
+            const subtotalSinDesc = cantidad * precio;
+            const montoDescuento = subtotalSinDesc * (descuento / 100);
+            const subtotalConDesc = subtotalSinDesc - montoDescuento;
+            let ivaArticulo = aplicaIva ? subtotalConDesc * 0.16 : 0;
+            
+            form.querySelector('.subtotal-display').value = formatCurrency(subtotalConDesc);
+            form.querySelector('.iva-display').value = formatCurrency(ivaArticulo);
+            
+            totalSubtotal += subtotalConDesc;
+            totalDescuentos += montoDescuento;
+            totalIva += ivaArticulo;
+            if (aplicaRetencionIva) totalRetencionIva += subtotalConDesc * 0.106667;
+            if (cantidad > 0 && precio > 0) itemsCount++;
+        });
+        
+        const granTotal = totalSubtotal + totalIva - totalRetencionIva;
+        document.getElementById('summary-items').textContent = itemsCount;
+        document.getElementById('summary-subtotal').textContent = `$${formatCurrency(totalSubtotal)}`;
+        document.getElementById('summary-descuentos').textContent = `-$${formatCurrency(totalDescuentos)}`;
+        document.getElementById('summary-iva').textContent = `$${formatCurrency(totalIva)}`;
+        document.getElementById('summary-retencion-iva').textContent = `-$${formatCurrency(totalRetencionIva)}`;
+        document.getElementById('summary-total').textContent = `$${formatCurrency(granTotal)}`;
+        document.getElementById('summary-total-mxn').textContent = `$${formatCurrency(granTotal)} MXN`;
+    }
+    
+    // Eventos
+    container.addEventListener('input', calculateTotals);
+    ordenCompraForm.addEventListener('submit', function(e) {
+        if (!confirmacionCheckbox.checked) {
+            alert('Confirme los datos.');
+            e.preventDefault();
+        }
+    });
+    
+    // Inicial
+    calculateTotals();
+});
+</script>
+{% endblock %}

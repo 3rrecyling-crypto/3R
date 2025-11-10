@@ -1,0 +1,545 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+
+{% block title %}Detalle de Factura - {{ factura.numero_factura }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-1 text-dark">Detalle de Factura</h1>
+                    <p class="text-muted mb-0">Información completa y gestión de pagos</p>
+                </div>
+                <div>
+                    <a href="{% url 'lista_facturas' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Volver
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Información Principal de la Factura -->
+        <div class="col-lg-8">
+            <!-- NUEVA SECCIÓN: Sincronización con Compras -->
+            <div class="card border-0 shadow-sm mb-4 border-info">
+                <div class="card-header bg-info text-white border-0 py-3">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-sync-alt me-2"></i>
+                        Sincronización con Compras
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="me-3">
+                                    <i class="fas fa-file-contract fa-2x text-primary"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-1">Orden de Compra</h6>
+                                    <p class="mb-0">
+                                        <a href="{% url 'detalle_orden_compra' factura.orden_compra.pk %}" 
+                                           class="text-decoration-none fw-bold text-dark">
+                                            {{ factura.orden_compra.folio }}
+                                        </a>
+                                    </p>
+                                    <small class="text-muted">Estado: 
+                                        <span class="badge {% if factura.orden_compra.estatus == 'APROBADA' %}bg-success{% elif factura.orden_compra.estatus == 'AUDITADA' %}bg-primary{% elif factura.orden_compra.estatus == 'LISTA_PARA_AUDITAR' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                            {{ factura.orden_compra.get_estatus_display }}
+                                        </span>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="me-3">
+                                    <i class="fas fa-link fa-2x text-success"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-1">Documentos Sincronizados</h6>
+                                    <div class="d-flex gap-3">
+                                        {% if factura.archivo_factura %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i>Factura
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-times me-1"></i>Factura
+                                        </span>
+                                        {% endif %}
+                                        
+                                        {% if factura.orden_compra.comprobante_pago %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i>Comprobante
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-times me-1"></i>Comprobante
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Checklist de Auditoría -->
+                    <div class="mt-3 p-3 bg-light rounded">
+                        <h6 class="text-dark mb-2">
+                            <i class="fas fa-clipboard-check me-2 text-primary"></i>
+                            Progreso de Auditoría en Compras
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" 
+                                           {% if factura.orden_compra.factura_subida %}checked{% endif %} disabled>
+                                    <label class="form-check-label {% if factura.orden_compra.factura_subida %}text-success{% endif %}">
+                                        Factura subida
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" 
+                                           {% if factura.orden_compra.comprobante_pago_subido %}checked{% endif %} disabled>
+                                    <label class="form-check-label {% if factura.orden_compra.comprobante_pago_subido %}text-success{% endif %}">
+                                        Comprobante subido
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-sm {% if factura.orden_compra.lista_para_auditar %}alert-success{% else %}alert-warning{% endif %} mb-0">
+                                    <small>
+                                        <i class="fas {% if factura.orden_compra.lista_para_auditar %}fa-check-circle{% else %}fa-clock{% endif %} me-1"></i>
+                                        {% if factura.orden_compra.lista_para_auditar %}
+                                            Lista para auditoría
+                                        {% else %}
+                                            Pendiente de documentos
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta de Información General -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0 py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0 text-dark">
+                            <i class="fas fa-file-invoice text-primary me-2"></i>
+                            Información de la Factura
+                        </h5>
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'editar_factura' factura.pk %}" class="btn btn-warning btn-sm">
+                                <i class="fas fa-edit me-1"></i>Editar
+                            </a>
+                            <a href="{% url 'crear_pago' %}?factura={{ factura.pk }}" class="btn btn-success btn-sm">
+                                <i class="fas fa-hand-holding-usd me-1"></i>Registrar Pago
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Columna Izquierda -->
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Número de Factura</label>
+                                <h5 class="text-dark mb-0">{{ factura.numero_factura }}</h5>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Orden de Compra</label>
+                                <p class="mb-0">
+                                    <i class="fas fa-file-contract text-info me-2"></i>
+                                    {{ factura.orden_compra.folio }}
+                                </p>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Proveedor</label>
+                                <p class="mb-0">
+                                    <i class="fas fa-building text-secondary me-2"></i>
+                                    {{ factura.orden_compra.proveedor.razon_social }}
+                                </p>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Fechas</label>
+                                <div class="d-flex gap-3">
+                                    <div>
+                                        <small class="text-muted d-block">Emisión</small>
+                                        <strong>{{ factura.fecha_emision }}</strong>
+                                    </div>
+                                    <div>
+                                        <small class="text-muted d-block">Vencimiento</small>
+                                        <strong class="{% if factura.esta_vencida %}text-danger{% elif factura.esta_por_vencer %}text-warning{% endif %}">
+                                            {{ factura.fecha_vencimiento }}
+                                        </strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Columna Derecha -->
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Estatus</label>
+                                <div>
+                                    <span class="badge {% if factura.estatus == 'PAGADA' %}bg-success{% elif factura.estatus == 'VENCIDA' %}bg-danger{% elif factura.estatus == 'POR_VENCER' %}bg-warning{% else %}bg-primary{% endif %} rounded-pill fs-6">
+                                        {{ factura.get_estatus_display }}
+                                    </span>
+                                    {% if factura.dias_restantes_credito %}
+                                    <small class="text-muted ms-2">
+                                        ({{ factura.dias_restantes_credito }} días)
+                                    </small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Montos</label>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span>Total:</span>
+                                    <strong class="text-dark">${{ factura.monto|floatformat:2|intcomma }}</strong>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span>Pagado:</span>
+                                    <strong class="text-success">${{ factura.monto_pagado|floatformat:2|intcomma }}</strong>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>Pendiente:</span>
+                                    <strong class="{% if factura.monto_pendiente > 0 %}text-warning{% else %}text-success{% endif %}">
+                                        ${{ factura.monto_pendiente|floatformat:2|intcomma }}
+                                    </strong>
+                                </div>
+                            </div>
+                            
+                            <!-- Barra de Progreso MEJORADA -->
+                            <div class="mt-3">
+                                <label class="form-label text-muted small mb-2">Progreso de Pago</label>
+                                
+                                <!-- Usa la propiedad porcentaje_pagado del modelo -->
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar {% if factura.pagada %}bg-success{% else %}bg-primary{% endif %}" 
+                                        role="progressbar" 
+                                        style="width: {{ factura.porcentaje_pagado|floatformat:0 }}%"
+                                        aria-valuenow="{{ factura.porcentaje_pagado|floatformat:0 }}" 
+                                        aria-valuemin="0" 
+                                        aria-valuemax="100">
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between mt-1">
+                                    <small class="text-muted">
+                                        {{ factura.porcentaje_pagado|floatformat:1 }}% completado
+                                    </small>
+                                    <small class="text-muted">
+                                        {{ factura.pagos.count }} pago{{ factura.pagos.count|pluralize }}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- NUEVA: Información de Archivos -->
+                    <div class="row mt-4 pt-3 border-top">
+                        <div class="col-md-6">
+                            <h6 class="text-dark mb-3">
+                                <i class="fas fa-paperclip me-2 text-primary"></i>
+                                Archivos de Factura
+                            </h6>
+                            {% if factura.archivo_factura %}
+                            <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded">
+                                <div>
+                                    <i class="fas fa-file-pdf text-danger me-2"></i>
+                                    <span class="fw-semibold">{{ factura.archivo_factura.name|slice:"-20:" }}</span>
+                                </div>
+                                <a href="{{ factura.archivo_factura.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-download me-1"></i>Descargar
+                                </a>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                No se ha cargado archivo de factura
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-dark mb-3">
+                                <i class="fas fa-sync-alt me-2 text-success"></i>
+                                Estado de Sincronización
+                            </h6>
+                            <div class="alert alert-info">
+                                <small>
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Los documentos cargados aquí se sincronizan automáticamente 
+                                    con la Orden de Compra en el módulo de Compras.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notas -->
+                    {% if factura.notas %}
+                    <div class="mt-4 pt-3 border-top">
+                        <label class="form-label text-muted small mb-2">Notas</label>
+                        <div class="alert alert-light border">
+                            <p class="mb-0">{{ factura.notas }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Lateral - Resumen Rápido -->
+        <div class="col-lg-4">
+            <!-- Tarjeta de Resumen -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0 py-3">
+                    <h6 class="card-title mb-0 text-dark">
+                        <i class="fas fa-chart-pie text-info me-2"></i>
+                        Resumen Rápido
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Estatus</span>
+                            <span class="badge {% if factura.estatus == 'PAGADA' %}bg-success{% elif factura.estatus == 'VENCIDA' %}bg-danger{% elif factura.estatus == 'POR_VENCER' %}bg-warning{% else %}bg-primary{% endif %}">
+                                {{ factura.get_estatus_display }}
+                            </span>
+                        </div>
+                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Días Restantes</span>
+                            <strong class="{% if factura.dias_restantes_credito < 0 %}text-danger{% elif factura.dias_restantes_credito <= 3 %}text-warning{% else %}text-success{% endif %}">
+                                {{ factura.dias_restantes_credito }}
+                            </strong>
+                        </div>
+                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Total Pagos</span>
+                            <strong>{{ factura.pagos.count }}</strong>
+                        </div>
+                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Creado por</span>
+                            <small class="text-muted">{{ factura.creado_por.username|default:"Sistema" }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NUEVA: Tarjeta de Documentos Sincronizados -->
+            <div class="card border-0 shadow-sm mb-4 border-success">
+                <div class="card-header bg-success text-white border-0 py-3">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-link me-2"></i>
+                        Enlace con Compras
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <i class="fas fa-sync-alt fa-2x text-success mb-2"></i>
+                        <h6 class="text-dark">Sincronización Activa</h6>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'detalle_orden_compra' factura.orden_compra.pk %}" 
+                           class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-external-link-alt me-2"></i>
+                            Ver Orden de Compra
+                        </a>
+                        <a href="{% url 'editar_factura' factura.pk %}" 
+                           class="btn btn-outline-success btn-sm">
+                            <i class="fas fa-upload me-2"></i>
+                            Cargar Documentos
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones Rápidas -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h6 class="card-title mb-0 text-dark">
+                        <i class="fas fa-bolt text-warning me-2"></i>
+                        Acciones Rápidas
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'crear_pago' %}?factura={{ factura.pk }}" class="btn btn-success">
+                            <i class="fas fa-hand-holding-usd me-2"></i>Registrar Pago
+                        </a>
+                        <a href="{% url 'editar_factura' factura.pk %}" class="btn btn-outline-warning">
+                            <i class="fas fa-edit me-2"></i>Editar Factura
+                        </a>
+                        <a href="{% url 'eliminar_factura' factura.pk %}" class="btn btn-outline-danger">
+                            <i class="fas fa-trash-alt me-2"></i>Eliminar Factura
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección de Pagos -->
+    <div class="row mt-2">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0 text-dark">
+                            <i class="fas fa-money-bill-wave text-success me-2"></i>
+                            Pagos Registrados
+                        </h5>
+                        <span class="badge bg-primary rounded-pill">{{ factura.pagos.count }}</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if factura.pagos.all %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="border-0">Fecha</th>
+                                    <th class="border-0 text-end">Monto</th>
+                                    <th class="border-0">Método</th>
+                                    <th class="border-0">Referencia</th>
+                                    <th class="border-0">Comprobante</th>
+                                    <th class="border-0">Registrado por</th>
+                                    <th class="border-0 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pago in factura.pagos.all %}
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-calendar text-muted me-2"></i>
+                                        {{ pago.fecha_pago }}
+                                    </td>
+                                    <td class="text-end">
+                                        <strong class="text-success">${{ pago.monto_pagado|floatformat:2|intcomma }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info rounded-pill">{{ pago.get_metodo_pago_display }}</span>
+                                    </td>
+                                    <td>
+                                        <code class="text-muted">{{ pago.referencia|default:"-" }}</code>
+                                    </td>
+                                    <td>
+                                        {% if pago.archivo_comprobante %}
+                                        <a href="{{ pago.archivo_comprobante.url }}" target="_blank" class="btn btn-sm btn-outline-success">
+                                            <i class="fas fa-file-download me-1"></i>Descargar
+                                        </a>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Sin archivo</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ pago.registrado_por.username|default:"Sistema" }}</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'editar_pago' pago.pk %}" class="btn btn-outline-warning" title="Editar pago">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{% url 'eliminar_pago' pago.pk %}" class="btn btn-outline-danger" title="Eliminar pago">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-money-bill-wave fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No hay pagos registrados</h5>
+                        <p class="text-muted mb-4">Esta factura aún no tiene pagos asociados</p>
+                        <a href="{% url 'crear_pago' %}?factura={{ factura.pk }}" class="btn btn-success">
+                            <i class="fas fa-hand-holding-usd me-2"></i>Registrar Primer Pago
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card {
+        transition: transform 0.2s ease-in-out;
+    }
+    
+    .card:hover {
+        transform: translateY(-1px);
+    }
+    
+    .progress {
+        background-color: #e9ecef;
+        border-radius: 10px;
+    }
+    
+    .progress-bar {
+        border-radius: 10px;
+        transition: width 0.6s ease;
+    }
+    
+    .table th {
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .btn-group .btn {
+        border-radius: 6px;
+        margin: 0 2px;
+    }
+    
+    .list-group-item {
+        border: none;
+        padding: 0.75rem 0;
+    }
+    
+    .badge {
+        font-size: 0.75em;
+    }
+    
+    /* NUEVOS ESTILOS PARA SINCRONIZACIÓN */
+    .border-info {
+        border: 1px solid #0dcaf0 !important;
+    }
+    
+    .border-success {
+        border: 1px solid #198754 !important;
+    }
+    
+    .form-check-input:checked {
+        background-color: #198754;
+        border-color: #198754;
+    }
+    
+    @media (max-width: 768px) {
+        .d-flex.gap-3 {
+            flex-direction: column;
+            gap: 1rem !important;
+        }
+        
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+    }
+</style>
+{% endblock %}

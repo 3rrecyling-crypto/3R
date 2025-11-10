@@ -1,0 +1,581 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+
+
+{% block title %}Gestión de Plazos - Factura {{ factura.numero_factura }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="{% url 'lista_facturas' %}" class="text-decoration-none">Facturas</a></li>
+                            <li class="breadcrumb-item"><a href="{% url 'detalle_factura' factura.pk %}" class="text-decoration-none">{{ factura.numero_factura }}</a></li>
+                            <li class="breadcrumb-item active">Gestión de Plazos</li>
+                        </ol>
+                    </nav>
+                    <h1 class="h2 mb-2 text-dark fw-bold">Gestión de Plazos de Pago</h1>
+                    <p class="text-muted mb-0">
+                        <i class="fas fa-file-invoice me-2"></i>Factura: <strong>{{ factura.numero_factura }}</strong> | 
+                        <i class="fas fa-building me-2 ms-3"></i>{{ factura.orden_compra.proveedor.razon_social }} | 
+                        <i class="fas fa-dollar-sign me-2 ms-3"></i>Total: ${{ factura.monto|floatformat:2|intcomma }}
+                    </p>
+                </div>
+                <div>
+                    <a href="{% url 'detalle_factura' factura.pk %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Volver a Factura
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-primary border-4 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-primary mb-1">Total de Plazos</h6>
+                            <h2 class="fw-bold text-dark mb-0">{{ factura.cantidad_plazos|default:"0" }}</h2>
+                            <small class="text-muted">Plazos programados</small>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-calendar-alt fa-2x text-primary opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-success border-4 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-success mb-1">Plazos Pagados</h6>
+                            <h2 class="fw-bold text-dark mb-0">{{ factura.pagos.count }}</h2>
+                            <small class="text-muted">Completados</small>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-check-circle fa-2x text-success opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-warning border-4 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-warning mb-1">Plazos Pendientes</h6>
+                            <h2 class="fw-bold text-dark mb-0">
+                                {{ factura.plazos_pendientes }}
+                            </h2>
+                            <small class="text-muted">Por pagar</small>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-clock fa-2x text-warning opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-info border-4 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="text-info mb-1">Progreso General</h6>
+                            <h2 class="fw-bold text-dark mb-0">
+                                {% with total_plazos=factura.cantidad_plazos|default:0 %}
+                                    {% if total_plazos > 0 %}
+                                        {% widthratio factura.pagos.count total_plazos 100 %}%
+                                    {% else %}
+                                        0%
+                                    {% endif %}
+                                {% endwith %}
+                            </h2>
+                            <div class="progress mt-2" style="height: 6px;">
+                                <div class="progress-bar bg-info" 
+                                     style="width: {% with total_plazos=factura.cantidad_plazos|default:0 %}{% if total_plazos > 0 %}{% widthratio factura.pagos.count total_plazos 100 %}%{% else %}0%{% endif %}{% endwith %}">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ms-3">
+                            <i class="fas fa-chart-line fa-2x text-info opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Registrar Pago Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-gradient-primary text-white py-3">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-plus-circle me-2"></i>Registrar Nuevo Pago
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        <!-- Campo oculto para la factura -->
+                        {{ form.factura }}
+                        
+                        {% if form.errors %}
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Error:</strong> Por favor corrige los errores en el formulario.
+                            <ul class="mb-0 mt-2">
+                                {% for field in form %}
+                                    {% for error in field.errors %}
+                                        <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                                    {% endfor %}
+                                {% endfor %}
+                            </ul>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        {% endif %}
+
+                        <!-- Información de validación de plazos -->
+                        <div class="alert alert-info mb-4">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-info-circle me-3 fa-lg"></i>
+                                <div>
+                                    <strong>Información del próximo plazo:</strong>
+                                    <ul class="mb-0 mt-1">
+                                        <li>Próximo plazo sugerido: <strong>#{{ form.numero_plazo.initial }}</strong></li>
+                                        <li>Monto sugerido por plazo: <strong>${{ factura.monto_por_plazo|floatformat:2|intcomma }}</strong></li>
+                                        {% if form.numero_plazo.initial > factura.cantidad_plazos %}
+                                        <li class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>Este plazo excede el número total programado</li>
+                                        {% endif %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label for="{{ form.numero_plazo.id_for_label }}" class="form-label fw-semibold">
+                                    <i class="fas fa-hashtag me-2 text-primary"></i>Número de Plazo
+                                </label>
+                                {{ form.numero_plazo }}
+                                {% if form.numero_plazo.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.numero_plazo.errors.0 }}
+                                </div>
+                                {% endif %}
+                                <div id="plazo-feedback" class="form-text"></div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label for="{{ form.fecha_pago.id_for_label }}" class="form-label fw-semibold">
+                                    <i class="fas fa-calendar-day me-2 text-primary"></i>Fecha de Pago
+                                </label>
+                                {{ form.fecha_pago }}
+                                {% if form.fecha_pago.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.fecha_pago.errors.0 }}
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-3">
+                                <label for="{{ form.monto_pagado.id_for_label }}" class="form-label fw-semibold">
+                                    <i class="fas fa-dollar-sign me-2 text-primary"></i>Monto Pagado
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light">$</span>
+                                    {{ form.monto_pagado }}
+                                </div>
+                                {% if form.monto_pagado.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.monto_pagado.errors.0 }}
+                                </div>
+                                {% endif %}
+                                <div class="form-text">
+                                    Monto programado: <strong>${{ factura.monto_por_plazo|floatformat:2|intcomma }}</strong><br>
+                                    Rango permitido: <strong>${{ factura.monto_minimo_permitido|floatformat:2|intcomma }}</strong> 
+                                    a <strong>${{ factura.monto_maximo_permitido|floatformat:2|intcomma }}</strong>
+                                </div>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label for="{{ form.metodo_pago.id_for_label }}" class="form-label fw-semibold">
+                                    <i class="fas fa-credit-card me-2 text-primary"></i>Método de Pago
+                                </label>
+                                {{ form.metodo_pago }}
+                                {% if form.metodo_pago.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.metodo_pago.errors.0 }}
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="{{ form.archivo_comprobante.id_for_label }}" class="form-label fw-semibold">
+                                    <i class="fas fa-file-upload me-2 text-primary"></i>Comprobante de Pago
+                                </label>
+                                {{ form.archivo_comprobante }}
+                                <div class="form-text">Formatos aceptados: PDF, JPG, PNG (Máx. 10MB)</div>
+                                {% if form.archivo_comprobante.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.archivo_comprobante.errors.0 }}
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="{{ form.referencia.id_for_label }}" class="form-label fw-semibold">
+                                    <i class="fas fa-receipt me-2 text-primary"></i>Referencia/Número de Operación
+                                </label>
+                                {{ form.referencia }}
+                                {% if form.referencia.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.referencia.errors.0 }}
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-12">
+                                <div class="d-flex justify-content-end pt-3">
+                                    <button type="reset" class="btn btn-outline-secondary me-3">
+                                        <i class="fas fa-undo me-2"></i>Limpiar
+                                    </button>
+                                    <button type="submit" class="btn btn-success px-4">
+                                        <i class="fas fa-save me-2"></i>Registrar Pago
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plazos Detalle Section -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-light py-3">
+                    <h5 class="card-title mb-0 text-dark">
+                        <i class="fas fa-list-ol me-2"></i>Detalle de Plazos Programados
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4"># Plazo</th>
+                                    <th>Fecha Programada</th>
+                                    <th class="text-end">Monto Programado</th>
+                                    <th>Estado</th>
+                                    <th>Fecha Pago Real</th>
+                                    <th class="text-end">Monto Pagado</th>
+                                    <th>Comprobante</th>
+                                    <th class="text-center pe-4">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for plazo in plazos_programados %}
+                                <tr class="{% if plazo.esta_pagado %}table-success{% elif plazo.esta_vencido %}table-danger{% elif plazo.esta_por_vencer %}table-warning{% else %}table-light{% endif %}">
+                                    <td class="ps-4 fw-bold">#{{ plazo.numero_plazo }}</td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border">
+                                            <i class="fas fa-calendar me-1"></i>{{ plazo.fecha_programada|date:"d/m/Y" }}
+                                        </span>
+                                        {% if plazo.esta_vencido %}
+                                        <span class="badge bg-danger ms-1" title="Plazo vencido">
+                                            <i class="fas fa-exclamation-triangle me-1"></i>Vencido
+                                        </span>
+                                        {% elif plazo.esta_por_vencer %}
+                                        <span class="badge bg-warning ms-1" title="Plazo por vencer">
+                                            <i class="fas fa-clock me-1"></i>Por vencer
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end fw-semibold text-primary">
+                                        ${{ plazo.monto_programado|floatformat:2|intcomma }}
+                                    </td>
+                                    <td>
+                                        {% if plazo.esta_pagado %}
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success">
+                                            <i class="fas fa-check-circle me-1"></i>Pagado
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">
+                                            <i class="fas fa-clock me-1"></i>Pendiente
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if plazo.esta_pagado %}
+                                        <span class="text-success">
+                                            <i class="fas fa-calendar-check me-1"></i>{{ plazo.pago.fecha_pago|date:"d/m/Y" }}
+                                        </span>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if plazo.esta_pagado %}
+                                        <span class="fw-semibold text-success">
+                                            ${{ plazo.pago.monto_pagado|floatformat:2|intcomma }}
+                                        </span>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if plazo.esta_pagado and plazo.pago.archivo_comprobante %}
+                                        <a href="{{ plazo.pago.archivo_comprobante.url }}" 
+                                           target="_blank" 
+                                           class="btn btn-sm btn-outline-primary"
+                                           data-bs-toggle="tooltip" 
+                                           title="Descargar comprobante">
+                                            <i class="fas fa-download"></i>
+                                        </a>
+                                        {% else %}
+                                        <span class="text-muted small">Sin comprobante</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center pe-4">
+                                        {% if plazo.esta_pagado %}
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{% url 'editar_pago' plazo.pago.pk %}" 
+                                               class="btn btn-outline-warning"
+                                               data-bs-toggle="tooltip" 
+                                               title="Editar pago">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{% url 'detalle_pago' plazo.pago.pk %}" 
+                                               class="btn btn-outline-info"
+                                               data-bs-toggle="tooltip" 
+                                               title="Ver detalles">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </div>
+                                        {% else %}
+                                        <button class="btn btn-sm btn-success" 
+                                                onclick="rellenarFormulario({{ plazo.numero_plazo }}, {{ plazo.monto_programado }})"
+                                                data-bs-toggle="tooltip" 
+                                                title="Rellenar formulario con este plazo">
+                                            <i class="fas fa-plus me-1"></i>Pagar
+                                        </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="8" class="text-center py-4 text-muted">
+                                        <i class="fas fa-info-circle fa-2x mb-3 d-block"></i>
+                                        No hay plazos programados para esta factura.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Inicializar tooltips
+    document.addEventListener('DOMContentLoaded', function() {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        });
+
+        // Form validation
+        var forms = document.querySelectorAll('.needs-validation')
+        Array.prototype.slice.call(forms).forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault()
+                    event.stopPropagation()
+                }
+                form.classList.add('was-validated')
+            }, false)
+        });
+
+        // Auto-fill date with today's date if empty
+        var fechaPagoField = document.getElementById('{{ form.fecha_pago.id_for_label }}');
+        if (fechaPagoField && !fechaPagoField.value) {
+            var today = new Date();
+            var dd = String(today.getDate()).padStart(2, '0');
+            var mm = String(today.getMonth() + 1).padStart(2, '0');
+            var yyyy = today.getFullYear();
+            fechaPagoField.value = yyyy + '-' + mm + '-' + dd;
+        }
+
+        // Validación de número de plazo en tiempo real
+        var plazoField = document.getElementById('{{ form.numero_plazo.id_for_label }}');
+        var plazoFeedback = document.getElementById('plazo-feedback');
+        
+        if (plazoField && plazoFeedback) {
+            plazoField.addEventListener('input', function() {
+                var plazoValue = parseInt(this.value);
+                var totalPlazos = {{ factura.cantidad_plazos|default:0 }};
+                var plazosPagados = {{ factura.pagos.count }};
+                
+                if (isNaN(plazoValue)) {
+                    plazoFeedback.innerHTML = '<span class="text-danger"><i class="fas fa-times-circle me-1"></i>Ingrese un número válido</span>';
+                } else if (plazoValue < 1) {
+                    plazoFeedback.innerHTML = '<span class="text-danger"><i class="fas fa-times-circle me-1"></i>El plazo debe ser mayor a 0</span>';
+                } else if (plazoValue > totalPlazos) {
+                    plazoFeedback.innerHTML = '<span class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>Este plazo excede el total programado (' + totalPlazos + ')</span>';
+                } else {
+                    // Verificar si el plazo ya está pagado
+                    var plazosPagadosArray = [{% for pago in factura.pagos.all %}{{ pago.numero_plazo }}{% if not forloop.last %},{% endif %}{% endfor %}];
+                    
+                    if (plazosPagadosArray.includes(plazoValue)) {
+                        plazoFeedback.innerHTML = '<span class="text-danger"><i class="fas fa-times-circle me-1"></i>Este plazo ya fue registrado</span>';
+                    } else {
+                        plazoFeedback.innerHTML = '<span class="text-success"><i class="fas fa-check-circle me-1"></i>Plazo disponible</span>';
+                    }
+                }
+            });
+            
+            // Trigger inicial
+            if (plazoField.value) {
+                plazoField.dispatchEvent(new Event('input'));
+            }
+        }
+    });
+
+    // Función mejorada para rellenar formulario
+    function rellenarFormulario(numeroPlazo, montoProgramado) {
+        document.getElementById('{{ form.numero_plazo.id_for_label }}').value = numeroPlazo;
+        document.getElementById('{{ form.monto_pagado.id_for_label }}').value = montoProgramado.toFixed(2);
+        
+        // Scroll al formulario
+        document.querySelector('.card-header.bg-gradient-primary').scrollIntoView({
+            behavior: 'smooth'
+        });
+        
+        // Disparar validación
+        var plazoField = document.getElementById('{{ form.numero_plazo.id_for_label }}');
+        if (plazoField) {
+            plazoField.dispatchEvent(new Event('input'));
+        }
+        
+        // Mostrar notificación
+        showNotification('Formulario rellenado con el plazo #' + numeroPlazo, 'success');
+    }
+
+    // Función para mostrar notificaciones
+    function showNotification(message, type) {
+        var alertClass = type === 'success' ? 'alert-success' : 'alert-warning';
+        var notification = document.createElement('div');
+        notification.className = 'alert ' + alertClass + ' alert-dismissible fade show position-fixed top-0 end-0 m-3';
+        notification.style.zIndex = '1060';
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check' : 'exclamation'}-circle me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 3 seconds
+        setTimeout(function() {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 3000);
+    }
+</script>
+
+<style>
+.card {
+    border: none;
+    border-radius: 12px;
+}
+
+.card-header {
+    border-radius: 12px 12px 0 0 !important;
+}
+
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.table td {
+    vertical-align: middle;
+    padding: 1rem 0.75rem;
+}
+
+.progress {
+    border-radius: 10px;
+}
+
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.form-control, .form-select {
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    padding: 0.75rem 1rem;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+.badge {
+    font-weight: 500;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(102, 126, 234, 0.04);
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+}
+
+/* Estilos para estados de plazos */
+.table-danger {
+    background-color: rgba(220, 53, 69, 0.05) !important;
+}
+
+.table-warning {
+    background-color: rgba(255, 193, 7, 0.05) !important;
+}
+
+.table-success {
+    background-color: rgba(25, 135, 84, 0.05) !important;
+}
+</style>
+{% endblock %}

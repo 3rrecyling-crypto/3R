@@ -1,0 +1,56 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+
+{% block title %}Confirmar Cierre de Sesión{% endblock %}
+
+{% block content %}
+<style>
+    .logout-container {
+        max-width: 500px;
+        margin: 5rem auto;
+        padding: 2.5rem;
+        background-color: #fff;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        text-align: center;
+    }
+    .logout-container i {
+        font-size: 3rem;
+        color: var(--primary-color);
+        margin-bottom: 1.5rem;
+    }
+    .logout-container h1 {
+        font-size: 1.75rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: var(--dark-color);
+    }
+    .logout-container p {
+        color: var(--gray-color);
+        margin-bottom: 2rem;
+    }
+    .logout-container .btn-danger {
+        background-color: #d9534f;
+        border-color: #d43f3a;
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+    }
+    .logout-container .btn-secondary {
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+    }
+</style>
+
+<div class="logout-container">
+    <i class="fas fa-sign-out-alt"></i>
+    <h1>Cerrar Sesión</h1>
+    <p>¿Estás seguro de que quieres cerrar tu sesión actual?</p>
+    <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+            <button type="submit" class="btn btn-danger btn-lg px-4 gap-3">Sí, Cerrar Sesión</button>
+            <a href="{% url 'home' %}" class="btn btn-outline-secondary btn-lg px-4">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

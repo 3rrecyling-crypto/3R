@@ -1,0 +1,486 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+
+{% block title %}Detalle de Pago - {{ pago.factura.numero_factura }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-1 text-dark">Detalle de Pago</h1>
+                    <p class="text-muted mb-0">Información completa del registro de pago</p>
+                </div>
+                <div>
+                    <a href="{% url 'lista_pagos' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Volver a Pagos
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Información Principal del Pago -->
+        <div class="col-lg-8">
+            <!-- Tarjeta de Información General -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0 py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0 text-dark">
+                            <i class="fas fa-money-bill-wave text-success me-2"></i>
+                            Información del Pago
+                        </h5>
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'editar_pago' pago.pk %}" class="btn btn-warning btn-sm">
+                                <i class="fas fa-edit me-1"></i>Editar
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Columna Izquierda -->
+                        <div class="col-md-6">
+                            <div class="mb-4">
+                                <label class="form-label text-muted small mb-1">Factura Relacionada</label>
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-file-invoice text-primary fa-2x me-3"></i>
+                                    <div>
+                                        <h5 class="text-dark mb-0">{{ pago.factura.numero_factura }}</h5>
+                                        <small class="text-muted">
+                                            OC: {{ pago.factura.orden_compra.folio }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label text-muted small mb-1">Proveedor</label>
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-building text-secondary fa-2x me-3"></i>
+                                    <div>
+                                        <h6 class="text-dark mb-0">{{ pago.factura.orden_compra.proveedor.razon_social }}</h6>
+                                        <small class="text-muted">
+                                            RFC: {{ pago.factura.orden_compra.proveedor.rfc }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Método de Pago</label>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge {% if pago.metodo_pago == 'TRANSFERENCIA' %}bg-info{% elif pago.metodo_pago == 'CHEQUE' %}bg-warning{% elif pago.metodo_pago == 'EFECTIVO' %}bg-success{% else %}bg-secondary{% endif %} fs-6 py-2 px-3">
+                                        <i class="fas {% if pago.metodo_pago == 'TRANSFERENCIA' %}fa-exchange-alt{% elif pago.metodo_pago == 'CHEQUE' %}fa-money-check{% elif pago.metodo_pago == 'EFECTIVO' %}fa-money-bill-wave{% else %}fa-credit-card{% endif %} me-2"></i>
+                                        {{ pago.get_metodo_pago_display }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Columna Derecha -->
+                        <div class="col-md-6">
+                            <div class="mb-4">
+                                <label class="form-label text-muted small mb-1">Monto del Pago</label>
+                                <div class="text-center p-4 bg-light rounded">
+                                    <h2 class="text-success mb-0">${{ pago.monto_pagado|floatformat:2|intcomma }}</h2>
+                                    <small class="text-muted">Monto pagado</small>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Fechas</label>
+                                <div class="d-flex justify-content-between">
+                                    <div class="text-center">
+                                        <small class="text-muted d-block">Pago</small>
+                                        <strong>{{ pago.fecha_pago }}</strong>
+                                    </div>
+                                    <div class="text-center">
+                                        <small class="text-muted d-block">Registro</small>
+                                        <strong>{{ pago.creado_en|date:"d/m/Y" }}</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Referencia</label>
+                                <div class="p-3 bg-light rounded">
+                                    {% if pago.referencia %}
+                                    <code class="fs-6">{{ pago.referencia }}</code>
+                                    {% else %}
+                                    <span class="text-muted">Sin referencia</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Información de Sincronización -->
+                    <div class="row mt-4 pt-4 border-top">
+                        <div class="col-12">
+                            <h6 class="text-dark mb-3">
+                                <i class="fas fa-sync-alt text-info me-2"></i>
+                                Sincronización con Compras
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="me-3">
+                                            <i class="fas fa-file-contract fa-2x text-primary"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="mb-1">Orden de Compra</h6>
+                                            <p class="mb-0">
+                                                <a href="{% url 'detalle_orden_compra' pago.factura.orden_compra.pk %}" 
+                                                   class="text-decoration-none fw-bold text-dark">
+                                                    {{ pago.factura.orden_compra.folio }}
+                                                </a>
+                                            </p>
+                                            <small class="text-muted">
+                                                Estado: 
+                                                <span class="badge {% if pago.factura.orden_compra.estatus == 'APROBADA' %}bg-success{% elif pago.factura.orden_compra.estatus == 'AUDITADA' %}bg-primary{% elif pago.factura.orden_compra.estatus == 'LISTA_PARA_AUDITAR' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                                    {{ pago.factura.orden_compra.get_estatus_display }}
+                                                </span>
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="me-3">
+                                            <i class="fas fa-link fa-2x text-success"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="mb-1">Comprobante Sincronizado</h6>
+                                            {% if pago.archivo_comprobante %}
+                                            <span class="badge bg-success fs-6">
+                                                <i class="fas fa-check me-1"></i>Disponible en Compras
+                                            </span>
+                                            {% else %}
+                                            <span class="badge bg-secondary fs-6">
+                                                <i class="fas fa-times me-1"></i>No sincronizado
+                                            </span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección de Comprobante -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="card-title mb-0 text-dark">
+                        <i class="fas fa-paperclip text-primary me-2"></i>
+                        Comprobante de Pago
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if pago.archivo_comprobante %}
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-file-pdf text-danger fa-3x me-3"></i>
+                                <div>
+                                    <h6 class="text-dark mb-1">Archivo de Comprobante</h6>
+                                    <p class="text-muted mb-0">
+                                        {{ pago.archivo_comprobante.name|slice:"-25:" }}
+                                        <br>
+                                        <small>
+                                            <i class="fas fa-calendar me-1"></i>
+                                            Subido: {{ pago.creado_en|date:"d/m/Y H:i" }}
+                                        </small>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <a href="{{ pago.archivo_comprobante.url }}" 
+                               target="_blank" 
+                               class="btn btn-primary btn-lg">
+                                <i class="fas fa-download me-2"></i>Descargar
+                            </a>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-file-excel fa-4x text-muted mb-3"></i>
+                        <h5 class="text-muted">No hay comprobante cargado</h5>
+                        <p class="text-muted mb-4">Este pago no tiene archivo de comprobante asociado</p>
+                        <a href="{% url 'editar_pago' pago.pk %}" class="btn btn-success">
+                            <i class="fas fa-upload me-2"></i>Cargar Comprobante
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Lateral -->
+        <div class="col-lg-4">
+            <!-- Tarjeta de Resumen -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0 py-3">
+                    <h6 class="card-title mb-0 text-dark">
+                        <i class="fas fa-chart-pie text-info me-2"></i>
+                        Resumen Rápido
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Estado Factura</span>
+                            <span class="badge {% if pago.factura.estatus == 'PAGADA' %}bg-success{% elif pago.factura.estatus == 'VENCIDA' %}bg-danger{% elif pago.factura.estatus == 'POR_VENCER' %}bg-warning{% else %}bg-primary{% endif %}">
+                                {{ pago.factura.get_estatus_display }}
+                            </span>
+                        </div>
+                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Pendiente Factura</span>
+                            <strong class="{% if pago.factura.monto_pendiente > 0 %}text-warning{% else %}text-success{% endif %}">
+                                ${{ pago.factura.monto_pendiente|floatformat:2|intcomma }}
+                            </strong>
+                        </div>
+                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Total Factura</span>
+                            <strong>${{ pago.factura.monto|floatformat:2|intcomma }}</strong>
+                        </div>
+                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Registrado por</span>
+                            <small class="text-muted">{{ pago.registrado_por.username|default:"Sistema" }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta de Sincronización -->
+            <div class="card border-0 shadow-sm mb-4 border-success">
+                <div class="card-header bg-success text-white border-0 py-3">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-link me-2"></i>
+                        Enlace con Compras
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <i class="fas fa-sync-alt fa-2x text-success mb-2"></i>
+                        <h6 class="text-dark">Sincronización Activa</h6>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'detalle_orden_compra' pago.factura.orden_compra.pk %}" 
+                           class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-external-link-alt me-2"></i>
+                            Ver Orden de Compra
+                        </a>
+                        <a href="{% url 'detalle_factura' pago.factura.pk %}" 
+                           class="btn btn-outline-info btn-sm">
+                            <i class="fas fa-file-invoice me-2"></i>
+                            Ver Factura
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones Rápidas -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h6 class="card-title mb-0 text-dark">
+                        <i class="fas fa-bolt text-warning me-2"></i>
+                        Acciones Rápidas
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'editar_pago' pago.pk %}" class="btn btn-warning">
+                            <i class="fas fa-edit me-2"></i>Editar Pago
+                        </a>
+                        <a href="{% url 'eliminar_pago' pago.pk %}" class="btn btn-outline-danger">
+                            <i class="fas fa-trash-alt me-2"></i>Eliminar Pago
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notas -->
+    {% if pago.notas %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="card-title mb-0 text-dark">
+                        <i class="fas fa-sticky-note text-warning me-2"></i>
+                        Notas del Pago
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-light border">
+                        <p class="mb-0">{{ pago.notas }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card {
+        transition: transform 0.2s ease-in-out;
+        border-radius: 12px;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
+    }
+    
+    .list-group-item {
+        border: none;
+        padding: 0.75rem 0;
+        background: transparent;
+    }
+    
+    .badge {
+        font-size: 0.75em;
+        font-weight: 500;
+    }
+    
+    .border-success {
+        border: 2px solid #198754 !important;
+    }
+    
+    .btn {
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn:hover {
+        transform: translateY(-1px);
+    }
+    
+    .bg-light {
+        background-color: #f8f9fa !important;
+    }
+    
+    code {
+        font-family: 'Courier New', monospace;
+        background: #f8f9fa;
+        padding: 0.5rem;
+        border-radius: 6px;
+        border: 1px solid #e9ecef;
+    }
+    
+    /* Colores para estados */
+    .bg-info { background-color: #17a2b8 !important; }
+    .bg-warning { background-color: #ffc107 !important; color: #000 !important; }
+    .bg-success { background-color: #28a745 !important; }
+    .bg-secondary { background-color: #6c757d !important; }
+    
+    /* Animaciones suaves */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .card {
+        animation: fadeIn 0.5s ease-out;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .d-flex.justify-content-between {
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .text-end {
+            text-align: left !important;
+            margin-top: 1rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Efectos de hover mejorados
+    const cards = document.querySelectorAll('.card');
+    cards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.transition = 'all 0.3s ease';
+        });
+    });
+
+    // Contador para el monto (efecto visual)
+    const montoElement = document.querySelector('h2.text-success');
+    if (montoElement) {
+        const montoTexto = montoElement.textContent;
+        montoElement.textContent = '$0.00';
+        
+        let montoNumerico = parseFloat(montoTexto.replace('$', '').replace(/,/g, ''));
+        let contador = 0;
+        const duracion = 1500; // 1.5 segundos
+        const incremento = montoNumerico / (duracion / 16);
+        
+        const animarMonto = () => {
+            contador += incremento;
+            if (contador >= montoNumerico) {
+                montoElement.textContent = montoTexto;
+            } else {
+                montoElement.textContent = '$' + contador.toLocaleString('es-MX', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+                setTimeout(animarMonto, 16);
+            }
+        };
+        
+        setTimeout(animarMonto, 500);
+    }
+
+    // Tooltips para badges
+    const badges = document.querySelectorAll('.badge[title]');
+    badges.forEach(badge => {
+        badge.addEventListener('mouseenter', function() {
+            const tooltip = document.createElement('div');
+            tooltip.className = 'custom-tooltip';
+            tooltip.textContent = this.title;
+            tooltip.style.cssText = `
+                position: absolute;
+                background: #333;
+                color: white;
+                padding: 5px 10px;
+                border-radius: 4px;
+                font-size: 12px;
+                z-index: 1000;
+                transform: translateY(-100%);
+            `;
+            this.appendChild(tooltip);
+        });
+        
+        badge.addEventListener('mouseleave', function() {
+            const tooltip = this.querySelector('.custom-tooltip');
+            if (tooltip) {
+                tooltip.remove();
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

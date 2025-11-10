@@ -1,0 +1,633 @@
+{% extends 'compras/compras_base.html' %}
+{% load widget_tweaks %}
+
+{% block compras_content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 class="fw-bold text-primary mb-1">
+                        <i class="fas fa-box me-2"></i>{{ titulo }}
+                    </h3>
+                    <p class="text-muted mb-0">Complete la información del artículo y sus proveedores</p>
+                </div>
+                <a href="{% url 'lista_articulos' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Volver al listado
+                </a>
+            </div>
+            <hr class="mt-3 mb-4">
+        </div>
+    </div>
+
+    <form method="post" id="articulo-form" class="needs-validation" novalidate>
+        {% csrf_token %}
+
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-primary text-white py-3">
+                <h5 class="card-title mb-0 fw-bold">
+                    <i class="fas fa-pencil-alt me-2"></i>Datos del Artículo
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger" role="alert">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+                
+                <div class="row">
+                    {% for field in form %}
+                        {% if field.field.widget_type != 'checkbox' %}
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ field.id_for_label }}" class="form-label fw-semibold">
+                                    {{ field.label }}
+                                    {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                                </label>
+                                
+                                {% if field.field.widget.input_type == 'select' %}
+                                    {% render_field field class+="form-select" %}
+                                {% elif field.field.widget.input_type == 'textarea' %}
+                                    {% render_field field class+="form-control" rows="3" %}
+                                {% else %}
+                                    {% render_field field class+="form-control" %}
+                                {% endif %}
+                                
+                                {% if field.help_text %}
+                                    <div class="form-text text-muted small">{{ field.help_text }}</div>
+                                {% endif %}
+                                
+                                {% if field.errors %}
+                                    <div class="invalid-feedback d-block">{{ field.errors|first }}</div>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                
+                <hr class="my-4">
+                
+                <div class="row">
+                    <h6 class="fw-semibold mb-3 text-secondary">
+                        <i class="fas fa-cog me-2"></i>Configuraciones
+                    </h6>
+                    {% for field in form %}
+                        {% if field.field.widget_type == 'checkbox' %}
+                            <div class="col-md-4">
+                                <div class="form-check form-switch mb-3">
+                                    {% render_field field class="form-check-input" role="switch" %}
+                                    <label for="{{ field.id_for_label }}" class="form-check-label fw-medium ms-2">{{ field.label }}</label>
+                                    {% if field.help_text %}
+                                        <div class="form-text small ms-4 mt-1">{{ field.help_text }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-primary text-white py-3 d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0 fw-bold">
+                    <i class="fas fa-truck me-2"></i>Proveedores y Precios
+                </h5>
+                <span class="badge bg-light text-primary fs-6" id="proveedor-count">{{ formset|length }} proveedor(es)</span>
+            </div>
+            <div class="card-body p-4">
+                {{ formset.management_form }}
+                
+                {% if formset.non_form_errors %}
+                    <div class="alert alert-danger" role="alert">
+                        {{ formset.non_form_errors }}
+                    </div>
+                {% endif %}
+
+                <div class="alert alert-info d-flex align-items-center mb-4" role="alert">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <div>
+                        <strong>Información importante:</strong> Agregue al menos un proveedor con su precio unitario. 
+                        Puede agregar múltiples proveedores para comparar precios.
+                    </div>
+                </div>
+                
+                <div id="proveedor-forms-container">
+                    {% for proveedor_form in formset %}
+                        <div class="row align-items-center proveedor-form mb-3 p-3 bg-light rounded border position-relative" 
+                             data-form-index="{{ forloop.counter0 }}">
+   
+                            {% if proveedor_form.id.value %}
+                                {{ proveedor_form.id }}
+                            {% endif %}
+                            
+                            {% if formset.can_delete %}
+                                <div class="position-absolute top-0 end-0 mt-2 me-2">
+                                    <div class="form-check" style="display: none;">
+                                        {{ proveedor_form.DELETE|add_class:"form-check-input delete-checkbox" }}
+                                    </div>
+                                </div>
+                            {% endif %}
+                            
+                            <div class="col-lg-5 mb-2">
+                                <label for="{{ proveedor_form.proveedor.id_for_label }}" class="form-label fw-semibold">
+                                    Proveedor <span class="text-danger">*</span>
+                                </label>
+                                {% render_field proveedor_form.proveedor class="form-select" %}
+                                {% if proveedor_form.proveedor.errors %}
+                                    <div class="invalid-feedback d-block">{{ proveedor_form.proveedor.errors|first }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-lg-5 mb-2">
+                                <label for="{{ proveedor_form.precio_unitario.id_for_label }}" class="form-label fw-semibold">
+                                    Precio Unitario ($) <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white border-end-0">$</span>
+                                    {% render_field proveedor_form.precio_unitario class="form-control border-start-0" placeholder="0.00" min="0" step="0.01" %}
+                                </div>
+                                {% if proveedor_form.precio_unitario.errors %}
+                                    <div class="invalid-feedback d-block">{{ proveedor_form.precio_unitario.errors|first }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-lg-2 d-flex align-items-center justify-content-end mb-2">
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-form-btn" title="Eliminar este proveedor">
+                                    <i class="fas fa-trash-alt me-1"></i> Eliminar
+                                </button>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="text-center py-5 text-muted bg-light rounded" id="empty-state">
+                            <i class="fas fa-truck fa-3x mb-3 opacity-50"></i>
+                            <h5 class="fw-semibold">No hay proveedores agregados</h5>
+                            <p class="mb-0">Agregue al menos un proveedor para continuar.</p>
+                        </div>
+                    {% endfor %}
+                </div>
+                
+                <div class="d-flex justify-content-center mt-4">
+                    <button type="button" id="add-form-btn" class="btn btn-primary px-4 py-2">
+                        <i class="fas fa-plus me-2"></i> Añadir Proveedor
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mt-4">
+            <div class="card-body py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-exclamation-circle text-warning me-2"></i>
+                        <span class="text-muted small">Todos los campos marcados con <span class="text-danger">*</span> son obligatorios</span>
+                    </div>
+                    <div class="d-flex gap-3">
+                        <a href="{% url 'lista_articulos' %}" class="btn btn-outline-secondary px-4">
+                            <i class="fas fa-times me-2"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-success px-4">
+                            <i class="fas fa-save me-2"></i> Guardar Cambios
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div id="empty-form-template" class="d-none">
+    <div class="row align-items-center proveedor-form mb-3 p-3 bg-light rounded border position-relative" id="form-__prefix__">
+        
+        {% if formset.can_delete %}
+            <div style="display: none;">
+                {{ formset.empty_form.DELETE }}
+            </div>
+        {% endif %}
+        
+        <div class="col-lg-5 mb-2">
+            <label for="id_proveedores-__prefix__-proveedor" class="form-label fw-semibold">Proveedor <span class="text-danger">*</span></label>
+            {% render_field formset.empty_form.proveedor class="form-select" %}
+        </div>
+        <div class="col-lg-5 mb-2">
+            <label for="id_proveedores-__prefix__-precio_unitario" class="form-label fw-semibold">Precio Unitario ($) <span class="text-danger">*</span></label>
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0">$</span>
+                {% render_field formset.empty_form.precio_unitario class="form-control border-start-0" placeholder="0.00" min="0" step="0.01" %}
+            </div>
+        </div>
+        <div class="col-lg-2 d-flex align-items-center justify-content-end mb-2">
+            <button type="button" class="btn btn-sm btn-outline-danger remove-form-btn" title="Eliminar este proveedor">
+                <i class="fas fa-trash-alt me-1"></i> Eliminar
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Módulo principal para gestionar el formulario
+const ArticuloFormManager = (function() {
+    // Elementos del DOM
+    const elements = {
+        formContainer: document.getElementById('proveedor-forms-container'),
+        addButton: document.getElementById('add-form-btn'),
+        totalFormsInput: document.querySelector('input[name="proveedores-TOTAL_FORMS"]'),
+        proveedorCount: document.getElementById('proveedor-count'),
+        emptyFormTemplate: document.getElementById('empty-form-template').innerHTML,
+        mainForm: document.getElementById('articulo-form'),
+        
+        // --- INICIO DE LA MODIFICACIÓN ---
+        // Elementos para los dropdowns dependientes
+        empresaSelect: document.getElementById('id_empresa'),
+        origenSelect: document.getElementById('id_origen')
+        // --- FIN DE LA MODIFICACIÓN ---
+    };
+    
+    // Estado
+    let state = {
+        formCounter: parseInt(elements.totalFormsInput.value) || 0
+    };
+    
+    // Métodos públicos
+    return {
+        init: function() {
+            this.bindEvents();
+            this.updateProveedorCount();
+            
+            // --- INICIO DE LA MODIFICACIÓN ---
+            // Deshabilita el dropdown de origen si no hay empresa seleccionada al cargar
+            if (elements.origenSelect) {
+                 elements.origenSelect.disabled = !elements.empresaSelect.value;
+            }
+            // --- FIN DE LA MODIFICACIÓN ---
+        },
+        
+        bindEvents: function() {
+            // Evento para añadir formulario
+            elements.addButton.addEventListener('click', () => this.addForm());
+            
+            // Evento para eliminar formulario
+            elements.formContainer.addEventListener('click', (e) => {
+                const removeButton = e.target.closest('.remove-form-btn');
+                if (removeButton) this.removeForm(removeButton);
+            });
+            
+            // Validación antes de enviar
+            elements.mainForm.addEventListener('submit', (e) => this.validateForm(e));
+            
+            // Quitar clases de error al cambiar los campos
+            elements.formContainer.addEventListener('change', (e) => {
+                if (e.target.matches('select, input')) {
+                    e.target.classList.remove('is-invalid');
+                }
+            });
+            
+            // --- INICIO DE LA MODIFICACIÓN ---
+            // Evento para actualizar orígenes cuando cambia la empresa
+            if (elements.empresaSelect) {
+                elements.empresaSelect.addEventListener('change', () => this.updateOrigenesDropdown());
+            }
+            // --- FIN DE LA MODIFICACIÓN ---
+        },
+        
+        // --- INICIO DE LA NUEVA FUNCIÓN AÑADIDA ---
+        /**
+         * Llama a la API para obtener los orígenes de la empresa seleccionada
+         * y actualiza el dropdown de 'Origen'.
+         */
+        updateOrigenesDropdown: function() {
+            const empresaId = elements.empresaSelect.value;
+            // Esta es la URL que definimos en compras/urls.py
+            const url = `/compras/api/origenes_por_empresa/${empresaId}/`;
+
+            // Desactivar y limpiar dropdown de origen
+            elements.origenSelect.disabled = true;
+            elements.origenSelect.innerHTML = '<option value="">Cargando...</option>';
+
+            if (!empresaId) {
+                elements.origenSelect.innerHTML = '<option value="">Seleccione una empresa</option>';
+                return;
+            }
+
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) throw new Error('Error en la respuesta de la red');
+                    return response.json();
+                })
+                .then(data => {
+                    // Limpia el dropdown y añade la opción por defecto
+                    elements.origenSelect.innerHTML = '<option value="">---------</option>'; 
+                    
+                    if (data.origenes && data.origenes.length > 0) {
+                        data.origenes.forEach(origen => {
+                            // Crea y añade la nueva opción
+                            const option = new Option(origen.nombre, origen.id);
+                            elements.origenSelect.appendChild(option);
+                        });
+                        // Habilita el dropdown
+                        elements.origenSelect.disabled = false;
+                    } else {
+                        // No se encontraron orígenes
+                        elements.origenSelect.innerHTML = '<option value="">No hay orígenes para esta empresa</option>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error al cargar orígenes:', error);
+                    elements.origenSelect.innerHTML = '<option value="">Error al cargar</option>';
+                });
+        },
+        // --- FIN DE LA NUEVA FUNCIÓN ---
+        
+        addForm: function() {
+            const newFormHtml = elements.emptyFormTemplate.replace(/__prefix__/g, state.formCounter);
+            
+            // Si no hay formularios, reemplazar el mensaje vacío
+            const emptyState = elements.formContainer.querySelector('#empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
+            elements.formContainer.insertAdjacentHTML('beforeend', newFormHtml);
+            
+            // Animar el nuevo formulario
+            const newForm = elements.formContainer.lastElementChild;
+            this.animateFormAppearance(newForm);
+
+            state.formCounter++;
+            elements.totalFormsInput.value = state.formCounter;
+            this.updateProveedorCount();
+        },
+        
+        removeForm: function(removeButton) {
+            const formToRemove = removeButton.closest('.proveedor-form');
+            const deleteCheckbox = formToRemove.querySelector('input[type="checkbox"][name$="-DELETE"]');
+            
+            if (deleteCheckbox) {
+                // Formulario existente: marcamos para eliminar y ocultamos
+                deleteCheckbox.checked = true;
+                this.animateFormRemoval(formToRemove, true);
+            } else {
+                // Formulario nuevo: eliminamos directamente
+                this.animateFormRemoval(formToRemove, false);
+            }
+        },
+        
+        animateFormAppearance: function(form) {
+            form.style.opacity = '0';
+            form.style.transform = 'translateY(10px)';
+            
+            setTimeout(() => {
+                form.style.transition = 'all 0.3s ease';
+                form.style.opacity = '1';
+                form.style.transform = 'translateY(0)';
+            }, 10);
+        },
+        
+        animateFormRemoval: function(form, isExisting) {
+            form.style.transition = 'all 0.3s ease';
+            form.style.opacity = '0';
+            form.style.transform = 'translateY(-10px)';
+            
+            setTimeout(() => {
+                if (isExisting) {
+                    form.style.display = 'none';
+                } else {
+                    form.remove();
+                }
+                
+                this.updateProveedorCount();
+                
+                // Si no quedan formularios, mostrar mensaje
+                if (this.getVisibleForms().length === 0) {
+                    elements.formContainer.innerHTML = `
+                        <div class="text-center py-5 text-muted bg-light rounded" id="empty-state">
+                            <i class="fas fa-truck fa-3x mb-3 opacity-50"></i>
+                            <h5 class="fw-semibold">No hay proveedores agregados</h5>
+                            <p class="mb-0">Agregue al menos un proveedor para continuar.</p>
+                        </div>
+                    `;
+                }
+            }, 300);
+        },
+        
+        getVisibleForms: function() {
+            return Array.from(elements.formContainer.querySelectorAll('.proveedor-form'))
+                        .filter(form => form.style.display !== 'none');
+        },
+        
+        updateProveedorCount: function() {
+            const visibleForms = this.getVisibleForms().length;
+            elements.proveedorCount.textContent = `${visibleForms} proveedor(es)`;
+            
+            // Actualizar clase del badge según la cantidad
+            if (visibleForms === 0) {
+                elements.proveedorCount.className = 'badge bg-danger text-white fs-6';
+            } else {
+                elements.proveedorCount.className = 'badge bg-light text-primary fs-6';
+            }
+        },
+        
+        validateForm: function(e) {
+            const visibleForms = this.getVisibleForms();
+            
+            // Validar que al menos hay un proveedor activo
+            if (visibleForms.length === 0) {
+                e.preventDefault();
+                this.showAlert('Debe agregar al menos un proveedor antes de guardar.', 'warning');
+                return false;
+            }
+            
+            // Validar que cada proveedor activo tenga datos completos
+            let isValid = true;
+            let emptyFields = [];
+            
+            visibleForms.forEach(form => {
+                const proveedorSelect = form.querySelector('select[name$="-proveedor"]');
+                const precioInput = form.querySelector('input[name$="-precio_unitario"]');
+                
+                if (!proveedorSelect.value) {
+                    isValid = false;
+                    proveedorSelect.classList.add('is-invalid');
+                    emptyFields.push('proveedor');
+                }
+                
+                if (!precioInput.value || parseFloat(precioInput.value) <= 0) {
+                    isValid = false;
+                    precioInput.classList.add('is-invalid');
+                    emptyFields.push('precio unitario');
+                }
+            });
+            
+            if (!isValid) {
+                e.preventDefault();
+                const uniqueFields = [...new Set(emptyFields)];
+                this.showAlert(`Por favor, complete todos los campos requeridos (${uniqueFields.join(', ')}) para los proveedores.`, 'error');
+                return false;
+            }
+        },
+        
+        showAlert: function(message, type) {
+            // Crear alerta temporal
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
+            alertDiv.style.top = '20px';
+            alertDiv.style.right = '20px';
+            alertDiv.style.zIndex = '9999';
+            alertDiv.style.minWidth = '300px';
+            alertDiv.innerHTML = `
+                <strong>${type === 'error' ? 'Error' : type === 'warning' ? 'Advertencia' : 'Información'}:</strong> ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.body.appendChild(alertDiv);
+            
+            // Auto-eliminar después de 5 segundos
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 5000);
+        }
+    };
+})();
+
+// Inicializar cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+    ArticuloFormManager.init();
+});
+</script>
+
+<style>
+/* Estilos mejorados */
+.card-header.bg-primary {
+    border-radius: 0.5rem 0.5rem 0 0 !important;
+}
+
+.card {
+    border-radius: 0.5rem;
+    border: 1px solid #e0e0e0;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.form-control, .form-select {
+    border-radius: 0.375rem;
+    border: 1px solid #ced4da;
+    transition: all 0.15s ease-in-out;
+    padding: 0.5rem 0.75rem;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    outline: 0;
+}
+
+.input-group-text {
+    background-color: #f8f9fa;
+    border: 1px solid #ced4da;
+    border-right: none;
+}
+
+.form-control.border-start-0 {
+    border-left: none;
+}
+
+.btn {
+    border-radius: 0.375rem;
+    font-weight: 500;
+    transition: all 0.15s ease-in-out;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    border: none;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #0a58ca 0%, #084298 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(13, 110, 253, 0.3);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #198754 0%, #146c43 100%);
+    border: none;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #146c43 0%, #0f5132 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(25, 135, 84, 0.3);
+}
+
+.proveedor-form {
+    transition: all 0.3s ease;
+    background-color: #f8f9fa;
+    border-left: 4px solid #0d6efd !important;
+}
+
+.proveedor-form:hover {
+    background-color: #e9ecef;
+    box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.1);
+}
+
+.form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.form-check-input:focus {
+    border-color: #86b7fe;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.invalid-feedback {
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: #dc3545;
+}
+
+.is-invalid {
+    border-color: #dc3545;
+}
+
+.is-invalid:focus {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+.alert {
+    border: none;
+    border-radius: 0.5rem;
+}
+
+.alert-info {
+    background-color: #e7f3ff;
+    color: #055160;
+}
+
+.badge {
+    font-size: 0.75rem;
+    padding: 0.35em 0.65em;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .proveedor-form .col-lg-5,
+    .proveedor-form .col-lg-2 {
+        margin-bottom: 1rem;
+    }
+    
+    .remove-form-btn {
+        width: 100%;
+        margin-top: 0.5rem;
+    }
+}
+</style>
+{% endblock %}

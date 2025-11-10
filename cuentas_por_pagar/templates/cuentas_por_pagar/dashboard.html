@@ -1,0 +1,731 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+
+{% block title %}Dashboard - Cuentas por Pagar{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Dashboard - Cuentas por Pagar</h1>
+            <div>
+                <a href="{% url 'exportar_facturas_excel' %}" class="btn btn-outline-info me-2">
+                    <i class="fas fa-file-excel me-2"></i>Exportar Excel
+                </a>
+                <a href="{% url 'lista_facturas' %}" class="btn btn-primary">
+                    <i class="fas fa-list me-2"></i>Ver Todas las Facturas
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resto del template se mantiene igual -->
+<div class="row mb-4">
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card text-white bg-primary h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ total_facturas }}</h4>
+                        <p class="card-text">Total Facturas</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-file-invoice fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card text-white bg-warning h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ facturas_pendientes_count }}</h4>
+                        <p class="card-text">Pendientes</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-clock fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card text-white bg-danger h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ facturas_vencidas_count }}</h4>
+                        <p class="card-text">Vencidas</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-exclamation-triangle fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card text-white bg-orange h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ facturas_por_vencer_count }}</h4>
+                        <p class="card-text">Por Vencer</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-hourglass-half fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card text-white bg-success h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">${{ total_deuda_general|floatformat:2|intcomma }}</h4>
+                        <p class="card-text">Deuda Total</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-money-bill-wave fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 mb-3">
+        <div class="card text-white bg-info h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="card-title">{{ estadisticas|length }}</h4>
+                        <p class="card-text">Proveedores</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-building fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Deuda por Proveedor</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="deudasChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Distribución de Facturas</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="distribucionChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Facturas por Proveedor</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="facturasProveedorChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Estatus por Proveedor</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="estatusProveedorChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Detalle por Proveedor</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Proveedor</th>
+                                <th class="text-end">Deuda Total</th>
+                                <th class="text-center">Total Facturas</th>
+                                <th class="text-center">Por Vencer</th>
+                                <th class="text-center">Vencidas</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in estadisticas %}
+                            <tr>
+                                <td>
+                                    <strong>{{ stat.proveedor }}</strong>
+                                </td>
+                                <td class="text-end">
+                                    <span class="fw-bold text-primary">${{ stat.total_deuda|floatformat:2|intcomma }}</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-primary">{{ stat.cantidad_facturas }}</span>
+                                </td>
+                                <td class="text-center">
+                                    {% if stat.facturas_por_vencer > 0 %}
+                                    <span class="badge bg-warning">{{ stat.facturas_por_vencer }}</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">0</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if stat.facturas_vencidas > 0 %}
+                                    <span class="badge bg-danger">{{ stat.facturas_vencidas }}</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">0</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <a href="{% url 'lista_facturas' %}?q={{ stat.proveedor|urlencode }}" 
+                                       class="btn btn-sm btn-outline-primary" 
+                                       title="Ver facturas de este proveedor">
+                                        <i class="fas fa-search"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4">
+                                    <i class="fas fa-check-circle text-success fa-2x mb-2"></i>
+                                    <p class="mb-0">No hay deudas pendientes</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Alertas Recientes</h5>
+            </div>
+            <div class="card-body">
+                {% if alertas_recientes %}
+                <div class="list-group list-group-flush">
+                    {% for alerta in alertas_recientes %}
+                    <div class="list-group-item px-0">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ alerta.numero_factura }}</h6>
+                            <small class="text-muted">{{ alerta.ultima_alerta_enviada|timesince }}</small>
+                        </div>
+                        <p class="mb-1 small">{{ alerta.orden_compra.proveedor.razon_social }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="badge {% if alerta.estatus == 'VENCIDA' %}bg-danger{% else %}bg-warning{% endif %}">
+                                {{ alerta.get_estatus_display }}
+                            </span>
+                            <small>${{ alerta.monto_pendiente|floatformat:2|intcomma }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-3">
+                    <i class="fas fa-bell-slash text-muted fa-2x mb-2"></i>
+                    <p class="text-muted mb-0">No hay alertas recientes</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Acciones Rápidas</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'crear_pago' %}" class="btn btn-warning">
+                        <i class="fas fa-hand-holding-usd me-2"></i>Registrar Pago
+                    </a>
+                    <a href="{% url 'lista_pagos' %}" class="btn btn-info">
+                        <i class="fas fa-money-bill-wave me-2"></i>Ver Pagos
+                    </a>
+                    <a href="{% url 'lista_facturas' %}" class="btn btn-outline-primary">
+                        <i class="fas fa-file-invoice me-2"></i>Gestionar Facturas
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .bg-orange {
+        background-color: #fd7e14 !important;
+    }
+    
+    .card {
+        transition: transform 0.2s ease-in-out;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .table th {
+        border-top: none;
+        font-weight: 600;
+    }
+    
+    .list-group-item {
+        border-left: none;
+        border-right: none;
+    }
+    
+    .list-group-item:first-child {
+        border-top: none;
+    }
+
+    /* Estilos para los números en las gráficas */
+    .chart-data-label {
+        font-weight: bold;
+        font-size: 12px;
+        text-shadow: 1px 1px 2px white;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Obtener datos de la tabla
+    function obtenerDatosDeTabla() {
+        const proveedores = [];
+        const deudas = [];
+        const facturasTotales = [];
+        const facturasPorVencer = [];
+        const facturasVencidas = [];
+        
+        document.querySelectorAll('table tbody tr').forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length >= 5) {
+                proveedores.push(cells[0].querySelector('strong').textContent.trim());
+                
+                // Deuda total
+                const deudaText = cells[1].textContent.trim().replace('$', '').replace(/,/g, '');
+                deudas.push(parseFloat(deudaText) || 0);
+                
+                // Total facturas
+                facturasTotales.push(parseInt(cells[2].textContent.trim()) || 0);
+                
+                // Por vencer
+                const porVencerBadge = cells[3].querySelector('.badge');
+                facturasPorVencer.push(porVencerBadge ? parseInt(porVencerBadge.textContent.trim()) : 0);
+                
+                // Vencidas
+                const vencidasBadge = cells[4].querySelector('.badge');
+                facturasVencidas.push(vencidasBadge ? parseInt(vencidasBadge.textContent.trim()) : 0);
+            }
+        });
+        
+        return {
+            labels: proveedores,
+            deudas: deudas,
+            facturas_totales: facturasTotales,
+            facturas_por_vencer: facturasPorVencer,
+            facturas_vencidas: facturasVencidas
+        };
+    }
+
+    // Función para formatear montos
+    function formatoMoneda(valor) {
+        if (valor >= 1000000) {
+            return '$' + (valor / 1000000).toFixed(1) + 'M';
+        } else if (valor >= 1000) {
+            return '$' + (valor / 1000).toFixed(1) + 'K';
+        } else {
+            return '$' + Math.round(valor).toLocaleString();
+        }
+    }
+
+    // Crear gráficas
+    const datos = obtenerDatosDeTabla();
+    
+    if (datos.labels.length > 0) {
+        crearGraficaDeudas(datos);
+        crearGraficaFacturasProveedor(datos);
+        crearGraficaEstatusProveedor(datos);
+    }
+    crearGraficaDistribucion();
+
+    function crearGraficaDeudas(data) {
+        const ctx = document.getElementById('deudasChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Deuda ($)',
+                    data: data.deudas,
+                    backgroundColor: 'rgba(26, 115, 232, 0.8)',
+                    borderColor: 'rgba(26, 115, 232, 1)',
+                    borderWidth: 1,
+                    borderRadius: 5,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `Deuda: ${formatoMoneda(context.parsed.y)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return formatoMoneda(value);
+                            }
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    }
+                }
+            }
+        });
+
+        // AGREGAR NÚMEROS MANUALMENTE - ESTILO POWER BI
+        chart.canvas.parentNode.style.position = 'relative';
+        const labelsContainer = document.createElement('div');
+        labelsContainer.style.position = 'absolute';
+        labelsContainer.style.top = '0';
+        labelsContainer.style.left = '0';
+        labelsContainer.style.width = '100%';
+        labelsContainer.style.height = '100%';
+        labelsContainer.style.pointerEvents = 'none';
+        chart.canvas.parentNode.appendChild(labelsContainer);
+
+        chart.update();
+        setTimeout(() => {
+            const meta = chart.getDatasetMeta(0);
+            data.deudas.forEach((value, index) => {
+                const bar = meta.data[index];
+                if (bar) {
+                    const label = document.createElement('div');
+                    label.className = 'chart-data-label';
+                    label.style.position = 'absolute';
+                    label.style.left = bar.x + 'px';
+                    label.style.top = (bar.y - 20) + 'px';
+                    label.style.transform = 'translateX(-50%)';
+                    label.style.textAlign = 'center';
+                    label.style.fontWeight = 'bold';
+                    label.style.fontSize = '12px';
+                    label.style.color = '#000';
+                    label.style.textShadow = '1px 1px 2px white';
+                    label.textContent = formatoMoneda(value);
+                    labelsContainer.appendChild(label);
+                }
+            });
+        }, 100);
+    }
+
+    function crearGraficaDistribucion() {
+        const ctx = document.getElementById('distribucionChart').getContext('2d');
+        
+        const totalPendientes = {{ facturas_pendientes_count }};
+        const totalPorVencer = {{ facturas_por_vencer_count }};
+        const totalVencidas = {{ facturas_vencidas_count }};
+        const totalPagadas = {{ total_facturas }} - totalPendientes - totalPorVencer - totalVencidas;
+        
+        const data = [totalPagadas, totalPendientes, totalPorVencer, totalVencidas];
+        const total = data.reduce((a, b) => a + b, 0);
+        
+        const chart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Pagadas', 'Pendientes', 'Por Vencer', 'Vencidas'],
+                datasets: [{
+                    data: data,
+                    backgroundColor: [
+                        'rgba(40, 167, 69, 0.8)',
+                        'rgba(255, 193, 7, 0.8)',
+                        'rgba(253, 126, 20, 0.8)',
+                        'rgba(220, 53, 69, 0.8)'
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+
+        // AGREGAR NÚMEROS MANUALMENTE - ESTILO POWER BI
+        chart.canvas.parentNode.style.position = 'relative';
+        const labelsContainer = document.createElement('div');
+        labelsContainer.style.position = 'absolute';
+        labelsContainer.style.top = '0';
+        labelsContainer.style.left = '0';
+        labelsContainer.style.width = '100%';
+        labelsContainer.style.height = '100%';
+        labelsContainer.style.pointerEvents = 'none';
+        labelsContainer.style.display = 'flex';
+        labelsContainer.style.alignItems = 'center';
+        labelsContainer.style.justifyContent = 'center';
+        chart.canvas.parentNode.appendChild(labelsContainer);
+
+        chart.update();
+        setTimeout(() => {
+            const centerLabel = document.createElement('div');
+            centerLabel.className = 'chart-data-label';
+            centerLabel.style.textAlign = 'center';
+            centerLabel.style.fontWeight = 'bold';
+            centerLabel.style.fontSize = '16px';
+            centerLabel.style.color = '#000';
+            centerLabel.style.textShadow = '1px 1px 2px white';
+            centerLabel.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+            centerLabel.style.padding = '8px';
+            centerLabel.style.borderRadius = '4px';
+            
+            let labelText = '';
+            data.forEach((value, index) => {
+                if (value > 0) {
+                    const percentage = Math.round((value / total) * 100);
+                    labelText += `${chart.data.labels[index]}: ${value} (${percentage}%)\n`;
+                }
+            });
+            centerLabel.textContent = labelText.trim();
+            labelsContainer.appendChild(centerLabel);
+        }, 100);
+    }
+
+    function crearGraficaFacturasProveedor(data) {
+        const ctx = document.getElementById('facturasProveedorChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Total Facturas',
+                    data: data.facturas_totales,
+                    backgroundColor: 'rgba(108, 117, 125, 0.8)',
+                    borderColor: 'rgba(108, 117, 125, 1)',
+                    borderWidth: 1,
+                    borderRadius: 3,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    }
+                }
+            }
+        });
+
+        // AGREGAR NÚMEROS MANUALMENTE - ESTILO POWER BI
+        chart.canvas.parentNode.style.position = 'relative';
+        const labelsContainer = document.createElement('div');
+        labelsContainer.style.position = 'absolute';
+        labelsContainer.style.top = '0';
+        labelsContainer.style.left = '0';
+        labelsContainer.style.width = '100%';
+        labelsContainer.style.height = '100%';
+        labelsContainer.style.pointerEvents = 'none';
+        chart.canvas.parentNode.appendChild(labelsContainer);
+
+        chart.update();
+        setTimeout(() => {
+            const meta = chart.getDatasetMeta(0);
+            data.facturas_totales.forEach((value, index) => {
+                const bar = meta.data[index];
+                if (bar) {
+                    const label = document.createElement('div');
+                    label.className = 'chart-data-label';
+                    label.style.position = 'absolute';
+                    label.style.left = bar.x + 'px';
+                    label.style.top = (bar.y - 20) + 'px';
+                    label.style.transform = 'translateX(-50%)';
+                    label.style.textAlign = 'center';
+                    label.style.fontWeight = 'bold';
+                    label.style.fontSize = '12px';
+                    label.style.color = '#000';
+                    label.style.textShadow = '1px 1px 2px white';
+                    label.textContent = value;
+                    labelsContainer.appendChild(label);
+                }
+            });
+        }, 100);
+    }
+
+    function crearGraficaEstatusProveedor(data) {
+        const ctx = document.getElementById('estatusProveedorChart').getContext('2d');
+        
+        const topProveedores = data.labels.slice(0, 5);
+        const topPorVencer = data.facturas_por_vencer.slice(0, 5);
+        const topVencidas = data.facturas_vencidas.slice(0, 5);
+        
+        const chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: topProveedores,
+                datasets: [
+                    {
+                        label: 'Por Vencer',
+                        data: topPorVencer,
+                        backgroundColor: 'rgba(253, 126, 20, 0.8)',
+                        borderColor: 'rgba(253, 126, 20, 1)',
+                        borderWidth: 1,
+                    },
+                    {
+                        label: 'Vencidas',
+                        data: topVencidas,
+                        backgroundColor: 'rgba(220, 53, 69, 0.8)',
+                        borderColor: 'rgba(220, 53, 69, 1)',
+                        borderWidth: 1,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        });
+
+        // AGREGAR NÚMEROS MANUALMENTE - ESTILO POWER BI
+        chart.canvas.parentNode.style.position = 'relative';
+        const labelsContainer = document.createElement('div');
+        labelsContainer.style.position = 'absolute';
+        labelsContainer.style.top = '0';
+        labelsContainer.style.left = '0';
+        labelsContainer.style.width = '100%';
+        labelsContainer.style.height = '100%';
+        labelsContainer.style.pointerEvents = 'none';
+        chart.canvas.parentNode.appendChild(labelsContainer);
+
+        chart.update();
+        setTimeout(() => {
+            const meta0 = chart.getDatasetMeta(0); // Por Vencer
+            const meta1 = chart.getDatasetMeta(1); // Vencidas
+            
+            topPorVencer.forEach((value, index) => {
+                const bar = meta0.data[index];
+                if (bar && value > 0) {
+                    const label = document.createElement('div');
+                    label.className = 'chart-data-label';
+                    label.style.position = 'absolute';
+                    label.style.left = bar.x + 'px';
+                    label.style.top = (bar.y - 10) + 'px';
+                    label.style.transform = 'translateX(-50%)';
+                    label.style.textAlign = 'center';
+                    label.style.fontWeight = 'bold';
+                    label.style.fontSize = '10px';
+                    label.style.color = '#fff';
+                    label.style.textShadow = '1px 1px 2px #000';
+                    label.textContent = value;
+                    labelsContainer.appendChild(label);
+                }
+            });
+
+            topVencidas.forEach((value, index) => {
+                const bar = meta1.data[index];
+                if (bar && value > 0) {
+                    const label = document.createElement('div');
+                    label.className = 'chart-data-label';
+                    label.style.position = 'absolute';
+                    label.style.left = bar.x + 'px';
+                    label.style.top = (bar.y - 10) + 'px';
+                    label.style.transform = 'translateX(-50%)';
+                    label.style.textAlign = 'center';
+                    label.style.fontWeight = 'bold';
+                    label.style.fontSize = '10px';
+                    label.style.color = '#fff';
+                    label.style.textShadow = '1px 1px 2px #000';
+                    label.textContent = value;
+                    labelsContainer.appendChild(label);
+                }
+            });
+        }, 100);
+    }
+});
+</script>
+{% endblock %}

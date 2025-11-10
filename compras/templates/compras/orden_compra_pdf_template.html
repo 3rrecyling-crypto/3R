@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Orden de Compra {{ orden.folio }}</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 1.5cm 1.5cm 2.5cm 1.5cm; /* Margen superior, derecho, inferior, izquierdo */
+            
+            @frame header {
+                -pdf-frame-content: header-content;
+                top: 0.5cm;
+                left: 1.5cm;
+                right: 1.5cm;
+                height: 3.5cm;
+            }
+
+            @frame footer {
+                -pdf-frame-content: footer-content;
+                bottom: -2cm;
+                left: 1.5cm;
+                right: 1.5cm;
+                height: 2cm;
+            }
+        }
+
+        body {
+            font-family: "Helvetica", "Arial", sans-serif;
+            font-size: 9pt;
+            color: #333;
+        }
+
+        /* --- HEADER --- */
+        #header-content .header-table { width: 100%; border-spacing: 0; }
+        #header-content .logo-cell { width: 65%; vertical-align: top; }
+        #header-content .info-cell { width: 35%; text-align: right; vertical-align: top; }
+        #header-content .logo { max-height: 80px; }
+        #header-content h1 {
+            font-size: 20pt;
+            color: #004a99;
+            margin: 0;
+            padding: 0;
+        }
+        #header-content .folio {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #e60000;
+            background-color: #f2f2f2;
+            padding: 5px 8px;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 5px;
+        }
+        
+        /* --- FOOTER --- */
+        #footer-content { 
+            text-align: center; 
+            font-size: 7pt; 
+            color: #555;
+            border-top: 1px solid #ccc;
+            padding-top: 5px;
+        }
+        #footer-content .page-number {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+        }
+
+        /* --- INFO BOXES --- */
+        .info-box-table { width: 100%; border-spacing: 10px 0; margin: 20px 0; }
+        .info-box {
+            width: 50%;
+            border: 1px solid #004a99;
+            border-radius: 5px;
+            font-size: 8.5pt;
+            vertical-align: top;
+        }
+        .info-box .title {
+            background-color: #004a99;
+            color: white;
+            padding: 5px 8px;
+            font-weight: bold;
+            border-bottom: 1px solid #004a99;
+            border-top-left-radius: 4px;
+            border-top-right-radius: 4px;
+        }
+        .info-box .content { padding: 8px; line-height: 1.4; }
+        .info-box strong { font-weight: bold; color: #004a99; }
+
+        /* --- ITEMS TABLE --- */
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 8.5pt;
+        }
+        .items-table th {
+            background-color: #004a99;
+            color: white;
+            padding: 6px 4px;
+            text-align: center;
+            border: 1px solid #004a99;
+        }
+        .items-table td {
+            padding: 6px 4px;
+            border: 1px solid #ccc;
+            vertical-align: top;
+        }
+        .items-table .even-row { background-color: #f2f9ff; }
+        .col-sku { width: 12%; }
+        .col-desc { width: 38%; }
+        .col-qty, .col-unit { width: 8%; text-align: center; }
+        .col-price, .col-subtotal { width: 12%; text-align: right; }
+        .col-disc { width: 10%; text-align: center; }
+
+        /* --- TOTALS & SIGNATURES --- */
+        .summary-table { width: 100%; margin-top: 20px; }
+        .summary-table .notes-cell { width: 60%; vertical-align: top; padding-right: 20px; }
+        .summary-table .totals-cell { width: 40%; vertical-align: top; }
+        
+        .totals-table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+        .totals-table td { padding: 5px 8px; border: 1px solid #ccc; }
+        .totals-table .label { text-align: left; }
+        .totals-table .amount { text-align: right; }
+        .totals-table .grand-total { background-color: #004a99; color: white; font-weight: bold; font-size: 10pt; }
+
+        .amount-in-words {
+            font-size: 8pt;
+            background-color: #f2f2f2;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+        }
+
+        .signatures-table {
+            width: 100%;
+            margin-top: 40px;
+            text-align: center;
+            font-size: 8pt;
+        }
+        .signatures-table .signature-box { padding: 0 20px; }
+        .signatures-table .line {
+            border-top: 1px solid #333;
+            margin: 0 auto 5px auto;
+            height: 40px;
+        }
+        .signatures-table .name { font-weight: bold; }
+
+    </style>
+</head>
+<body>
+
+    <div id="header-content">
+        <h1 style="text-align: center; color: #004a99; font-size: 24pt; margin: 0; padding-bottom: 10px;">
+            3R RECYCLING
+        </h1>
+        <div style="border-top: 3px solid #004a99;"></div>
+    </div>
+
+    <div id="footer-content">
+        Este documento es una Orden de Compra oficial de <strong>{{ orden.empresa.nombre }}</strong>.
+        Para cualquier aclaración, favor de contactar al departamento de compras.<br>
+        {{ orden.empresa.direccion }}
+        <div class="page-number">Página <pdf:page-number /> de <pdf:page-count /></div>
+    </div>
+
+    <main>
+        <table class="info-box-table">
+            <tr>
+                <td class="info-box">
+                    <div class="title">PROVEEDOR</div>
+                    <div class="content">
+                        <strong>{{ orden.proveedor.razon_social }}</strong><br>
+                        <strong>RFC:</strong> {{ orden.proveedor.rfc }}<br>
+                        {{ orden.proveedor.direccion|linebreaksbr }}<br>
+                        <strong>Contacto:</strong> {{ orden.proveedor.contacto_principal|default_if_none:"N/A" }}
+                    </div>
+                </td>
+                <td class="info-box">
+                    <div class="title">DATOS DE LA ORDEN</div>
+                    <div class="content">
+                        <strong>Empresa Origen:</strong>{{ orden.empresa.nombre }}<br>
+                        <strong>Orden de compra:</strong>{{ orden.folio }}<br>
+                        <strong>Fecha Emisión:</strong> {{ orden.fecha_emision|date:"d M, Y" }}<br>
+                        <strong>Fecha Entrega Req:</strong> {{ orden.fecha_entrega_esperada|date:"d M, Y" }}<br>
+                        <strong>Condiciones de Pago:</strong> {{ orden.condiciones_pago }}<br>
+                        <strong>Moneda:</strong> {{ orden.get_moneda_display }}
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th class="col-sku">SKU</th>
+                    <th class="col-desc">DESCRIPCIÓN</th>
+                    <th class="col-qty">CANT.</th>
+                    <th class="col-unit">UNIDAD</th>
+                    <th class="col-price">P. UNITARIO</th>
+                    <th class="col-disc">DESC. %</th>
+                    <th class="col-subtotal">SUBTOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for detalle in orden.detalles.all %}
+                <tr class="{% if forloop.counter|divisibleby:2 %}even-row{% endif %}">
+                    <td>{{ detalle.articulo.sku|default:"-" }}</td>
+                    <td><b>{{ detalle.articulo.nombre }}</b><br><small>{{ detalle.articulo.descripcion|truncatewords:10 }}</small></td>
+                    <td class="col-qty">{{ detalle.cantidad|floatformat:"2" }}</td>
+                    <td class="col-unit">{{ detalle.articulo.unidad_medida.abreviatura }}</td>
+                    <td class="col-price">{{ orden.moneda_simbolo }}{{ detalle.precio_unitario|floatformat:"4" }}</td>
+                    <td class="col-disc">{{ detalle.descuento|floatformat:"2" }}%</td>
+                    <td class="col-subtotal">{{ orden.moneda_simbolo }}{{ detalle.subtotal|floatformat:"2" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" style="text-align:center; padding: 20px;">No hay artículos en esta orden.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <table class="summary-table">
+            <tr>
+                <td class="notes-cell">
+                    <div class="amount-in-words">
+                        <strong>IMPORTE CON LETRA:</strong> {{ total_en_letra }}
+                    </div>
+                    {% if qr_code_img %}
+                        <img src="data:image/png;base64,{{ qr_code_img }}" style="max-height: 90px; margin-top: 10px;" alt="QR Code">
+                    {% endif %}
+                </td>
+                <td class="totals-cell">
+                    <table class="totals-table">
+                        </tr>
+                        <tr>
+                            <td class="label">Descuentos</td>
+                            <td class="amount">- {{ orden.moneda_simbolo }}{{ orden.total_descuentos|floatformat:2 }}</td>
+                        </tr>
+                        <tr>
+                            <td class="label"><b>Subtotal Neto</b></td>
+                            <td class="amount"><b>{{ orden.moneda_simbolo }}{{ orden.total_subtotal|floatformat:2 }}</b></td>
+                        </tr>
+                        <tr>
+                            <td class="label">IVA (16%)</td>
+                            <td class="amount">+ {{ orden.moneda_simbolo }}{{ orden.total_iva|floatformat:2 }}</td>
+                        </tr>
+                        {% if orden.total_retenciones > 0 %}
+                        <tr>
+                            <td class="label">Retenciones</td>
+                            <td class="amount">- {{ orden.moneda_simbolo }}{{ orden.total_retenciones|floatformat:2 }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr class="grand-total">
+                            <td class="label">TOTAL A PAGAR</td>
+                            <td class="amount">{{ orden.moneda_simbolo }}{{ orden.total_general|floatformat:2 }}</td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+        
+        <table class="signatures-table">
+            <tr>
+                <td class="signature-box">
+                    <div class="line"></div>
+                    <div class="name">{{ orden.creado_por.get_full_name|default:orden.creado_por.username }}</div>
+                    <div>ELABORADO POR</div>
+                </td>
+                <td class="signature-box">
+                    <div class="line"></div>
+                    <div class="name">
+                        {% if orden.aprobado_por %}
+                            {{ orden.aprobado_por.get_full_name|default:orden.aprobado_por.username }}
+                        {% else %}
+                            AUTORIZACIÓN PENDIENTE
+                        {% endif %}
+                    </div>
+                    <div>AUTORIZADO POR</div>
+                </td>
+            </tr>
+        </table>
+    </main>
+
+</body>
+</html>

@@ -1,0 +1,93 @@
+document.addEventListener('DOMContentLoaded', function () {
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    const tabs = Array.from(document.querySelectorAll('#formTabs .nav-link'));
+    const form = document.getElementById('entradaForm');
+    let currentTab = 0;
+
+    function updateButtons() {
+        // Botón Anterior
+        prevBtn.disabled = currentTab === 0;
+
+        // Botón Siguiente y Guardar
+        if (currentTab === tabs.length - 1) {
+            nextBtn.style.display = 'none';
+            submitBtn.style.display = 'inline-block';
+        } else {
+            nextBtn.style.display = 'inline-block';
+            submitBtn.style.display = 'none';
+        }
+    }
+
+    nextBtn.addEventListener('click', function () {
+        if (currentTab < tabs.length - 1) {
+            currentTab++;
+            new bootstrap.Tab(tabs[currentTab]).show();
+        }
+    });
+
+    prevBtn.addEventListener('click', function () {
+        if (currentTab > 0) {
+            currentTab--;
+            new bootstrap.Tab(tabs[currentTab]).show();
+        }
+    });
+    
+    // Actualizar botones cuando se cambia de pestaña (incluso haciendo clic en ellas)
+    tabs.forEach((tab, index) => {
+        tab.addEventListener('shown.bs.tab', function() {
+            currentTab = index;
+            updateButtons();
+        });
+    });
+
+    // Estado inicial de los botones
+    updateButtons();
+});document.addEventListener('DOMContentLoaded', function () {
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    const tabs = Array.from(document.querySelectorAll('#formTabs .nav-link'));
+    const form = document.getElementById('entradaForm');
+    let currentTab = 0;
+
+    function updateButtons() {
+        // Botón Anterior
+        prevBtn.disabled = currentTab === 0;
+
+        // Botón Siguiente y Guardar
+        if (currentTab === tabs.length - 1) {
+            nextBtn.style.display = 'none';
+            submitBtn.style.display = 'inline-block';
+        } else {
+            nextBtn.style.display = 'inline-block';
+            submitBtn.style.display = 'none';
+        }
+    }
+
+    nextBtn.addEventListener('click', function () {
+        if (currentTab < tabs.length - 1) {
+            currentTab++;
+            new bootstrap.Tab(tabs[currentTab]).show();
+        }
+    });
+
+    prevBtn.addEventListener('click', function () {
+        if (currentTab > 0) {
+            currentTab--;
+            new bootstrap.Tab(tabs[currentTab]).show();
+        }
+    });
+    
+    // Actualizar botones cuando se cambia de pestaña (incluso haciendo clic en ellas)
+    tabs.forEach((tab, index) => {
+        tab.addEventListener('shown.bs.tab', function() {
+            currentTab = index;
+            updateButtons();
+        });
+    });
+
+    // Estado inicial de los botones
+    updateButtons();
+});

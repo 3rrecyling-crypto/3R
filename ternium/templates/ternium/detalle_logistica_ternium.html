@@ -1,0 +1,196 @@
+{% extends "ternium/base.html" %}
+{% load humanize %}
+
+{% block title %}
+  Detalle del Registro - {{ registro.remision }}
+{% endblock title %}
+
+{% block content %}
+<style>
+    .detail-card { margin-bottom: 1.5rem; }
+    .detail-header {
+        background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; font-weight: 600;
+        color: var(--primary-color, #2c3e50); font-size: 1.1rem; padding: 0.75rem 1.25rem;
+    }
+    .detail-list { list-style: none; padding: 0; }
+    .detail-list li {
+        display: flex; justify-content: space-between; padding: 0.75rem 1.25rem;
+        border-bottom: 1px solid #f1f1f1;
+    }
+    .detail-list li:last-child { border-bottom: none; }
+    .detail-label { color: #5f6368; font-weight: 500; }
+    .detail-value { font-weight: 500; text-align: right; }
+    .file-link { display: flex; align-items: center; gap: 8px; }
+    .file-link .fa-check-circle { color: var(--success-color, #2ecc71); }
+    .file-link .fa-times-circle { color: var(--accent-color, #e74c3c); }
+    .image-preview { max-width: 200px; max-height: 150px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .status-badge { font-size: 1rem; padding: 0.5em 0.75em; }
+</style>
+
+<div class="container-fluid mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Detalle: {{ registro.remision }}</h4>
+            <div>
+                {% if registro.status != 'AUDITADO' %}
+                <a href="{% url 'editar_registro_logistica' registro.pk %}" class="btn btn-warning btn-sm">
+                    <i class="fas fa-edit me-1"></i> Editar
+                </a>
+                {% endif %}
+                
+                {% if registro.status == 'TERMINADO' %}
+                <form method="post" action="{% url 'auditar_registro_logistica' registro.pk %}" style="display: inline;" onsubmit="return confirm('¿Está seguro de que desea auditar este registro? Esta acción no se puede deshacer.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success btn-sm">
+                        <i class="fas fa-check-circle me-1"></i> Auditar Registro
+                    </button>
+                </form>
+                {% endif %}
+
+                <a href="{% url 'descargar_paquete_zip' registro.pk %}" class="btn btn-info btn-sm">
+                    <i class="fas fa-file-archive me-1"></i> Descargar ZIP
+                </a>
+                <a href="{% url 'lista_registros_logistica' %}" class="btn btn-secondary btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i> Volver
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-lg-7">
+                    <div class="card detail-card">
+                        <div class="detail-header">Datos Generales</div>
+                        <ul class="detail-list">
+                            <li><span class="detail-label">Número de Remisión</span> <span class="detail-value">{{ registro.remision }}</span></li>
+                            <li><span class="detail-label">Fecha de Carga</span> <span class="detail-value">{{ registro.fecha_carga|date:"d/m/Y" }}</span></li>
+                            <li><span class="detail-label"># Boleta Báscula</span> <span class="detail-value">{{ registro.boleta_bascula }}</span></li>
+                            <li><span class="detail-label">Fecha de Envío a Ternium</span> <span class="detail-value">{{ registro.fecha_envio|date:"d/m/Y"|default:"No especificada" }}</span></li>
+                        </ul>
+                    </div>
+
+                    <div class="card detail-card">
+                        <div class="detail-header">Información del Transporte</div>
+                        <ul class="detail-list">
+                            <li><span class="detail-label">Transportista</span> <span class="detail-value">{{ registro.transportista.nombre|default:"N/A" }}</span></li>
+                            <li><span class="detail-label">Nombre del Chofer</span> <span class="detail-value">{{ registro.chofer.nombre|default:"N/A" }}</span></li>
+                            <li><span class="detail-label">No. Económico Tractor</span> <span class="detail-value">{{ registro.tractor.nombre|default:"N/A" }}</span></li>
+                            <li><span class="detail-label">Placa Tractor</span> <span class="detail-value">{{ registro.tractor.placas|default:"N/A" }}</span></li>
+                            <li><span class="detail-label">No. Económico Tolva/Caja</span> <span class="detail-value">{{ registro.tolva.nombre|default:"N/A" }}</span></li>
+                            <li><span class="detail-label">Placa Tolva/Caja</span> <span class="detail-value">{{ registro.tolva.placas|default:"N/A" }}</span></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="card detail-card">
+                        <div class="detail-header">Estatus y Auditoría</div>
+                        <ul class="detail-list">
+                             <li>
+                                <span class="detail-label">Estatus</span> 
+                                <span class="detail-value">
+                                    {% if registro.status == 'PENDIENTE' %}
+                                        <span class="badge bg-warning text-dark status-badge">{{ registro.get_status_display }}</span>
+                                    {% elif registro.status == 'TERMINADO' %}
+                                        <span class="badge bg-info status-badge">{{ registro.get_status_display }}</span>
+                                    {% elif registro.status == 'AUDITADO' %}
+                                        <span class="badge bg-success status-badge">{{ registro.get_status_display }}</span>
+                                    {% endif %}
+                                </span>
+                            </li>
+                            {% if registro.status == 'AUDITADO' %}
+                            <li><span class="detail-label">Auditado por</span> <span class="detail-value">{{ registro.auditado_por.username|default:"N/A" }}</span></li>
+                            <li><span class="detail-label">Fecha de Auditoría</span> <span class="detail-value">{{ registro.auditado_en|date:"d/m/Y H:i" }}</span></li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                    <div class="card detail-card">
+                        <div class="detail-header">Material y Pesos</div>
+                        <ul class="detail-list">
+                            <li><span class="detail-label">Descripción del Material</span> <span class="detail-value">{{ registro.material.nombre|default:"N/A" }}</span></li>
+                            <li><span class="detail-label">Toneladas Remisionadas</span> <span class="detail-value">{{ registro.toneladas_remisionadas|floatformat:3|intcomma }} Ton.</span></li>
+                            <li><span class="detail-label">Toneladas Recibidas</span> <span class="detail-value">{{ registro.toneladas_recibidas|floatformat:3|intcomma|default:"No registrado" }} Ton.</span></li>
+                            {% if registro.merma_absoluta is not None %}
+                            <li>
+                                <span class="detail-label">Merma</span> 
+                                <span class="detail-value text-danger fw-bold">
+                                    {{ registro.merma_absoluta|floatformat:3|intcomma }} Ton. ({{ registro.merma_porcentaje|floatformat:2 }}%)
+                                </span>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-12">
+                    <div class="card detail-card">
+                        <div class="detail-header">Documentación y Evidencias Fotográficas</div>
+                        <div class="card-body">
+                            <div class="row g-4">
+                                <div class="col-md-6">
+                                    <h5>Documentos (PDF)</h5>
+                                    <ul class="detail-list">
+                                        <li>
+                                            <span class="detail-label">1. PDF Documento 1</span>
+                                            <span class="detail-value file-link">
+                                                {% if registro.pdf_registro_camion_remision %}
+                                                    <i class="fas fa-check-circle"></i> <a href="{{ registro.pdf_registro_camion_remision.url }}" target="_blank">Ver {{ registro.remision }}-4.pdf</a>
+                                                {% else %}
+                                                    <i class="fas fa-times-circle"></i> No adjuntado
+                                                {% endif %}
+                                            </span>
+                                        </li>
+                                        <li>
+                                            <span class="detail-label">2. PDF Documento 2</span>
+                                            <span class="detail-value file-link">
+                                                {% if registro.pdf_remision_permiso %}
+                                                    <i class="fas fa-check-circle"></i> <a href="{{ registro.pdf_remision_permiso.url }}" target="_blank">Ver {{ registro.remision }}-5.pdf</a>
+                                                {% else %}
+                                                    <i class="fas fa-times-circle"></i> No adjuntado
+                                                {% endif %}
+                                            </span>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6 align-self-center">
+                                    {% if registro.documentos_completos %}
+                                        <div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>Todos los documentos y fotos han sido cargados.</div>
+                                    {% else %}
+                                        <div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>Faltan algunos documentos o fotografías.</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-12"><hr></div>
+                                <div class="col-md-3 text-center">
+                                    <h6>Foto Superior (Vacía)</h6>
+                                    {% if registro.foto_superior_vacia %}
+                                        <a href="{{ registro.foto_superior_vacia.url }}" target="_blank"><img src="{{ registro.foto_superior_vacia.url }}" alt="Foto Superior Vacía" class="img-fluid image-preview"></a>
+                                    {% else %}<p class="text-muted">No adjuntada</p>{% endif %}
+                                </div>
+                                <div class="col-md-3 text-center">
+                                    <h6>Foto Frontal</h6>
+                                    {% if registro.foto_frontal %}
+                                        <a href="{{ registro.foto_frontal.url }}" target="_blank"><img src="{{ registro.foto_frontal.url }}" alt="Foto Frontal" class="img-fluid image-preview"></a>
+                                    {% else %}<p class="text-muted">No adjuntada</p>{% endif %}
+                                </div>
+                                <div class="col-md-3 text-center">
+                                    <h6>Foto Superior (Llena)</h6>
+                                    {% if registro.foto_superior_llena %}
+                                        <a href="{{ registro.foto_superior_llena.url }}" target="_blank"><img src="{{ registro.foto_superior_llena.url }}" alt="Foto Superior Llena" class="img-fluid image-preview"></a>
+                                    {% else %}<p class="text-muted">No adjuntada</p>{% endif %}
+                                </div>
+                                <div class="col-md-3 text-center">
+                                    <h6>Foto Trasera</h6>
+                                    {% if registro.foto_trasera %}
+                                        <a href="{{ registro.foto_trasera.url }}" target="_blank"><img src="{{ registro.foto_trasera.url }}" alt="Foto Trasera" class="img-fluid image-preview"></a>
+                                    {% else %}<p class="text-muted">No adjuntada</p>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
