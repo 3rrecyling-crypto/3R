@@ -106,10 +106,10 @@ class LugarForm(forms.ModelForm):
 class RemisionForm(forms.ModelForm):
     class Meta:
         model = Remision
-        exclude = ['status', 'auditado_por', 'auditado_en']
+        # 'remision' ya está (correctamente) en exclude
+        exclude = ['status', 'auditado_por', 'auditado_en', 'remision']
         widgets = {
             'empresa': forms.Select(attrs={'class': 'form-select'}),
-            'remision': forms.TextInput(attrs={'class': 'form-control'}),
             'fecha': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'linea_transporte': forms.Select(attrs={'class': 'form-select'}),
             'operador': forms.Select(attrs={'class': 'form-select'}),
@@ -130,18 +130,15 @@ class RemisionForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        # Extraemos 'empresa' de los argumentos, si se proporciona desde la vista
         empresa = kwargs.pop('empresa', None)
         super().__init__(*args, **kwargs)
 
-        # Si se pasó una empresa, filtramos los QuerySets de los campos relacionados
         if empresa:
             self.fields['linea_transporte'].queryset = LineaTransporte.objects.filter(empresas=empresa)
             self.fields['unidad'].queryset = Unidad.objects.filter(empresas=empresa)
             self.fields['contenedor'].queryset = Contenedor.objects.filter(empresas=empresa)
             self.fields['origen'].queryset = Lugar.objects.filter(empresas=empresa, tipo__in=['ORIGEN', 'AMBOS'])
             self.fields['destino'].queryset = Lugar.objects.filter(empresas=empresa, tipo__in=['DESTINO', 'AMBOS'])
-        # Si no hay empresa (al crear una remisión nueva), los campos aparecen vacíos
         else:
             self.fields['linea_transporte'].queryset = LineaTransporte.objects.none()
             self.fields['unidad'].queryset = Unidad.objects.none()
@@ -149,22 +146,21 @@ class RemisionForm(forms.ModelForm):
             self.fields['origen'].queryset = Lugar.objects.none()
             self.fields['destino'].queryset = Lugar.objects.none()
 
-        # Nota: El campo 'operador' no está relacionado a 'Empresa' en el modelo,
-        # por lo que muestra todos los operadores disponibles.
         self.fields['operador'].queryset = Operador.objects.all()
 
-        # --- MODIFICACIÓN INICIA (Basada en nuestra conversación) ---
+        # --- INICIO DE LA MODIFICACIÓN ---
         # Si la instancia ya existe (es un formulario de edición),
-        # solo bloqueamos el campo 'remision' para que no se pueda escribir.
+        # deshabilitamos el campo 'empresa'.
         if self.instance and self.instance.pk:
-            self.fields['remision'].widget.attrs['readonly'] = True
-        # --- MODIFICACIÓN TERMINA ---
+            self.fields['empresa'].disabled = True
+        # --- FIN DE LA MODIFICACIÓN ---
 
         if self.instance and self.instance.pk and self.instance.status == 'AUDITADO':
             for field in self.fields:
                 self.fields[field].disabled = True
     
     def clean(self):
+        # ... (Tu método clean() se queda exactamente igual que en la versión anterior)
         cleaned_data = super().clean()
         origen = cleaned_data.get('origen')
         destino = cleaned_data.get('destino')
@@ -172,7 +168,7 @@ class RemisionForm(forms.ModelForm):
         patios_exentos = ["PATIO MONTERREY", "PATIO NUEVO LAREDO"]
 
         is_completing = all([
-            cleaned_data.get('remision'), cleaned_data.get('fecha'), cleaned_data.get('linea_transporte'),
+            cleaned_data.get('fecha'), cleaned_data.get('linea_transporte'),
             cleaned_data.get('operador'), cleaned_data.get('unidad'), origen, destino,
             cleaned_data.get('folio_ld'), cleaned_data.get('folio_dlv')
         ])

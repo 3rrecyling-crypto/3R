@@ -528,6 +528,7 @@ def crear_remision(request):
                 pass
         
         # Le pasamos la 'empresa' al RemisionForm para una validación correcta
+        # 'remision' ya no está en el form, así que no se valida aquí.
         form = RemisionForm(request.POST, request.FILES, empresa=empresa_seleccionada)
         
         material_qs = Material.objects.filter(empresas=empresa_seleccionada) if empresa_seleccionada else Material.objects.none()
@@ -541,17 +542,58 @@ def crear_remision(request):
 
         if form.is_valid() and formset.is_valid():
             try:
-                with transaction.atomic():
-                    remision = form.save()
+                # --- INICIO DE LA LÓGICA DE GUARDADO SEGURO ---
+                with transaction.atomic(): 
+                    remision = form.save(commit=False) # Objeto en memoria
+                    
+                    if not empresa_seleccionada or not empresa_seleccionada.prefijo:
+                        messages.error(request, 'La empresa seleccionada no tiene un prefijo configurado.')
+                        # Usamos una excepción para detener la transacción
+                        raise ValidationError("Empresa sin prefijo.")
+
+                    prefix_with_dash = f"{empresa_seleccionada.prefijo.strip().upper()}-"
+                    
+                    # 1. Bloquea la tabla (o filas) para evitar "race conditions"
+                    last_remision_data = Remision.objects.select_for_update().filter(
+                        remision__startswith=prefix_with_dash
+                    ).aggregate(
+                        max_remision=Max('remision')
+                    )
+                    last_remision = last_remision_data['max_remision']
+                    
+                    # 2. Calcula el siguiente número de forma segura
+                    next_num = 1
+                    if last_remision:
+                        try:
+                            last_num_str = last_remision.split('-')[-1]
+                            last_num = int(last_num_str)
+                            next_num = last_num + 1
+                        except (ValueError, IndexError):
+                            next_num = 1 # Fallback si hay un formato inesperado
+                    
+                    # 3. Asigna el folio consecutivo y seguro
+                    remision.remision = f"{prefix_with_dash}{str(next_num).zfill(3)}"
+                    
+                    # 4. Guarda el objeto principal en la BD con el folio ya asignado
+                    remision.save() 
+                    
+                    # 5. Asigna la instancia al formset y guarda los detalles
                     formset.instance = remision
                     formset.save()
+                    
+                    # 6. Llama al save() final de la remisión (para la lógica de estatus)
                     remision.save()
+                    
+                    # 7. Actualiza el inventario
                     _update_inventory_from_remision(remision, revert=False)
                     
-                    messages.success(request, f'Remisión {remision.remision} creada.')
+                    messages.success(request, f'Remisión {remision.remision} creada exitosamente.')
                     return redirect('remision_lista')
+                # --- FIN DE LA LÓGICA DE GUARDADO SEGURO ---
+                
             except Exception as e:
-                messages.error(request, f'Ocurrió un error: {e}')
+                # Si algo falla (incluida nuestra ValidationError), la transacción se revierte
+                messages.error(request, f'Ocurrió un error al guardar: {e}')
     else:
         # En GET, no pasamos empresa, así el formulario se inicializa con campos vacíos
         form = RemisionForm()
@@ -560,12 +602,11 @@ def crear_remision(request):
             form_kwargs={'material_queryset': Material.objects.none(), 'lugar_queryset': Lugar.objects.none()}
         )
 
-    # --- MODIFICACIÓN INICIA (Basada en nuestra conversación) ---
     context = {
         'form': form, 
         'formset': formset, 
         'titulo': 'Nueva Remisión',
-        'is_editing': False  # <-- AÑADE ESTA LÍNEA
+        'is_editing': False  # Se mantiene para el JS
     }
     return render(request, 'ternium/remision_formulario.html', context)
 
@@ -580,17 +621,15 @@ def editar_remision(request, pk):
         Remision, DetalleRemision, form=DetalleRemisionForm, extra=0, can_delete=True, min_num=1
     )
     
+    # --- INICIO DE LA MODIFICACIÓN ---
+    # La empresa SIEMPRE será la original. Ya no se lee del POST.
     empresa_para_form = remision_original.empresa
+    # --- FIN DE LA MODIFICACIÓN ---
 
     if request.method == 'POST':
-        empresa_id = request.POST.get('empresa')
-        if empresa_id:
-            try:
-                empresa_para_form = Empresa.objects.get(pk=empresa_id)
-            except (Empresa.DoesNotExist, ValueError):
-                pass
+        # Ya no necesitamos buscar la 'empresa_id' en el POST
         
-        # Pasamos la empresa (la nueva o la original) para una validación correcta
+        # Pasamos la empresa original para una validación correcta de catálogos
         form = RemisionForm(request.POST, request.FILES, instance=remision_original, empresa=empresa_para_form)
         
         material_qs = Material.objects.filter(empresas=empresa_para_form) if empresa_para_form else Material.objects.none()
@@ -609,17 +648,23 @@ def editar_remision(request, pk):
                     _update_inventory_from_remision(remision_original, revert=True)
                     
                     remision = form.save(commit=False)
-                    remision_num = form.cleaned_data.get('remision', 'sin_remision').strip()
+                    
+                    # --- INICIO DE LA MODIFICACIÓN ---
+                    # Usamos el folio original para las rutas de archivos
+                    remision_num = remision_original.remision 
+                    # --- FIN DE LA MODIFICACIÓN ---
 
                     if 'evidencia_carga' in request.FILES:
                         _eliminar_archivo_de_s3(remision_original.evidencia_carga.name if remision_original.evidencia_carga else None)
                         archivo = request.FILES['evidencia_carga']
+                        # Usamos el remision_num (que es el original)
                         s3_path = f"remisiones/{remision_num}/carga_{archivo.name}"
                         remision.evidencia_carga = _subir_archivo_a_s3(archivo, s3_path)
                     
                     if 'evidencia_descarga' in request.FILES:
                         _eliminar_archivo_de_s3(remision_original.evidencia_descarga.name if remision_original.evidencia_descarga else None)
                         archivo = request.FILES['evidencia_descarga']
+                        # Usamos el remision_num (que es el original)
                         s3_path = f"remisiones/{remision_num}/descarga_{archivo.name}"
                         remision.evidencia_descarga = _subir_archivo_a_s3(archivo, s3_path)
 
@@ -645,16 +690,14 @@ def editar_remision(request, pk):
             form_kwargs={'material_queryset': material_qs, 'lugar_queryset': lugar_qs}
         )
 
-    # --- MODIFICACIÓN INICIA (Basada en nuestra conversación) ---
     context = {
         'form': form,
         'formset': formset,
-        'remision': remision_original,
+        'remision': remision_original, # <-- Pasamos la remisión al contexto
         'titulo': f'Editar Remisión {remision_original.remision}',
-        'is_editing': True  # <-- AÑADE ESTA LÍNEA
+        'is_editing': True  # <-- Se mantiene para el JS y el HTML
     }
     return render(request, 'ternium/remision_formulario.html', context)
-    # --- MODIFICACIÓN TERMINA ---
 
     
 @login_required
