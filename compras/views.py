@@ -440,7 +440,9 @@ def crear_solicitud(request):
 @login_required
 def aprobar_solicitud(request, pk):
     if request.method == 'POST':
+        print("🔵 DEBUG: Entrando a aprobar_solicitud")
         solicitud = get_object_or_404(SolicitudCompra, pk=pk)
+        print(f"🔵 DEBUG: Solicitud {solicitud.folio} - Estatus: {solicitud.estatus}")
         
         if solicitud.estatus != 'PENDIENTE_APROBACION':
             messages.warning(request, "Esta solicitud no se puede aprobar en su estado actual.")
@@ -457,12 +459,9 @@ def aprobar_solicitud(request, pk):
                 solicitud.aprobado_por = request.user
                 solicitud.fecha_aprobacion = timezone.now()
                 solicitud.save()
+                print("🔵 DEBUG: Solicitud aprobada y guardada")
 
-                # --- INICIO DE LA CORRECCIÓN ---
-                # Se establece un valor por defecto o vacío para las condiciones de pago,
-                # en lugar de usar los días de crédito.
                 condiciones = f"{solicitud.proveedor.dias_credito} días de crédito" if solicitud.proveedor and solicitud.proveedor.dias_credito > 0 else "Contado"
-                # --- FIN DE LA CORRECCIÓN ---
 
                 # 2. Crea la Orden de Compra en estado BORRADOR
                 orden = OrdenCompra.objects.create(
@@ -470,13 +469,14 @@ def aprobar_solicitud(request, pk):
                     empresa=solicitud.empresa,
                     proveedor=solicitud.proveedor,
                     fecha_entrega_esperada=timezone.now().date() + timezone.timedelta(days=7),
-                    condiciones_pago=condiciones, # Usamos la variable corregida
+                    condiciones_pago=condiciones,
                     estatus='BORRADOR',
                     creado_por=request.user,
                     usuario_creacion=request.user,
                 )
+                print(f"🔵 DEBUG: OC creada - {orden.folio}")
 
-                # 3. Crea los detalles de la OC a partir de los detalles de la solicitud
+                # 3. Crea los detalles de la OC
                 for detalle_sol in solicitud.detalles.all():
                     DetalleOrdenCompra.objects.create(
                         orden_compra=orden,
@@ -485,10 +485,54 @@ def aprobar_solicitud(request, pk):
                         precio_unitario=detalle_sol.precio_unitario,
                         descuento=0
                     )
+                print("🔵 DEBUG: Detalles de OC creados")
                 
-                messages.success(request, f"Solicitud {solicitud.folio} aprobada. Se ha generado el borrador de la OC {orden.folio}.")
+                # --- NUEVO: CREAR FACTURA AUTOMÁTICA EN CXP ---
+                try:
+                    from cuentas_por_pagar.models import Factura
+                    from datetime import datetime
+                    
+                    print("🔵 DEBUG: Intentando importar modelos de CXP")
+                    
+                    # Verificar si ya existe factura para evitar duplicados
+                    if not hasattr(orden, 'factura_cxp'):
+                        print("🔵 DEBUG: No existe factura, creando...")
+                        
+                        # Generar número de factura único
+                        numero_factura = f"FAC-{orden.folio}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                        print(f"🔵 DEBUG: Número factura generado: {numero_factura}")
+                        
+                        # Calcular fecha de vencimiento
+                        dias_credito = getattr(orden.proveedor, 'dias_credito', 30)
+                        fecha_vencimiento = timezone.now().date() + timezone.timedelta(days=dias_credito)
+                        print(f"🔵 DEBUG: Fecha vencimiento: {fecha_vencimiento}")
+                        
+                        # Crear la factura en CXP
+                        factura = Factura.objects.create(
+                            orden_compra=orden,
+                            numero_factura=numero_factura,
+                            fecha_emision=timezone.now().date(),
+                            fecha_vencimiento=fecha_vencimiento,
+                            monto=orden.total_general,
+                            creado_por=request.user
+                        )
+                        print(f"🔵 DEBUG: Factura creada exitosamente: {factura.numero_factura}")
+                        
+                        messages.success(request, f"Solicitud {solicitud.folio} aprobada. Se ha generado el borrador de la OC {orden.folio} y la factura {factura.numero_factura} en CXP.")
+                    else:
+                        print("🔵 DEBUG: Ya existe factura para esta OC")
+                        messages.success(request, f"Solicitud {solicitud.folio} aprobada. Se ha generado el borrador de la OC {orden.folio}.")
+                        
+                except ImportError as e:
+                    print(f"🔴 DEBUG ERROR ImportError: {e}")
+                    messages.success(request, f"Solicitud {solicitud.folio} aprobada. Se ha generado el borrador de la OC {orden.folio}. (No se pudo crear factura en CXP - ImportError)")
+                except Exception as e:
+                    print(f"🔴 DEBUG ERROR General: {e}")
+                    messages.warning(request, f"Solicitud {solicitud.folio} aprobada. Se ha generado el borrador de la OC {orden.folio}. (Error al crear factura: {e})")
+                # --- FIN NUEVO ---
         
         except Exception as e:
+            print(f"🔴 DEBUG ERROR Transacción: {e}")
             messages.error(request, f"Ocurrió un error al aprobar la solicitud y generar la OC: {e}")
 
         return redirect('detalle_solicitud', pk=pk)
@@ -637,7 +681,20 @@ def generar_orden_de_compra(request, pk):
                 oc.save()
                 formset.save()
                 
-                messages.success(request, f"Orden de Compra {oc.folio} ha sido finalizada y aprobada exitosamente.")
+                # --- NUEVO: ACTUALIZAR FACTURA EN CXP SI EXISTE ---
+                try:
+                    from cuentas_por_pagar.models import Factura
+                    if hasattr(oc, 'factura_cxp'):
+                        factura = oc.factura_cxp
+                        factura.monto = oc.total_general  # Actualizar monto por si cambió
+                        factura.save()
+                        messages.success(request, f"Orden de Compra {oc.folio} ha sido finalizada y aprobada exitosamente. Factura {factura.numero_factura} actualizada en CXP.")
+                    else:
+                        messages.success(request, f"Orden de Compra {oc.folio} ha sido finalizada y aprobada exitosamente.")
+                except Exception as e:
+                    messages.success(request, f"Orden de Compra {oc.folio} ha sido finalizada y aprobada exitosamente. (No se pudo actualizar factura en CXP: {e})")
+                # --- FIN NUEVO ---
+                
                 return redirect('detalle_orden_compra', pk=oc.pk)
         else:
             messages.error(request, "El formulario no es válido. Revisa los errores.")

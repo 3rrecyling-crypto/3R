@@ -389,14 +389,22 @@ $(document).ready(function() {
         }
     }
 
-    function initializePreviews() {
+    function initializePreviews() { //
         document.querySelectorAll('.image-preview').forEach(preview => {
             const existingUrl = preview.dataset.existingUrl; //
             if (existingUrl) {
-                const img = document.createElement('img');
-                img.src = existingUrl;
-                preview.innerHTML = '';
-                preview.appendChild(img);
+                // --- INICIO: LÓGICA MEJORADA (PDF/IMAGEN) ---
+                const fileName = existingUrl.split('/').pop().split('?')[0];
+                if (/\.(jpe?g|png|gif|webp)$/i.test(existingUrl)) {
+                    const img = document.createElement('img');
+                    img.src = existingUrl;
+                    preview.innerHTML = '';
+                    preview.appendChild(img);
+                } else {
+                    // Si no es una imagen (ej. PDF), muestra el ícono de archivo
+                    preview.innerHTML = '<div class="text-muted p-3"><i class="fas fa-file-alt fa-2x"></i><br><small>'+ fileName +'</small></div>';
+                }
+                // --- FIN: LÓGICA MEJORADA ---
             } else {
                 preview.innerHTML = '<div class="text-muted p-3"><i class="fas fa-file-alt fa-2x"></i></div>';
             }
