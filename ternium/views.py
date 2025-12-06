@@ -5,6 +5,8 @@ import os
 import zipfile
 import datetime
 import decimal
+from django.db.models import Count, Sum, F, Avg, Q, FloatField, Case, When, Value
+from django.db.models.functions import TruncMonth, Coalesce # <-- AGREGAR ESTA LÍNEA
 from openpyxl import Workbook
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl.styles import Alignment, PatternFill
@@ -1829,8 +1831,6 @@ class EmpresaVincularOrigenesView(LoginRequiredMixin, UpdateView):
 # --- COLOCAR AL FINAL DE ternium/views.py ---
 
 # Asegúrate de que estas importaciones estén presentes
-from django.db.models import Count, Sum, F, Avg, Q, FloatField, Case, When, Value
-from django.db.models.functions import TruncMonth, Coalesce # <-- AGREGAR ESTA LÍNEA
 
 @login_required
 def dashboard_analisis_view(request):
@@ -1854,37 +1854,36 @@ def dashboard_analisis_view(request):
 
     # 1.1 KPIS DE VOLUMEN
     
-    # Maquila (Entradas / Compras)
+    # Maquila (Entradas / Compras) -> FloatField
     entradas_mes = entradas_qs.filter(fecha_ingreso__gte=start_of_month)
     entradas_year = entradas_qs.filter(fecha_ingreso__gte=start_of_year)
     
-    toneladas_compradas_mes = entradas_mes.aggregate(Sum('peso_neto'))['peso_neto__sum'] or 0
-    toneladas_compradas_year = entradas_year.aggregate(Sum('peso_neto'))['peso_neto__sum'] or 0
+    # Aseguramos que sean float
+    toneladas_compradas_mes = float(entradas_mes.aggregate(Sum('peso_neto'))['peso_neto__sum'] or 0)
+    toneladas_compradas_year = float(entradas_year.aggregate(Sum('peso_neto'))['peso_neto__sum'] or 0)
     
-    # Logística (Salidas / Ventas)
-    # CORRECCIÓN: Se cambió 'fecha_salida' por 'fecha_carga'
+    # Logística (Salidas / Ventas) -> DecimalField
     salidas_mes = logistica_qs.filter(fecha_carga__gte=start_of_month)
     salidas_year = logistica_qs.filter(fecha_carga__gte=start_of_year)
     
-    toneladas_vendidas_mes = salidas_mes.aggregate(Sum('toneladas_remisionadas'))['toneladas_remisionadas__sum'] or 0
-    toneladas_vendidas_year = salidas_year.aggregate(Sum('toneladas_remisionadas'))['toneladas_remisionadas__sum'] or 0
+    # CORRECCIÓN DE ERROR: Convertimos Decimal a float explícitamente
+    toneladas_vendidas_mes = float(salidas_mes.aggregate(Sum('toneladas_remisionadas'))['toneladas_remisionadas__sum'] or 0)
+    toneladas_vendidas_year = float(salidas_year.aggregate(Sum('toneladas_remisionadas'))['toneladas_remisionadas__sum'] or 0)
 
     # Inventario Actual
     inventario_agg = InventarioPatio.objects.aggregate(total_kg=Coalesce(Sum('cantidad'), 0.0, output_field=FloatField()))
     inventario_actual_tons = float(inventario_agg['total_kg']) / 1000 if inventario_agg['total_kg'] else 0
 
     # Mermas / Pérdidas (Acumulado)
-    # Nota: EntradaMaquila no tiene 'peso_neto_proveedor' en el modelo provisto, 
-    # usaremos 'peso_remision' vs 'peso_neto'
-    merma_maq_tons = entradas_qs.aggregate(
+    merma_maq_tons = float(entradas_qs.aggregate(
         merma_tons=Sum(F('peso_remision') - F('peso_neto'), output_field=FloatField())
-    )['merma_tons'] or 0
+    )['merma_tons'] or 0)
     
-    # Logística
-    merma_log_tons = logistica_qs.aggregate(
+    merma_log_tons = float(logistica_qs.aggregate(
         merma_tons=Sum(F('toneladas_remisionadas') - F('toneladas_recibidas'), output_field=FloatField())
-    )['merma_tons'] or 0
+    )['merma_tons'] or 0)
     
+    # Ahora la suma funciona porque ambos son float
     merma_total_global = merma_maq_tons + merma_log_tons
     total_manejado = toneladas_compradas_year + toneladas_vendidas_year
     
@@ -1905,7 +1904,6 @@ def dashboard_analisis_view(request):
         toneladas=Sum('peso_neto')
     ).order_by('mes')
 
-    # CORRECCIÓN: Se cambió 'fecha_salida' por 'fecha_carga'
     ventas_mensuales = logistica_qs.annotate(
         mes=TruncMonth('fecha_carga')
     ).values('mes').annotate(
@@ -1917,15 +1915,17 @@ def dashboard_analisis_view(request):
     for entry in compras_mensuales:
         if entry['mes']:
             mes_str = entry['mes'].strftime("%Y-%m")
-            timeline_data[mes_str] = {'comprado': float(entry['toneladas'] or 0), 'vendido': 0}
+            # Convertimos a float
+            timeline_data[mes_str] = {'comprado': float(entry['toneladas'] or 0), 'vendido': 0.0}
 
     for entry in ventas_mensuales:
         if entry['mes']:
             mes_str = entry['mes'].strftime("%Y-%m")
+            val_vendido = float(entry['toneladas'] or 0) # Convertimos Decimal a float
             if mes_str in timeline_data:
-                timeline_data[mes_str]['vendido'] = float(entry['toneladas'] or 0)
+                timeline_data[mes_str]['vendido'] = val_vendido
             else:
-                timeline_data[mes_str] = {'comprado': 0, 'vendido': float(entry['toneladas'] or 0)}
+                timeline_data[mes_str] = {'comprado': 0.0, 'vendido': val_vendido}
     
     sorted_timeline_keys = sorted(timeline_data.keys())
     chart_timeline_labels = sorted_timeline_keys
@@ -1959,14 +1959,27 @@ def dashboard_analisis_view(request):
     material_analysis = {}
     for item in materiales_entradas:
         calidad = item['calidad'] or "Sin Especificar"
-        material_analysis[calidad] = {'comprado': float(item['comprado'] or 0), 'vendido': 0, 'merma_incidencias': item['merma_count'], 'stock': 0}
+        # Casteo explícito a float
+        material_analysis[calidad] = {
+            'comprado': float(item['comprado'] or 0), 
+            'vendido': 0.0, 
+            'merma_incidencias': item['merma_count'], 
+            'stock': 0.0
+        }
         
     for item in materiales_salidas:
         name = item['material__nombre'] or "Sin Especificar"
+        val_vendido = float(item['vendido'] or 0) # Casteo Decimal -> Float
+        
         if name in material_analysis:
-            material_analysis[name]['vendido'] = float(item['vendido'] or 0)
+            material_analysis[name]['vendido'] = val_vendido
         else:
-            material_analysis[name] = {'comprado': 0, 'vendido': float(item['vendido'] or 0), 'merma_incidencias': 0, 'stock': 0}
+            material_analysis[name] = {
+                'comprado': 0.0, 
+                'vendido': val_vendido, 
+                'merma_incidencias': 0, 
+                'stock': 0.0
+            }
             
     for item in inventario_por_material:
          name = item['material__nombre'] or "Sin Especificar"
@@ -1974,6 +1987,7 @@ def dashboard_analisis_view(request):
          if name in material_analysis:
              material_analysis[name]['stock'] = stock_ton
     
+    # Ahora la suma en la lambda function funcionará porque ambos valores son float
     sorted_material_analysis = sorted(material_analysis.items(), key=lambda item: item[1]['comprado'] + item[1]['vendido'], reverse=True)[:10]
 
     # ==========================================
@@ -1986,8 +2000,6 @@ def dashboard_analisis_view(request):
         avg_merma_perc=Avg('porcentaje_faltante')
     ).order_by('-toneladas')[:5]
 
-    # CORRECCIÓN: 'cliente' no existe en RegistroLogistico, se cambia por 'transportista'
-    # para analizar qué transportista mueve más volumen de salida.
     top_clientes = logistica_qs.values('transportista__nombre').annotate(
         toneladas=Sum('toneladas_remisionadas'),
         viajes=Count('id')
@@ -1997,10 +2009,8 @@ def dashboard_analisis_view(request):
     # 5. LISTA DE BOLETAS/REMISIONES
     # ==========================================
     
-    # CORRECCIÓN: 'folio' no existe en EntradaMaquila, se usa 'c_id_remito' y se aliasa como folio para el template
     ultimas_entradas = entradas_qs.order_by('-fecha_ingreso').values(folio=F('c_id_remito'), calidad_mat=F('calidad'), peso=F('peso_neto'), trans=F('transporte'))[:10]
     
-    # CORRECCIÓN: 'fecha_salida' no existe, se usa 'fecha_carga'
     ultimas_salidas = logistica_qs.order_by('-fecha_carga').values('remision', 'material__nombre', 'toneladas_remisionadas', 'transportista__nombre')[:10]
     
     
@@ -2023,10 +2033,10 @@ def dashboard_analisis_view(request):
         
         'material_analysis': sorted_material_analysis,
         'top_proveedores': top_proveedores,
-        'top_clientes': top_clientes, # Ahora contiene Transportistas
+        'top_clientes': top_clientes,
         
         'ultimas_entradas': list(ultimas_entradas),
         'ultimas_salidas': list(ultimas_salidas),
     }
 
-    return render(request, 'ternium/dashboard_analisis.html', context)
+    return render(request, 'ternium/dashboard_analisis.html', context)# nueva actuaolizacopon
