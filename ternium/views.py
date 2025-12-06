@@ -1409,10 +1409,10 @@ import re
 import io
 import logging
 import pandas as pd
+from .models import RegistroLogistico, EntradaMaquila, InventarioPatio # Asegúrate de importar tus modelos
 import boto3
 from botocore.exceptions import NoCredentialsError, BotoCoreError
-
-from django.shortcuts import render
+import json
 from django.http import JsonResponse
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -1829,69 +1829,204 @@ class EmpresaVincularOrigenesView(LoginRequiredMixin, UpdateView):
 # --- COLOCAR AL FINAL DE ternium/views.py ---
 
 # Asegúrate de que estas importaciones estén presentes
-from django.db.models import Count, Sum, F, Avg, Q
-from django.db.models.functions import TruncMonth, Coalesce
+from django.db.models import Count, Sum, F, Avg, Q, FloatField, Case, When, Value
+from django.db.models.functions import TruncMonth, Coalesce # <-- AGREGAR ESTA LÍNEA
 
 @login_required
 def dashboard_analisis_view(request):
-    # 1. DATOS TERNIUM (LOGÍSTICA)
-    logistica_qs = RegistroLogistico.objects.filter(status='TERMINADO')
     
-    log_kpis = logistica_qs.aggregate(
-        total_viajes=Count('id'),
-        total_enviado=Sum('toneladas_remisionadas'),
-        total_recibido=Sum('toneladas_recibidas'),
-        merma_total=Sum(F('toneladas_remisionadas') - F('toneladas_recibidas')),
-    )
+    # 1. FILTROS DE TIEMPO
+    now = timezone.now()
     
-    if log_kpis['total_enviado'] and log_kpis['total_enviado'] > 0:
-        porcentaje_merma = (log_kpis['merma_total'] / log_kpis['total_enviado']) * 100
-    else:
-        porcentaje_merma = 0
-
-    log_materiales = logistica_qs.values('material__nombre').annotate(
-        total_tons=Sum('toneladas_remisionadas')
-    ).order_by('-total_tons')[:5]
-
-    log_transportistas = logistica_qs.values('transportista__nombre').annotate(
-        viajes=Count('id')
-    ).order_by('-viajes')[:5]
-
-    # 2. DATOS BOLETAS (MAQUILA)
+    # Filtro Global de Maquila (Entradas)
     entradas_qs = EntradaMaquila.objects.all()
+    
+    # Filtro Global de Logística (Salidas)
+    logistica_qs = RegistroLogistico.objects.filter(status='TERMINADO')
 
-    maq_kpis = entradas_qs.aggregate(
-        total_entradas=Count('id'),
-        total_peso_neto=Sum('peso_neto'),
-        total_alertas=Count('id', filter=Q(alerta=True)),
-        promedio_tara=Avg('peso_tara')
-    )
+    # ==========================================
+    # 1. CÁLCULO DE KPIS GLOBALES (MES Y ACUMULADO)
+    # ==========================================
+    
+    # Rango de tiempo: Mes actual y Año actual
+    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    start_of_year = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    maq_calidades = entradas_qs.values('calidad').annotate(
-        cantidad=Count('id'),
-        toneladas=Sum('peso_neto')
-    ).order_by('-toneladas')
+    # 1.1 KPIS DE VOLUMEN
+    
+    # Maquila (Entradas / Compras)
+    entradas_mes = entradas_qs.filter(fecha_ingreso__gte=start_of_month)
+    entradas_year = entradas_qs.filter(fecha_ingreso__gte=start_of_year)
+    
+    toneladas_compradas_mes = entradas_mes.aggregate(Sum('peso_neto'))['peso_neto__sum'] or 0
+    toneladas_compradas_year = entradas_year.aggregate(Sum('peso_neto'))['peso_neto__sum'] or 0
+    
+    # Logística (Salidas / Ventas)
+    # CORRECCIÓN: Se cambió 'fecha_salida' por 'fecha_carga'
+    salidas_mes = logistica_qs.filter(fecha_carga__gte=start_of_month)
+    salidas_year = logistica_qs.filter(fecha_carga__gte=start_of_year)
+    
+    toneladas_vendidas_mes = salidas_mes.aggregate(Sum('toneladas_remisionadas'))['toneladas_remisionadas__sum'] or 0
+    toneladas_vendidas_year = salidas_year.aggregate(Sum('toneladas_remisionadas'))['toneladas_remisionadas__sum'] or 0
 
-    maq_timeline = entradas_qs.annotate(
+    # Inventario Actual
+    inventario_agg = InventarioPatio.objects.aggregate(total_kg=Coalesce(Sum('cantidad'), 0.0, output_field=FloatField()))
+    inventario_actual_tons = float(inventario_agg['total_kg']) / 1000 if inventario_agg['total_kg'] else 0
+
+    # Mermas / Pérdidas (Acumulado)
+    # Nota: EntradaMaquila no tiene 'peso_neto_proveedor' en el modelo provisto, 
+    # usaremos 'peso_remision' vs 'peso_neto'
+    merma_maq_tons = entradas_qs.aggregate(
+        merma_tons=Sum(F('peso_remision') - F('peso_neto'), output_field=FloatField())
+    )['merma_tons'] or 0
+    
+    # Logística
+    merma_log_tons = logistica_qs.aggregate(
+        merma_tons=Sum(F('toneladas_remisionadas') - F('toneladas_recibidas'), output_field=FloatField())
+    )['merma_tons'] or 0
+    
+    merma_total_global = merma_maq_tons + merma_log_tons
+    total_manejado = toneladas_compradas_year + toneladas_vendidas_year
+    
+    porcentaje_merma_global = (merma_total_global / total_manejado) * 100 if total_manejado > 0 else 0
+
+    # 1.2 KPIS DE OPERACIÓN
+    tiempo_almacenamiento_dias = 0 # Valor placeholder
+    movimientos_totales = entradas_qs.count() + logistica_qs.count()
+
+    # ==========================================
+    # 2. GRÁFICAS PRINCIPALES
+    # ==========================================
+
+    # Volumen comprado vs vendido (Línea Mensual)
+    compras_mensuales = entradas_qs.annotate(
         mes=TruncMonth('fecha_ingreso')
     ).values('mes').annotate(
-        total=Sum('peso_neto')
+        toneladas=Sum('peso_neto')
     ).order_by('mes')
 
-    # 3. INVENTARIO
-    inventario_actual = InventarioPatio.objects.values('patio__nombre', 'material__nombre').annotate(
-        total_kg=Sum('cantidad')
-    ).order_by('patio__nombre')
-
-    context = {
-        'log_kpis': log_kpis,
-        'porcentaje_merma': porcentaje_merma,
-        'log_materiales': list(log_materiales),
-        'log_transportistas': list(log_transportistas),
-        'maq_kpis': maq_kpis,
-        'maq_calidades': list(maq_calidades),
-        'maq_timeline': list(maq_timeline),
-        'inventario': inventario_actual,
-    }
+    # CORRECCIÓN: Se cambió 'fecha_salida' por 'fecha_carga'
+    ventas_mensuales = logistica_qs.annotate(
+        mes=TruncMonth('fecha_carga')
+    ).values('mes').annotate(
+        toneladas=Sum('toneladas_remisionadas')
+    ).order_by('mes')
     
+    # Consolidar datos mensuales
+    timeline_data = {}
+    for entry in compras_mensuales:
+        if entry['mes']:
+            mes_str = entry['mes'].strftime("%Y-%m")
+            timeline_data[mes_str] = {'comprado': float(entry['toneladas'] or 0), 'vendido': 0}
+
+    for entry in ventas_mensuales:
+        if entry['mes']:
+            mes_str = entry['mes'].strftime("%Y-%m")
+            if mes_str in timeline_data:
+                timeline_data[mes_str]['vendido'] = float(entry['toneladas'] or 0)
+            else:
+                timeline_data[mes_str] = {'comprado': 0, 'vendido': float(entry['toneladas'] or 0)}
+    
+    sorted_timeline_keys = sorted(timeline_data.keys())
+    chart_timeline_labels = sorted_timeline_keys
+    chart_timeline_comprado = [timeline_data[k]['comprado'] for k in sorted_timeline_keys]
+    chart_timeline_vendido = [timeline_data[k]['vendido'] for k in sorted_timeline_keys]
+
+    # Pérdidas por mes (Proxy usando Entradas)
+    merma_mensual = entradas_qs.annotate(
+        mes=TruncMonth('fecha_ingreso')
+    ).values('mes').annotate(
+        avg_merma=Avg('porcentaje_faltante')
+    ).order_by('mes')
+    
+    chart_merma_labels = [item['mes'].strftime("%Y-%m") for item in merma_mensual if item['mes']]
+    chart_merma_data = [float(item['avg_merma'] or 0) for item in merma_mensual if item['mes']]
+
+
+    # ==========================================
+    # 3. ANÁLISIS POR MATERIAL
+    # ==========================================
+    
+    materiales_entradas = entradas_qs.values('calidad').annotate(comprado=Sum('peso_neto'), merma_count=Count('id', filter=Q(alerta=True))).order_by('-comprado')
+    
+    materiales_salidas = logistica_qs.values('material__nombre').annotate(vendido=Sum('toneladas_remisionadas')).order_by('-vendido')
+
+    inventario_por_material = InventarioPatio.objects.values('material__nombre').annotate(
+        stock=Sum('cantidad')
+    )
+
+    # Consolidar Materiales
+    material_analysis = {}
+    for item in materiales_entradas:
+        calidad = item['calidad'] or "Sin Especificar"
+        material_analysis[calidad] = {'comprado': float(item['comprado'] or 0), 'vendido': 0, 'merma_incidencias': item['merma_count'], 'stock': 0}
+        
+    for item in materiales_salidas:
+        name = item['material__nombre'] or "Sin Especificar"
+        if name in material_analysis:
+            material_analysis[name]['vendido'] = float(item['vendido'] or 0)
+        else:
+            material_analysis[name] = {'comprado': 0, 'vendido': float(item['vendido'] or 0), 'merma_incidencias': 0, 'stock': 0}
+            
+    for item in inventario_por_material:
+         name = item['material__nombre'] or "Sin Especificar"
+         stock_ton = float(item['stock']) / 1000 if item['stock'] else 0
+         if name in material_analysis:
+             material_analysis[name]['stock'] = stock_ton
+    
+    sorted_material_analysis = sorted(material_analysis.items(), key=lambda item: item[1]['comprado'] + item[1]['vendido'], reverse=True)[:10]
+
+    # ==========================================
+    # 4. RANKING DE PROVEEDORES Y CLIENTES
+    # ==========================================
+
+    top_proveedores = entradas_qs.values('transporte').annotate(
+        toneladas=Sum('peso_neto'),
+        viajes=Count('id'),
+        avg_merma_perc=Avg('porcentaje_faltante')
+    ).order_by('-toneladas')[:5]
+
+    # CORRECCIÓN: 'cliente' no existe en RegistroLogistico, se cambia por 'transportista'
+    # para analizar qué transportista mueve más volumen de salida.
+    top_clientes = logistica_qs.values('transportista__nombre').annotate(
+        toneladas=Sum('toneladas_remisionadas'),
+        viajes=Count('id')
+    ).order_by('-toneladas')[:5]
+
+    # ==========================================
+    # 5. LISTA DE BOLETAS/REMISIONES
+    # ==========================================
+    
+    # CORRECCIÓN: 'folio' no existe en EntradaMaquila, se usa 'c_id_remito' y se aliasa como folio para el template
+    ultimas_entradas = entradas_qs.order_by('-fecha_ingreso').values(folio=F('c_id_remito'), calidad_mat=F('calidad'), peso=F('peso_neto'), trans=F('transporte'))[:10]
+    
+    # CORRECCIÓN: 'fecha_salida' no existe, se usa 'fecha_carga'
+    ultimas_salidas = logistica_qs.order_by('-fecha_carga').values('remision', 'material__nombre', 'toneladas_remisionadas', 'transportista__nombre')[:10]
+    
+    
+    context = {
+        'kpi_comp_mes': round(toneladas_compradas_mes, 2),
+        'kpi_comp_year': round(toneladas_compradas_year, 2),
+        'kpi_vent_mes': round(toneladas_vendidas_mes, 2),
+        'kpi_vent_year': round(toneladas_vendidas_year, 2),
+        'kpi_inv_act': round(inventario_actual_tons, 2),
+        'kpi_merma_perc': round(porcentaje_merma_global, 2),
+        'kpi_merma_tons': round(merma_total_global, 2),
+        'kpi_movs_total': movimientos_totales,
+        'kpi_almacen_dias': tiempo_almacenamiento_dias,
+        
+        'chart_tl_labels': json.dumps(chart_timeline_labels),
+        'chart_tl_comprado': json.dumps(chart_timeline_comprado),
+        'chart_tl_vendido': json.dumps(chart_timeline_vendido),
+        'chart_merma_labels': json.dumps(chart_merma_labels),
+        'chart_merma_data': json.dumps(chart_merma_data),
+        
+        'material_analysis': sorted_material_analysis,
+        'top_proveedores': top_proveedores,
+        'top_clientes': top_clientes, # Ahora contiene Transportistas
+        
+        'ultimas_entradas': list(ultimas_entradas),
+        'ultimas_salidas': list(ultimas_salidas),
+    }
+
     return render(request, 'ternium/dashboard_analisis.html', context)

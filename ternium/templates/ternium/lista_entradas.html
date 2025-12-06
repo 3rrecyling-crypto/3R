@@ -5,7 +5,7 @@
 
 {% block content %}
 <style>
-    /* Estilos Premium para Tablas y Badges */
+    /* --- Estilos Generales --- */
     .page-header {
         background: #fff;
         padding: 1.5rem 2rem;
@@ -23,7 +23,7 @@
         margin-bottom: 1.5rem;
     }
 
-    /* Tabla Profesional */
+    /* --- Tabla Profesional (Estilo Logística) --- */
     .table-card {
         background: #fff;
         border-radius: 8px;
@@ -33,13 +33,13 @@
     }
 
     .table thead th {
-        background-color: #f1f3fa;
-        color: #6c757d;
+        background-color: #f5f9ff; /* Mismo azul claro que logística */
+        color: #0056b3;           /* Mismo color de texto que logística */
         font-weight: 600;
         text-transform: uppercase;
-        font-size: 0.75rem;
+        font-size: 0.85rem;
         letter-spacing: 0.5px;
-        border-bottom: none;
+        border-bottom: 2px solid #dee2e6;
         padding: 1rem;
     }
 
@@ -52,7 +52,10 @@
     }
 
     .table tbody tr:hover {
-        background-color: #fbfbfb;
+        background-color: #f8fafc;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        transition: all 0.2s ease;
     }
 
     /* ID Monoespaciado */
@@ -62,36 +65,35 @@
         font-weight: 600;
     }
 
-    /* Badges Estilo "Soft" */
+    /* --- Badges --- */
+    .badge { padding: 0.4em 0.8em; font-weight: 500; }
     .badge-soft-success { background-color: rgba(10, 207, 151, 0.18); color: #0acf97; }
     .badge-soft-warning { background-color: rgba(255, 188, 0, 0.18); color: #ffbc00; }
     .badge-soft-danger { background-color: rgba(250, 92, 124, 0.18); color: #fa5c7c; }
     .badge-soft-info { background-color: rgba(57, 175, 209, 0.18); color: #39afd1; }
-    
-    .badge {
-        padding: 0.4em 0.8em;
-        font-weight: 500;
-        font-size: 0.75rem;
-    }
 
-    /* Botón de Acción Circular */
-    .btn-action {
-        width: 32px;
-        height: 32px;
-        padding: 0;
-        line-height: 32px;
-        text-align: center;
-        border-radius: 50%;
-        color: #6c757d;
-        transition: all 0.2s;
+    /* --- Botones de Acción (Estilo Logística) --- */
+    .btn-group .btn {
+        border-radius: 6px !important;
+        margin-right: 5px;
     }
-    .btn-action:hover, .btn-action:focus {
-        background-color: #eef2f7;
-        color: #313a46;
-    }
-    
-    .dropdown-item i { width: 20px; text-align: center; margin-right: 8px; }
-    .dropdown-item.text-danger:hover { background-color: #fff0f0; }
+    .btn-group .btn:last-child { margin-right: 0; }
+
+    /* Botón Info (Descargas) */
+    .btn-outline-info { color: #17a2b8; border-color: #17a2b8; }
+    .btn-outline-info:hover { background-color: #17a2b8; color: white; }
+
+    /* Botón Warning (Editar) */
+    .btn-outline-warning { color: #ffc107; border-color: #ffc107; }
+    .btn-outline-warning:hover { background-color: #ffc107; color: #212529; }
+
+    /* Botón Primary (Ver) */
+    .btn-outline-primary { color: #0056b3; border-color: #0056b3; }
+    .btn-outline-primary:hover { background-color: #0056b3; color: white; }
+
+    /* Botón Danger (Eliminar) */
+    .btn-outline-danger { color: #dc3545; border-color: #dc3545; }
+    .btn-outline-danger:hover { background-color: #dc3545; color: white; }
 </style>
 
 <div class="container-fluid px-4">
@@ -149,7 +151,7 @@
 
     <div class="table-card">
         <div class="table-responsive">
-            <table class="table mb-0">
+            <table class="table mb-0 align-middle">
                 <thead>
                     <tr>
                         <th class="ps-4">ID Remito</th>
@@ -204,46 +206,39 @@
                         </td>
 
                         <td class="text-end pe-4">
-                            <div class="dropdown">
-                                <button class="btn btn-action" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <i class="fas fa-ellipsis-v"></i>
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end border-0 shadow">
-                                    <li><h6 class="dropdown-header text-uppercase small">Gestionar</h6></li>
-                                    
-                                    <li>
-                                        <a class="dropdown-item" href="{% url 'detalle_entrada' pk=entrada.pk %}">
-                                            <i class="fas fa-eye text-primary"></i> Ver detalles
-                                        </a>
-                                    </li>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a href="{% url 'detalle_entrada' pk=entrada.pk %}" 
+                                   class="btn btn-outline-primary" 
+                                   title="Ver detalles" data-bs-toggle="tooltip">
+                                    <i class="fas fa-eye"></i>
+                                </a>
 
-                                    <li>
-                                        <a class="dropdown-item" href="{% url 'descargar_zip_maquila' pk=entrada.pk %}">
-                                            <i class="fas fa-file-archive text-info"></i> Descargar Evidencias
-                                        </a>
-                                    </li>
-                                    
-                                    <li><hr class="dropdown-divider"></li>
+                                <a href="{% url 'descargar_zip_maquila' pk=entrada.pk %}" 
+                                   class="btn btn-outline-info" 
+                                   title="Descargar Evidencias" data-bs-toggle="tooltip">
+                                    <i class="fas fa-file-archive"></i>
+                                </a>
 
-                                    {% if entrada.status != 'AUDITADO' %}
-                                        <li>
-                                            <a class="dropdown-item" href="{% url 'editar_entrada' pk=entrada.pk %}">
-                                                <i class="fas fa-pencil-alt text-warning"></i> Editar
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <form action="{% url 'eliminar_entrada' pk=entrada.pk %}" method="POST" onsubmit="return confirm('¿Estás seguro de eliminar esta entrada?');">
-                                                {% csrf_token %}
-                                                <button type="submit" class="dropdown-item text-danger">
-                                                    <i class="fas fa-trash-alt"></i> Eliminar
-                                                </button>
-                                            </form>
-                                        </li>
-                                    {% else %}
-                                        <li><span class="dropdown-item text-muted small fst-italic"><i class="fas fa-lock"></i> Registro bloqueado</span></li>
-                                    {% endif %}
-                                </ul>
+                                {% if entrada.status != 'AUDITADO' %}
+                                    <a href="{% url 'editar_entrada' pk=entrada.pk %}" 
+                                       class="btn btn-outline-warning" 
+                                       title="Editar" data-bs-toggle="tooltip">
+                                        <i class="fas fa-pencil-alt"></i>
+                                    </a>
+
+                                    <button type="button" class="btn btn-outline-danger" 
+                                            onclick="confirmarEliminacion('{{ entrada.pk }}')" 
+                                            title="Eliminar" data-bs-toggle="tooltip">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                {% endif %}
                             </div>
+
+                            {% if entrada.status != 'AUDITADO' %}
+                            <form id="form-eliminar-{{ entrada.pk }}" action="{% url 'eliminar_entrada' pk=entrada.pk %}" method="POST" style="display: none;">
+                                {% csrf_token %}
+                            </form>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}
@@ -282,4 +277,20 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+    function confirmarEliminacion(id) {
+        if (confirm('¿Estás seguro de que deseas eliminar esta entrada permanentemente?')) {
+            document.getElementById('form-eliminar-' + id).submit();
+        }
+    }
+    
+    // Inicializar Tooltips de Bootstrap (necesario para que se vean los títulos al pasar el mouse)
+    document.addEventListener('DOMContentLoaded', function () {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+    });
+</script>
 {% endblock %}
