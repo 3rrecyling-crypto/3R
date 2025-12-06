@@ -107,5 +107,7 @@ path('lineas-transporte/<int:pk>/editar/', views.LineaTransporteUpdateView.as_vi
     path('empresas/<int:pk>/vincular-origenes/', 
          views.EmpresaVincularOrigenesView.as_view(), 
          name='vincular_origenes_empresa'),
+    path('analisis/dashboard/', views.dashboard_analisis_view, name='dashboard_analisis'),
 ]
+    
 

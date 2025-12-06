@@ -468,110 +468,143 @@
     <div class="hero-section text-center">
         <div class="hero-content container">
             <h1 class="hero-title animate-fadein">3R Recycling</h1>
-            <p class="hero-subtitle animate-fadein" style="animation-delay: 0.1s;">Control, Gestión y Análisis de Procesos de Reciclaje</p>
-            <a href="{% url 'lista_entradas' %}" class="btn btn-light hero-btn animate-fadein" style="animation-delay: 0.2s;">
-                <i class="fas fa-play-circle me-2"></i> Comenzar
+            <p class="hero-subtitle animate-fadein" style="animation-delay: 0.1s;">Control, Gestión y Análisis de Procesos</p>
+            
+            {% if perms.ternium.view_ternium_module %}
+                <a href="{% url 'lista_entradas' %}" class="btn btn-light hero-btn animate-fadein" style="animation-delay: 0.2s;">
+                    <i class="fas fa-play-circle me-2"></i> Comenzar Operación
+                </a>
+            {% else %}
+                <div class="animate-fadein mt-4" style="animation-delay: 0.2s;">
+                    <p class="text-white-50"><i class="fas fa-user-check me-2"></i>Bienvenido, {{ user.username }}.</p>
+                    <p class="small">Selecciona tu módulo en el menú superior.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if perms.ternium.view_ternium_module %}
+        {% if stats %}
+        <div class="stats-section animate-fadein">
+            <h2 class="section-title">Resumen Estadístico</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.total_toneladas|floatformat:1|intcomma }}</div>
+                    <div class="stat-label">Toneladas procesadas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.patios_activos }}</div>
+                    <div class="stat-label">Patios activos</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.materiales_diferentes }}</div>
+                    <div class="stat-label">Materiales diferentes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.entradas_hoy }}</div>
+                    <div class="stat-label">Entradas hoy</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <h2 class="section-title animate-fadein">Inventario en Patios</h2>
+        <div class="patio-dashboard-grid">
+            {% for patio in patios_inventario %}
+            <div class="patio-card animate-fadein">
+                <div class="patio-card-header">
+                    <h4><i class="fas fa-warehouse"></i>{{ patio.nombre|upper }}</h4>
+                    <span class="patio-status 
+                        {% if patio.estado == 'warning' %}status-warning
+                        {% elif patio.estado == 'danger' %}status-danger
+                        {% else %}status-ok{% endif %}">
+                        {% if patio.estado == 'warning' %}Alerta
+                        {% elif patio.estado == 'danger' %}Crítico
+                        {% else %}Operativo{% endif %}
+                    </span>
+                </div>
+                <ul class="material-list">
+                    {% for item in patio.materiales %}
+                    <li class="material-item">
+                        <div>
+                            <span class="material-name"><i class="fas fa-box-open"></i>{{ item.material_nombre }}</span>
+                            <div class="material-progress">
+                                <div class="material-progress-bar" style="width: {{ item.porcentaje_ocupacion }}%"></div>
+                            </div>
+                        </div>
+                        <span class="material-weight">{{ item.cantidad_toneladas|floatformat:3|intcomma }} Ton</span>
+                    </li>
+                    {% empty %}
+                    <li class="no-materials">
+                        <i class="fas fa-inbox"></i>
+                        No hay materiales en este patio
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="patio-card-footer">
+                    <div class="total-weight">Total: {{ patio.total_toneladas|floatformat:3|intcomma }} Ton</div>
+                    {% if patio.ultima_actualizacion %}
+                    <div class="last-update" title="{{ patio.ultima_actualizacion }}">
+                        Act. hace {{ patio.ultima_actualizacion|naturaltime }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12 animate-fadein">
+                <div class="no-materials py-4">
+                    <i class="fas fa-warehouse fa-2x"></i>
+                    <p class="mt-2">No hay patios de inventario configurados en el sistema.</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <h2 class="section-title animate-fadein">Accesos Rápidos</h2>
+        <div class="quick-access-grid">
+            <a href="{% url 'home_portal' %}" class="quick-access-card animate-fadein" style="animation-delay: 0.1s;">
+                <i class="fas fa-clipboard-list"></i>
+                <h5>Ternium</h5>
+                <p>{{ total_entradas }} registros</p>
+            </a>
+
+            <a href="{% url 'remision_lista' %}" class="quick-access-card animate-fadein" style="animation-delay: 0.2s;">
+                <i class="fas fa-industry"></i>
+                <h5>Reportes Operativos</h5>
+                <p>Trane, Medline</p>
+            </a>
+            
+            <a href="{% url 'dashboard_analisis' %}" class="quick-access-card animate-fadein" style="animation-delay: 0.3s;">
+                <i class="fas fa-chart-bar"></i>
+                <h5>Análisis TEST</h5>
+                <p>Estadísticas y gráficos</p>
             </a>
         </div>
-    </div>
-
-    {% if stats %}
-    <div class="stats-section animate-fadein">
-        <h2 class="section-title">Resumen Estadístico</h2>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-value">{{ stats.total_toneladas|floatformat:1|intcomma }}</div>
-                <div class="stat-label">Toneladas procesadas</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">{{ stats.patios_activos }}</div>
-                <div class="stat-label">Patios activos</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">{{ stats.materiales_diferentes }}</div>
-                <div class="stat-label">Materiales diferentes</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">{{ stats.entradas_hoy }}</div>
-                <div class="stat-label">Entradas hoy</div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <h2 class="section-title animate-fadein">Inventario en Patios</h2>
-    <div class="patio-dashboard-grid">
-        {% for patio in patios_inventario %}
-        <div class="patio-card animate-fadein">
-            <div class="patio-card-header">
-                <h4><i class="fas fa-warehouse"></i>{{ patio.nombre|upper }}</h4>
-                <span class="patio-status 
-                    {% if patio.estado == 'warning' %}status-warning
-                    {% elif patio.estado == 'danger' %}status-danger
-                    {% else %}status-ok{% endif %}">
-                    {% if patio.estado == 'warning' %}Alerta
-                    {% elif patio.estado == 'danger' %}Crítico
-                    {% else %}Operativo{% endif %}
-                </span>
-            </div>
-            <ul class="material-list">
-                {% for item in patio.materiales %}
-                <li class="material-item">
-                    <div>
-                        <span class="material-name"><i class="fas fa-box-open"></i>{{ item.material_nombre }}</span>
-                        <div class="material-progress">
-                            <div class="material-progress-bar" style="width: {{ item.porcentaje_ocupacion }}%"></div>
-                        </div>
-                    </div>
-                    <span class="material-weight">{{ item.cantidad_toneladas|floatformat:3|intcomma }} Ton</span>
-                </li>
-                {% empty %}
-                <li class="no-materials">
-                    <i class="fas fa-inbox"></i>
-                    No hay materiales en este patio
-                </li>
-                {% endfor %}
-            </ul>
-            <div class="patio-card-footer">
-                <div class="total-weight">Total: {{ patio.total_toneladas|floatformat:3|intcomma }} Ton</div>
-                {% if patio.ultima_actualizacion %}
-                <div class="last-update" title="{{ patio.ultima_actualizacion }}">
-                    Act. hace {{ patio.ultima_actualizacion|naturaltime }}
-                </div>
-                {% endif %}
-            </div>
-        </div>
-        {% empty %}
-        <div class="col-12 animate-fadein">
-            <div class="no-materials py-4">
-                <i class="fas fa-warehouse fa-2x"></i>
-                <p class="mt-2">No hay patios de inventario configurados en el sistema.</p>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-
-    <h2 class="section-title animate-fadein">Accesos Rápidos</h2>
-    <div class="quick-access-grid">
-        <a href="{% url 'home_portal' %}" class="quick-access-card animate-fadein" style="animation-delay: 0.1s;">
-            <i class="fas fa-clipboard-list"></i>
-            <h5>Ternium</h5>
-            <p>{{ total_entradas }} registros</p>
-        </a>
-
-        <a href="{% url 'remision_lista' %}" class="quick-access-card animate-fadein" style="animation-delay: 0.2s;">
-            <i class="fas fa-industry"></i>
-            <h5>Reportes Operativos</h5>
-            <p>Trane, Medline</p>
-        </a>
         
-        <a href="#" class="quick-access-card animate-fadein" style="animation-delay: 0.3s;">
-            <i class="fas fa-chart-bar"></i>
-            <h5>Análisis</h5>
-            <p>Estadísticas y gráficos</p>
-        </a>
-    
-    </div>
+    {% else %}
+        <div class="row mt-5 animate-fadein">
+            <div class="col-md-8 mx-auto text-center">
+                <div class="card border-0 shadow-sm p-5">
+                    <i class="fas fa-shield-alt fa-3x text-secondary mb-3"></i>
+                    <h3 class="text-secondary">Panel de Operaciones Restringido</h3>
+                    <p class="text-muted">Tu usuario no tiene permisos para ver el inventario en tiempo real o los reportes operativos.</p>
+                    <hr class="my-4">
+                    <p>Utiliza el menú superior para acceder a tus módulos asignados:</p>
+                    <div class="d-flex justify-content-center gap-3 mt-3 flex-wrap">
+                        {% if perms.ternium.use_ai_assistant %}
+                            <a href="{% url 'asistente_ia' %}" class="btn btn-outline-primary"><i class="fas fa-robot me-2"></i>Asistente IA</a>
+                        {% endif %}
+                        {% if perms.ternium.access_compras %}
+                            <a href="{% url 'lista_solicitudes' %}" class="btn btn-outline-success"><i class="fas fa-shopping-cart me-2"></i>Compras</a>
+                        {% endif %}
+                        {% if perms.ternium.access_cxp %}
+                            <a href="{% url 'dashboard_cuentas_por_pagar' %}" class="btn btn-outline-warning"><i class="fas fa-money-bill-wave me-2"></i>CxP</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
 </div>
 
 <script>
@@ -605,10 +638,12 @@
         
         addHoverEffects();
         
-        // Cargar datos adicionales si es necesario
-        if (typeof loadAdditionalData === 'function') {
-            setTimeout(loadAdditionalData, 1000);
-        }
+        // Cargar datos adicionales si es necesario (y si el usuario tiene permisos)
+        {% if perms.ternium.view_ternium_module %}
+            if (typeof loadAdditionalData === 'function') {
+                setTimeout(loadAdditionalData, 1000);
+            }
+        {% endif %}
     });
 </script>
 {% endblock %}

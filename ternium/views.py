@@ -25,7 +25,12 @@ from django.db import transaction
 from django.core.exceptions import ValidationError, PermissionDenied
 import datetime
 from openpyxl import Workbook
+from openpyxl.worksheet.table import Table, TableStyleInfo
+from openpyxl.styles import Alignment
+from openpyxl.utils import get_column_letter
 from django.db.models import Max # <-- Añadir esta importación
+from django.contrib.auth.decorators import login_required, permission_required
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 
 # === IMPORTS ADICIONALES PARA CARGA MANUAL A S3 ===
 import boto3
@@ -175,14 +180,15 @@ def home(request):
 
 
 @login_required
+@permission_required('ternium.view_ternium_module', raise_exception=True)
 def home_portal_view(request):
     return render(request, 'ternium/home_portal.html')
 
 
 # --- VISTAS DE ENTRADA MAQUILA ---
-
 @method_decorator(login_required, name='dispatch')
-class EntradaMaquilaListView(ListView):
+class EntradaMaquilaListView(PermissionRequiredMixin, ListView):
+    permission_required = 'ternium.view_ternium_module' 
     model = EntradaMaquila
     template_name = 'ternium/lista_entradas.html'
     context_object_name = 'entradas'
@@ -324,21 +330,86 @@ def auditar_entrada(request, pk):
 
 @login_required
 def export_entradas_to_excel(request):
+    # Crear libro y hoja
     wb = Workbook()
     ws = wb.active
     ws.title = "Entradas Maquila"
+    
+    # Encabezados
     headers = [
         "ID", "C_ID_REMITO", "PESO-REMISION", "Num Boleta/Remision Bascula", "Peso Tara", 
         "Peso Bruto", "Peso Neto", "Fecha de Ingreso", "Calidad", "Dif Ton", 
         "TRANSPORTE", "FECHA ENTREGA A TERNIUM"
     ]
     ws.append(headers)
-    for entrada in EntradaMaquila.objects.all().order_by('-fecha_ingreso'):
+    
+    # Obtener y escribir datos
+    entradas = EntradaMaquila.objects.all().order_by('-fecha_ingreso')
+    
+    for entrada in entradas:
         ws.append([
-            entrada.id, entrada.c_id_remito, entrada.peso_remision, entrada.num_boleta_remision,
-            entrada.peso_tara, entrada.peso_bruto, entrada.peso_neto, entrada.fecha_ingreso,
-            entrada.calidad, entrada.diferencia_toneladas, entrada.transporte, entrada.fecha_entrega_ternium
+            entrada.id, 
+            entrada.c_id_remito, 
+            entrada.peso_remision, 
+            entrada.num_boleta_remision,
+            entrada.peso_tara, 
+            entrada.peso_bruto, 
+            entrada.peso_neto, 
+            entrada.fecha_ingreso,
+            entrada.calidad, 
+            entrada.diferencia_toneladas, 
+            entrada.transporte, 
+            entrada.fecha_entrega_ternium
         ])
+
+    # --- NUEVA LÓGICA DE FORMATO ---
+    
+    # 1. Crear la Tabla de Excel (Formato General)
+    # Definimos el rango: A1 hasta la última columna y fila
+    last_col_letter = get_column_letter(len(headers))
+    last_row = ws.max_row
+    # Validamos que haya datos para crear la tabla
+    if last_row >= 1:
+        table_ref = f"A1:{last_col_letter}{last_row}"
+        
+        tabla = Table(displayName="TablaEntradasMaquila", ref=table_ref)
+        
+        # Estilo azul estándar
+        style = TableStyleInfo(
+            name="TableStyleMedium9", 
+            showFirstColumn=False,
+            showLastColumn=False, 
+            showRowStripes=True, 
+            showColumnStripes=False
+        )
+        tabla.tableStyleInfo = style
+        ws.add_table(tabla)
+
+    # 2. Centrar contenido y 3. Ajustar ancho de columnas
+    center_alignment = Alignment(horizontal='center', vertical='center')
+    
+    for col in ws.columns:
+        max_length = 0
+        column = col[0].column_letter # Letra de la columna (A, B, C...)
+        
+        for cell in col:
+            # Aplicar centrado a cada celda
+            cell.alignment = center_alignment
+            
+            # Calcular longitud máxima para el autoajuste
+            try:
+                if cell.value:
+                    length = len(str(cell.value))
+                    if length > max_length:
+                        max_length = length
+            except:
+                pass
+        
+        # Ajustar ancho (sumamos un extra para espacio visual)
+        adjusted_width = (max_length + 4)
+        ws.column_dimensions[column].width = adjusted_width
+
+    # Generar respuesta
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="Entradas_Maquila_{datetime.date.today()}.xlsx"'
     wb.save(response)
@@ -708,6 +779,7 @@ def detalle_remision(request, pk):
 
 @login_required
 @require_POST
+@permission_required('ternium.can_audit_remision', raise_exception=True)
 def auditar_remision(request, pk):
     remision = get_object_or_404(Remision, pk=pk)
     if remision.status == 'TERMINADO':
@@ -1169,9 +1241,12 @@ class DescargaCreateView(CreateView):
         
 @login_required
 def export_remisiones_to_excel(request):
+    # Crear el libro de trabajo
     wb = Workbook()
     ws = wb.active
     ws.title = "Remisiones"
+    
+    # Encabezados
     headers = [
         'ID', 'Remisión', 'Fecha', 'Estatus', 'Empresa',
         'Origen', 'Destino', 'Línea de Transporte', 'Operador',
@@ -1179,9 +1254,13 @@ def export_remisiones_to_excel(request):
         'Diferencia (Ton)'
     ]
     ws.append(headers)
+    
+    # Obtener datos
     remisiones = Remision.objects.select_related(
         'empresa', 'origen', 'destino', 'linea_transporte', 'operador', 'unidad', 'contenedor'
     ).all().order_by('-fecha')
+    
+    # Escribir filas
     for remision in remisiones:
         ws.append([
             remision.pk,
@@ -1199,6 +1278,51 @@ def export_remisiones_to_excel(request):
             remision.total_peso_dlv,
             remision.diff
         ])
+
+    # --- NUEVA LÓGICA DE FORMATO ---
+    
+    # 1. Crear la Tabla de Excel (Formato General)
+    # Definimos el rango: Desde A1 hasta la última columna y última fila
+    last_col_letter = get_column_letter(len(headers))
+    last_row = ws.max_row
+    table_ref = f"A1:{last_col_letter}{last_row}"
+    
+    tabla = Table(displayName="TablaRemisiones", ref=table_ref)
+    
+    # Estilo de tabla (TableStyleMedium9 es un estilo azul estándar agradable)
+    style = TableStyleInfo(
+        name="TableStyleMedium9", 
+        showFirstColumn=False,
+        showLastColumn=False, 
+        showRowStripes=True, 
+        showColumnStripes=False
+    )
+    tabla.tableStyleInfo = style
+    ws.add_table(tabla)
+
+    # 2. Centrar contenido y 3. Ajustar ancho de columnas
+    center_alignment = Alignment(horizontal='center', vertical='center')
+    
+    for col in ws.columns:
+        max_length = 0
+        column = col[0].column_letter # Letra de la columna
+        
+        for cell in col:
+            # Aplicar centrado a cada celda
+            cell.alignment = center_alignment
+            
+            # Calcular longitud máxima para el autoajuste
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        
+        # Ajustar ancho (se suma un extra para que no quede apretado)
+        adjusted_width = (max_length + 4)
+        ws.column_dimensions[column].width = adjusted_width
+
+    # Generar respuesta
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
@@ -1329,6 +1453,7 @@ def _extraer_sql(texto_respuesta_ia: str) -> str:
 
 
 @login_required
+@permission_required('ternium.use_ai_assistant', raise_exception=True)
 @csrf_exempt
 def asistente_ia(request):
     """
@@ -1701,3 +1826,72 @@ class EmpresaVincularOrigenesView(LoginRequiredMixin, UpdateView):
         # (Ajusta 'lista_lugares' si tienes una lista de empresas)
         return reverse_lazy('lista_lugares')
     
+# --- COLOCAR AL FINAL DE ternium/views.py ---
+
+# Asegúrate de que estas importaciones estén presentes
+from django.db.models import Count, Sum, F, Avg, Q
+from django.db.models.functions import TruncMonth, Coalesce
+
+@login_required
+def dashboard_analisis_view(request):
+    # 1. DATOS TERNIUM (LOGÍSTICA)
+    logistica_qs = RegistroLogistico.objects.filter(status='TERMINADO')
+    
+    log_kpis = logistica_qs.aggregate(
+        total_viajes=Count('id'),
+        total_enviado=Sum('toneladas_remisionadas'),
+        total_recibido=Sum('toneladas_recibidas'),
+        merma_total=Sum(F('toneladas_remisionadas') - F('toneladas_recibidas')),
+    )
+    
+    if log_kpis['total_enviado'] and log_kpis['total_enviado'] > 0:
+        porcentaje_merma = (log_kpis['merma_total'] / log_kpis['total_enviado']) * 100
+    else:
+        porcentaje_merma = 0
+
+    log_materiales = logistica_qs.values('material__nombre').annotate(
+        total_tons=Sum('toneladas_remisionadas')
+    ).order_by('-total_tons')[:5]
+
+    log_transportistas = logistica_qs.values('transportista__nombre').annotate(
+        viajes=Count('id')
+    ).order_by('-viajes')[:5]
+
+    # 2. DATOS BOLETAS (MAQUILA)
+    entradas_qs = EntradaMaquila.objects.all()
+
+    maq_kpis = entradas_qs.aggregate(
+        total_entradas=Count('id'),
+        total_peso_neto=Sum('peso_neto'),
+        total_alertas=Count('id', filter=Q(alerta=True)),
+        promedio_tara=Avg('peso_tara')
+    )
+
+    maq_calidades = entradas_qs.values('calidad').annotate(
+        cantidad=Count('id'),
+        toneladas=Sum('peso_neto')
+    ).order_by('-toneladas')
+
+    maq_timeline = entradas_qs.annotate(
+        mes=TruncMonth('fecha_ingreso')
+    ).values('mes').annotate(
+        total=Sum('peso_neto')
+    ).order_by('mes')
+
+    # 3. INVENTARIO
+    inventario_actual = InventarioPatio.objects.values('patio__nombre', 'material__nombre').annotate(
+        total_kg=Sum('cantidad')
+    ).order_by('patio__nombre')
+
+    context = {
+        'log_kpis': log_kpis,
+        'porcentaje_merma': porcentaje_merma,
+        'log_materiales': list(log_materiales),
+        'log_transportistas': list(log_transportistas),
+        'maq_kpis': maq_kpis,
+        'maq_calidades': list(maq_calidades),
+        'maq_timeline': list(maq_timeline),
+        'inventario': inventario_actual,
+    }
+    
+    return render(request, 'ternium/dashboard_analisis.html', context)

@@ -329,6 +329,7 @@ class Remision(models.Model):
     auditado_en = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de Auditoría")
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
+    
 
     @property
     def total_peso_ld(self):
@@ -399,6 +400,12 @@ class Remision(models.Model):
         verbose_name_plural = "Remisiones"
         ordering = ['-fecha', '-creado_en']
         indexes = [models.Index(fields=['status']), models.Index(fields=['fecha'])]
+        # --- NUEVO: Permiso para auditar y acceder al módulo ---
+        permissions = [
+            ("can_audit_remision", "Puede auditar remisiones"),
+            ("view_ternium_module", "Puede acceder al módulo Ternium"),
+        ]
+
 
 
 class DetalleRemision(models.Model):
@@ -525,6 +532,10 @@ class RegistroLogistico(models.Model):
         verbose_name_plural = "Registros Logísticos"
         ordering = ['-fecha_carga', '-creado_en']
         indexes = [models.Index(fields=['remision']), models.Index(fields=['status'])]
+        # --- NUEVO ---
+        permissions = [
+            ("can_audit_logistica", "Puede auditar logística"),
+        ]
 
     def __str__(self):
         return f"Registro {self.remision} del {self.fecha_carga}"
@@ -633,6 +644,10 @@ class EntradaMaquila(models.Model):
             models.Index(fields=['c_id_remito']),
             models.Index(fields=['fecha_ingreso']),
             models.Index(fields=['status']),
+        ]
+        # --- NUEVO ---
+        permissions = [
+            ("can_audit_entrada", "Puede auditar entradas de maquila"),
         ]
 
     def __str__(self):

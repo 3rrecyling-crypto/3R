@@ -1,0 +1,304 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Dashboard Analítico{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+    :root {
+        --primary-color: #2c3e50;
+        --secondary-color: #3498db;
+        --accent-color: #e74c3c;
+        --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        --border-radius: 10px;
+    }
+
+    .dashboard-header {
+        background: white;
+        padding: 1.5rem;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+        margin-bottom: 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .kpi-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+        border-left: 5px solid var(--secondary-color);
+        transition: transform 0.3s ease;
+    }
+    
+    .kpi-card:hover { transform: translateY(-5px); }
+    .kpi-card.danger { border-left-color: var(--accent-color); }
+    .kpi-card.success { border-left-color: #2ecc71; }
+
+    .kpi-value { font-size: 2rem; font-weight: 700; color: var(--primary-color); }
+    .kpi-label { color: #7f8c8d; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
+    .kpi-sub { font-size: 0.8rem; color: #95a5a6; margin-top: 0.5rem; }
+
+    .chart-container {
+        background: white;
+        padding: 1.5rem;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+        margin-bottom: 2rem;
+        height: 400px;
+    }
+
+    .inventory-table {
+        background: white;
+        padding: 1.5rem;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+    }
+    
+    .fade-in { animation: fadeIn 0.5s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+</style>
+
+<div class="container-fluid px-4 py-4">
+    
+    <div class="dashboard-header">
+        <div>
+            <h2 class="m-0 text-dark fw-bold"><i class="fas fa-chart-line me-2"></i>Centro de Análisis</h2>
+            <p class="text-muted m-0">Visualización estratégica de datos</p>
+        </div>
+        <div class="d-flex align-items-center">
+            <label for="dashboardSelect" class="me-3 fw-bold">Ver Dashboard:</label>
+            <select id="dashboardSelect" class="form-select form-select-lg" style="width: 300px; border: 2px solid var(--secondary-color);">
+                <option value="ternium" selected>📊 Logística Ternium</option>
+                <option value="boletas">🚛 Boletas (Entradas Maquila)</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="view-ternium" class="dashboard-section fade-in">
+        <h4 class="mb-3 text-secondary border-bottom pb-2">Resumen Logístico Ternium</h4>
+        
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-value">{{ log_kpis.total_viajes|intcomma }}</div>
+                <div class="kpi-label">Total Viajes</div>
+                <div class="kpi-sub">Registros terminados</div>
+            </div>
+            <div class="kpi-card success">
+                <div class="kpi-value">{{ log_kpis.total_enviado|floatformat:1|intcomma }}</div>
+                <div class="kpi-label">Ton. Enviadas</div>
+                <div class="kpi-sub">Según remisión</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-value">{{ log_kpis.total_recibido|floatformat:1|intcomma }}</div>
+                <div class="kpi-label">Ton. Recibidas</div>
+                <div class="kpi-sub">Báscula Ternium</div>
+            </div>
+            <div class="kpi-card danger">
+                <div class="kpi-value text-danger">{{ porcentaje_merma|floatformat:2 }}%</div>
+                <div class="kpi-label">Merma Promedio</div>
+                <div class="kpi-sub">Total perdida: {{ log_kpis.merma_total|floatformat:2 }} Ton</div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-8">
+                <div class="chart-container">
+                    <h5 class="text-center mb-4">Top Materiales Movidos (Toneladas)</h5>
+                    <canvas id="chartLogMateriales"></canvas>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="chart-container">
+                    <h5 class="text-center mb-4">Eficiencia Transportistas</h5>
+                    <canvas id="chartLogTransporte"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-boletas" class="dashboard-section fade-in" style="display: none;">
+        <h4 class="mb-3 text-secondary border-bottom pb-2">Análisis de Entradas Maquila (Boletas)</h4>
+
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-value">{{ maq_kpis.total_entradas|intcomma }}</div>
+                <div class="kpi-label">Total Entradas</div>
+                <div class="kpi-sub">Registros históricos</div>
+            </div>
+            <div class="kpi-card success">
+                <div class="kpi-value">{{ maq_kpis.total_peso_neto|floatformat:1|intcomma }}</div>
+                <div class="kpi-label">Total Neto (Ton)</div>
+                <div class="kpi-sub">Peso procesado</div>
+            </div>
+            <div class="kpi-card danger">
+                <div class="kpi-value text-danger">{{ maq_kpis.total_alertas }}</div>
+                <div class="kpi-label">Alertas de Discrepancia</div>
+                <div class="kpi-sub">Diferencias > 1%</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-value">{{ maq_kpis.promedio_tara|floatformat:2 }}</div>
+                <div class="kpi-label">Tara Promedio</div>
+                <div class="kpi-sub">Peso camiones vacíos</div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <h5 class="text-center mb-4">Materiales Recibidos por Calidad</h5>
+                    <canvas id="chartMaqCalidad"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <h5 class="text-center mb-4">Tendencia de Entradas (Últimos 6 Meses)</h5>
+                    <canvas id="chartMaqTimeline"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="inventory-table mt-4">
+        <h4 class="mb-3"><i class="fas fa-cubes me-2 text-primary"></i>Inventario Actual en Patio</h4>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Patio</th>
+                        <th>Material</th>
+                        <th class="text-end">Cantidad (Kg)</th>
+                        <th class="text-end">Cantidad (Ton)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in inventario %}
+                    <tr>
+                        <td class="fw-bold">{{ item.patio__nombre }}</td>
+                        <td>{{ item.material__nombre }}</td>
+                        <td class="text-end">{{ item.total_kg|floatformat:0|intcomma }} kg</td>
+                        <td class="text-end text-success fw-bold">{{ item.total_kg|floatformat:3 }} Ton</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted">No hay inventario registrado.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const selector = document.getElementById('dashboardSelect');
+        const viewTernium = document.getElementById('view-ternium');
+        const viewBoletas = document.getElementById('view-boletas');
+
+        selector.addEventListener('change', function() {
+            if (this.value === 'ternium') {
+                viewTernium.style.display = 'block';
+                viewBoletas.style.display = 'none';
+            } else {
+                viewTernium.style.display = 'none';
+                viewBoletas.style.display = 'block';
+            }
+        });
+
+        const logMaterialesData = [
+            {% for item in log_materiales %}
+                { label: "{{ item.material__nombre }}", value: {{ item.total_tons|default:0 }} },
+            {% endfor %}
+        ];
+        
+        const logTransporteData = [
+            {% for item in log_transportistas %}
+                { label: "{{ item.transportista__nombre }}", value: {{ item.viajes|default:0 }} },
+            {% endfor %}
+        ];
+
+        const maqCalidadData = [
+            {% for item in maq_calidades %}
+                { label: "{{ item.calidad }}", value: {{ item.toneladas|default:0 }} },
+            {% endfor %}
+        ];
+
+        const maqTimelineData = [
+            {% for item in maq_timeline %}
+                { label: "{{ item.mes|date:'M Y' }}", value: {{ item.total|default:0 }} },
+            {% endfor %}
+        ];
+
+        new Chart(document.getElementById('chartLogMateriales'), {
+            type: 'bar',
+            data: {
+                labels: logMaterialesData.map(d => d.label),
+                datasets: [{
+                    label: 'Toneladas Enviadas',
+                    data: logMaterialesData.map(d => d.value),
+                    backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                    borderColor: 'rgba(52, 152, 219, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        new Chart(document.getElementById('chartLogTransporte'), {
+            type: 'doughnut',
+            data: {
+                labels: logTransporteData.map(d => d.label),
+                datasets: [{
+                    data: logTransporteData.map(d => d.value),
+                    backgroundColor: ['#2c3e50', '#e74c3c', '#3498db', '#f1c40f', '#2ecc71']
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        new Chart(document.getElementById('chartMaqCalidad'), {
+            type: 'pie',
+            data: {
+                labels: maqCalidadData.map(d => d.label),
+                datasets: [{
+                    data: maqCalidadData.map(d => d.value),
+                    backgroundColor: ['#9b59b6', '#34495e', '#16a085', '#27ae60', '#c0392b']
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        new Chart(document.getElementById('chartMaqTimeline'), {
+            type: 'line',
+            data: {
+                labels: maqTimelineData.map(d => d.label),
+                datasets: [{
+                    label: 'Toneladas Recibidas por Mes',
+                    data: maqTimelineData.map(d => d.value),
+                    borderColor: '#e67e22',
+                    backgroundColor: 'rgba(230, 126, 34, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    });
+</script>
+{% endblock %}

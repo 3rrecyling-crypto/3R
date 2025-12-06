@@ -1,142 +1,285 @@
 {% extends 'ternium/base.html' %}
 {% load static %}
 
-{% block title %}Registro de Entradas de Maquila{% endblock %}
+{% block title %}Entradas de Maquila | Gestión{% endblock %}
 
 {% block content %}
-<div class="container animate-fadein">
-    <header class="d-flex justify-content-between align-items-center mb-4">
+<style>
+    /* Estilos Premium para Tablas y Badges */
+    .page-header {
+        background: #fff;
+        padding: 1.5rem 2rem;
+        border-bottom: 1px solid #eef2f7;
+        margin-bottom: 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    }
+
+    .filter-card {
+        background: #f8f9fa;
+        border: 1px solid #eef2f7;
+        border-radius: 8px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    /* Tabla Profesional */
+    .table-card {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 0 35px 0 rgba(154,161,171,.15);
+        border: 1px solid #eef2f7;
+        overflow: hidden;
+    }
+
+    .table thead th {
+        background-color: #f1f3fa;
+        color: #6c757d;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+        border-bottom: none;
+        padding: 1rem;
+    }
+
+    .table tbody td {
+        padding: 1rem;
+        vertical-align: middle;
+        border-bottom: 1px solid #eef2f7;
+        color: #313a46;
+        font-size: 0.9rem;
+    }
+
+    .table tbody tr:hover {
+        background-color: #fbfbfb;
+    }
+
+    /* ID Monoespaciado */
+    .id-cell {
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        color: #727cf5;
+        font-weight: 600;
+    }
+
+    /* Badges Estilo "Soft" */
+    .badge-soft-success { background-color: rgba(10, 207, 151, 0.18); color: #0acf97; }
+    .badge-soft-warning { background-color: rgba(255, 188, 0, 0.18); color: #ffbc00; }
+    .badge-soft-danger { background-color: rgba(250, 92, 124, 0.18); color: #fa5c7c; }
+    .badge-soft-info { background-color: rgba(57, 175, 209, 0.18); color: #39afd1; }
+    
+    .badge {
+        padding: 0.4em 0.8em;
+        font-weight: 500;
+        font-size: 0.75rem;
+    }
+
+    /* Botón de Acción Circular */
+    .btn-action {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        line-height: 32px;
+        text-align: center;
+        border-radius: 50%;
+        color: #6c757d;
+        transition: all 0.2s;
+    }
+    .btn-action:hover, .btn-action:focus {
+        background-color: #eef2f7;
+        color: #313a46;
+    }
+    
+    .dropdown-item i { width: 20px; text-align: center; margin-right: 8px; }
+    .dropdown-item.text-danger:hover { background-color: #fff0f0; }
+</style>
+
+<div class="container-fluid px-4">
+    
+    <div class="page-header d-flex justify-content-between align-items-center">
         <div>
-            <h1 class="h2 mb-0">Registro de Entradas</h1>
-            <p class="text-muted">Gestión centralizada de la maquila.</p>
+            <h4 class="mb-1 text-primary fw-bold"><i class="fas fa-truck-loading me-2"></i>Entradas de Maquila</h4>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb m-0 p-0 bg-transparent text-muted small">
+                    <li class="breadcrumb-item">Operaciones</li>
+                    <li class="breadcrumb-item active">Registro de Entradas</li>
+                </ol>
+            </nav>
         </div>
-        <div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'export_entradas_excel' %}" class="btn btn-light border text-success fw-bold">
+                <i class="fas fa-file-excel me-2"></i>Excel
+            </a>
             <a href="{% url 'crear_entrada' %}" class="btn btn-primary shadow-sm">
                 <i class="fas fa-plus me-2"></i>Nueva Entrada
             </a>
-            <a href="{% url 'export_entradas_excel' %}" class="btn btn-success shadow-sm">
-                <i class="fas fa-file-excel me-2"></i>Exportar a Excel
-            </a>
         </div>
-    </header>
+    </div>
 
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body">
-            <form method="get" action="{% url 'lista_entradas' %}">
-                <div class="row g-3 align-items-end">
-                    <div class="col-md-3">
-                        <label for="remito_q" class="form-label small fw-bold text-muted">Remito</label>
-                        <input type="text" name="q" id="remito_q" class="form-control" placeholder="Buscar por remito..." value="{{ request.GET.q }}">
-                    </div>
-                    <div class="col-md-2">
-                        <label for="calidad_filter" class="form-label small fw-bold text-muted">Calidad</label>
-                        <input type="text" name="calidad" id="calidad_filter" class="form-control" placeholder="Filtrar calidad" value="{{ request.GET.calidad }}">
-                    </div>
-                    <div class="col-md-2">
-                        <label for="transporte_filter" class="form-label small fw-bold text-muted">Transporte</label>
-                        <input type="text" name="transporte" id="transporte_filter" class="form-control" placeholder="Filtrar transporte" value="{{ request.GET.transporte }}">
-                    </div>
-                    <div class="col-md-2">
-                        <label for="status_filter" class="form-label small fw-bold text-muted">Estatus</label>
-                        <select name="status" id="status_filter" class="form-select">
-                            <option value="">Todos</option>
-                            <option value="PENDIENTE" {% if request.GET.status == 'PENDIENTE' %}selected{% endif %}>Pendiente</option>
-                            <option value="TERMINADO" {% if request.GET.status == 'TERMINADO' %}selected{% endif %}>Terminado</option>
-                            <option value="AUDITADO" {% if request.GET.status == 'AUDITADO' %}selected{% endif %}>Auditado</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3 d-flex gap-2">
-                        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-filter me-1"></i> Filtrar</button>
-                        <a href="{% url 'lista_entradas' %}" class="btn btn-outline-secondary" title="Limpiar filtros"><i class="fas fa-times"></i></a>
+    <div class="filter-card">
+        <form method="get" action="{% url 'lista_entradas' %}">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white text-muted"><i class="fas fa-barcode"></i></span>
+                        <input type="text" name="q" class="form-control border-start-0 ps-0" placeholder="Buscar ID Remito..." value="{{ request.GET.q }}">
                     </div>
                 </div>
-            </form>
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white text-muted"><i class="fas fa-truck"></i></span>
+                        <input type="text" name="transporte" class="form-control border-start-0 ps-0" placeholder="Línea de Transporte..." value="{{ request.GET.transporte }}">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <select name="status" class="form-select">
+                        <option value="">Estatus: Todos</option>
+                        <option value="PENDIENTE" {% if request.GET.status == 'PENDIENTE' %}selected{% endif %}>Pendiente</option>
+                        <option value="TERMINADO" {% if request.GET.status == 'TERMINADO' %}selected{% endif %}>Terminado</option>
+                        <option value="AUDITADO" {% if request.GET.status == 'AUDITADO' %}selected{% endif %}>Auditado</option>
+                    </select>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-filter me-1"></i> Filtrar</button>
+                    <a href="{% url 'lista_entradas' %}" class="btn btn-light border ms-1" title="Limpiar"><i class="fas fa-sync-alt"></i></a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4">ID Remito</th>
+                        <th>Fecha</th>
+                        <th>Transporte</th>
+                        <th>Calidad</th>
+                        <th>Peso Neto</th>
+                        <th>Discrepancia</th>
+                        <th class="text-center">Estatus</th>
+                        <th class="text-end pe-4">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entrada in entradas %}
+                    <tr>
+                        <td class="ps-4">
+                            <span class="id-cell">{{ entrada.c_id_remito }}</span>
+                            <div class="small text-muted mt-1">Bol: {{ entrada.num_boleta_remision }}</div>
+                        </td>
+                        <td>
+                            <div class="fw-bold text-dark">{{ entrada.fecha_ingreso|date:"d M, Y" }}</div>
+                            <small class="text-muted">{{ entrada.fecha_ingreso|date:"l" }}</small>
+                        </td>
+                        <td>
+                            <div class="text-truncate" style="max-width: 180px;" title="{{ entrada.transporte }}">
+                                <i class="fas fa-truck text-muted me-1"></i> {{ entrada.transporte|default:"-" }}
+                            </div>
+                        </td>
+                        <td><span class="badge bg-light text-dark border">{{ entrada.calidad|truncatechars:15 }}</span></td>
+                        <td class="fw-bold">{{ entrada.peso_neto|floatformat:3 }} Ton</td>
+                        
+                        <td>
+                            {% if entrada.alerta %}
+                                <span class="badge badge-soft-danger">
+                                    <i class="fas fa-exclamation-triangle me-1"></i> {{ entrada.porcentaje_faltante|floatformat:1 }}%
+                                </span>
+                            {% else %}
+                                <span class="badge badge-soft-success"><i class="fas fa-check me-1"></i> OK</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="text-center">
+                            {% if entrada.status == 'PENDIENTE' %}
+                                <span class="badge badge-soft-warning">Pendiente</span>
+                            {% elif entrada.status == 'TERMINADO' %}
+                                <span class="badge badge-soft-info">Terminado</span>
+                            {% elif entrada.status == 'AUDITADO' %}
+                                <span class="badge badge-soft-success">
+                                    <i class="fas fa-lock me-1"></i> Auditado
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <td class="text-end pe-4">
+                            <div class="dropdown">
+                                <button class="btn btn-action" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end border-0 shadow">
+                                    <li><h6 class="dropdown-header text-uppercase small">Gestionar</h6></li>
+                                    
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'detalle_entrada' pk=entrada.pk %}">
+                                            <i class="fas fa-eye text-primary"></i> Ver detalles
+                                        </a>
+                                    </li>
+
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'descargar_zip_maquila' pk=entrada.pk %}">
+                                            <i class="fas fa-file-archive text-info"></i> Descargar Evidencias
+                                        </a>
+                                    </li>
+                                    
+                                    <li><hr class="dropdown-divider"></li>
+
+                                    {% if entrada.status != 'AUDITADO' %}
+                                        <li>
+                                            <a class="dropdown-item" href="{% url 'editar_entrada' pk=entrada.pk %}">
+                                                <i class="fas fa-pencil-alt text-warning"></i> Editar
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <form action="{% url 'eliminar_entrada' pk=entrada.pk %}" method="POST" onsubmit="return confirm('¿Estás seguro de eliminar esta entrada?');">
+                                                {% csrf_token %}
+                                                <button type="submit" class="dropdown-item text-danger">
+                                                    <i class="fas fa-trash-alt"></i> Eliminar
+                                                </button>
+                                            </form>
+                                        </li>
+                                    {% else %}
+                                        <li><span class="dropdown-item text-muted small fst-italic"><i class="fas fa-lock"></i> Registro bloqueado</span></li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-5">
+                            <div class="text-muted">
+                                <i class="fas fa-folder-open fa-3x mb-3 opacity-50"></i>
+                                <h5>No se encontraron registros</h5>
+                                <p class="small">Intenta ajustar los filtros de búsqueda.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
+
+        {% if is_paginated %}
+        <div class="d-flex justify-content-between align-items-center p-3 border-top bg-light">
+            <small class="text-muted">Mostrando página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</small>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link border-0" href="?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode }}">Anterior</a>
+                        </li>
+                    {% endif %}
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link border-0" href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode }}">Siguiente</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
     </div>
-
-    <div class="table-container">
-        <table class="table table-hover align-middle">
-            <thead>
-                <tr>
-                    <th>ID Remito</th>
-                    <th>Fecha Ingreso</th>
-                    <th>Transporte</th>
-                    <th>Estatus</th>
-                    <th>Alerta de Peso</th>
-                    <th class="text-end">Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for entrada in entradas %}
-                <tr>
-                    <td class="fw-bold">{{ entrada.c_id_remito }}</td>
-                    <td>{{ entrada.fecha_ingreso|date:"d/m/Y" }}</td>
-                    <td>{{ entrada.transporte|default:"N/A"|truncatechars:25 }}</td>
-                    <td>
-                        {% if entrada.status == 'PENDIENTE' %}<span class="badge bg-warning text-dark">Pendiente</span>
-                        {% elif entrada.status == 'TERMINADO' %}<span class="badge bg-info">Terminado</span>
-                        {% elif entrada.status == 'AUDITADO' %}<span class="badge bg-success">Auditado</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if entrada.alerta %}
-                            <span class="text-danger"><i class="fas fa-exclamation-triangle"></i> Discrepancia</span>
-                        {% else %}
-                            <span class="text-success"><i class="fas fa-check-circle"></i> OK</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-end">
-                        <div class="btn-group btn-group-sm">
-                            <a href="{% url 'detalle_entrada' pk=entrada.pk %}" class="btn btn-outline-primary" title="Ver Detalles">
-                                <i class="fas fa-eye"></i>
-                            </a>
-                            {% if entrada.status != 'AUDITADO' %}
-                            <a href="{% url 'editar_entrada' pk=entrada.pk %}" class="btn btn-outline-secondary" title="Editar">
-                                <i class="fas fa-pencil-alt"></i>
-                            </a>
-                            {% endif %}
-                            <a href="{% url 'descargar_zip_maquila' pk=entrada.pk %}" class="btn btn-outline-info" title="Descargar ZIP">
-                                <i class="fas fa-file-archive"></i>
-                            </a>
-                            {% if entrada.status != 'AUDITADO' %}
-                            <a href="{% url 'eliminar_entrada' pk=entrada.pk %}" class="btn btn-outline-danger" title="Eliminar">
-                                <i class="fas fa-trash-alt"></i>
-                            </a>
-                            {% endif %}
-                        </div>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="6" class="text-center p-5">
-                        <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
-                        <h4 class="mb-2">No se encontraron entradas</h4>
-                        <p class="text-muted">Intenta ajustar los filtros o <a href="{% url 'crear_entrada' %}">agrega una nueva entrada</a>.</p>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-    {% if is_paginated %}
-    <nav class="mt-4" aria-label="Paginación de resultados">
-        <ul class="pagination justify-content-center">
-            {% if page_obj.has_previous %}
-                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode }}">&laquo;</a></li>
-            {% else %}
-                <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
-            {% endif %}
-
-            <li class="page-item active"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
-
-            {% if page_obj.has_next %}
-                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode }}">&raquo;</a></li>
-            {% else %}
-                <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
-            {% endif %}
-        </ul>
-    </nav>
-    {% endif %}
 </div>
 {% endblock %}
