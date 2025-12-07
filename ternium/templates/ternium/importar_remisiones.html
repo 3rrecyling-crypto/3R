@@ -1,325 +1,88 @@
-{% extends 'base.html' %}
-{% load humanize %}
+{% extends 'ternium/base.html' %}
 
 {% block content %}
-
-<div class="container-fluid py-4">
-    
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="h3 fw-bold text-dark">Dashboard Operativo</h2>
-        <form method="get" class="d-flex gap-2">
-            <select name="origen" class="form-select form-select-sm" onchange="this.form.submit()">
-                <option value="">Todos Orígenes</option>
-                {% for o in origenes_list %}
-                <option value="{{ o.id }}" {% if filtro_origen_sel == o.id %}selected{% endif %}>{{ o.nombre }}</option>
-                {% endfor %}
-            </select>
-            <select name="destino" class="form-select form-select-sm" onchange="this.form.submit()">
-                <option value="">Todos Destinos</option>
-                {% for d in destinos_list %}
-                <option value="{{ d.id }}" {% if filtro_destino_sel == d.id %}selected{% endif %}>{{ d.nombre }}</option>
-                {% endfor %}
-            </select>
-            {% if filtro_origen_sel or filtro_destino_sel %}
-            <a href="?" class="btn btn-sm btn-outline-danger">Limpiar</a>
-            {% endif %}
-        </form>
-    </div>
-
-    <div class="row g-3 mb-4">
-        <div class="col-md-4">
-            <div class="card shadow-sm border-0 bg-primary text-white h-100">
-                <div class="card-body">
-                    <h6 class="text-uppercase opacity-75 small">Total Carga (Anual)</h6>
-                    <h3 class="fw-bold mb-0">{{ kpi_carga|floatformat:2|intcomma }} Ton</h3>
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            
+            <div class="card shadow border-0">
+                <div class="card-header bg-primary text-white py-3">
+                    <h4 class="mb-0 fw-bold">
+                        <i class="bi bi-file-earmark-spreadsheet-fill me-2"></i>Importar Remisiones
+                    </h4>
                 </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card shadow-sm border-0 bg-success text-white h-100">
-                <div class="card-body">
-                    <h6 class="text-uppercase opacity-75 small">Total Descarga (Anual)</h6>
-                    <h3 class="fw-bold mb-0">{{ kpi_descarga|floatformat:2|intcomma }} Ton</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card shadow-sm border-0 {% if kpi_merma_perc > 1 %}bg-danger{% else %}bg-secondary{% endif %} text-white h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <div>
-                            <h6 class="text-uppercase opacity-75 small">Merma Total</h6>
-                            <h3 class="fw-bold mb-0">{{ kpi_merma_ton|floatformat:2|intcomma }} Ton</h3>
+                
+                <div class="card-body p-4">
+                    
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {% if message.tags == 'success' %}
+                                    <i class="bi bi-check-circle-fill me-2"></i>
+                                {% else %}
+                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                {% endif %}
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <p class="text-muted mb-4">
+                        Selecciona tu archivo Excel (<strong>.xlsx</strong>) para actualizar la base de datos. 
+                        El sistema validará automáticamente si las remisiones ya existen para evitar duplicados.
+                    </p>
+
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label for="archivo_excel" class="form-label fw-bold text-dark">Archivo de Datos</label>
+                            <input type="file" 
+                                   name="archivo_excel" 
+                                   id="archivo_excel" 
+                                   class="form-control form-control-lg" 
+                                   accept=".xlsx, .xls, .csv" 
+                                   required>
+                            <div class="form-text">
+                                Formatos soportados: Excel (.xlsx, .xls) o CSV.
+                            </div>
                         </div>
-                        <div class="text-end">
-                            <h2 class="fw-bold mb-0">{{ kpi_merma_perc }}%</h2>
-                            <small class="opacity-75">Global</small>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg shadow-sm">
+                                <i class="bi bi-cloud-arrow-up-fill me-2"></i>Procesar Archivo
+                            </button>
+                            <a href="{% url 'dashboard_remisiones' %}" class="btn btn-outline-secondary">
+                                Cancelar y Volver
+                            </a>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card-footer bg-light p-3">
+                    <small class="fw-bold text-uppercase text-muted" style="font-size: 0.75rem;">Estructura requerida (Ejemplo):</small>
+                    <div class="row mt-2" style="font-size: 0.85rem;">
+                        <div class="col-6">
+                            <ul class="list-unstyled text-muted mb-0">
+                                <li><i class="bi bi-dot"></i> Fecha</li>
+                                <li><i class="bi bi-dot"></i> Remisión (Folio)</li>
+                                <li><i class="bi bi-dot"></i> Origen</li>
+                                <li><i class="bi bi-dot"></i> Destino</li>
+                            </ul>
+                        </div>
+                        <div class="col-6">
+                            <ul class="list-unstyled text-muted mb-0">
+                                <li><i class="bi bi-dot"></i> Material</li>
+                                <li><i class="bi bi-dot"></i> Peso Bruto / Tara</li>
+                                <li><i class="bi bi-dot"></i> Operador / Unidad</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <div class="row g-3 mb-4">
-        
-        <div class="col-lg-5">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-header bg-white py-3">
-                    <h5 class="card-title mb-0 fw-bold">Volumen por Material</h5>
-                    <small class="text-muted">Haz clic en un material para ver detalles</small>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive" style="max-height: 400px;">
-                        <table class="table table-hover mb-0 align-middle">
-                            <thead class="bg-light sticky-top">
-                                <tr>
-                                    <th class="ps-3">Material</th>
-                                    <th class="text-end">Carga (T)</th>
-                                    <th class="text-end pe-3">%</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for mat in lista_materiales %}
-                                <tr style="cursor: pointer;" onclick="abrirDetalleMaterial('{{ mat.nombre|escapejs }}')">
-                                    <td class="ps-3">
-                                        <div class="fw-bold text-primary">{{ mat.nombre }}</div>
-                                        <small class="text-muted" style="font-size: 0.75rem;">Ver rutas &rarr;</small>
-                                    </td>
-                                    <td class="text-end">{{ mat.carga|floatformat:2|intcomma }}</td>
-                                    <td class="text-end pe-3">
-                                        <div class="d-flex align-items-center justify-content-end gap-2">
-                                            <span>{{ mat.porcentaje_relativo|floatformat:1 }}%</span>
-                                            <div class="progress" style="width: 50px; height: 4px;">
-                                                <div class="progress-bar" role="progressbar" style="width: {{ mat.porcentaje_relativo|stringformat:'f' }}%"></div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-7">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0 fw-bold">Evolución Mensual</h5>
-                    <span class="badge bg-light text-dark border">Sin entradas a Patio</span>
-                </div>
-                <div class="card-body">
-                    <canvas id="evolutionChart" style="max-height: 350px;"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-3">
-        <div class="col-lg-6">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-header bg-white py-3">
-                    <h5 class="card-title mb-0 fw-bold">Ranking & Merma Operadores</h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive" style="max-height: 400px;">
-                        <table class="table table-sm table-striped mb-0 small">
-                            <thead class="bg-light sticky-top">
-                                <tr>
-                                    <th>Operador</th>
-                                    <th class="text-center">Viajes</th>
-                                    <th class="text-end">Merma (T)</th>
-                                    <th class="text-end">%</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for op in ranking_operadores %}
-                                <tr>
-                                    <td>{{ op.nombre }}</td>
-                                    <td class="text-center">{{ op.viajes }}</td>
-                                    <td class="text-end {% if op.diff > 0.5 %}text-danger fw-bold{% endif %}">
-                                        {{ op.diff|floatformat:2 }}
-                                    </td>
-                                    <td class="text-end">{{ op.perc|floatformat:2 }}%</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-6">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0 fw-bold">Viajes Pendientes</h5>
-                    <span class="badge bg-warning text-dark">{{ lista_pendientes|length }} Activos</span>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive" style="max-height: 400px;">
-                        <table class="table table-hover mb-0 small">
-                            <thead class="bg-light sticky-top">
-                                <tr>
-                                    <th>Remisión</th>
-                                    <th>Días</th>
-                                    <th>Estatus</th>
-                                    <th class="text-end">Peso</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for p in lista_pendientes %}
-                                <tr>
-                                    <td>
-                                        <div class="fw-bold">{{ p.remision }}</div>
-                                        <div class="text-muted">{{ p.unidad }}</div>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge {% if p.dias > 3 %}bg-danger{% else %}bg-secondary{% endif %}">
-                                            +{{ p.dias }} d
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span class="badge {{ p.badge_cls }}">{{ p.estado_txt }}</span>
-                                    </td>
-                                    <td class="text-end">{{ p.peso_origen|floatformat:2 }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
-
-<div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasMateriales" aria-labelledby="offcanvasLabel" style="width: 600px;">
-  <div class="offcanvas-header bg-primary text-white">
-    <h5 class="offcanvas-title" id="offcanvasLabel">Detalle de Material</h5>
-    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-  </div>
-  <div class="offcanvas-body">
-    <h4 id="tituloMaterial" class="mb-4 text-dark fw-bold border-bottom pb-2"></h4>
-    
-    <div class="table-responsive">
-        <table class="table table-striped table-hover align-middle" id="tablaDetalleMaterial">
-            <thead class="table-light">
-                <tr>
-                    <th>Fecha</th>
-                    <th>Ruta</th>
-                    <th class="text-end">Peso (T)</th>
-                </tr>
-            </thead>
-            <tbody>
-                </tbody>
-        </table>
-    </div>
-  </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        
-        // 1. CARGA DE DATOS PARA GRÁFICAS (Chart.js)
-        const ctx = document.getElementById('evolutionChart').getContext('2d');
-        try {
-            const labels = JSON.parse('{{ chart_labels|escapejs }}');
-            const dataCarga = JSON.parse('{{ chart_carga|escapejs }}');
-            const dataDescarga = JSON.parse('{{ chart_descarga|escapejs }}');
-
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'Carga (Salida)',
-                            data: dataCarga,
-                            borderColor: '#0d6efd',
-                            backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                            tension: 0.3,
-                            fill: true
-                        },
-                        {
-                            label: 'Descarga',
-                            data: dataDescarga,
-                            borderColor: '#198754',
-                            backgroundColor: 'rgba(25, 135, 84, 0.1)',
-                            tension: 0.3,
-                            fill: true
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'top' } },
-                    interaction: { mode: 'nearest', axis: 'x', intersect: false }
-                }
-            });
-        } catch (e) {
-            console.error("Error al cargar la gráfica:", e);
-        }
-
-        // 2. LÓGICA DEL DESLIZADOR (OFFCANVAS)
-        // Cargamos el JSON de materiales que viene de la vista
-        let dataMateriales = {};
-        try {
-            const rawJson = '{{ materiales_detalle_json|escapejs }}';
-            dataMateriales = JSON.parse(rawJson);
-            console.log("Materiales cargados:", Object.keys(dataMateriales).length);
-        } catch (e) {
-            console.error("Error leyendo JSON de materiales:", e);
-        }
-
-        // Definimos la función globalmente para que el HTML onclick la vea
-        window.abrirDetalleMaterial = function(nombreMaterial) {
-            console.log("Abriendo:", nombreMaterial);
-            
-            const registros = dataMateriales[nombreMaterial] || [];
-            
-            // Elementos del DOM
-            const titulo = document.getElementById('tituloMaterial');
-            const tbody = document.querySelector('#tablaDetalleMaterial tbody');
-            const offcanvasEl = document.getElementById('offcanvasMateriales');
-
-            // Limpiamos contenido previo
-            titulo.innerText = nombreMaterial;
-            tbody.innerHTML = '';
-
-            if (registros.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">No hay registros para mostrar.</td></tr>';
-            } else {
-                registros.forEach(reg => {
-                    const pesoStr = parseFloat(reg.peso).toFixed(2);
-                    const row = `
-                        <tr>
-                            <td class="small text-muted" style="white-space: nowrap;">${reg.fecha}</td>
-                            <td>
-                                <div class="fw-bold text-dark small">
-                                    ${reg.origen} <i class="bi bi-arrow-right-short text-primary"></i> ${reg.destino}
-                                </div>
-                                <small class="text-muted" style="font-size: 0.75rem;">Rem: ${reg.remision}</small>
-                            </td>
-                            <td class="text-end fw-bold">${pesoStr}</td>
-                        </tr>
-                    `;
-                    tbody.insertAdjacentHTML('beforeend', row);
-                });
-            }
-
-            // Mostrar el Offcanvas
-            // Usamos Bootstrap JS. Si falla, es porque no se cargó el script de arriba.
-            const bsOffcanvas = new bootstrap.Offcanvas(offcanvasEl);
-            bsOffcanvas.show();
-        };
-
-    });
-</script>
 {% endblock %}
