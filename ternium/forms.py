@@ -450,3 +450,9 @@ class EmpresaOrigenesForm(forms.ModelForm):
         self.fields['origenes'].queryset = Origen.objects.all().order_by('nombre')
         self.fields['origenes'].label = "Orígenes Vinculados a esta Empresa"
         self.fields['origenes'].help_text = "Selecciona todos los orígenes que esta empresa puede usar."
+        
+class ImportarRemisionesForm(forms.Form):
+    archivo_excel = forms.FileField(
+        label="Selecciona el archivo Excel (.xlsx)",
+        help_text="El archivo debe tener las columnas correctas: Remision, Fecha, Empresa, Operador, etc."
+    )

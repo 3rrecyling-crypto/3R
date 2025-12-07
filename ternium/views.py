@@ -481,7 +481,6 @@ class DescargarZipMaquilaView(View):
 
 # --- VISTAS DE REMISIONES ---
 
-@method_decorator(login_required, name='dispatch')
 class RemisionListView(ListView):
     model = Remision
     template_name = 'ternium/remision_lista.html'
@@ -489,27 +488,41 @@ class RemisionListView(ListView):
     paginate_by = 15
     
     def get_queryset(self):
+        # CAMBIO CRÍTICO AQUÍ:
+        # Usamos .order_by('-pk') en lugar de '-remision'.
+        # '-pk' ordena por el ID interno de la base de datos (el último creado aparece primero).
+        # Esto soluciona el error de que 999 aparezca antes que 1000.
         queryset = Remision.objects.select_related(
             'empresa', 'origen', 'destino'
         ).prefetch_related(
             'detalles__material'
-        ).order_by('-fecha', '-creado_en')
+        ).order_by('-pk') 
         
-        search_params = self.request.GET
+        self.search_params = self.request.GET.copy()
         
-        # --- INICIO DE LA MODIFICACIÓN ---
-        # Filtros actualizados según tu solicitud.
+        # Detectar si hay filtros activos
+        filtros_activos = any(
+            k.startswith('q_') and v for k, v in self.request.GET.items()
+        )
+        
+        # Lógica de fechas por defecto (Hoy y hace 1 mes) si no hay filtros
+        if not filtros_activos:
+            today = timezone.now().date()
+            month_ago = today - datetime.timedelta(days=30)
+            self.search_params['q_fecha_desde'] = month_ago.strftime('%Y-%m-%d')
+            self.search_params['q_fecha_hasta'] = today.strftime('%Y-%m-%d')
+
+        # Aplicar filtros
         filters = {
-            'remision__icontains': search_params.get('q_remision'),     # Filtro por N° Remisión
-            'empresa__prefijo__icontains': search_params.get('q_prefijo'), # Filtro por Prefijo (Operación)
-            'detalles__material_id': search_params.get('q_material'),  # Filtro por Material
-            'origen_id': search_params.get('q_origen'),                  # Filtro por Origen
-            'destino_id': search_params.get('q_destino'),                # Filtro por Destino
-            'status': search_params.get('q_status'),                   # Filtro por Estatus
-            'fecha__gte': search_params.get('q_fecha_desde'),
-            'fecha__lte': search_params.get('q_fecha_hasta'),
+            'remision__icontains': self.search_params.get('q_remision'),
+            'empresa__prefijo__icontains': self.search_params.get('q_prefijo'),
+            'detalles__material_id': self.search_params.get('q_material'),
+            'origen_id': self.search_params.get('q_origen'),
+            'destino_id': self.search_params.get('q_destino'),
+            'status': self.search_params.get('q_status'),
+            'fecha__gte': self.search_params.get('q_fecha_desde'),
+            'fecha__lte': self.search_params.get('q_fecha_hasta'),
         }
-        # --- FIN DE LA MODIFICACIÓN ---
         
         for key, value in filters.items():
             if value:
@@ -522,11 +535,10 @@ class RemisionListView(ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['search_params'] = self.request.GET
-        # --- INICIO DE LA MODIFICACIÓN ---
-        # Se cambia 'empresas' por 'prefijos'
+        # Pasamos search_params para que los inputs de fecha en el HTML se llenen solos
+        context['search_params'] = self.search_params 
+        
         context['prefijos'] = Empresa.objects.exclude(prefijo__isnull=True).exclude(prefijo='').values_list('prefijo', flat=True).distinct().order_by('prefijo')
-        # --- FIN DE LA MODIFICACIÓN ---
         context['materiales'] = Material.objects.all().order_by('nombre')
         context['origenes'] = Lugar.objects.filter(tipo__in=['ORIGEN', 'AMBOS']).order_by('nombre')
         context['destinos'] = Lugar.objects.filter(tipo__in=['DESTINO', 'AMBOS']).order_by('nombre')
@@ -534,55 +546,55 @@ class RemisionListView(ListView):
         context['all_remision_numbers'] = Remision.objects.values_list('remision', flat=True).distinct().order_by('remision')
         return context
     
+def calcular_siguiente_folio(prefijo):
+    """
+    Calcula el siguiente folio basado en números enteros para evitar
+    que 'MTY-999' sea mayor que 'MTY-1000' alfabéticamente.
+    """
+    prefix_with_dash = f"{prefijo.strip().upper()}-"
+    
+    # Obtenemos solo los textos de las remisiones que coinciden con el prefijo
+    remisiones_existentes = Remision.objects.filter(
+        remision__startswith=prefix_with_dash
+    ).values_list('remision', flat=True)
+
+    max_num = 0
+    
+    for rem_str in remisiones_existentes:
+        try:
+            # Separamos el texto por guiones y tomamos la última parte
+            # Ejemplo: "MTY-1005" -> "1005" -> 1005 (int)
+            parts = rem_str.split('-')
+            if len(parts) > 1:
+                # Intentamos convertir a entero para comparar numéricamente
+                num = int(parts[-1])
+                if num > max_num:
+                    max_num = num
+        except ValueError:
+            continue
+
+    next_num = max_num + 1
+    # Rellenamos con ceros a la izquierda (mínimo 3 dígitos)
+    return f"{prefix_with_dash}{str(next_num).zfill(3)}"
+
+
 @login_required
 def get_next_remision_number(request, empresa_id):
     """
-    Genera el siguiente número de remisión basado en el prefijo
-    definido en el modelo Empresa.
+    Esta es la vista que llama el JavaScript para obtener el folio.
     """
     try:
         empresa = Empresa.objects.get(pk=empresa_id)
         
-        # Nueva lógica: Obtener el prefijo del modelo
-        prefix = empresa.prefijo
-        
-        if prefix:
-            # Aseguramos que el prefijo termine con guión para la búsqueda
-            prefix_with_dash = f"{prefix.strip().upper()}-"
-
-            # Buscar la última remisión que COMIENCE con este prefijo
-            last_remision = Remision.objects.filter(
-                remision__startswith=prefix_with_dash
-            ).aggregate(
-                max_remision=Max('remision')
-            )['max_remision']
-            
-            next_num = 1 # Por defecto, empezamos en 1
-            
-            if last_remision:
-                # Extraer el número, convertir a int, sumar 1
-                try:
-                    # Intentar obtener el número después del último guión
-                    last_num_str = last_remision.split('-')[-1]
-                    last_num = int(last_num_str)
-                    next_num = last_num + 1
-                except (ValueError, IndexError):
-                    # Fallback si hay un formato inesperado (ej. "MTY-ABC")
-                    # En este caso, simplemente usa 1
-                    next_num = 1 
-            
-            # Formatear el número con 3 ceros a la izquierda (ej: MTY-001)
-            next_remision_str = f"{prefix_with_dash}{str(next_num).zfill(3)}"
-            
-            return JsonResponse({'next_remision': next_remision_str, 'is_manual': False})
+        if empresa.prefijo:
+            # Usamos la función auxiliar que definimos arriba
+            next_remision = calcular_siguiente_folio(empresa.prefijo)
+            return JsonResponse({'next_remision': next_remision, 'is_manual': False})
         else:
-            # Si la empresa no tiene prefijo, el campo es manual
             return JsonResponse({'is_manual': True})
 
     except Empresa.DoesNotExist:
         return JsonResponse({'error': 'Empresa no encontrada'}, status=404)
-
-
 
 
 @login_required
@@ -600,8 +612,7 @@ def crear_remision(request):
             except (Empresa.DoesNotExist, ValueError):
                 pass
         
-        # Le pasamos la 'empresa' al RemisionForm para una validación correcta
-        # 'remision' ya no está en el form, así que no se valida aquí.
+        # Pasamos la empresa al form para filtrar los catálogos
         form = RemisionForm(request.POST, request.FILES, empresa=empresa_seleccionada)
         
         material_qs = Material.objects.filter(empresas=empresa_seleccionada) if empresa_seleccionada else Material.objects.none()
@@ -615,60 +626,37 @@ def crear_remision(request):
 
         if form.is_valid() and formset.is_valid():
             try:
-                # --- INICIO DE LA LÓGICA DE GUARDADO SEGURO ---
                 with transaction.atomic(): 
-                    remision = form.save(commit=False) # Objeto en memoria
+                    remision = form.save(commit=False)
                     
+                    # --- LÓGICA DE FOLIO CORREGIDA ---
                     if not empresa_seleccionada or not empresa_seleccionada.prefijo:
-                        messages.error(request, 'La empresa seleccionada no tiene un prefijo configurado.')
-                        # Usamos una excepción para detener la transacción
-                        raise ValidationError("Empresa sin prefijo.")
+                        # Si no hay prefijo, validamos que el usuario haya escrito algo manualmente
+                        if not remision.remision:
+                             raise ValidationError("La empresa no tiene prefijo y no se ingresó folio manual.")
+                    else:
+                        # Recalculamos el folio justo antes de guardar para evitar duplicados
+                        # y asegurar que el consecutivo sea correcto (superando el 1000)
+                        remision.remision = calcular_siguiente_folio(empresa_seleccionada.prefijo)
+                    # ---------------------------------
 
-                    prefix_with_dash = f"{empresa_seleccionada.prefijo.strip().upper()}-"
-                    
-                    # 1. Bloquea la tabla (o filas) para evitar "race conditions"
-                    last_remision_data = Remision.objects.select_for_update().filter(
-                        remision__startswith=prefix_with_dash
-                    ).aggregate(
-                        max_remision=Max('remision')
-                    )
-                    last_remision = last_remision_data['max_remision']
-                    
-                    # 2. Calcula el siguiente número de forma segura
-                    next_num = 1
-                    if last_remision:
-                        try:
-                            last_num_str = last_remision.split('-')[-1]
-                            last_num = int(last_num_str)
-                            next_num = last_num + 1
-                        except (ValueError, IndexError):
-                            next_num = 1 # Fallback si hay un formato inesperado
-                    
-                    # 3. Asigna el folio consecutivo y seguro
-                    remision.remision = f"{prefix_with_dash}{str(next_num).zfill(3)}"
-                    
-                    # 4. Guarda el objeto principal en la BD con el folio ya asignado
                     remision.save() 
                     
-                    # 5. Asigna la instancia al formset y guarda los detalles
                     formset.instance = remision
                     formset.save()
                     
-                    # 6. Llama al save() final de la remisión (para la lógica de estatus)
+                    # Guardado final para actualizar estatus
                     remision.save()
                     
-                    # 7. Actualiza el inventario
+                    # Actualizar inventarios
                     _update_inventory_from_remision(remision, revert=False)
                     
                     messages.success(request, f'Remisión {remision.remision} creada exitosamente.')
                     return redirect('remision_lista')
-                # --- FIN DE LA LÓGICA DE GUARDADO SEGURO ---
                 
             except Exception as e:
-                # Si algo falla (incluida nuestra ValidationError), la transacción se revierte
                 messages.error(request, f'Ocurrió un error al guardar: {e}')
     else:
-        # En GET, no pasamos empresa, así el formulario se inicializa con campos vacíos
         form = RemisionForm()
         formset = DetalleFormSet(
             prefix='detalles', 
@@ -679,7 +667,7 @@ def crear_remision(request):
         'form': form, 
         'formset': formset, 
         'titulo': 'Nueva Remisión',
-        'is_editing': False  # Se mantiene para el JS
+        'is_editing': False
     }
     return render(request, 'ternium/remision_formulario.html', context)
 
@@ -1248,22 +1236,26 @@ def export_remisiones_to_excel(request):
     ws = wb.active
     ws.title = "Remisiones"
     
-    # Encabezados
+    # --- CAMBIO 1: Agregamos 'Material' a los Encabezados ---
     headers = [
         'ID', 'Remisión', 'Fecha', 'Estatus', 'Empresa',
         'Origen', 'Destino', 'Línea de Transporte', 'Operador',
-        'Unidad', 'Contenedor', 'Total Peso Carga (Ton)', 'Total Peso Descarga (Ton)',
+        'Unidad', 'Contenedor', 'Material', 'Total Peso Carga (Ton)', 'Total Peso Descarga (Ton)',
         'Diferencia (Ton)'
     ]
     ws.append(headers)
     
-    # Obtener datos
+    # Obtener datos (Asegúrate de tener prefetch_related para optimizar)
     remisiones = Remision.objects.select_related(
         'empresa', 'origen', 'destino', 'linea_transporte', 'operador', 'unidad', 'contenedor'
-    ).all().order_by('-fecha')
+    ).prefetch_related('detalles__material').all().order_by('-fecha') # <-- Agregamos prefetch_related
     
     # Escribir filas
     for remision in remisiones:
+        # --- CAMBIO 2: Obtener nombres de materiales concatenados ---
+        # Esto junta todos los materiales de la remisión separados por coma (ej: "Acero, Chatarra")
+        materiales_str = ", ".join([d.material.nombre for d in remision.detalles.all() if d.material])
+
         ws.append([
             remision.pk,
             remision.remision,
@@ -1276,58 +1268,40 @@ def export_remisiones_to_excel(request):
             remision.operador.nombre if remision.operador else '',
             str(remision.unidad) if remision.unidad else '',
             str(remision.contenedor) if remision.contenedor else '',
+            materiales_str,  # <--- CAMBIO 3: Insertamos la variable aquí
             remision.total_peso_ld,
             remision.total_peso_dlv,
             remision.diff
         ])
 
-    # --- NUEVA LÓGICA DE FORMATO ---
+    # ... (El resto de la función con el formato de tabla se queda igual) ...
     
     # 1. Crear la Tabla de Excel (Formato General)
-    # Definimos el rango: Desde A1 hasta la última columna y última fila
     last_col_letter = get_column_letter(len(headers))
     last_row = ws.max_row
     table_ref = f"A1:{last_col_letter}{last_row}"
     
     tabla = Table(displayName="TablaRemisiones", ref=table_ref)
-    
-    # Estilo de tabla (TableStyleMedium9 es un estilo azul estándar agradable)
-    style = TableStyleInfo(
-        name="TableStyleMedium9", 
-        showFirstColumn=False,
-        showLastColumn=False, 
-        showRowStripes=True, 
-        showColumnStripes=False
-    )
+    style = TableStyleInfo(name="TableStyleMedium9", showFirstColumn=False, showLastColumn=False, showRowStripes=True, showColumnStripes=False)
     tabla.tableStyleInfo = style
     ws.add_table(tabla)
 
-    # 2. Centrar contenido y 3. Ajustar ancho de columnas
+    # Ajuste de anchos y centrado
     center_alignment = Alignment(horizontal='center', vertical='center')
-    
     for col in ws.columns:
         max_length = 0
-        column = col[0].column_letter # Letra de la columna
-        
+        column = col[0].column_letter
         for cell in col:
-            # Aplicar centrado a cada celda
             cell.alignment = center_alignment
-            
-            # Calcular longitud máxima para el autoajuste
             try:
                 if len(str(cell.value)) > max_length:
                     max_length = len(str(cell.value))
             except:
                 pass
-        
-        # Ajustar ancho (se suma un extra para que no quede apretado)
         adjusted_width = (max_length + 4)
         ws.column_dimensions[column].width = adjusted_width
 
-    # Generar respuesta
-    response = HttpResponse(
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="Remisiones_{datetime.date.today()}.xlsx"'
     wb.save(response)
     return response
@@ -2040,3 +2014,442 @@ def dashboard_analisis_view(request):
     }
 
     return render(request, 'ternium/dashboard_analisis.html', context)# nueva actuaolizacopon
+
+
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db import transaction
+from django.db.models import Q
+from django.utils import timezone
+import pandas as pd
+
+# Importa tus modelos
+from .models import Empresa, Remision, Material, Operador, LineaTransporte, Unidad, Lugar, DetalleRemision, Cliente
+from .forms import ImportarRemisionesForm
+
+@login_required
+def importar_remisiones_excel(request):
+    lista_errores = [] 
+    
+    if request.method == 'POST':
+        form = ImportarRemisionesForm(request.POST, request.FILES)
+        
+        if form.is_valid():
+            archivo = request.FILES['archivo_excel']
+            
+            try:
+                # 1. Leer el Excel
+                df = pd.read_excel(archivo)
+                df.columns = df.columns.str.strip().str.lower()
+                
+                conteo_creadas = 0
+                conteo_actualizadas = 0
+
+                # --- BUSCAR EMPRESA MONTERREY ---
+                empresa_mty = Empresa.objects.filter(
+                    Q(nombre__icontains="Monterrey") | Q(prefijo__icontains="MTY")
+                ).first()
+                
+                if not empresa_mty:
+                    messages.error(request, "Error Crítico: No se encontró la empresa 'Monterrey' o 'MTY'.")
+                    return render(request, 'ternium/importar_remisiones.html', {'form': form})
+
+                # --- ITERAR FILAS ---
+                for index, row in df.iterrows():
+                    fila_excel = index + 2
+                    try:
+                        # VALIDAR REMISIÓN
+                        remision_num = str(row.get('remision', '')).strip()
+                        if not remision_num or remision_num.lower() == 'nan':
+                            continue 
+
+                        # =======================================================
+                        #      AUTO-ALTA DE CATÁLOGOS
+                        # =======================================================
+
+                        # 1. MATERIAL
+                        nombre_material = str(row.get('material', 'Genérico')).strip()
+                        material_obj, _ = Material.objects.get_or_create(
+                            nombre__iexact=nombre_material, defaults={'nombre': nombre_material}
+                        )
+                        material_obj.empresas.add(empresa_mty) 
+
+                        # 2. OPERADOR
+                        nombre_operador = str(row.get('operador', 'Sin Operador')).strip()
+                        operador_obj, _ = Operador.objects.get_or_create(
+                            nombre__iexact=nombre_operador, defaults={'nombre': nombre_operador}
+                        )
+                        if hasattr(operador_obj, 'empresas'): operador_obj.empresas.add(empresa_mty)
+
+                        # 3. LÍNEA DE TRANSPORTE
+                        nombre_linea = str(row.get('linea de transporte', 'Particular')).strip()
+                        linea_obj, _ = LineaTransporte.objects.get_or_create(
+                            nombre__iexact=nombre_linea, defaults={'nombre': nombre_linea}
+                        )
+                        if hasattr(linea_obj, 'empresas'): linea_obj.empresas.add(empresa_mty)
+
+                        # 4. UNIDAD
+                        tracto_id = str(row.get('unidad', 'S/N')).strip()
+                        unidad_obj, _ = Unidad.objects.get_or_create(
+                            internal_id__iexact=tracto_id, defaults={'internal_id': tracto_id}
+                        )
+                        if hasattr(unidad_obj, 'empresas'): unidad_obj.empresas.add(empresa_mty)
+
+                        # 5. ORIGEN (Lugar)
+                        nombre_origen = str(row.get('origen', 'Origen Desconocido')).strip()
+                        origen_obj, _ = Lugar.objects.get_or_create(
+                            nombre__iexact=nombre_origen, defaults={'nombre': nombre_origen, 'tipo': 'ORIGEN'}
+                        )
+                        if hasattr(origen_obj, 'empresas'): origen_obj.empresas.add(empresa_mty)
+
+                        # 6. DESTINO (Lugar) -> ESTE ES EL CRUCIAL PARA EL DETALLE
+                        nombre_destino = str(row.get('destino', 'Destino Desconocido')).strip()
+                        destino_obj, _ = Lugar.objects.get_or_create(
+                            nombre__iexact=nombre_destino, defaults={'nombre': nombre_destino, 'tipo': 'DESTINO'}
+                        )
+                        if hasattr(destino_obj, 'empresas'): destino_obj.empresas.add(empresa_mty)
+                        
+                        # 7. CLIENTE (Modelo Cliente para cabecera Remisión)
+                        cliente_remision_obj, _ = Cliente.objects.get_or_create(
+                            nombre__iexact=nombre_destino, defaults={'nombre': nombre_destino}
+                        )
+                        if hasattr(cliente_remision_obj, 'empresas'): cliente_remision_obj.empresas.add(empresa_mty)
+
+                        # 8. FECHA
+                        fecha_str = row.get('fecha')
+                        try: fecha_remision = pd.to_datetime(fecha_str).date()
+                        except: fecha_remision = timezone.now().date()
+
+                        # =======================================================
+                        #      CREAR O ACTUALIZAR (UPSERT)
+                        # =======================================================
+                        with transaction.atomic():
+                            remision_existente = Remision.objects.filter(remision=remision_num).first()
+                            
+                            if remision_existente:
+                                # --- ACTUALIZAR ---
+                                remision_obj = remision_existente
+                                remision_obj.empresa = empresa_mty
+                                remision_obj.fecha = fecha_remision
+                                remision_obj.operador = operador_obj
+                                remision_obj.linea_transporte = linea_obj
+                                remision_obj.unidad = unidad_obj
+                                remision_obj.origen = origen_obj
+                                remision_obj.destino = destino_obj
+                                remision_obj.cliente = cliente_remision_obj
+                                remision_obj.descripcion = "Actualizado vía Excel"
+                                remision_obj.save()
+                                
+                                # Limpiar detalles previos para re-insertar
+                                DetalleRemision.objects.filter(remision=remision_obj).delete()
+                                conteo_actualizadas += 1
+                            else:
+                                # --- CREAR ---
+                                remision_obj = Remision.objects.create(
+                                    empresa=empresa_mty,
+                                    remision=remision_num,
+                                    fecha=fecha_remision,
+                                    operador=operador_obj,
+                                    linea_transporte=linea_obj,
+                                    unidad=unidad_obj,
+                                    origen=origen_obj,
+                                    destino=destino_obj,
+                                    cliente=cliente_remision_obj,
+                                    status='PENDIENTE', # Temporal
+                                    descripcion="Importación Excel"
+                                )
+                                conteo_creadas += 1
+
+                            # --- FORZAR ESTATUS A TERMINADO ---
+                            # Usamos update() para saltarnos validaciones de fotos
+                            Remision.objects.filter(pk=remision_obj.pk).update(status='TERMINADO')
+
+                            # --- DETALLE DE PESOS ---
+                            val_peso_origen = row.get('peso carga', 0) 
+                            val_peso_destino = row.get('peso', 0)
+                            
+                            try: p_ld = float(val_peso_origen) if pd.notnull(val_peso_origen) else 0.0
+                            except: p_ld = 0.0
+                            try: p_dlv = float(val_peso_destino) if pd.notnull(val_peso_destino) else 0.0
+                            except: p_dlv = 0.0
+
+                            # --- AQUÍ GUARDAMOS EL CAMPO CLIENTE EN EL DETALLE ---
+                            # Usamos 'destino_obj' porque tu modelo DetalleRemision pide un LUGAR
+                            DetalleRemision.objects.create(
+                                remision=remision_obj,
+                                material=material_obj,
+                                cliente=destino_obj,  # <--- Asignación explícita del Lugar (Destino)
+                                peso_ld=p_ld,
+                                peso_dlv=p_dlv
+                            )
+
+                    except Exception as e:
+                        lista_errores.append(f"Fila {fila_excel}: Error inesperado - {str(e)}")
+
+                # --- MENSAJES FINALES ---
+                if conteo_creadas > 0 or conteo_actualizadas > 0:
+                    messages.success(request, f"✅ Proceso terminado: {conteo_creadas} creadas, {conteo_actualizadas} actualizadas (Status: TERMINADO).")
+                
+                if lista_errores:
+                    messages.warning(request, f"⚠ Errores en {len(lista_errores)} filas.")
+                    return render(request, 'ternium/importar_remisiones.html', {
+                        'form': form,
+                        'lista_errores': lista_errores
+                    })
+                
+                return redirect('remision_lista')
+
+            except Exception as e:
+                messages.error(request, f"❌ Error general: {e}")
+                return render(request, 'ternium/importar_remisiones.html', {'form': form})
+        else:
+            messages.error(request, "Formulario inválido.")
+    else:
+        form = ImportarRemisionesForm()
+
+    return render(request, 'ternium/importar_remisiones.html', {'form': form})
+# --- AGREGAR AL FINAL DE ternium/views.py ---
+
+
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from django.db.models import Sum, Count, FloatField, F, Q
+from django.db.models.functions import TruncMonth, Coalesce
+from django.utils import timezone
+import json
+
+from .models import Remision, Lugar
+
+@login_required
+def dashboard_remisiones_view(request):
+    now = timezone.now()
+    start_of_year = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    # 0. FILTROS DE URL
+    filtro_origen_id = request.GET.get('origen')
+    filtro_destino_id = request.GET.get('destino')
+
+    # 1. BASE COMPLETA (INCLUYE PATIOS)
+    # Esta base tiene TODO lo que está Terminado/Auditado y con Peso > 0
+    qs_completa = Remision.objects.filter(
+        status__in=['TERMINADO', 'AUDITADO'],
+        detalles__peso_ld__gt=0,
+        detalles__peso_dlv__gt=0
+    )
+
+    # Aplicamos filtros de usuario a la base completa
+    if filtro_origen_id:
+        qs_completa = qs_completa.filter(origen_id=filtro_origen_id)
+    if filtro_destino_id:
+        qs_completa = qs_completa.filter(destino_id=filtro_destino_id)
+
+    # =======================================================
+    # LÓGICA DE NO DUPLICIDAD (CLEAN DATA)
+    # =======================================================
+    # Regla: 
+    # - Si va a PATIO (Destino='Patio') -> NO CONTAR (Es entrada/stock)
+    # - Si sale de PATIO o va directo -> CONTAR (Es salida/venta)
+    #
+    # Esto se usará para: Gráficas, Materiales y KPIs para que todo cuadre.
+    qs_sin_duplicados = qs_completa.exclude(destino__nombre__icontains='patio')
+
+    # =======================================================
+    # 3. GRÁFICA EVOLUCIÓN
+    # =======================================================
+    timeline_qs = qs_sin_duplicados.annotate(mes=TruncMonth('fecha')).values('mes').annotate(
+        carga=Coalesce(Sum('detalles__peso_ld'), 0.0, output_field=FloatField()),
+        descarga=Coalesce(Sum('detalles__peso_dlv'), 0.0, output_field=FloatField())
+    ).order_by('mes')
+
+    chart_labels = []
+    chart_carga = []
+    chart_descarga = []
+    for entry in timeline_qs:
+        if entry['mes']:
+            chart_labels.append(entry['mes'].strftime("%Y-%m"))
+            chart_carga.append(entry['carga'])
+            chart_descarga.append(entry['descarga'])
+
+    # =======================================================
+    # 4. ANÁLISIS MATERIALES (MODIFICADO: Usa qs_sin_duplicados)
+    # =======================================================
+    # Antes usaba qs_analisis, ahora usa la lógica estricta de no duplicar patios
+    materiales_data = qs_sin_duplicados.values('detalles__material__nombre').annotate(
+        total_carga=Coalesce(Sum('detalles__peso_ld'), 0.0, output_field=FloatField()),
+        total_descarga=Coalesce(Sum('detalles__peso_dlv'), 0.0, output_field=FloatField())
+    ).order_by('-total_carga')
+
+    mat_labels = []
+    mat_carga_data = []
+    mat_descarga_data = []
+    
+    lista_materiales = []
+    total_volumen = materiales_data[0]['total_carga'] if materiales_data else 1
+
+    for mat in materiales_data:
+        c = mat['total_carga']
+        d = mat['total_descarga']
+        n = mat['detalles__material__nombre']
+        
+        mat_labels.append(n)
+        mat_carga_data.append(c)
+        mat_descarga_data.append(d)
+        
+        lista_materiales.append({
+            'nombre': n,
+            'carga': c,
+            'descarga': d,
+            'porcentaje_relativo': (c / total_volumen * 100)
+        })
+
+    # =======================================================
+    # 5. DATA PARA EL DESLIZADOR (OFFCANVAS) (MODIFICADO)
+    # =======================================================
+    # También debe usar qs_sin_duplicados para que coincida con la tabla
+    raw_details = qs_sin_duplicados.values(
+        'fecha', 'remision', 'origen__nombre', 'destino__nombre', 
+        'detalles__material__nombre', 'detalles__peso_ld'
+    ).order_by('-fecha')
+
+    materiales_detalle_map = {}
+    for item in raw_details:
+        mat_nombre = item['detalles__material__nombre'] or "Sin Material"
+        if mat_nombre not in materiales_detalle_map:
+            materiales_detalle_map[mat_nombre] = []
+        
+        # Conversión a float para evitar error JSON
+        peso_val = float(item['detalles__peso_ld']) if item['detalles__peso_ld'] else 0.0
+        
+        materiales_detalle_map[mat_nombre].append({
+            'fecha': item['fecha'].strftime("%d/%m/%Y"),
+            'remision': item['remision'],
+            'origen': item['origen__nombre'],
+            'destino': item['destino__nombre'],
+            'peso': peso_val 
+        })
+
+    # =======================================================
+    # 6. RANKING OPERADORES (Mantiene qs_completa)
+    # =======================================================
+    # Aquí SIEMPRE usamos la completa porque al operador se le paga todo el movimiento
+    operadores_data = qs_completa.values('operador__nombre').annotate(
+        total_viajes=Count('id', distinct=True),
+        total_cargado=Coalesce(Sum('detalles__peso_ld'), 0.0, output_field=FloatField()),
+        total_entregado=Coalesce(Sum('detalles__peso_dlv'), 0.0, output_field=FloatField())
+    ).order_by('-total_cargado')[:50]
+
+    ranking_operadores = []
+    for op in operadores_data:
+        cargado = op['total_cargado']
+        entregado = op['total_entregado']
+        diff = cargado - entregado
+        
+        json_detalles = "[]"
+        if diff > 0.1:
+             bad_rems = qs_completa.filter(
+                 operador__nombre=op['operador__nombre'],
+                 detalles__peso_ld__gt=F('detalles__peso_dlv')
+             ).values('remision','origen__nombre','destino__nombre','detalles__material__nombre','comentario','detalles__peso_ld','detalles__peso_dlv')
+             
+             d_list = []
+             for br in bad_rems:
+                 p_ld = float(br['detalles__peso_ld'] or 0)
+                 p_dlv = float(br['detalles__peso_dlv'] or 0)
+                 m = p_ld - p_dlv
+                 
+                 if m > 0.05:
+                     d_list.append({
+                         'remision': br['remision'], 
+                         'origen': br['origen__nombre'],
+                         'destino': br['destino__nombre'],
+                         'material': br['detalles__material__nombre'], 
+                         'merma': round(m, 3), 
+                         'comentario': br['comentario'] or ''
+                     })
+             json_detalles = json.dumps(d_list)
+
+        ranking_operadores.append({
+            'nombre': op['operador__nombre'] or "S/N", 'viajes': op['total_viajes'],
+            'cargado': cargado, 'entregado': entregado, 'diff': diff,
+            'perc': ((diff)/cargado*100) if cargado>0 else 0, 'json_detalles': json_detalles
+        })
+    ranking_operadores.sort(key=lambda x: x['perc'], reverse=True)
+
+    # =======================================================
+    # 7. PENDIENTES
+    # =======================================================
+    pendientes_qs = Remision.objects.filter(status='PENDIENTE')
+    if filtro_origen_id: pendientes_qs = pendientes_qs.filter(origen_id=filtro_origen_id)
+    if filtro_destino_id: pendientes_qs = pendientes_qs.filter(destino_id=filtro_destino_id)
+
+    resumen_pend = pendientes_qs.aggregate(
+        total_carga=Coalesce(Sum('detalles__peso_ld'), 0.0, output_field=FloatField()),
+        total_descarga=Coalesce(Sum('detalles__peso_dlv'), 0.0, output_field=FloatField())
+    )
+    
+    lista_pendientes = []
+    hoy_date = now.date()
+    for rem in pendientes_qs:
+        try: det=rem.detalles.first(); p_ld=float(det.peso_ld); p_dlv=float(det.peso_dlv)
+        except: p_ld=0; p_dlv=0
+        dias = (hoy_date - rem.fecha).days
+        if p_dlv == 0: e="En Tránsito"; c="bg-secondary"
+        elif abs(p_ld-p_dlv)>0.1: e="Diferencia"; c="bg-warning text-dark"
+        else: e="Por Cerrar"; c="bg-info"
+        
+        lista_pendientes.append({
+            'remision': rem.remision, 'fecha': rem.fecha, 'dias': dias,
+            'empresa': rem.empresa.nombre if rem.empresa else '', 
+            'cliente': rem.cliente.nombre if rem.cliente else '',
+            'unidad': rem.unidad.internal_id if rem.unidad else '', 
+            'peso_origen': p_ld, 'peso_destino': p_dlv,
+            'estado_txt': e, 'badge_cls': c
+        })
+    lista_pendientes.sort(key=lambda x: x['dias'], reverse=True)
+
+    # =======================================================
+    # 8. KPIS & CONTEXTO FINAL (Usamos qs_sin_duplicados)
+    # =======================================================
+    # Actualizamos los KPIs generales para que coincidan con la gráfica y tabla
+    kpis_year = qs_sin_duplicados.filter(fecha__gte=start_of_year).aggregate(
+        total_carga=Coalesce(Sum('detalles__peso_ld'), 0.0, output_field=FloatField()),
+        total_descarga=Coalesce(Sum('detalles__peso_dlv'), 0.0, output_field=FloatField())
+    )
+
+    origenes_list = Lugar.objects.filter(tipo__in=['ORIGEN', 'AMBOS']).order_by('nombre')
+    destinos_list = Lugar.objects.filter(tipo__in=['DESTINO', 'AMBOS']).order_by('nombre')
+
+    context = {
+        'kpi_carga': round(kpis_year['total_carga'], 2), 
+        'kpi_descarga': round(kpis_year['total_descarga'], 2),
+        'kpi_merma_ton': round(kpis_year['total_carga'] - kpis_year['total_descarga'], 2),
+        
+        # Gráficas
+        'chart_labels': json.dumps(chart_labels), 
+        'chart_carga': json.dumps(chart_carga), 
+        'chart_descarga': json.dumps(chart_descarga),
+        
+        # Materiales
+        'mat_labels': json.dumps(mat_labels),
+        'mat_carga_data': json.dumps(mat_carga_data),
+        'mat_descarga_data': json.dumps(mat_descarga_data),
+        'lista_materiales': lista_materiales,
+        'materiales_detalle_json': json.dumps(materiales_detalle_map),
+
+        # Filtros y Tablas
+        'origenes_list': origenes_list, 'destinos_list': destinos_list,
+        'filtro_origen_sel': int(filtro_origen_id) if filtro_origen_id else None,
+        'filtro_destino_sel': int(filtro_destino_id) if filtro_destino_id else None,
+        'ranking_operadores': ranking_operadores,
+        'pendientes_carga_total': resumen_pend['total_carga'], 
+        'pendientes_descarga_total': resumen_pend['total_descarga'],
+        'lista_pendientes': lista_pendientes,
+    }
+    
+    if context['kpi_carga'] > 0:
+        context['kpi_merma_perc'] = round((context['kpi_merma_ton'] / context['kpi_carga']) * 100, 2)
+    else:
+        context['kpi_merma_perc'] = 0
+
+    return render(request, 'ternium/dashboard_remisiones.html', context)

@@ -313,6 +313,10 @@ class Remision(models.Model):
     contenedor = models.ForeignKey(Contenedor, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Contenedor")
     origen = models.ForeignKey(Lugar, on_delete=models.SET_NULL, null=True, blank=True, related_name="remisiones_origen", verbose_name="Lugar de Origen")
     destino = models.ForeignKey(Lugar, on_delete=models.SET_NULL, null=True, blank=True, related_name="remisiones_destino", verbose_name="Lugar de Destino")
+    
+    # --- AQUÍ ESTÁ EL CAMBIO (con comillas para evitar errores) ---
+    cliente = models.ForeignKey('Cliente', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Cliente Destino")
+    
     inicia_ld = models.DateTimeField(verbose_name="Inicia Carga", null=True, blank=True)
     termina_ld = models.DateTimeField(verbose_name="Termina Carga", null=True, blank=True)
     folio_ld = models.CharField(max_length=50, verbose_name="Folio Carga", blank=True)
@@ -400,12 +404,32 @@ class Remision(models.Model):
         verbose_name_plural = "Remisiones"
         ordering = ['-fecha', '-creado_en']
         indexes = [models.Index(fields=['status']), models.Index(fields=['fecha'])]
-        # --- NUEVO: Permiso para auditar y acceder al módulo ---
         permissions = [
             ("can_audit_remision", "Puede auditar remisiones"),
             ("view_ternium_module", "Puede acceder al módulo Ternium"),
         ]
+        
+class Cliente(models.Model):
+    """
+    Catálogo de Clientes comerciales para asignar en las remisiones.
+    """
+    search_fields = ['nombre']
+    nombre = models.CharField(max_length=200, unique=True, verbose_name="Nombre del Cliente")
+    empresas = models.ManyToManyField(
+        'Empresa',  # Usamos comillas por si acaso
+        blank=True,
+        related_name="clientes_asociados",
+        verbose_name="Unidades de Negocio (Empresas)"
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = "Cliente"
+        verbose_name_plural = "Clientes"
+        ordering = ['nombre']
 
 
 class DetalleRemision(models.Model):

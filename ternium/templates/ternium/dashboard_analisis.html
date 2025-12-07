@@ -20,7 +20,22 @@
 </style>
 
 <div class="container-fluid px-4 py-4">
-    <h2 class="fw-bold text-dark mb-4"><i class="fas fa-chart-line me-2 text-success"></i>Control Operacional y Financiero</h2>
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold text-dark m-0">
+            <i class="fas fa-chart-line me-2 text-success"></i>Control Operacional y Financiero
+        </h2>
+        
+        <div class="dropdown">
+            <button class="btn btn-outline-dark dropdown-toggle fw-bold" type="button" id="dashboardSelector" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fas fa-chart-pie me-2"></i>Vista: General
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dashboardSelector">
+                <li><a class="dropdown-item active" href="#">General (Maquila y Logística)</a></li>
+                <li><a class="dropdown-item" href="{% url 'dashboard_remisiones' %}">Exclusivo Remisiones</a></li>
+            </ul>
+        </div>
+    </div>
     
     <div class="row g-3 mb-4">
         <div class="col-lg-2 col-md-4 col-sm-6">{% include 'ternium/kpi_card.html' with title='Ton Compradas (Mes)' value=kpi_comp_mes unit='Ton' icon='fas fa-arrow-down' color='primary' %}</div>
@@ -180,7 +195,7 @@
 </div>
 
 <script>
-    // 🟩 Añadir las etiquetas de datos a las gráficas (lo que llamaste "ponerles números")
+    // Configuración de etiquetas para mostrar valores en las gráficas
     const plugins = [{
         id: 'datalabels',
         afterDatasetsDraw(chart, args, options) {
@@ -194,10 +209,9 @@
                 meta.data.forEach((element, index) => {
                     const dataValue = dataset.data[index];
                     const x = element.x;
-                    const y = element.y - 10; // Ajustar posición vertical
+                    const y = element.y - 10; 
                     
-                    if (dataValue > 0) { // Solo mostrar si hay valor
-                        // Usamos dataset.borderColor o dataset.backgroundColor para el color del texto
+                    if (dataValue > 0) { 
                         ctx.fillStyle = dataset.borderColor || dataset.backgroundColor; 
                         ctx.font = 'bold 10px Segoe UI';
                         ctx.textAlign = 'center';
@@ -240,7 +254,7 @@
             plugins: { legend: { position: 'top' } },
             scales: { y: { beginAtZero: true }, x: { grid: { display: false } } }
         },
-        plugins: [plugins[0]] // Aplicar plugins
+        plugins: [plugins[0]] 
     });
 
     // 2. Pérdidas por Mes (Barra)
@@ -262,9 +276,9 @@
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, max: 10 } } // Escala máxima a 10% por defecto
+            scales: { y: { beginAtZero: true, max: 10 } } 
         },
-        plugins: [plugins[0]] // Aplicar plugins
+        plugins: [plugins[0]] 
     });
 
 </script>

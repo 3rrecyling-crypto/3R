@@ -1,0 +1,321 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Dashboard Remisiones{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
+<div class="container-fluid px-4 py-4">
+    
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold text-dark m-0 mb-3 mb-md-0">
+            <i class="fas fa-truck-loading me-2 text-primary"></i>Tablero de Control
+        </h2>
+        
+        <form method="GET" action="" class="d-flex gap-2 bg-white p-2 rounded shadow-sm border">
+            <div class="input-group">
+                <span class="input-group-text bg-light fw-bold"><i class="fas fa-map-marker-alt"></i></span>
+                <select name="origen" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">-- Todos los Orígenes --</option>
+                    {% for org in origenes_list %}
+                        <option value="{{ org.id }}" {% if filtro_origen_sel == org.id %}selected{% endif %}>
+                            {{ org.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="input-group">
+                <span class="input-group-text bg-light fw-bold"><i class="fas fa-flag-checkered"></i></span>
+                <select name="destino" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">-- Todos los Destinos --</option>
+                    {% for dest in destinos_list %}
+                        <option value="{{ dest.id }}" {% if filtro_destino_sel == dest.id %}selected{% endif %}>
+                            {{ dest.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if filtro_origen_sel or filtro_destino_sel %}
+                <a href="?" class="btn btn-sm btn-outline-danger" title="Limpiar Filtros"><i class="fas fa-times"></i></a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-3">
+            <div class="card shadow-sm border-start border-4 border-primary h-100 p-3">
+                <div class="text-muted small fw-bold">CARGA TOTAL</div>
+                <h3 class="text-primary fw-bold">{{ kpi_carga|floatformat:2|intcomma }} Ton</h3>
+            </div>
+        </div>
+        <div class="col-lg-3">
+            <div class="card shadow-sm border-start border-4 border-success h-100 p-3">
+                <div class="text-muted small fw-bold">DESCARGA TOTAL</div>
+                <h3 class="text-success fw-bold">{{ kpi_descarga|floatformat:2|intcomma }} Ton</h3>
+            </div>
+        </div>
+        <div class="col-lg-3">
+            <div class="card shadow-sm border-start border-4 border-danger h-100 p-3">
+                <div class="text-muted small fw-bold">MERMA ACUMULADA</div>
+                <h3 class="text-danger fw-bold">{{ kpi_merma_ton|floatformat:2|intcomma }} Ton</h3>
+            </div>
+        </div>
+        <div class="col-lg-3">
+            <div class="card shadow-sm border-start border-4 border-warning h-100 p-3">
+                <div class="text-muted small fw-bold">% MERMA</div>
+                <h3 class="text-warning fw-bold">{{ kpi_merma_perc|floatformat:2 }}%</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-warning mb-4">
+        <div class="card-header bg-warning text-dark fw-bold d-flex justify-content-between">
+            <span><i class="fas fa-clock me-2"></i>Monitoreo de Tránsito (Pendientes)</span>
+            <span class="badge bg-dark">{{ lista_pendientes|length }}</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                <table class="table table-sm table-hover mb-0 align-middle">
+                    <thead class="bg-light sticky-top">
+                        <tr>
+                            <th>Remisión</th>
+                            <th>Días</th>
+                            <th>Cliente</th>
+                            <th>Unidad</th>
+                            <th class="text-end">Carga</th>
+                            <th class="text-end">Descarga</th>
+                            <th class="text-center">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in lista_pendientes %}
+                        <tr>
+                            <td class="fw-bold text-primary">{{ p.remision }}</td>
+                            <td>
+                                {% if p.dias > 5 %}<span class="badge bg-danger">{{ p.dias }}d</span>
+                                {% elif p.dias > 2 %}<span class="badge bg-warning text-dark">{{ p.dias }}d</span>
+                                {% else %}<span class="badge bg-success">{{ p.dias }}d</span>{% endif %}
+                            </td>
+                            <td>{{ p.cliente }}</td>
+                            <td>{{ p.unidad }}</td>
+                            <td class="text-end fw-bold">{{ p.peso_origen|floatformat:2 }}</td>
+                            <td class="text-end text-muted">{{ p.peso_destino|floatformat:2 }}</td>
+                            <td class="text-center"><span class="badge {{ p.badge_cls }}">{{ p.estado_txt }}</span></td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="7" class="text-center text-muted">No hay unidades pendientes.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white fw-bold">
+                    <i class="fas fa-cubes me-2"></i>Análisis de Materiales por Ruta
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 border-end">
+                            <h6 class="fw-bold text-primary mb-3 text-center">MATERIALES CARGADOS (Mayor a Menor)</h6>
+                            <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                                <table class="table table-sm table-hover align-middle">
+                                    <thead class="bg-light sticky-top">
+                                        <tr>
+                                            <th>Material</th>
+                                            <th class="text-end">Carga</th>
+                                            <th style="width: 30%;">Volumen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for mat in lista_materiales %}
+                                        <tr>
+                                            <td class="fw-bold">{{ mat.nombre }}</td>
+                                            <td class="text-end fw-bold text-primary">{{ mat.carga|floatformat:2|intcomma }}</td>
+                                            <td>
+                                                <div class="progress" style="height: 6px;">
+                                                    <div class="progress-bar bg-primary" style="width: {{ mat.porcentaje_relativo }}%"></div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr><td colspan="3" class="text-center">Sin datos.</td></tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-bold text-success mb-3 text-center">VOLUMEN DESCARGADO</h6>
+                            <div style="height: 350px; overflow-y: auto; border: 1px solid #eee;">
+                                <div id="chartMatContainer" style="height: 300px; position: relative;">
+                                    <canvas id="chartMateriales"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold">Evolución Mensual (Incluye Pendientes)</div>
+                <div class="card-body" style="height: 300px;">
+                    <canvas id="chartEvolucion"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-12">
+            <div class="card shadow-sm border-danger">
+                <div class="card-header bg-danger text-white fw-bold">
+                    <i class="fas fa-user-secret me-2"></i>Riesgo por Operador (Clic para detalles)
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                        <table class="table table-striped table-hover mb-0 align-middle">
+                            <thead class="bg-light sticky-top">
+                                <tr>
+                                    <th>Operador</th>
+                                    <th class="text-center">Viajes</th>
+                                    <th class="text-end">Cargado</th>
+                                    <th class="text-end">Entregado</th>
+                                    <th class="text-end text-danger">Faltante</th>
+                                    <th class="text-end">Merma %</th>
+                                    <th class="text-center">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for op in ranking_operadores %}
+                                <tr>
+                                    <td class="fw-bold">
+                                        <button class="btn btn-link text-dark fw-bold text-decoration-none p-0 text-start"
+                                                onclick='verDetalles("{{ op.nombre }}")'>
+                                            {{ op.nombre }}
+                                        </button>
+                                        <textarea id="data-{{ forloop.counter }}" style="display:none;">{{ op.json_detalles|safe }}</textarea>
+                                    </td>
+                                    <td class="text-center">{{ op.viajes }}</td>
+                                    <td class="text-end">{{ op.cargado|floatformat:2|intcomma }}</td>
+                                    <td class="text-end">{{ op.entregado|floatformat:2|intcomma }}</td>
+                                    <td class="text-end fw-bold {% if op.diff > 0 %}text-danger{% else %}text-success{% endif %}">
+                                        {{ op.diff|floatformat:2 }}
+                                    </td>
+                                    <td class="text-end fw-bold">{{ op.perc|floatformat:2 }}%</td>
+                                    <td class="text-center">
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                onclick='verDetallesDesdeID("{{ op.nombre }}", "data-{{ forloop.counter }}")'>
+                                            <i class="fas fa-search"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalDetalleOperador" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold">Faltantes: <span id="modalOpName"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0 small">
+                        <thead class="bg-light">
+                            <tr><th>Remisión</th><th>Origen</th><th>Destino</th><th>Material</th><th class="text-end text-danger">Merma</th><th>Comentario</th></tr>
+                        </thead>
+                        <tbody id="modalTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    Chart.register(ChartDataLabels);
+
+    // 1. CHART MATERIALES (Dinámico)
+    const lblMat = {{ mat_labels|safe }};
+    const datMat = {{ mat_descarga_data|safe }};
+    // Ajustar altura: Mínimo 300px, o 35px por barra
+    document.getElementById('chartMatContainer').style.height = Math.max(300, lblMat.length * 35) + 'px';
+
+    new Chart(document.getElementById('chartMateriales').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: lblMat,
+            datasets: [{
+                label: 'Descarga', data: datMat,
+                backgroundColor: 'rgba(25, 135, 84, 0.7)', borderColor: '#198754', borderWidth: 1, borderRadius: 3
+            }]
+        },
+        options: {
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            plugins: { legend: {display:false}, datalabels: {color:'#000', anchor:'end', align:'end', formatter: Math.round} }
+        }
+    });
+
+    // 2. CHART EVOLUCIÓN (BARRAS)
+    new Chart(document.getElementById('chartEvolucion').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: {{ chart_labels|safe }},
+            datasets: [
+                { label: 'Carga', data: {{ chart_carga|safe }}, backgroundColor: 'rgba(13, 110, 253, 0.7)', borderColor: '#0d6efd', borderWidth: 1 },
+                { label: 'Descarga', data: {{ chart_descarga|safe }}, backgroundColor: 'rgba(25, 135, 84, 0.7)', borderColor: '#198754', borderWidth: 1 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { datalabels: { color: '#444', anchor: 'end', align: 'top', font: {weight:'bold'}, formatter: Math.round } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+
+    // 3. MODAL FUNCION
+    function verDetallesDesdeID(nombre, elementId) {
+        var rawJson = document.getElementById(elementId).value;
+        var list = [];
+        try { list = JSON.parse(rawJson); } catch(e){}
+        
+        document.getElementById('modalOpName').innerText = nombre;
+        const tbody = document.getElementById('modalTableBody');
+        tbody.innerHTML = '';
+
+        if(!list.length) tbody.innerHTML = '<tr><td colspan="6" class="text-center py-3">Sin registros.</td></tr>';
+        else {
+            list.forEach(i => {
+                tbody.innerHTML += `<tr>
+                    <td class="fw-bold">${i.remision}</td><td>${i.origen}</td><td>${i.destino}</td><td>${i.material}</td>
+                    <td class="text-end text-danger fw-bold">-${i.merma} Ton</td><td class="text-muted">${i.comentario}</td>
+                </tr>`;
+            });
+        }
+        new bootstrap.Modal(document.getElementById('modalDetalleOperador')).show();
+    }
+    // Alias para el clic en nombre
+    function verDetalles(n){ 
+        // Buscamos el ID dinámicamente si es necesario, pero mejor usar el botón de la lupa que ya tiene el ID correcto
+        // Este es un placeholder por si usas el onclick directo
+    }
+</script>
+{% endblock %}

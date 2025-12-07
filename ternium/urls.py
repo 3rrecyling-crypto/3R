@@ -108,6 +108,8 @@ path('lineas-transporte/<int:pk>/editar/', views.LineaTransporteUpdateView.as_vi
          views.EmpresaVincularOrigenesView.as_view(), 
          name='vincular_origenes_empresa'),
     path('analisis/dashboard/', views.dashboard_analisis_view, name='dashboard_analisis'),
+    path('remisiones/importar/', views.importar_remisiones_excel, name='importar_remisiones_excel'),
+    path('analisis/remisiones/', views.dashboard_remisiones_view, name='dashboard_remisiones'),
 ]
     
 

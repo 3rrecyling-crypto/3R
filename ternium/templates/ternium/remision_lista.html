@@ -7,7 +7,6 @@
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
 <style>
-    /* ... (tu CSS existente se mantiene igual) ... */
     :root {
         --primary-color: #2c3e50;
         --secondary-color: #3498db;
@@ -164,8 +163,14 @@
                         </select>
                     </div>
                     
-                    <div class="col-md-3"><label for="q_fecha_desde" class="form-label small fw-bold">Fecha desde</label><input type="date" name="q_fecha_desde" id="q_fecha_desde" class="form-control form-control-sm" value="{{ search_params.q_fecha_desde|default:'' }}"></div>
-                    <div class="col-md-3"><label for="q_fecha_hasta" class="form-label small fw-bold">Fecha hasta</label><input type="date" name="q_fecha_hasta" id="q_fecha_hasta" class="form-control form-control-sm" value="{{ search_params.q_fecha_hasta|default:'' }}"></div>
+                    <div class="col-md-3">
+                        <label for="q_fecha_desde" class="form-label small fw-bold">Fecha desde</label>
+                        <input type="date" name="q_fecha_desde" id="q_fecha_desde" class="form-control form-control-sm" value="{{ search_params.q_fecha_desde|default:'' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="q_fecha_hasta" class="form-label small fw-bold">Fecha hasta</label>
+                        <input type="date" name="q_fecha_hasta" id="q_fecha_hasta" class="form-control form-control-sm" value="{{ search_params.q_fecha_hasta|default:'' }}">
+                    </div>
                 </div>
                 
                 <div class="row mt-4">
@@ -173,8 +178,15 @@
                         <a id="export-excel-btn" href="{% url 'export_remisiones_to_excel' %}" class="btn btn-outline-success btn-sm me-2 rounded-pill py-2 px-3">
                             <i class="fas fa-file-excel me-2"></i>Exportar a Excel
                         </a>
-                        <a href="{% url 'remision_lista' %}" class="btn btn-outline-secondary btn-sm me-2 rounded-pill py-2 px-3"><i class="fas fa-broom me-2"></i>Limpiar</a>
-                        <button type="submit" class="btn btn-primary-gradient btn-sm shadow-sm rounded-pill py-2 px-3"><i class="fas fa-search me-2"></i>Aplicar Filtros</button>
+                        
+                        {# CAMBIO IMPORTANTE: Botón de limpiar apunta a la URL limpia #}
+                        <a href="{% url 'remision_lista' %}" class="btn btn-outline-secondary btn-sm me-2 rounded-pill py-2 px-3">
+                            <i class="fas fa-broom me-2"></i>Limpiar Filtros
+                        </a>
+                        
+                        <button type="submit" class="btn btn-primary-gradient btn-sm shadow-sm rounded-pill py-2 px-3">
+                            <i class="fas fa-search me-2"></i>Aplicar Filtros
+                        </button>
                     </div>
                 </div>
             </form>
@@ -185,7 +197,7 @@
         <div class="card-header py-3 bg-primary-gradient text-white">
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="m-0 font-weight-bold"><i class="fas fa-list-ol me-2"></i>Resultados</h6>
-                <span class="badge bg-white text-dark rounded-pill py-2 px-3">{{ page_obj.paginator.count|default:"0" }} registros</span>
+                <span class="badge bg-white text-dark rounded-pill py-2 px-3">{{ page_obj.paginator.count|default:"0" }} registros encontrados</span>
             </div>
         </div>
         
@@ -199,6 +211,7 @@
                             <th class="py-3 px-3">Estatus</th>
                             <th class="py-3 px-3">Origen</th>
                             <th class="py-3 px-3">Destino</th>
+                            <th class="py-3 px-3">Material</th> 
                             <th class="text-end py-3 px-3">Peso Carga (Ton)</th>
                             <th class="text-end py-3 px-3">Peso Descarga (Ton)</th>
                             <th class="text-end py-3 px-3">Diferencia (Ton)</th>
@@ -213,6 +226,15 @@
                             <td class="text-nowrap py-3 px-3"><span class="status-badge status-{{ remision.status }}">{{ remision.get_status_display }}</span></td>
                             <td class="py-3 px-3">{{ remision.origen.nombre|default:"-" }}</td>
                             <td class="py-3 px-3">{{ remision.destino.nombre|default:"-" }}</td>
+                            
+                            <td class="py-3 px-3">
+                                {% for detalle in remision.detalles.all %}
+                                    {{ detalle.material.nombre }}{% if not forloop.last %}, <br>{% endif %}
+                                {% empty %}
+                                    <span class="text-muted small">-</span>
+                                {% endfor %}
+                            </td>
+
                             <td class="text-end py-3 px-3">{{ remision.total_peso_ld|floatformat:3 }}</td>
                             <td class="text-end py-3 px-3">{{ remision.total_peso_dlv|floatformat:3 }}</td>
                             <td class="text-end py-3 px-3">
@@ -239,7 +261,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="9" class="text-center py-5">
+                            <td colspan="10" class="text-center py-5">
                                 <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
                                 <h5 class="text-muted">No se encontraron remisiones</h5>
                                 <p class="text-muted small">Intente ajustar los filtros de búsqueda o limpiar la selección.</p>
@@ -252,12 +274,63 @@
         </div>
         
         {% if is_paginated %}
-        <div class="card-footer">
-             <nav><ul class="pagination pagination-sm justify-content-center mb-0">
-                {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page=1{% for key, value in search_params.items %}&{{ key }}={{ value }}{% endfor %}">&laquo;&laquo;</a></li><li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in search_params.items %}&{{ key }}={{ value }}{% endfor %}">&laquo;</a></li>{% endif %}
-                <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
-                {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in search_params.items %}&{{ key }}={{ value }}{% endfor %}">&raquo;</a></li><li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in search_params.items %}&{{ key }}={{ value }}{% endfor %}">&raquo;&raquo;</a></li>{% endif %}
-            </ul></nav>
+        <div class="card-footer bg-white py-3">
+            <nav aria-label="Navegación de páginas">
+                <ul class="pagination pagination-sm justify-content-center mb-0 flex-wrap">
+                    
+                    {# --- Botón Anterior --- #}
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            {# FIX: Evitamos duplicar 'page' en la URL #}
+                            <a class="page-link" href="?page=1{% for key, value in search_params.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Primero">
+                                <span aria-hidden="true">&laquo;&laquo;</span>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in search_params.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Anterior">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">&laquo;&laquo;</span></li>
+                        <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
+                    {% endif %}
+
+                    {# --- Números de Página (Elided Pagination) --- #}
+                    {% for i in page_obj.paginator.get_elided_page_range %}
+                        {% if page_obj.paginator.ELLIPSIS == i %}
+                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% else %}
+                            <li class="page-item {% if page_obj.number == i %}active{% endif %}">
+                                <a class="page-link" href="?page={{ i }}{% for key, value in search_params.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                    {{ i }}
+                                </a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {# --- Botón Siguiente --- #}
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in search_params.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Siguiente">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in search_params.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Último">
+                                <span aria-hidden="true">&raquo;&raquo;</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
+                        <li class="page-item disabled"><span class="page-link">&raquo;&raquo;</span></li>
+                    {% endif %}
+                    
+                </ul>
+                <div class="text-center text-muted mt-2 small">
+                    Mostrando registros {{ page_obj.start_index }} - {{ page_obj.end_index }} de un total de <strong>{{ page_obj.paginator.count }}</strong>
+                </div>
+            </nav>
         </div>
         {% endif %}
     </div>
@@ -281,9 +354,6 @@ $(document).ready(function() {
     });
 
     // --- LÓGICA PARA EXPORTACIÓN A EXCEL ---
-    // Nota: La lógica de filtros dinámicos por empresa se ha eliminado ya que
-    // el filtro principal ahora es 'Operación' (prefijo), que es más directo.
-    
     function updateExportUrl() {
         const form = $('#filterForm');
         const params = new URLSearchParams(new FormData(form[0])).toString();

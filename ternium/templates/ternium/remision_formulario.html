@@ -116,18 +116,19 @@
                 
                 <div class="col-md-4">
                     <label for="id_remision_display" class="form-label">Remisión</label>
-                    <input type="text" id="id_remision_display" class="form-control" 
-                           readonly disabled 
-                           value="{% if is_editing %}{{ remision.remision }}{% else %}Seleccione empresa...{% endif %}">
+                    <input type="text" id="id_remision_display" name="remision" class="form-control" 
+                           readonly 
+                           value="{% if is_editing %}{{ remision.remision }}{% endif %}">
                     
                     <div class="form-text">
                         {% if is_editing %}
                             El folio no puede ser modificado.
                         {% else %}
-                            Este folio es una sugerencia y se asignará al guardar.
+                            Este folio es automático y se asignará al guardar.
                         {% endif %}
                     </div>
                 </div>
+
                 <div class="col-md-4"><label for="{{ form.fecha.id_for_label }}" class="form-label">{{ form.fecha.label }}</label>{{ form.fecha }}<div class="form-error">{{ form.fecha.errors }}</div></div>
             </div></div>
         </div>
@@ -229,22 +230,13 @@
 $(document).ready(function() {
     
     // --- Variables y selectores ---
-    
-    // --- INICIO: MODIFICACIÓN PARA OBTENER EL ESTADO DE EDICIÓN ---
-    // Esta variable 'IS_EDITING' viene del contexto de Django que añadimos en las vistas.
-    const IS_EDITING = {{ is_editing|yesno:"true,false" }}; //
-    // --- FIN: MODIFICACIÓN ---
-    
+    const IS_EDITING = {{ is_editing|yesno:"true,false" }}; 
     let cachedCatalogData = { materiales: [], lugares: [] };
     const formContainer = $('#form-container');
     const addButton = $('#add-form');
     const totalFormsInput = $('#id_detalles-TOTAL_FORMS');
     const empresaSelect = $('#id_empresa');
-    
-    // --- INICIO: MODIFICACIÓN JAVASCRIPT ---
-    // Apunta al nuevo campo de visualización
-    const remisionInput = $('#id_remision_display'); //
-    // --- FIN: MODIFICACIÓN JAVASCRIPT ---
+    const remisionInput = $('#id_remision_display'); 
     
     const emptyFormTemplate = $('#empty-form-template').html();
 
@@ -253,8 +245,7 @@ $(document).ready(function() {
         $(context).find('select:not([data-select2-id])').select2({
             theme: 'bootstrap-5', width: '100%', placeholder: 'Seleccione una opción', allowClear: true
         });
-        // Esta línea OCULTA los checkboxes "DELETE" para que solo se vea el botón de basura
-        $(context).find('input[type="checkbox"][name$="-DELETE"]').hide(); //
+        $(context).find('input[type="checkbox"][name$="-DELETE"]').hide(); 
     }
     
     function populateSelect(selectElement, options) {
@@ -269,24 +260,23 @@ $(document).ready(function() {
     initializeSelect2(document);
 
     // --- LÓGICA PRINCIPAL AL CAMBIAR LA EMPRESA ---
-    empresaSelect.on('change', function() { //
+    empresaSelect.on('change', function() { 
         const empresaId = $(this).val();
         addButton.prop('disabled', true);
 
         if (empresaId) {
-            
-            // --- INICIO: MODIFICACIÓN PARA EVITAR AUTO-INCREMENTO AL EDITAR ---
-            // Si NO estamos editando (IS_EDITING es false), entonces sí buscamos el folio.
-            // Si estamos editando, este bloque se omite y el folio no se toca.
-            if (!IS_EDITING) { //
-                fetch(`/api/get-next-remision/${empresaId}/`) //
+            if (!IS_EDITING) { 
+                fetch(`/api/get-next-remision/${empresaId}/`) 
                     .then(response => response.json())
                     .then(data => {
                         if (data.is_manual) {
+                            // Si es manual, quitamos readonly para que el usuario escriba
                             remisionInput.prop('readonly', false);
                             remisionInput.val('');
                             remisionInput.attr('placeholder', 'Ingrese folio manualmente');
                         } else if (data.next_remision) {
+                            // Si es automático, ponemos el valor y readonly=true
+                            // IMPORTANTE: NO usamos disabled, así el valor se envía.
                             remisionInput.val(data.next_remision);
                             remisionInput.prop('readonly', true);
                             remisionInput.attr('placeholder', '');
@@ -296,10 +286,9 @@ $(document).ready(function() {
                         remisionInput.prop('readonly', false);
                     });
             }
-            // --- FIN: MODIFICACIÓN ---
 
-            // Lógica para cargar catálogos (Esta se ejecuta siempre)
-            fetch(`/api/get-catalogos/${empresaId}/`) //
+            // Lógica para cargar catálogos
+            fetch(`/api/get-catalogos/${empresaId}/`) 
                 .then(response => response.json())
                 .then(data => {
                     cachedCatalogData.materiales = data.materiales || [];
@@ -318,17 +307,18 @@ $(document).ready(function() {
                     });
                 }).finally(() => { addButton.prop('disabled', false); });
         } else {
-            // Si no hay empresa, se vacían los catálogos y se habilita la remisión manual
             cachedCatalogData = { materiales: [], lugares: [] };
             addButton.prop('disabled', true);
-            remisionInput.prop('readonly', false);
-            remisionInput.val('');
-            remisionInput.attr('placeholder', 'Seleccione empresa primero');
+            if (!IS_EDITING) {
+                remisionInput.prop('readonly', false);
+                remisionInput.val('');
+                remisionInput.attr('placeholder', 'Seleccione empresa primero');
+            }
         }
     });
 
-    // --- LÓGICA DEL FORMSET (Añadir/Eliminar/Calcular) ---
-    addButton.on('click', function() { //
+    // --- LÓGICA DEL FORMSET ---
+    addButton.on('click', function() { 
         if (!empresaSelect.val()) {
             alert('Por favor, seleccione una Unidad de Negocio (Empresa) primero.'); return;
         }
@@ -342,17 +332,15 @@ $(document).ready(function() {
         totalFormsInput.val(formIndex + 1);
     });
     
-    // Este JS maneja el clic en el botón de basura
-    // Oculta la fila Y marca el checkbox 'DELETE' para que Django la borre al guardar.
-    formContainer.on('click', '.btn-delete-row', function() { //
-        $(this).closest('.detalle-form-row').find('input[type="checkbox"][name$="-DELETE"]').prop('checked', true).end().hide(); //
+    formContainer.on('click', '.btn-delete-row', function() { 
+        $(this).closest('.detalle-form-row').find('input[type="checkbox"][name$="-DELETE"]').prop('checked', true).end().hide(); 
     });
 
-    formContainer.on('input', '.peso-carga, .peso-descarga', function() { //
+    formContainer.on('input', '.peso-carga, .peso-descarga', function() { 
         const row = $(this).closest('.row');
         const carga = parseFloat(row.find('.peso-carga').val()) || 0;
         const descarga = parseFloat(row.find('.peso-descarga').val()) || 0;
-        const diferencia = descarga - carga; // Cambiado a Descarga - Carga para 'Ganancia'
+        const diferencia = descarga - carga; 
         const labelSpan = row.find('.perdida-calculada-label');
         const valorSpan = row.find('.perdida-calculada-valor');
 
@@ -366,8 +354,8 @@ $(document).ready(function() {
         }
     });
     
-    // --- LÓGICA PARA VISTA PREVIA DE IMÁGENES ---
-    function handleImagePreview(inputElement, previewId) { //
+    // --- IMÁGENES ---
+    function handleImagePreview(inputElement, previewId) { 
         const previewContainer = document.getElementById(previewId);
         if (!previewContainer) return;
 
@@ -389,11 +377,10 @@ $(document).ready(function() {
         }
     }
 
-    function initializePreviews() { //
+    function initializePreviews() { 
         document.querySelectorAll('.image-preview').forEach(preview => {
-            const existingUrl = preview.dataset.existingUrl; //
+            const existingUrl = preview.dataset.existingUrl; 
             if (existingUrl) {
-                // --- INICIO: LÓGICA MEJORADA (PDF/IMAGEN) ---
                 const fileName = existingUrl.split('/').pop().split('?')[0];
                 if (/\.(jpe?g|png|gif|webp)$/i.test(existingUrl)) {
                     const img = document.createElement('img');
@@ -401,26 +388,20 @@ $(document).ready(function() {
                     preview.innerHTML = '';
                     preview.appendChild(img);
                 } else {
-                    // Si no es una imagen (ej. PDF), muestra el ícono de archivo
                     preview.innerHTML = '<div class="text-muted p-3"><i class="fas fa-file-alt fa-2x"></i><br><small>'+ fileName +'</small></div>';
                 }
-                // --- FIN: LÓGICA MEJORADA ---
             } else {
                 preview.innerHTML = '<div class="text-muted p-3"><i class="fas fa-file-alt fa-2x"></i></div>';
             }
         });
     }
     
-    $('#id_evidencia_carga').on('change', function() { handleImagePreview(this, 'preview_evidencia_carga'); }); //
-    $('#id_evidencia_descarga').on('change', function() { handleImagePreview(this, 'preview_evidencia_descarga'); }); //
+    $('#id_evidencia_carga').on('change', function() { handleImagePreview(this, 'preview_evidencia_carga'); }); 
+    $('#id_evidencia_descarga').on('change', function() { handleImagePreview(this, 'preview_evidencia_descarga'); }); 
 
-    // --- EJECUCIÓN INICIAL AL CARGAR LA PÁGINA ---
     initializePreviews();
 
-    // Si la página se carga y ya hay una empresa seleccionada (como en 'editar'),
-    // dispara el evento 'change' para cargar todos los catálogos.
-    // El folio de remisión no se cambiará gracias al 'if (!IS_EDITING)'.
-    if (empresaSelect.val()) { //
+    if (empresaSelect.val()) { 
         empresaSelect.trigger('change');
     } else {
         addButton.prop('disabled', true);
