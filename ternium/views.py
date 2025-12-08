@@ -4,6 +4,7 @@ import io
 import os
 import zipfile
 import datetime
+from django.db import IntegrityError # <--- AGREGAR ESTO AL INICIO DE views.py
 import decimal
 from django.db.models import Count, Sum, F, Avg, Q, FloatField, Case, When, Value
 from django.db.models.functions import TruncMonth, Coalesce # <-- AGREGAR ESTA LÍNEA
@@ -637,7 +638,6 @@ def crear_remision(request):
             except (Empresa.DoesNotExist, ValueError):
                 pass
         
-        # Pasamos la empresa al form para filtrar los catálogos
         form = RemisionForm(request.POST, request.FILES, empresa=empresa_seleccionada)
         
         material_qs = Material.objects.filter(empresas=empresa_seleccionada) if empresa_seleccionada else Material.objects.none()
@@ -650,37 +650,57 @@ def crear_remision(request):
         )
 
         if form.is_valid() and formset.is_valid():
-            try:
-                with transaction.atomic(): 
-                    remision = form.save(commit=False)
-                    
-                    # --- LÓGICA DE FOLIO CORREGIDA ---
-                    if not empresa_seleccionada or not empresa_seleccionada.prefijo:
-                        # Si no hay prefijo, validamos que el usuario haya escrito algo manualmente
-                        if not remision.remision:
-                             raise ValidationError("La empresa no tiene prefijo y no se ingresó folio manual.")
-                    else:
-                        # Recalculamos el folio justo antes de guardar para evitar duplicados
-                        # y asegurar que el consecutivo sea correcto (superando el 1000)
-                        remision.remision = calcular_siguiente_folio(empresa_seleccionada.prefijo)
-                    # ---------------------------------
+            # --- SOLUCIÓN CONCURRENCIA: INTENTOS AUTOMÁTICOS ---
+            max_intentos = 5
+            guardado_exitoso = False
+            intento_actual = 0
+            
+            while intento_actual < max_intentos and not guardado_exitoso:
+                try:
+                    # Iniciamos una transacción atómica para este intento
+                    with transaction.atomic(): 
+                        remision = form.save(commit=False)
+                        
+                        # --- CÁLCULO DE FOLIO ---
+                        if not empresa_seleccionada or not empresa_seleccionada.prefijo:
+                            if not remision.remision:
+                                raise ValidationError("La empresa no tiene prefijo y no se ingresó folio manual.")
+                        else:
+                            # Calculamos el folio AL MOMENTO de guardar
+                            remision.remision = calcular_siguiente_folio(empresa_seleccionada.prefijo)
+                        # ------------------------
 
-                    remision.save() 
-                    
-                    formset.instance = remision
-                    formset.save()
-                    
-                    # Guardado final para actualizar estatus
-                    remision.save()
-                    
-                    # Actualizar inventarios
-                    _update_inventory_from_remision(remision, revert=False)
-                    
-                    messages.success(request, f'Remisión {remision.remision} creada exitosamente.')
-                    return redirect('remision_lista')
+                        # Intentamos guardar. Si el folio ya existe (por otro usuario), 
+                        # esto lanzará IntegrityError y saltaremos al 'except'
+                        remision.save() 
+                        
+                        formset.instance = remision
+                        formset.save()
+                        
+                        # Guardado final para actualizar estatus
+                        remision.save()
+                        
+                        # Actualizar inventarios
+                        _update_inventory_from_remision(remision, revert=False)
+                        
+                        # Si llegamos aquí, todo salió bien
+                        guardado_exitoso = True
+                        messages.success(request, f'Remisión {remision.remision} creada exitosamente.')
+                        return redirect('remision_lista')
                 
-            except Exception as e:
-                messages.error(request, f'Ocurrió un error al guardar: {e}')
+                except IntegrityError:
+                    # ¡AQUÍ ESTÁ LA MAGIA!
+                    # Si falla porque el folio ya existe, incrementamos el contador 
+                    # y el 'while' volverá a ejecutar el código, calculando el folio SIGUIENTE.
+                    intento_actual += 1
+                    if intento_actual >= max_intentos:
+                        messages.error(request, 'El sistema está recibiendo demasiadas solicitudes simultáneas. Por favor intente de nuevo.')
+                
+                except Exception as e:
+                    # Otros errores no relacionados con el folio rompen el bucle
+                    messages.error(request, f'Ocurrió un error al guardar: {e}')
+                    break 
+                    
     else:
         form = RemisionForm()
         formset = DetalleFormSet(
