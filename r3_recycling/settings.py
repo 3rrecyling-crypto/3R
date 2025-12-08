@@ -161,3 +161,16 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CSRF_TRUSTED_ORIGINS = [
     "https://threer-recycling.onrender.com",
 ]
+
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER') 
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = 'Soporte 3R Recycling <3rrecycling@gmail.com>'
+
+# TIEMPO DE SESIÓN (Para "Recordar sesión")
+SESSION_COOKIE_AGE = 1209600  # 2 semanas por defecto (en segundos)
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True # Por defecto se cierra al salir, el checkbox cambiará esto

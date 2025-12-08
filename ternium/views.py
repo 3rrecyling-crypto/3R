@@ -1744,70 +1744,88 @@ from .models import Profile # Asegúrate de que Profile esté importado
 @login_required
 def vista_perfil(request):
     user = request.user
-    # Se usa transaction.atomic para asegurar que todos los cambios se guarden o ninguno.
-    with transaction.atomic():
-        profile, created = Profile.objects.select_for_update().get_or_create(user=user)
     
+    # Inicializamos el formulario de contraseña (se usará en GET y POST)
     password_form = PasswordChangeForm(user)
 
     if request.method == 'POST':
-        # --- Formulario para actualizar la información del perfil ---
+        # --- CASO 1: ACTUALIZAR INFORMACIÓN DEL PERFIL ---
         if 'update_profile' in request.POST:
-            user.first_name = request.POST.get('first_name', '')
-            user.last_name = request.POST.get('last_name', '')
-            user.email = request.POST.get('email', '')
-            user.save()
+            try:
+                # Actualizar datos del modelo User
+                user.first_name = request.POST.get('first_name', user.first_name)
+                user.last_name = request.POST.get('last_name', user.last_name)
+                user.email = request.POST.get('email', user.email)
+                user.save()
 
-            profile.area = request.POST.get('area', '')
-            profile.empresa = request.POST.get('empresa', '')
-            profile.telefono = request.POST.get('telefono', '')
-
-            # --- INICIO: LÓGICA MODIFICADA PARA SUBIR AVATAR A S3 ---
-            if 'avatar' in request.FILES:
-                archivo_avatar = request.FILES['avatar']
-                
-                # 1. Obtenemos la ruta del avatar antiguo para poder borrarlo después.
-                #    Nos aseguramos de no intentar borrar el avatar por defecto.
-                ruta_avatar_antiguo = None
-                if profile.avatar and profile.avatar.name != 'avatars/default-avatar.png':
-                    ruta_avatar_antiguo = profile.avatar.name
-
-                # 2. Construimos la nueva ruta en S3.
-                s3_path_relativa = f"avatars/user_{user.id}/{archivo_avatar.name}"
-                
-                # 3. Subimos el nuevo archivo usando la función auxiliar.
-                ruta_guardada = _subir_archivo_a_s3(archivo_avatar, s3_path_relativa)
-
-                if ruta_guardada:
-                    # 4. Asignamos la nueva ruta al perfil.
-                    profile.avatar = ruta_guardada
+                # Actualizar datos del modelo Profile (ternium_profile)
+                if hasattr(user, 'ternium_profile'):
+                    profile = user.ternium_profile
+                    profile.telefono = request.POST.get('telefono', profile.telefono)
+                    profile.area = request.POST.get('area', profile.area)
+                    profile.empresa = request.POST.get('empresa', profile.empresa)
                     
-                    # 5. Si la subida fue exitosa y había un avatar antiguo, lo eliminamos.
-                    if ruta_avatar_antiguo:
-                        _eliminar_archivo_de_s3(ruta_avatar_antiguo)
-                else:
-                    messages.error(request, "Hubo un error al subir tu nueva foto de perfil.")
-            # --- FIN: LÓGICA MODIFICADA ---
-            
-            profile.save()
-            messages.success(request, '¡Tu perfil se ha actualizado correctamente!')
-            return redirect('perfil')
+                    # Manejo de archivo (Avatar)
+                    if 'avatar' in request.FILES:
+                        profile.avatar = request.FILES['avatar']
+                    
+                    profile.save()
+                
+                messages.success(request, 'Tu información de perfil ha sido actualizada.')
+                return redirect('perfil')
+            except Exception as e:
+                messages.error(request, f'Ocurrió un error al actualizar el perfil: {e}')
 
-        # --- Formulario para cambiar la contraseña (sin cambios) ---
+        # --- CASO 2: CAMBIAR CONTRASEÑA ---
         elif 'change_password' in request.POST:
             password_form = PasswordChangeForm(user, request.POST)
             if password_form.is_valid():
                 user = password_form.save()
-                update_session_auth_hash(request, user)
-                messages.success(request, '¡Tu contraseña fue cambiada con éxito!')
+                # Importante: Mantener la sesión activa tras cambiar contraseña
+                update_session_auth_hash(request, user) 
+                messages.success(request, 'Tu contraseña ha sido actualizada correctamente.')
                 return redirect('perfil')
             else:
-                messages.error(request, 'No se pudo cambiar la contraseña. Por favor, corrige los errores.')
+                messages.error(request, 'Error al cambiar contraseña. Revisa los campos.')
 
-    user_groups = user.groups.all()
+    # =======================================================
+    # LÓGICA PARA MOSTRAR PERMISOS (SOLICITADO)
+    # =======================================================
+    permisos_usuario = user.get_all_permissions()
+    lista_permisos_legibles = []
+    
+    # Diccionario para traducir los códigos técnicos a texto amigable
+    nombres_amigables = {
+        # Permisos Ternium / Operaciones
+        'ternium.acceso_dashboard_patio': 'Dashboard de Patios',
+        'ternium.acceso_remisiones': 'Módulo de Remisiones',
+        'ternium.acceso_ia': 'Asistente de IA',
+        'ternium.acceso_catalogos': 'Catálogos Operativos',
+        'ternium.acceso_reportes_kpi': 'Reportes y KPIs',
+        'ternium.view_ternium_module': 'Logística General',
+        
+        # Permisos Compras
+        'compras.acceso_compras': 'Gestión de Compras',
+        'compras.aprobar_solicitudes': 'Aprobar Solicitudes',
+        
+        # Permisos CXP
+        'cuentas_por_pagar.acceso_cxp': 'Cuentas por Pagar',
+        'cuentas_por_pagar.autorizar_pagos': 'Autorizar Pagos',
+    }
+
+    for perm_code in permisos_usuario:
+        if perm_code in nombres_amigables:
+            lista_permisos_legibles.append(nombres_amigables[perm_code])
+        # Opcional: Si quieres mostrar otros permisos estándar de Django, descomenta esto:
+        # else:
+        #     lista_permisos_legibles.append(perm_code.split('.')[1].replace('_', ' ').capitalize())
+
+    lista_permisos_legibles.sort()
+
     context = {
         'password_form': password_form,
-        'user_groups': user_groups
+        'user_groups': user.groups.all(),
+        'permisos_detallados': lista_permisos_legibles, # <--- Enviamos la lista al HTML
     }
     return render(request, 'ternium/perfil.html', context)
 
@@ -2479,3 +2497,24 @@ def dashboard_remisiones_view(request):
         context['kpi_merma_perc'] = 0
 
     return render(request, 'ternium/dashboard_remisiones.html', context)
+
+
+from django.contrib.auth import login
+from django.contrib.auth.views import LoginView
+from .forms import LoginForm
+
+class CustomLoginView(LoginView):
+    form_class = LoginForm
+    template_name = 'registration/login.html'
+
+    def form_valid(self, form):
+        # Lógica de "Recordar sesión"
+        remember_me = form.cleaned_data.get('remember_me')
+        if not remember_me:
+            # Si NO marcó recordar, la sesión expira al cerrar el navegador
+            self.request.session.set_expiry(0)
+        else:
+            # Si SÍ marcó, usa la duración de SESSION_COOKIE_AGE (2 semanas)
+            self.request.session.modified = True
+        
+        return super().form_valid(form)

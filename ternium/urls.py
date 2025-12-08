@@ -2,6 +2,7 @@
 
 from django.urls import path
 from . import views
+from .forms import LoginForm # Importa tu form nuevo
 from .views import (
     UnidadDetailView, UnidadUpdateView, LugarDetailView, LugarUpdateView, 
     EmpresaDetailView, EmpresaUpdateView, ContenedorDetailView, ContenedorUpdateView,
@@ -138,4 +139,8 @@ urlpatterns = [
     # Portal específico para clientes/ternium
     path('ternium/', views.home_portal_view, name='ternium_portal'),
     path('portal/', views.home_portal_view, name='home_portal'),
+    path('login/', auth_views.LoginView.as_view(
+    template_name='registration/login.html',
+    authentication_form=LoginForm # <--- USA TU FORM AQUÍ
+), name='login'),
 ]

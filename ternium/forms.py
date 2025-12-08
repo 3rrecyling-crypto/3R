@@ -456,3 +456,10 @@ class ImportarRemisionesForm(forms.Form):
         label="Selecciona el archivo Excel (.xlsx)",
         help_text="El archivo debe tener las columnas correctas: Remision, Fecha, Empresa, Operador, etc."
     )
+    
+    
+from django.contrib.auth.forms import AuthenticationForm
+from django import forms
+
+class LoginForm(AuthenticationForm):
+    remember_me = forms.BooleanField(required=False, label="Recordar sesión")
