@@ -220,6 +220,13 @@ class Factura(models.Model):
             })
         
         return plazos
+    
+    class Meta:
+        permissions = [
+            ("acceso_cxp", "Acceso al Módulo Cuentas por Pagar"),
+            ("autorizar_pagos", "Puede autorizar pagos"),
+            ("ver_reportes_cxp", "Puede ver reportes de CXP"),
+        ]
 
     def _get_estado_plazo(self, numero_plazo):
         """Determina el estado de un plazo específico"""

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Sistema de Gestión de Reciclaje 3R RECYCLING">
-    <title>{% block title %}Gestión de Operaciónes en Reciclaje{% endblock %}</title>
+    <title>{% block title %}Gestión de Operaciones en Reciclaje{% endblock %}</title>
     
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
@@ -35,11 +35,7 @@
             --transition-base: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Roboto', sans-serif;
@@ -51,7 +47,7 @@
             line-height: 1.6;
         }
 
-        /* Mejoras en la navegación */
+        /* Navbar */
         .navbar {
             background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -63,16 +59,14 @@
 
         .navbar-brand {
             font-weight: 700;
-            font-size: 1.5rem;
+            font-size: 1.6rem; /* Ligeramente más grande */
             display: flex;
             align-items: center;
             color: white !important;
             transition: var(--transition-base);
         }
 
-        .navbar-brand:hover {
-            transform: translateY(-2px);
-        }
+        .navbar-brand:hover { transform: translateY(-2px); }
 
         .navbar-brand img {
             margin-right: 12px;
@@ -83,9 +77,7 @@
             transition: var(--transition-base);
         }
 
-        .navbar-brand:hover img {
-            transform: rotate(-5deg);
-        }
+        .navbar-brand:hover img { transform: rotate(-5deg); }
 
         .navbar-nav .nav-link {
             color: rgba(255, 255, 255, 0.9) !important;
@@ -110,9 +102,7 @@
         }
 
         .navbar-nav .nav-link:hover::after,
-        .navbar-nav .nav-link.active::after {
-            width: 70%;
-        }
+        .navbar-nav .nav-link.active::after { width: 70%; }
 
         .navbar-nav .nav-link:hover,
         .navbar-nav .nav-link.active {
@@ -120,9 +110,7 @@
             color: white !important;
         }
 
-        /* ------------------------- */
-        /* PERFIL DE USUARIO MEJORADO */
-        /* ------------------------- */
+        /* User Profile */
         .user-profile {
             display: flex;
             align-items: center;
@@ -133,30 +121,18 @@
             position: relative;
         }
 
-        .user-profile:hover {
-            background: rgba(255, 255, 255, 0.15);
-        }
+        .user-profile:hover { background: rgba(255, 255, 255, 0.15); }
 
         .user-avatar {
-            width: 70px;
-            height: 68px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             object-fit: cover;
-            border: 3px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
-            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
-        .user-profile:hover .user-avatar {
-            transform: scale(1.1);
-            border-color: rgba(255, 255, 255, 0.4);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-        }
-
-        .user-info {
-            display: flex;
-            flex-direction: column;
-        }
+        .user-info { display: flex; flex-direction: column; }
 
         .user-name {
             font-weight: 600;
@@ -172,7 +148,12 @@
             font-weight: 400;
         }
 
-        /* Menú desplegable mejorado */
+        /* Dropdown Menus */
+        .dropdown-menu-dark {
+            background-color: #343a40;
+            border: 1px solid rgba(0,0,0,0.15);
+        }
+        
         .dropdown-menu-user {
             min-width: 240px;
             border: none;
@@ -185,8 +166,8 @@
 
         .dropdown-menu-user .dropdown-header {
             padding: 12px 16px;
-            background: rgba(0, 0, 0, 0.1);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(0, 0, 0, 0.05);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
         }
 
         .dropdown-menu-user .dropdown-item {
@@ -200,24 +181,18 @@
             width: 24px;
             text-align: center;
             margin-right: 10px;
-            color: rgba(255, 255, 255, 0.7);
+            color: var(--gray-color);
         }
 
         .dropdown-menu-user .dropdown-item:hover {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(26, 115, 232, 0.05);
             padding-left: 20px;
+            color: var(--primary-color);
         }
+        
+        .dropdown-menu-user .dropdown-item:hover i { color: var(--primary-color); }
 
-        .dropdown-menu-user .dropdown-item:hover i {
-            color: var(--accent-color);
-        }
-
-        .dropdown-divider {
-            border-color: rgba(255, 255, 255, 0.05);
-            margin: 0.25rem 0;
-        }
-
-        /* Contenido principal mejorado */
+        /* Main Container */
         .main-container {
             margin-top: 30px;
             margin-bottom: 40px;
@@ -230,78 +205,7 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Cards mejoradas */
-        .card {
-            border: none;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: var(--card-shadow);
-            transition: var(--transition-base);
-            margin-bottom: 25px;
-            background-color: white;
-        }
-
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--hover-shadow);
-        }
-
-        /* Tablas más accesibles */
-        .table {
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-            border-collapse: separate;
-            border-spacing: 0;
-        }
-
-        .table th {
-            position: sticky;
-            top: 0;
-        }
-
-        /* Botones mejorados */
-        .btn {
-            transition: var(--transition-base);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .btn-primary {
-            background: var(--primary-color);
-            border: none;
-            padding: 0.6rem 1.5rem;
-            border-radius: 8px;
-            font-weight: 500;
-        }
-
-        .btn-primary:hover {
-            background: var(--primary-dark);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 10px rgba(26, 115, 232, 0.3);
-        }
-
-        .btn-primary:active {
-            transform: translateY(0);
-        }
-
-        /* Efecto Ripple */
-        .ripple-effect {
-            position: absolute;
-            border-radius: 50%;
-            background-color: rgba(255, 255, 255, 0.6);
-            transform: scale(0);
-            animation: ripple-animation 0.8s linear;
-        }
-
-        @keyframes ripple-animation {
-            to {
-                transform: scale(4);
-                opacity: 0;
-            }
-        }
-        
-        /* Footer mejorado */
+        /* Footer */
         .footer {
             background: var(--dark-color);
             color: rgba(255, 255, 255, 0.8);
@@ -317,76 +221,9 @@
             transition: color 0.3s ease;
         }
         
-        .footer-links a:hover {
-            color: white;
-        }
+        .footer-links a:hover { color: white; }
 
-        /* Efectos de carga mejorados */
-        .skeleton {
-            animation: skeleton-loading 1.5s linear infinite alternate;
-            opacity: 0.7;
-            border-radius: 4px;
-        }
-
-        @keyframes skeleton-loading {
-            0% { background-color: hsl(200, 20%, 80%); }
-            100% { background-color: hsl(200, 20%, 95%); }
-        }
-
-        /* Mejoras en responsive */
-        @media (max-width: 992px) {
-            .navbar-nav .nav-link {
-                padding: 0.6rem 0.8rem;
-                margin: 3px 0;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .container-fluid {
-                padding-left: 15px;
-                padding-right: 15px;
-            }
-            .stat-card .number {
-                font-size: 1.8rem;
-            }
-            
-            .user-profile {
-                padding: 0.5rem 0.75rem;
-            }
-            
-            .user-avatar {
-                width: 40px;
-                height: 40px;
-            }
-            
-            .user-name {
-                font-size: 0.85rem;
-            }
-            
-            .user-role {
-                display: none;
-            }
-        }
-
-        /* Dark mode opcional */
-        @media (prefers-color-scheme: dark) {
-            body {
-                background: #121212;
-                color: #f5f5f5;
-            }
-            .card, .stat-card, .chart-container, .table, .table tbody tr {
-                background: #1e1e1e;
-                color: #f5f5f5;
-            }
-            .table thead th {
-                background-color: #2d2d2d;
-            }
-            .table tbody tr:hover {
-                background-color: rgba(251, 188, 5, 0.15);
-            }
-        }
-
-        /* Indicador de estado de usuario */
+        /* Status Indicator */
         #user-self-status-indicator {
             font-size: 0.65rem;
             vertical-align: middle;
@@ -399,77 +236,123 @@
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container-fluid">
             <a class="navbar-brand" href="{% url 'home' %}">
-                <img src="{% static 'r3_recycling/img/logo.png' %}" alt="Logo" height="77" class="d-inline-block align-text-top" loading="lazy">
+                <img src="{% static 'r3_recycling/img/logo.png' %}" alt="Logo" height="65" class="d-inline-block align-text-top loading="lazy">
                 <span>3R RECYCLING</span>
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
+            
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    
+                    {% if perms.ternium.acceso_dashboard_patio %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'home' %}"><i class="fas fa-route me-1"></i> Operaciones</a>
+                        <a class="nav-link" href="{% url 'dashboard_operaciones' %}">
+                            <i class="fas fa-warehouse me-1"></i> Operaciones
+                        </a>
                     </li>
+                    {% endif %}
+
+                    {% if perms.ternium.acceso_remisiones %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'conversation_list' %}"><i class="fas fa-comments me-1"></i> Chat</a>
+                        <a class="nav-link" href="{% url 'remision_lista' %}">
+                            <i class="fas fa-file-invoice me-1"></i> Remisiones
+                        </a>
                     </li>
+                    {% endif %}
+
+                    {% if perms.ternium.acceso_ia %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'asistente_ia' %}">
-                            <i class="fas fa-robot"></i> Asistente IA
+                            <i class="fas fa-robot me-1"></i> Asistente IA
                         </a>
                     </li>
-                   <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownCuentasPagar" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    {% endif %}
+
+                    {% if perms.cuentas_por_pagar.acceso_cxp %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navCXP" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-money-bill-wave me-1"></i> Cuentas por Pagar
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navbarDropdownCuentasPagar">
-                            <li><a class="dropdown-item" href="{% url 'dashboard_cuentas_por_pagar' %}"><i class="fas fa-chart-pie fa-fw me-2"></i> Dashboard CxP</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{% url 'lista_facturas' %}"><i class="fas fa-file-invoice fa-fw me-2"></i> Facturas</a></li>
-                            <li><a class="dropdown-item" href="{% url 'lista_pagos' %}"><i class="fas fa-cash-register fa-fw me-2"></i> Pagos</a></li>
+                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navCXP">
+                            <li><a class="dropdown-item" href="{% url 'dashboard_cuentas_por_pagar' %}">
+                                <i class="fas fa-tachometer-alt fa-fw me-2"></i> Dashboard CXP
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'lista_facturas' %}">
+                                <i class="fas fa-receipt fa-fw me-2"></i> Facturas
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'lista_pagos' %}">
+                                <i class="fas fa-cash-register fa-fw me-2"></i> Pagos
+                            </a></li>
                         </ul>
                     </li>
+                    {% endif %}
+
+                    {% if perms.compras.acceso_compras %}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownCompras" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <a class="nav-link dropdown-toggle" href="#" id="navCompras" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-shopping-cart me-1"></i> Compras
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navbarDropdownCompras">
-                            <li><a class="dropdown-item" href="{% url 'dashboard_compras' %}"><i class="fas fa-tachometer-alt fa-fw me-2"></i> Dashboard</a></li>
+                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navCompras">
+                            <li><h6 class="dropdown-header text-uppercase small text-muted">Gestión</h6></li>
+                            <li><a class="dropdown-item" href="{% url 'dashboard_compras' %}">
+                                <i class="fas fa-chart-bar fa-fw me-2"></i> Dashboard
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'lista_solicitudes' %}">
+                                <i class="fas fa-file-alt fa-fw me-2"></i> Solicitudes
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'lista_ordenes_compra' %}">
+                                <i class="fas fa-file-invoice fa-fw me-2"></i> Órdenes de Compra
+                            </a></li>
+                            
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{% url 'lista_solicitudes' %}"><i class="fas fa-file-alt fa-fw me-2"></i> Solicitudes de Compra</a></li>
-                            <li><a class="dropdown-item" href="{% url 'lista_ordenes_compra' %}"><i class="fas fa-file-invoice-dollar fa-fw me-2"></i> Órdenes de Compra</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownCatalogos" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-book me-1"></i> Catálogos
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navbarDropdownCatalogos">
-                            <li><a class="dropdown-item" href="{% url 'lista_empresas' %}"><i class="fas fa-hashtag fa-fw me-2"></i> Operaciones Folios</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{% url 'lista_lineas_transporte' %}"><i class="fas fa-truck-fast fa-fw me-2"></i> Líneas de Transporte</a></li>
-                            <li><a class="dropdown-item" href="{% url 'lista_operadores' %}"><i class="fas fa-id-card fa-fw me-2"></i> Operadores</a></li>
-                            <li><a class="dropdown-item" href="{% url 'lista_materiales' %}"><i class="fas fa-cubes fa-fw me-2"></i> Materiales</a></li>
-                            <li><a class="dropdown-item" href="{% url 'lista_unidades' %}"><i class="fas fa-truck-pickup fa-fw me-2"></i> Unidades</a></li>
-                            <li><a class="dropdown-item" href="{% url 'lista_contenedores' %}"><i class="fas fa-box fa-fw me-2"></i> Contenedores</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{% url 'lista_lugares' %}"><i class="fas fa-map-marker-alt fa-fw me-2"></i> Orígenes y Destinos</a></li>
+                            <li><h6 class="dropdown-header text-uppercase small text-muted">Catálogos de Compra</h6></li>
                             <li><a class="dropdown-item" href="{% url 'lista_proveedores' %}"><i class="fas fa-truck fa-fw me-2"></i> Proveedores</a></li>
-                            <li><a class="dropdown-item" href="{% url 'lista_articulos' %}"><i class="fas fa-boxes fa-fw me-2"></i> Artículos</a></li>
+                            <li><a class="dropdown-item" href="{% url 'lista_articulos' %}"><i class="fas fa-boxes fa-fw me-2"></i> Artículos / Servicios</a></li>
                             <li><a class="dropdown-item" href="{% url 'lista_categorias' %}"><i class="fas fa-tags fa-fw me-2"></i> Categorías</a></li>
                         </ul>
                     </li>
+                    {% endif %}
+
+                    {% if perms.ternium.acceso_catalogos %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navCatalogos" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-database me-1"></i> Catálogos
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navCatalogos">
+                            <li><a class="dropdown-item" href="{% url 'lista_empresas' %}"><i class="fas fa-building fa-fw me-2"></i> Empresas / Folios</a></li>
+                            <li><a class="dropdown-item" href="{% url 'lista_lugares' %}"><i class="fas fa-map-marker-alt fa-fw me-2"></i> Orígenes y Destinos</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'lista_operadores' %}"><i class="fas fa-id-card fa-fw me-2"></i> Operadores</a></li>
+                            <li><a class="dropdown-item" href="{% url 'lista_unidades' %}"><i class="fas fa-truck fa-fw me-2"></i> Unidades</a></li>
+                            <li><a class="dropdown-item" href="{% url 'lista_contenedores' %}"><i class="fas fa-box fa-fw me-2"></i> Contenedores</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'lista_materiales' %}"><i class="fas fa-cubes fa-fw me-2"></i> Materiales (Carga)</a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
+                    
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'conversation_list' %}">
+                            <i class="fas fa-comments me-1"></i> Chat
+                        </a>
+                    </li>
                 </ul>
+
                 <div class="d-flex align-items-center">
                     {% if user.is_authenticated %}
-                        <a href="{% url 'conversation_list' %}" class="text-white me-3 position-relative" id="chat-notification-icon" aria-label="Notificaciones de Chat">
+                        
+                        <a href="{% url 'conversation_list' %}" class="text-white me-3 position-relative" id="chat-notification-icon">
                             <i class="fas fa-bell fa-lg"></i>
                             <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="chat-notification-badge" style="display: none;">
                                 0
                             </span>
                         </a>
+
                         <div class="dropdown">
-                            <a href="#" class="user-profile text-decoration-none dropdown-toggle" id="dropdownUser" data-bs-toggle="dropdown" aria-expanded="false">
+                            <a href="#" class="user-profile text-decoration-none dropdown-toggle" id="dropdownUser" data-bs-toggle="dropdown">
                                 {% if user.is_authenticated and user.ternium_profile and user.ternium_profile.avatar %}
                                     <img src="{{ user.ternium_profile.avatar.url }}" alt="User" class="user-avatar">
                                 {% else %}
@@ -479,11 +362,11 @@
                                     <span class="user-name">{{ user.username }}</span>
                                     <small class="user-role">
                                         <span class="badge rounded-pill bg-secondary" id="user-self-status-indicator">Desconectado</span>
-                                        {% if user.is_staff %}Administrador{% else %}Usuario{% endif %}
+                                        {% if user.is_staff %}Admin{% else %}Usuario{% endif %}
                                     </small>
                                 </div>
                             </a>
-                            <ul class="dropdown-menu dropdown-menu-user dropdown-menu-end shadow" aria-labelledby="dropdownUser">
+                            <ul class="dropdown-menu dropdown-menu-user dropdown-menu-end shadow">
                                 <li class="dropdown-header">
                                     <div class="d-flex align-items-center">
                                         {% if user.is_authenticated and user.ternium_profile and user.ternium_profile.avatar %}
@@ -503,15 +386,13 @@
                                 <li>
                                     <form action="{% url 'logout' %}" method="post" class="d-inline w-100">
                                         {% csrf_token %}
-                                        <button type="submit" class="dropdown-item">
-                                            <i class="fas fa-sign-out-alt fa-fw"></i> Cerrar Sesión
-                                        </button>
+                                        <button type="submit" class="dropdown-item"><i class="fas fa-sign-out-alt fa-fw"></i> Cerrar Sesión</button>
                                     </form>
                                 </li>
                             </ul>
                         </div>
                     {% else %}
-                        <a href="{% url 'login' %}" class="btn btn-light btn-sm btn-ripple">
+                        <a href="{% url 'login' %}" class="btn btn-light btn-sm">
                             <i class="fas fa-sign-in-alt me-1"></i> Iniciar Sesión
                         </a>
                     {% endif %}
@@ -521,28 +402,25 @@
     </nav>
 
     <div class="container-fluid main-container">
-        {% comment %}
+        
         {% if messages %}
             {% for message in messages %}
-            <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+            <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show shadow-sm" role="alert">
                 {{ message }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
             {% endfor %}
         {% endif %}
-        {% endcomment %}
-
+        
         {% block content %}
         {% endblock %}
     </div>
 
     <footer class="footer">
         <div class="container-fluid">
-            <p class="mb-2">&copy; <span id="current-year"></span> 3r recycling - Sistema de Gestión de Transporte. Todos los derechos reservados.</p>
+            <p class="mb-2">&copy; <span id="current-year"></span> 3R Recycling.</p>
             <div class="footer-links">
                 <a href="#"><i class="fas fa-shield-alt me-1"></i> Privacidad</a>
-                <a href="#"><i class="fas fa-file-contract me-1"></i> Términos</a>
-                <a href="#"><i class="fas fa-question-circle me-1"></i> Soporte</a>
                 <a href="#"><i class="fas fa-envelope me-1"></i> Contacto</a>
             </div>
         </div>
@@ -555,77 +433,11 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Actualizar año en el footer
             document.getElementById('current-year').textContent = new Date().getFullYear();
-            
-            // Efecto ripple para botones
-            document.querySelectorAll('.btn-ripple').forEach(button => {
-                button.addEventListener('click', function(e) {
-                    const rect = this.getBoundingClientRect();
-                    const ripple = document.createElement('span');
-                    
-                    ripple.className = 'ripple-effect';
-                    ripple.style.left = `${e.clientX - rect.left}px`;
-                    ripple.style.top = `${e.clientY - rect.top}px`;
-                    
-                    this.appendChild(ripple);
-                    
-                    setTimeout(() => {
-                        ripple.remove();
-                    }, 800);
-                });
-            });
-            
-            // Inicializar gráficos si existen en la página
-            if (document.getElementById('dieselChart')) {
-                initDieselChart();
-            }
         });
-        
-        function initDieselChart() {
-            const ctx = document.getElementById('dieselChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul'],
-                    datasets: [{
-                        label: 'Consumo de Diesel (L)',
-                        data: [5200, 5800, 5400, 6100, 5900, 6500, 6300],
-                        backgroundColor: 'rgba(26, 115, 232, 0.1)',
-                        borderColor: 'var(--primary-color)',
-                        borderWidth: 3,
-                        tension: 0.4,
-                        pointBackgroundColor: 'var(--primary-color)',
-                        pointRadius: 5,
-                        pointHoverRadius: 7,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                            padding: 12,
-                            titleFont: { size: 14, weight: 'bold' },
-                            bodyFont: { size: 13 }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: false,
-                            grid: { color: 'rgba(0, 0, 0, 0.05)' },
-                            ticks: { callback: (value) => value + ' L' }
-                        },
-                        x: {
-                            grid: { display: false }
-                        }
-                    }
-                }
-            });
-        }
     </script>
+    
     {% block extra_js %}{% endblock %}
+
     {% if user.is_authenticated %}
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -633,30 +445,25 @@
             const currentUserId = "{{ user.id }}";
             let presenceSocket = null;
             let inactivityTimer;
-            const INACTIVITY_TIMEOUT = 20 * 60 * 1000; // 20 minutos
+            const INACTIVITY_TIMEOUT = 20 * 60 * 1000; // 20 minutos de inactividad
 
-            // --- LÓGICA DE INACTIVIDAD ---
             function setUserStatusAway() {
                 if (presenceSocket && presenceSocket.readyState === WebSocket.OPEN) {
-                    console.log('Usuario inactivo. Cambiando estado a Ausente.');
                     presenceSocket.send(JSON.stringify({ 'status': 'away' }));
                 }
             }
 
             function resetInactivityTimer() {
-                // Si el usuario estaba 'Ausente', lo vuelve a poner 'Conectado' al detectar actividad
+                // Si estaba Ausente, volver a Conectado
                 if (statusIndicator && statusIndicator.textContent === 'Ausente') {
                     if (presenceSocket && presenceSocket.readyState === WebSocket.OPEN) {
-                        console.log('Usuario activo de nuevo. Cambiando estado a Conectado.');
                         presenceSocket.send(JSON.stringify({ 'status': 'online' }));
                     }
                 }
-                // Limpia el temporizador anterior y establece uno nuevo
                 clearTimeout(inactivityTimer);
                 inactivityTimer = setTimeout(setUserStatusAway, INACTIVITY_TIMEOUT);
             }
 
-            // --- CONEXIÓN WEBSOCKET ---
             function connect() {
                 const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
                 presenceSocket = new WebSocket(
@@ -664,14 +471,11 @@
                 );
 
                 presenceSocket.onopen = function(e) {
-                    console.log('Socket de presencia conectado.');
-                    // Inicia el temporizador de inactividad en cuanto se conecta
                     resetInactivityTimer();
                 };
 
                 presenceSocket.onclose = function(e) {
-                    console.log('Socket de presencia cerrado. Reconectando en 5 segundos...');
-                    clearTimeout(inactivityTimer); // Detiene el temporizador al desconectar
+                    clearTimeout(inactivityTimer);
                     if (statusIndicator) {
                         statusIndicator.textContent = 'Desconectado';
                         statusIndicator.classList.remove('bg-success', 'bg-warning');
@@ -684,7 +488,6 @@
                     const data = JSON.parse(e.data);
                     
                     if (data.type === 'presence') {
-                        // Actualiza el indicador de estado del propio usuario
                         if (data.user_id == currentUserId && statusIndicator) {
                             if (data.status === 'online') {
                                 statusIndicator.textContent = 'Conectado';
@@ -694,7 +497,7 @@
                                 statusIndicator.textContent = 'Ausente';
                                 statusIndicator.classList.remove('bg-success', 'bg-secondary');
                                 statusIndicator.classList.add('bg-warning');
-                            } else { // 'offline'
+                            } else {
                                 statusIndicator.textContent = 'Desconectado';
                                 statusIndicator.classList.remove('bg-success', 'bg-warning');
                                 statusIndicator.classList.add('bg-secondary');
@@ -703,7 +506,6 @@
                     }
                     
                     if (data.type === 'chat_notification') {
-                        console.log('Nueva notificación de chat:', data.message);
                         const badge = document.getElementById('chat-notification-badge');
                         if (badge) {
                             const currentCount = parseInt(badge.textContent) || 0;
@@ -712,19 +514,11 @@
                         }
                     }
                 };
-
-                presenceSocket.onerror = function(err) {
-                    console.error('Error en socket de presencia:', err.message);
-                    presenceSocket.close();
-                };
             }
 
-            // Inicia la conexión
             connect();
 
-            // Añade listeners para detectar actividad y reiniciar el temporizador
-            const activityEvents = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'];
-            activityEvents.forEach(eventName => {
+            ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'].forEach(eventName => {
                 document.addEventListener(eventName, resetInactivityTimer, false);
             });
         });

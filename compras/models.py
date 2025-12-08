@@ -428,6 +428,14 @@ class OrdenCompra(models.Model):
     @property
     def total_general(self):
         return self.total_subtotal + self.total_iva - self.total_retenciones
+    
+    class Meta:
+        # ... (otras configuraciones meta si tienes) ...
+        permissions = [
+            ("acceso_compras", "Acceso al Módulo de Compras"),
+            ("aprobar_solicitudes", "Puede aprobar solicitudes de compra"),
+            ("ver_reportes_compras", "Puede ver reportes de compras"),
+        ]
 
 
 class DetalleOrdenCompra(models.Model):

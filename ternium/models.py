@@ -404,9 +404,18 @@ class Remision(models.Model):
         verbose_name_plural = "Remisiones"
         ordering = ['-fecha', '-creado_en']
         indexes = [models.Index(fields=['status']), models.Index(fields=['fecha'])]
+        
+        # DEFINICIÓN DE PERMISOS PERSONALIZADOS
         permissions = [
             ("can_audit_remision", "Puede auditar remisiones"),
-            ("view_ternium_module", "Puede acceder al módulo Ternium"),
+            ("view_ternium_module", "Puede acceder al módulo Ternium"), # Equivale a Acceso_ternium
+            
+            # --- TUS NUEVOS PERMISOS ---
+            ("acceso_ia", "Acceso a Inteligencia Artificial"),
+            ("acceso_remisiones", "Acceso a Módulo Remisiones"),
+            ("acceso_dashboard_patio", "Acceso a Dashboard Patios"),
+            ("acceso_catalogos", "Acceso a Catálogos"),
+            ("acceso_reportes_kpi", "Acceso a Reportes y KPIs"), # Para el Dashboard de Análisis
         ]
         
 class Cliente(models.Model):

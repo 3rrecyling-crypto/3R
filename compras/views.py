@@ -35,10 +35,13 @@ from django.http import HttpResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 from ternium.models import Empresa, Origen # Asegúrate que Origen esté importado
+from django.contrib.auth.decorators import permission_required, login_required
+from django.contrib.auth.mixins import PermissionRequiredMixin
 
 # --- DASHBOARD ---
 
 @login_required
+@permission_required('compras.acceso_compras', raise_exception=True)
 def dashboard_compras(request):
     solicitudes_pendientes = SolicitudCompra.objects.filter(estatus='PENDIENTE_APROBACION').count()
     ordenes_abiertas = OrdenCompra.objects.filter(estatus='APROBADA').count()
@@ -254,7 +257,8 @@ def editar_articulo(request, pk):
 
 # --- CRUD Y FLUJO DE SOLICITUD DE COMPRA ---
 
-class SolicitudCompraListView(LoginRequiredMixin, ListView):
+class SolicitudCompraListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'compras.acceso_compras'
     model = SolicitudCompra
     template_name = 'compras/solicitud_lista.html'
     context_object_name = 'solicitudes'

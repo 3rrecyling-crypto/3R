@@ -18,6 +18,9 @@ from django.conf import settings
 from django.db.models import Max
 from django.utils import timezone
 from django.db import transaction, IntegrityError
+from django.contrib.auth.decorators import permission_required, login_required
+from django.contrib.auth.mixins import PermissionRequiredMixin
+
 
 # ==============================================================================
 # === FUNCIONES AUXILIARES PARA GESTIONAR ARCHIVOS EN S3 (COMO EN TERNIUM) ===
@@ -73,7 +76,8 @@ def _eliminar_archivo_de_s3(ruta_completa_s3):
     except (BotoCoreError, NoCredentialsError, Exception) as e:
         print(f"Error al eliminar archivo antiguo de S3: {e}")
 
-class FacturaListView(LoginRequiredMixin, ListView):
+class FacturaListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'cuentas_por_pagar.acceso_cxp'
     model = Factura
     template_name = 'cuentas_por_pagar/factura_list.html'
     context_object_name = 'facturas'
@@ -317,8 +321,8 @@ class PagoDeleteView(LoginRequiredMixin, DeleteView):
         
         return super().delete(request, *args, **kwargs)
 
-# Nuevas vistas funcionales
 @login_required
+@permission_required('cuentas_por_pagar.acceso_cxp', raise_exception=True)
 def dashboard_cuentas_por_pagar(request):
     # Obtener todas las facturas pendientes
     facturas_pendientes = Factura.objects.filter(pagada=False).select_related(

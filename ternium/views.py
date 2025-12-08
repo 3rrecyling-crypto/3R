@@ -140,45 +140,66 @@ def _update_inventory_from_remision(remision, revert=False):
 
 
 @login_required
-def home(request):
-    total_entradas = EntradaMaquila.objects.count()
-    total_alertas = EntradaMaquila.objects.filter(alerta=True).count()
-    total_registros_logistica = RegistroLogistico.objects.count()
+def home_bienvenida(request):
+    """
+    Vista simple que carga la landing page.
+    Accesible para todos los usuarios logueados.
+    """
+    return render(request, 'ternium/bienvenida.html')
+
+
+# --- 2. VISTA DASHBOARD OPERACIONES (ANTIGUO HOME) ---
+@login_required
+def dashboard_operaciones_view(request):
     
-    patios_activos = Lugar.objects.filter(es_patio=True).order_by('nombre')
-    patios_data = []
+    # Solo calculamos los datos SI el usuario tiene permiso
+    if request.user.has_perm('ternium.acceso_dashboard_patio'):
+        total_entradas = EntradaMaquila.objects.count()
+        total_alertas = EntradaMaquila.objects.filter(alerta=True).count()
+        total_registros_logistica = RegistroLogistico.objects.count()
+        
+        patios_activos = Lugar.objects.filter(es_patio=True).order_by('nombre')
+        patios_data = []
+        
+        KG_TO_TON = decimal.Decimal('1000.0')
+
+        for patio in patios_activos:
+            inventario_kg = InventarioPatio.objects.filter(
+                patio=patio, cantidad__gt=0
+            ).select_related('material').order_by('material__nombre')
+            
+            total_kg = inventario_kg.aggregate(total=Sum('cantidad'))['total'] or 0
+            total_toneladas = decimal.Decimal(total_kg) / KG_TO_TON
+            
+            materiales_en_toneladas = [{
+                'material_nombre': item.material.nombre,
+                'cantidad_toneladas': item.cantidad / KG_TO_TON,
+                # Simulamos porcentaje para la barra visual (puedes ajustar lógica real)
+                'porcentaje_ocupacion': 75 
+            } for item in inventario_kg]
+
+            ultima_actualizacion_obj = InventarioPatio.objects.filter(patio=patio).order_by('-ultima_actualizacion').first()
+
+            patios_data.append({
+                'nombre': patio.nombre,
+                'materiales': materiales_en_toneladas,
+                'total_toneladas': total_toneladas,
+                'ultima_actualizacion': ultima_actualizacion_obj.ultima_actualizacion if ultima_actualizacion_obj else None,
+                'estado': 'ok' # Puedes añadir lógica para 'warning' o 'danger'
+            })
+
+        context = {
+            'total_entradas': total_entradas,
+            'total_alertas': total_alertas,
+            'patios_inventario': patios_data,
+            'total_registros_logistica': total_registros_logistica,
+            'has_permission': True # Bandera para el template
+        }
+        return render(request, 'ternium/home.html', context)
     
-    KG_TO_TON = decimal.Decimal('1000.0')
-
-    for patio in patios_activos:
-        inventario_kg = InventarioPatio.objects.filter(
-            patio=patio, cantidad__gt=0
-        ).select_related('material').order_by('material__nombre')
-        
-        total_kg = inventario_kg.aggregate(total=Sum('cantidad'))['total'] or 0
-        total_toneladas = decimal.Decimal(total_kg) / KG_TO_TON
-        
-        materiales_en_toneladas = [{
-            'material_nombre': item.material.nombre,
-            'cantidad_toneladas': item.cantidad / KG_TO_TON
-        } for item in inventario_kg]
-
-        ultima_actualizacion_obj = InventarioPatio.objects.filter(patio=patio).order_by('-ultima_actualizacion').first()
-
-        patios_data.append({
-            'nombre': patio.nombre,
-            'materiales': materiales_en_toneladas,
-            'total_toneladas': total_toneladas,
-            'ultima_actualizacion': ultima_actualizacion_obj.ultima_actualizacion if ultima_actualizacion_obj else None,
-        })
-
-    context = {
-        'total_entradas': total_entradas,
-        'total_alertas': total_alertas,
-        'patios_inventario': patios_data,
-        'total_registros_logistica': total_registros_logistica,
-    }
-    return render(request, 'ternium/home.html', context)
+    else:
+        # Si NO tiene permiso, renderizamos la página vacía (el HTML mostrará el bloqueo)
+        return render(request, 'ternium/home.html', {'has_permission': False})
 
 
 @login_required
@@ -481,7 +502,11 @@ class DescargarZipMaquilaView(View):
 
 # --- VISTAS DE REMISIONES ---
 
-class RemisionListView(ListView):
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+
+# Busca la clase RemisionListView y modifícala así:
+class RemisionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'ternium.acceso_remisiones' # <--- PROTECCIÓN
     model = Remision
     template_name = 'ternium/remision_lista.html'
     context_object_name = 'remisiones'
@@ -562,7 +587,7 @@ def calcular_siguiente_folio(prefijo):
     
     for rem_str in remisiones_existentes:
         try:
-            # Separamos el texto por guiones y tomamos la última parte
+            # Separamos el texto por guiones y tomamos la última parteaaaa
             # Ejemplo: "MTY-1005" -> "1005" -> 1005 (int)
             parts = rem_str.split('-')
             if len(parts) > 1:
@@ -1429,7 +1454,7 @@ def _extraer_sql(texto_respuesta_ia: str) -> str:
 
 
 @login_required
-@permission_required('ternium.use_ai_assistant', raise_exception=True)
+@permission_required('ternium.acceso_ia', raise_exception=True) # <--- PROTECCIÓN
 @csrf_exempt
 def asistente_ia(request):
     """
@@ -1807,6 +1832,7 @@ class EmpresaVincularOrigenesView(LoginRequiredMixin, UpdateView):
 # Asegúrate de que estas importaciones estén presentes
 
 @login_required
+@permission_required('ternium.acceso_reportes_kpi', raise_exception=True) # <--- PROTECCIÓN
 def dashboard_analisis_view(request):
     
     # 1. FILTROS DE TIEMPO
