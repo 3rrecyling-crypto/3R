@@ -59,7 +59,7 @@
 
         .navbar-brand {
             font-weight: 700;
-            font-size: 1.6rem; /* Ligeramente más grande */
+            font-size: 1.8rem; /* AUMENTADO */
             display: flex;
             align-items: center;
             color: white !important;
@@ -110,12 +110,12 @@
             color: white !important;
         }
 
-        /* User Profile */
+        /* User Profile - FOTO MÁS GRANDE */
         .user-profile {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 0.5rem 1rem;
+            padding: 0.2rem 0.5rem; /* Ajustado padding */
             border-radius: 8px;
             transition: var(--transition-base);
             position: relative;
@@ -124,19 +124,19 @@
         .user-profile:hover { background: rgba(255, 255, 255, 0.15); }
 
         .user-avatar {
-            width: 40px;
-            height: 40px;
+            width: 85px;  /* AUMENTADO (Antes 40px) */
+            height: 85px; /* AUMENTADO (Antes 40px) */
             border-radius: 50%;
             object-fit: cover;
-            border: 2px solid rgba(255, 255, 255, 0.5);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border: 3px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.2);
         }
 
         .user-info { display: flex; flex-direction: column; }
 
         .user-name {
             font-weight: 600;
-            font-size: 0.95rem;
+            font-size: 1rem;
             color: white;
             margin-bottom: 0;
             line-height: 1.2;
@@ -144,7 +144,7 @@
 
         .user-role {
             font-size: 0.75rem;
-            color: rgba(255, 255, 255, 0.8);
+            color: rgba(255, 255, 255, 0.9);
             font-weight: 400;
         }
 
@@ -236,7 +236,7 @@
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container-fluid">
             <a class="navbar-brand" href="{% url 'home' %}">
-                <img src="{% static 'r3_recycling/img/logo.png' %}" alt="Logo" height="65" class="d-inline-block align-text-top loading="lazy">
+                <img src="{% static 'r3_recycling/img/logo.png' %}" alt="Logo" height="85" class="d-inline-block align-text-top loading="lazy">
                 <span>3R RECYCLING</span>
             </a>
             
@@ -308,7 +308,7 @@
                             </a></li>
                             
                             <li><hr class="dropdown-divider"></li>
-                            <li><h6 class="dropdown-header text-uppercase small text-muted">Catálogos de Compra</h6></li>
+                            <li><h6 class="dropdown-header text-uppercase small text-muted">Catálogos</h6></li>
                             <li><a class="dropdown-item" href="{% url 'lista_proveedores' %}"><i class="fas fa-truck fa-fw me-2"></i> Proveedores</a></li>
                             <li><a class="dropdown-item" href="{% url 'lista_articulos' %}"><i class="fas fa-boxes fa-fw me-2"></i> Artículos / Servicios</a></li>
                             <li><a class="dropdown-item" href="{% url 'lista_categorias' %}"><i class="fas fa-tags fa-fw me-2"></i> Categorías</a></li>
@@ -322,13 +322,17 @@
                             <i class="fas fa-database me-1"></i> Catálogos
                         </a>
                         <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navCatalogos">
+                            <li><h6 class="dropdown-header text-uppercase small text-muted">Operativos</h6></li>
                             <li><a class="dropdown-item" href="{% url 'lista_empresas' %}"><i class="fas fa-building fa-fw me-2"></i> Empresas / Folios</a></li>
                             <li><a class="dropdown-item" href="{% url 'lista_lugares' %}"><i class="fas fa-map-marker-alt fa-fw me-2"></i> Orígenes y Destinos</a></li>
+                            <li><a class="dropdown-item" href="{% url 'lista_lineas_transporte' %}"><i class="fas fa-truck-fast fa-fw me-2"></i> Líneas de Transporte</a></li>
+                            
                             <li><hr class="dropdown-divider"></li>
+                            
+                            <li><h6 class="dropdown-header text-uppercase small text-muted">Recursos</h6></li>
                             <li><a class="dropdown-item" href="{% url 'lista_operadores' %}"><i class="fas fa-id-card fa-fw me-2"></i> Operadores</a></li>
                             <li><a class="dropdown-item" href="{% url 'lista_unidades' %}"><i class="fas fa-truck fa-fw me-2"></i> Unidades</a></li>
                             <li><a class="dropdown-item" href="{% url 'lista_contenedores' %}"><i class="fas fa-box fa-fw me-2"></i> Contenedores</a></li>
-                            <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{% url 'lista_materiales' %}"><i class="fas fa-cubes fa-fw me-2"></i> Materiales (Carga)</a></li>
                         </ul>
                     </li>
