@@ -1256,12 +1256,12 @@ class DescargaCreateView(CreateView):
         
 @login_required
 def export_remisiones_to_excel(request):
-    # Crear el libro de trabajo
+    # 1. Crear el libro de trabajo
     wb = Workbook()
     ws = wb.active
     ws.title = "Remisiones"
     
-    # --- CAMBIO 1: Agregamos 'Material' a los Encabezados ---
+    # 2. Definir Encabezados
     headers = [
         'ID', 'Remisión', 'Fecha', 'Estatus', 'Empresa',
         'Origen', 'Destino', 'Línea de Transporte', 'Operador',
@@ -1270,15 +1270,57 @@ def export_remisiones_to_excel(request):
     ]
     ws.append(headers)
     
-    # Obtener datos (Asegúrate de tener prefetch_related para optimizar)
-    remisiones = Remision.objects.select_related(
+    # 3. Construir la consulta Base
+    queryset = Remision.objects.select_related(
         'empresa', 'origen', 'destino', 'linea_transporte', 'operador', 'unidad', 'contenedor'
-    ).prefetch_related('detalles__material').all().order_by('-fecha') # <-- Agregamos prefetch_related
+    ).prefetch_related('detalles__material')
+
+    # 4. APLICAR FILTROS (Misma lógica que en RemisionListView)
+    # ---------------------------------------------------------
+    q_remision = request.GET.get('q_remision')
+    q_prefijo = request.GET.get('q_prefijo')
+    q_material = request.GET.get('q_material')
+    q_origen = request.GET.get('q_origen')
+    q_destino = request.GET.get('q_destino')
+    q_status = request.GET.get('q_status')
+    q_fecha_desde = request.GET.get('q_fecha_desde')
+    q_fecha_hasta = request.GET.get('q_fecha_hasta')
+
+    filters = {}
     
-    # Escribir filas
-    for remision in remisiones:
-        # --- CAMBIO 2: Obtener nombres de materiales concatenados ---
-        # Esto junta todos los materiales de la remisión separados por coma (ej: "Acero, Chatarra")
+    if q_remision:
+        filters['remision__icontains'] = q_remision
+    if q_prefijo:
+        filters['empresa__prefijo__icontains'] = q_prefijo
+    if q_material:
+        filters['detalles__material_id'] = q_material
+    if q_origen:
+        filters['origen_id'] = q_origen
+    if q_destino:
+        filters['destino_id'] = q_destino
+    if q_status:
+        filters['status'] = q_status
+    if q_fecha_desde:
+        filters['fecha__gte'] = q_fecha_desde
+    if q_fecha_hasta:
+        filters['fecha__lte'] = q_fecha_hasta
+
+    # Aplicamos los filtros acumulados
+    if filters:
+        queryset = queryset.filter(**filters)
+    
+    # Si filtramos por detalles (material), evitamos duplicados
+    if q_material:
+        queryset = queryset.distinct()
+
+    # 5. ORDENAMIENTO (Mayor a Menor por ID)
+    # ---------------------------------------
+    # '-pk' asegura que salgan los registros más nuevos primero.
+    queryset = queryset.order_by('-pk')
+    
+    # 6. Iterar y escribir datos en Excel
+    for remision in queryset:
+        # Obtener nombres de materiales concatenados
         materiales_str = ", ".join([d.material.nombre for d in remision.detalles.all() if d.material])
 
         ws.append([
@@ -1293,25 +1335,25 @@ def export_remisiones_to_excel(request):
             remision.operador.nombre if remision.operador else '',
             str(remision.unidad) if remision.unidad else '',
             str(remision.contenedor) if remision.contenedor else '',
-            materiales_str,  # <--- CAMBIO 3: Insertamos la variable aquí
+            materiales_str,
             remision.total_peso_ld,
             remision.total_peso_dlv,
             remision.diff
         ])
 
-    # ... (El resto de la función con el formato de tabla se queda igual) ...
-    
-    # 1. Crear la Tabla de Excel (Formato General)
+    # 7. Formato de Tabla Excel (Estilos)
     last_col_letter = get_column_letter(len(headers))
     last_row = ws.max_row
-    table_ref = f"A1:{last_col_letter}{last_row}"
     
-    tabla = Table(displayName="TablaRemisiones", ref=table_ref)
-    style = TableStyleInfo(name="TableStyleMedium9", showFirstColumn=False, showLastColumn=False, showRowStripes=True, showColumnStripes=False)
-    tabla.tableStyleInfo = style
-    ws.add_table(tabla)
+    # Validamos que haya datos antes de crear la tabla para evitar error de Excel corrupto
+    if last_row > 1:
+        table_ref = f"A1:{last_col_letter}{last_row}"
+        tabla = Table(displayName="TablaRemisiones", ref=table_ref)
+        style = TableStyleInfo(name="TableStyleMedium9", showFirstColumn=False, showLastColumn=False, showRowStripes=True, showColumnStripes=False)
+        tabla.tableStyleInfo = style
+        ws.add_table(tabla)
 
-    # Ajuste de anchos y centrado
+    # 8. Ajuste de anchos y centrado
     center_alignment = Alignment(horizontal='center', vertical='center')
     for col in ws.columns:
         max_length = 0
@@ -1319,13 +1361,14 @@ def export_remisiones_to_excel(request):
         for cell in col:
             cell.alignment = center_alignment
             try:
-                if len(str(cell.value)) > max_length:
+                if cell.value and len(str(cell.value)) > max_length:
                     max_length = len(str(cell.value))
             except:
                 pass
         adjusted_width = (max_length + 4)
         ws.column_dimensions[column].width = adjusted_width
 
+    # 9. Retornar respuesta HTTP
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="Remisiones_{datetime.date.today()}.xlsx"'
     wb.save(response)
