@@ -43,6 +43,7 @@
         margin-bottom: 1.5rem;
     }
 
+    /* BADGES DE ESTATUS */
     .status-badge {
         font-size: 0.8rem;
         font-weight: 600;
@@ -56,6 +57,14 @@
     .status-PENDIENTE { background-color: #f39c1233; color: #f39c12; }
     .status-TERMINADO { background-color: #3498db33; color: #3498db; }
     .status-AUDITADO { background-color: #27ae6033; color: #27ae60; }
+    
+    /* NUEVO ESTILO PARA CANCELADO */
+    .status-CANCELADO { 
+        background-color: #e9ecef; 
+        color: #6c757d; 
+        border: 1px solid #dee2e6;
+        text-decoration: line-through; 
+    }
 
     .text-loss { color: var(--accent-color); font-weight: bold; }
     .text-gain { color: var(--gain-color); font-weight: bold; }
@@ -66,21 +75,11 @@
         padding: 0.25rem 0.5rem;
     }
 
-    .select2-container--bootstrap-5 .select2-dropdown {
-        border-color: var(--secondary-color);
-    }
-
-    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
-        line-height: 1.5;
-    }
-
-    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
-        top: 50%;
-        transform: translateY(-50%);
-    }
+    .select2-container--bootstrap-5 .select2-dropdown { border-color: var(--secondary-color); }
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered { line-height: 1.5; }
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow { top: 50%; transform: translateY(-50%); }
 </style>
 {% endblock %}
-
 
 {% block content %}
 <div class="container-fluid px-4 mt-4">
@@ -102,7 +101,6 @@
         <div class="card-body collapse show" id="filterCollapse" style="background-color: #f8f9fa;">
             <form method="get" action="" class="needs-validation" novalidate id="filterForm">
                 <div class="row g-3">
-                    
                     <div class="col-md-4">
                         <label for="q_remision" class="form-label small fw-bold">N° Remisión</label>
                         <input type="text" name="q_remision" id="q_remision" class="form-control form-control-sm" placeholder="Buscar por número" value="{{ search_params.q_remision|default:'' }}" list="remision-list">
@@ -112,7 +110,6 @@
                             {% endfor %}
                         </datalist>
                     </div>
-
                     <div class="col-md-4">
                         <label for="q_prefijo" class="form-label small fw-bold">Operación</label>
                         <select name="q_prefijo" id="q_prefijo" class="form-select form-select-sm searchable-select">
@@ -122,7 +119,6 @@
                             {% endfor %}
                         </select>
                     </div>
-
                     <div class="col-md-4">
                         <label for="q_material" class="form-label small fw-bold">Material</label>
                         <select name="q_material" id="q_material" class="form-select form-select-sm searchable-select">
@@ -132,7 +128,6 @@
                             {% endfor %}
                         </select>
                     </div>
-
                     <div class="col-md-4">
                         <label for="q_status" class="form-label small fw-bold">Estatus</label>
                         <select name="q_status" id="q_status" class="form-select form-select-sm searchable-select">
@@ -142,7 +137,6 @@
                             {% endfor %}
                         </select>
                     </div>
-
                     <div class="col-md-4">
                         <label for="q_origen" class="form-label small fw-bold">Origen</label>
                         <select name="q_origen" id="q_origen" class="form-select form-select-sm searchable-select">
@@ -152,7 +146,6 @@
                             {% endfor %}
                         </select>
                     </div>
-
                     <div class="col-md-4">
                         <label for="q_destino" class="form-label small fw-bold">Destino</label>
                         <select name="q_destino" id="q_destino" class="form-select form-select-sm searchable-select">
@@ -162,7 +155,6 @@
                             {% endfor %}
                         </select>
                     </div>
-                    
                     <div class="col-md-3">
                         <label for="q_fecha_desde" class="form-label small fw-bold">Fecha desde</label>
                         <input type="date" name="q_fecha_desde" id="q_fecha_desde" class="form-control form-control-sm" value="{{ search_params.q_fecha_desde|default:'' }}">
@@ -178,12 +170,9 @@
                         <a id="export-excel-btn" href="{% url 'export_remisiones_to_excel' %}" class="btn btn-outline-success btn-sm me-2 rounded-pill py-2 px-3">
                             <i class="fas fa-file-excel me-2"></i>Exportar a Excel
                         </a>
-                        
-                        {# CAMBIO IMPORTANTE: Botón de limpiar apunta a la URL limpia #}
                         <a href="{% url 'remision_lista' %}" class="btn btn-outline-secondary btn-sm me-2 rounded-pill py-2 px-3">
                             <i class="fas fa-broom me-2"></i>Limpiar Filtros
                         </a>
-                        
                         <button type="submit" class="btn btn-primary-gradient btn-sm shadow-sm rounded-pill py-2 px-3">
                             <i class="fas fa-search me-2"></i>Aplicar Filtros
                         </button>
@@ -247,14 +236,22 @@
                             <td class="text-center py-3 px-3">
                                 <div class="btn-group btn-group-sm" role="group">
                                     <a href="{% url 'detalle_remision' pk=remision.pk %}" class="btn btn-outline-primary" data-bs-toggle="tooltip" title="Ver detalles"><i class="fas fa-eye"></i></a>
-                                    {% if remision.status != 'AUDITADO' %}
+                                    
+                                    {% if remision.status != 'AUDITADO' and remision.status != 'CANCELADO' %}
                                         <a href="{% url 'editar_remision' pk=remision.pk %}" class="btn btn-outline-primary" data-bs-toggle="tooltip" title="Editar"><i class="fas fa-edit"></i></a>
-                                        <a href="{% url 'eliminar_remision' pk=remision.pk %}" class="btn btn-outline-danger" data-bs-toggle="tooltip" title="Eliminar">
-                                            <i class="fas fa-trash-alt"></i>
-                                        </a>
+                                        
+                                        <form action="{% url 'cancelar_remision' pk=remision.pk %}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás SEGURO de cancelar la remisión {{ remision.remision }}?\n\nEsto revertirá los movimientos de inventario y la quitará del dashboard.');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-outline-warning" data-bs-toggle="tooltip" title="Cancelar Remisión (Revertir)">
+                                                <i class="fas fa-ban"></i>
+                                            </button>
+                                        </form>
+
+                                        <a href="{% url 'eliminar_remision' pk=remision.pk %}" class="btn btn-outline-danger" data-bs-toggle="tooltip" title="Eliminar"><i class="fas fa-trash-alt"></i></a>
                                     {% else %}
-                                        <a href="#" class="btn btn-outline-secondary disabled" data-bs-toggle="tooltip" title="No se puede editar"><i class="fas fa-edit"></i></a>
-                                        <a href="#" class="btn btn-outline-secondary disabled" data-bs-toggle="tooltip" title="No se puede eliminar"><i class="fas fa-trash-alt"></i></a>
+                                        <button class="btn btn-outline-secondary disabled"><i class="fas fa-edit"></i></button>
+                                        <button class="btn btn-outline-secondary disabled"><i class="fas fa-ban"></i></button>
+                                        <button class="btn btn-outline-secondary disabled"><i class="fas fa-trash-alt"></i></button>
                                     {% endif %}
                                 </div>
                             </td>
@@ -277,11 +274,8 @@
         <div class="card-footer bg-white py-3">
             <nav aria-label="Navegación de páginas">
                 <ul class="pagination pagination-sm justify-content-center mb-0 flex-wrap">
-                    
-                    {# --- Botón Anterior --- #}
                     {% if page_obj.has_previous %}
                         <li class="page-item">
-                            {# FIX: Evitamos duplicar 'page' en la URL #}
                             <a class="page-link" href="?page=1{% for key, value in search_params.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Primero">
                                 <span aria-hidden="true">&laquo;&laquo;</span>
                             </a>
@@ -296,7 +290,6 @@
                         <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
                     {% endif %}
 
-                    {# --- Números de Página (Elided Pagination) --- #}
                     {% for i in page_obj.paginator.get_elided_page_range %}
                         {% if page_obj.paginator.ELLIPSIS == i %}
                             <li class="page-item disabled"><span class="page-link">...</span></li>
@@ -309,7 +302,6 @@
                         {% endif %}
                     {% endfor %}
 
-                    {# --- Botón Siguiente --- #}
                     {% if page_obj.has_next %}
                         <li class="page-item">
                             <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in search_params.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Siguiente">
@@ -325,7 +317,6 @@
                         <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
                         <li class="page-item disabled"><span class="page-link">&raquo;&raquo;</span></li>
                     {% endif %}
-                    
                 </ul>
                 <div class="text-center text-muted mt-2 small">
                     Mostrando registros {{ page_obj.start_index }} - {{ page_obj.end_index }} de un total de <strong>{{ page_obj.paginator.count }}</strong>
@@ -342,7 +333,6 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 $(document).ready(function() {
-    // --- INICIALIZACIÓN GENERAL ---
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
@@ -353,7 +343,6 @@ $(document).ready(function() {
         width: $(this).data('width') ? $(this).data('width') : $(this).hasClass('w-100') ? '100%' : 'style'
     });
 
-    // --- LÓGICA PARA EXPORTACIÓN A EXCEL ---
     function updateExportUrl() {
         const form = $('#filterForm');
         const params = new URLSearchParams(new FormData(form[0])).toString();

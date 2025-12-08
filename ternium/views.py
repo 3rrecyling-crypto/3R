@@ -2329,12 +2329,14 @@ def dashboard_remisiones_view(request):
     mat_descarga_data = []
     
     lista_materiales = []
-    total_volumen = materiales_data[0]['total_carga'] if materiales_data else 1
+    # Evitamos división por cero si no hay datos
+    total_volumen = materiales_data[0]['total_carga'] if (materiales_data and materiales_data[0]['total_carga'] > 0) else 1
 
     for mat in materiales_data:
         c = mat['total_carga']
         d = mat['total_descarga']
         n = mat['detalles__material__nombre']
+        diff = c - d  # <--- CÁLCULO DE DIFERENCIA
         
         mat_labels.append(n)
         mat_carga_data.append(c)
@@ -2344,6 +2346,7 @@ def dashboard_remisiones_view(request):
             'nombre': n,
             'carga': c,
             'descarga': d,
+            'diff': diff,  # <--- AGREGADO AL DICCIONARIO
             'porcentaje_relativo': (c / total_volumen * 100)
         })
 
@@ -2353,7 +2356,7 @@ def dashboard_remisiones_view(request):
     # También debe usar qs_sin_duplicados para que coincida con la tabla
     raw_details = qs_sin_duplicados.values(
         'fecha', 'remision', 'origen__nombre', 'destino__nombre', 
-        'detalles__material__nombre', 'detalles__peso_ld'
+        'detalles__material__nombre', 'detalles__peso_ld', 'detalles__peso_dlv'
     ).order_by('-fecha')
 
     materiales_detalle_map = {}
@@ -2362,15 +2365,24 @@ def dashboard_remisiones_view(request):
         if mat_nombre not in materiales_detalle_map:
             materiales_detalle_map[mat_nombre] = []
         
-        # Conversión a float para evitar error JSON
-        peso_val = float(item['detalles__peso_ld']) if item['detalles__peso_ld'] else 0.0
+        # Conversiones y cálculos
+        p_carga = float(item['detalles__peso_ld'] or 0)
+        p_descarga = float(item['detalles__peso_dlv'] or 0)
+        faltante = p_carga - p_descarga
+        
+        # Calcular porcentaje de faltante (evitando división por cero)
+        porcentaje = (faltante / p_carga * 100) if p_carga > 0 else 0.0
         
         materiales_detalle_map[mat_nombre].append({
             'fecha': item['fecha'].strftime("%d/%m/%Y"),
             'remision': item['remision'],
+            'material': mat_nombre,
             'origen': item['origen__nombre'],
             'destino': item['destino__nombre'],
-            'peso': peso_val 
+            'carga': p_carga,
+            'descarga': p_descarga,
+            'faltante': faltante,
+            'porcentaje': porcentaje
         })
 
     # =======================================================
@@ -2380,45 +2392,65 @@ def dashboard_remisiones_view(request):
     operadores_data = qs_completa.values('operador__nombre').annotate(
         total_viajes=Count('id', distinct=True),
         total_cargado=Coalesce(Sum('detalles__peso_ld'), 0.0, output_field=FloatField()),
-        total_entregado=Coalesce(Sum('detalles__peso_dlv'), 0.0, output_field=FloatField())
-    ).order_by('-total_cargado')[:50]
+        
+        # CÁLCULO DE MERMA ACUMULADA (Solo suma si Carga > Descarga)
+        merma_acumulada=Sum(
+            Case(
+                When(
+                    detalles__peso_ld__gt=F('detalles__peso_dlv'),
+                    then=F('detalles__peso_ld') - F('detalles__peso_dlv')
+                ),
+                default=0.0,
+                output_field=FloatField()
+            )
+        )
+    ).order_by('-merma_acumulada')[:50] # Ordenamos por quién ha perdido más material
 
     ranking_operadores = []
+    
     for op in operadores_data:
-        cargado = op['total_cargado']
-        entregado = op['total_entregado']
-        diff = cargado - entregado
+        cargado = op['total_cargado'] or 0
+        merma_real = op['merma_acumulada'] or 0 # Esta es la suma pura de faltantes
         
-        json_detalles = "[]"
-        if diff > 0.1:
-             bad_rems = qs_completa.filter(
-                 operador__nombre=op['operador__nombre'],
-                 detalles__peso_ld__gt=F('detalles__peso_dlv')
-             ).values('remision','origen__nombre','destino__nombre','detalles__material__nombre','comentario','detalles__peso_ld','detalles__peso_dlv')
-             
-             d_list = []
-             for br in bad_rems:
-                 p_ld = float(br['detalles__peso_ld'] or 0)
-                 p_dlv = float(br['detalles__peso_dlv'] or 0)
-                 m = p_ld - p_dlv
-                 
-                 if m > 0.05:
-                     d_list.append({
-                         'remision': br['remision'], 
-                         'origen': br['origen__nombre'],
-                         'destino': br['destino__nombre'],
-                         'material': br['detalles__material__nombre'], 
-                         'merma': round(m, 3), 
-                         'comentario': br['comentario'] or ''
-                     })
-             json_detalles = json.dumps(d_list)
+        # Porcentaje de Riesgo: Cuánto material pierde del total que mueve
+        riesgo_perc = ((merma_real / cargado) * 100) if cargado > 0 else 0
+        
+        # Obtener detalle de viajes CON FALTANTE para el deslizador
+        # Filtramos merma > 0.02 (20kg) para limpiar tolerancias mínimas
+        viajes_con_faltante = qs_completa.filter(
+            operador__nombre=op['operador__nombre'],
+            detalles__peso_ld__gt=F('detalles__peso_dlv') + 0.02 
+        ).values(
+            'fecha', 'remision', 'detalles__material__nombre',
+            'origen__nombre', 'destino__nombre',
+            'detalles__peso_ld', 'detalles__peso_dlv'
+        ).order_by('-fecha')
+
+        detalles_list = []
+        for v in viajes_con_faltante:
+            p_carga = float(v['detalles__peso_ld'] or 0)
+            p_descarga = float(v['detalles__peso_dlv'] or 0)
+            faltante = p_carga - p_descarga
+            
+            detalles_list.append({
+                'fecha': v['fecha'].strftime("%d/%m/%Y"),
+                'remision': v['remision'],
+                'material': v['detalles__material__nombre'] or 'S/M',
+                'origen': v['origen__nombre'],
+                'destino': v['destino__nombre'],
+                'carga': p_carga,
+                'descarga': p_descarga,
+                'faltante': round(faltante, 3)
+            })
 
         ranking_operadores.append({
-            'nombre': op['operador__nombre'] or "S/N", 'viajes': op['total_viajes'],
-            'cargado': cargado, 'entregado': entregado, 'diff': diff,
-            'perc': ((diff)/cargado*100) if cargado>0 else 0, 'json_detalles': json_detalles
+            'nombre': op['operador__nombre'] or "S/N", 
+            'viajes': op['total_viajes'],
+            'cargado': cargado,
+            'diff': merma_real, # Ahora 'diff' representa solo pérdida
+            'riesgo_perc': riesgo_perc,
+            'json_detalles': json.dumps(detalles_list)
         })
-    ranking_operadores.sort(key=lambda x: x['perc'], reverse=True)
 
     # =======================================================
     # 7. PENDIENTES
@@ -2518,3 +2550,45 @@ class CustomLoginView(LoginView):
             self.request.session.modified = True
         
         return super().form_valid(form)
+    
+    
+@login_required
+@require_POST
+def cancelar_remision(request, pk):
+    """
+    Cancela una remisión, revierte el movimiento de inventario 
+    y evita que aparezca en el Dashboard.
+    """
+    remision = get_object_or_404(Remision, pk=pk)
+    
+    # Validaciones de seguridad
+    if remision.status == 'AUDITADO':
+        messages.error(request, 'No se puede cancelar una remisión que ya fue auditada.')
+        return redirect('remision_lista')
+        
+    if remision.status == 'CANCELADO':
+        messages.warning(request, 'Esta remisión ya estaba cancelada.')
+        return redirect('remision_lista')
+
+    try:
+        with transaction.atomic():
+            # 1. Revertir el inventario (Devolver el material al origen/destino)
+            # Esto es crucial para que los stocks cuadren.
+            _update_inventory_from_remision(remision, revert=True)
+            
+            # 2. Cambiar estatus
+            remision.status = 'CANCELADO'
+            
+            # 3. Opcional: Agregar nota automática en descripción
+            usuario = request.user.username
+            fecha = timezone.now().strftime("%d/%m/%Y %H:%M")
+            remision.descripcion += f" [CANCELADA por {usuario} el {fecha}]"
+            
+            remision.save()
+            
+        messages.success(request, f'La remisión {remision.remision} ha sido CANCELADA y el inventario revertido.')
+        
+    except Exception as e:
+        messages.error(request, f'Error al cancelar: {e}')
+        
+    return redirect('remision_lista')

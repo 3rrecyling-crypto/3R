@@ -302,6 +302,7 @@ class Remision(models.Model):
         ('PENDIENTE', 'Pendiente'),
         ('TERMINADO', 'Terminado'),
         ('AUDITADO', 'Auditado'),
+        ('CANCELADO', 'Cancelado'), # <--- NUEVO ESTATUS
     ]
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDIENTE', verbose_name="Estatus")
     empresa = models.ForeignKey(Empresa, on_delete=models.PROTECT, related_name="remisiones", verbose_name="Unidad de Negocio (Empresa)")

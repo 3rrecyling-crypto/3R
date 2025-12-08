@@ -143,4 +143,5 @@ urlpatterns = [
     template_name='registration/login.html',
     authentication_form=LoginForm # <--- USA TU FORM AQUÍ
 ), name='login'),
+    path('remision/<int:pk>/cancelar/', views.cancelar_remision, name='cancelar_remision'),
 ]
