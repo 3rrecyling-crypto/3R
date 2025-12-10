@@ -33,14 +33,14 @@ class DatosFiscales(models.Model):
     direccion = models.TextField(verbose_name="Dirección Fiscal", blank=True, null=True)
     email_contacto = models.EmailField(verbose_name="Email para envío de factura", blank=True, null=True)
     
+    # --- CORREGIDO AQUI (De 5 a 50) ---
     uso_cfdi = models.CharField(
-        max_length=5, 
+        max_length=50,  
         default='G03', 
         choices=USO_CFDI_CHOICES,
         verbose_name="Uso de CFDI Preferido"
     )
 
-    # Campos internos para relacionar con tu sistema
     es_emisor = models.BooleanField(default=False, help_text="Marcar si estos son TUS datos fiscales")
     cliente_interno = models.OneToOneField(Cliente, on_delete=models.SET_NULL, null=True, blank=True, related_name='datos_fiscales')
 
@@ -64,39 +64,32 @@ class Factura(models.Model):
     ]
 
     usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name='facturas_usuario', null=True, blank=True)
-    
-    # Relaciones Fiscales
     emisor = models.ForeignKey(DatosFiscales, on_delete=models.PROTECT, related_name='facturas_emitidas', null=True)
     receptor = models.ForeignKey(DatosFiscales, on_delete=models.PROTECT, related_name='facturas_recibidas', null=True)
-    
-    # Relación con Ternium (Remisiones que ampara esta factura)
     remisiones = models.ManyToManyField(Remision, blank=True, related_name='facturas')
 
-    # Archivos
     archivo_pdf = models.FileField(upload_to='facturas_emitidas/pdf/', verbose_name="PDF Factura", blank=True, null=True)
     archivo_xml = models.FileField(upload_to='facturas_emitidas/xml/', verbose_name="XML Factura", blank=True, null=True)
     
-    # Datos del SAT
     folio_fiscal = models.CharField(max_length=100, blank=True, null=True, verbose_name="Folio Fiscal (UUID)")
     serie = models.CharField(max_length=10, blank=True, null=True, verbose_name="Serie")
     folio = models.CharField(max_length=20, blank=True, null=True, verbose_name="Folio Interno")
     
-    # Importes
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    impuestos_trasladados = models.DecimalField(max_digits=12, decimal_places=2, default=0.00) # IVA
-    impuestos_retenidos = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)   # Retenciones
+    impuestos_trasladados = models.DecimalField(max_digits=12, decimal_places=2, default=0.00) 
+    impuestos_retenidos = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)   
     monto_total = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, verbose_name="Total")
     
     fecha_emision = models.DateTimeField(default=timezone.now, verbose_name="Fecha de Emisión")
     fecha_timbrado = models.DateTimeField(blank=True, null=True)
     estado = models.CharField(max_length=20, choices=ESTADOS, default='pendiente')
     
-    # Conceptos básicos para CFDI 4.0
-    moneda = models.CharField(max_length=5, default='MXN')
-    tipo_cambio = models.DecimalField(max_digits=10, decimal_places=4, default=1.0) # <--- AGREGADO
-    forma_pago = models.CharField(max_length=5, default='99')
-    metodo_pago = models.CharField(max_length=5, default='PPD')
-    uso_cfdi = models.CharField(max_length=5, default='G03') # <--- AGREGADO
+    # --- CORREGIDO AQUI (De 5 a 50) ---
+    moneda = models.CharField(max_length=50, default='MXN')
+    tipo_cambio = models.DecimalField(max_digits=10, decimal_places=4, default=1.0)
+    forma_pago = models.CharField(max_length=50, default='99')
+    metodo_pago = models.CharField(max_length=50, default='PPD')
+    uso_cfdi = models.CharField(max_length=50, default='G03')
 
     def __str__(self):
         return f"Factura {self.folio or self.id} - {self.monto_total}"
@@ -122,7 +115,10 @@ class ComplementoPago(models.Model):
     factura = models.ForeignKey(Factura, on_delete=models.CASCADE, related_name='complementos_pago')
     fecha_pago = models.DateTimeField(default=timezone.now)
     monto = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Monto Pagado")
-    forma_pago = models.CharField(max_length=5, default='03', verbose_name="Forma de Pago SAT")
+    
+    # --- CORREGIDO AQUI (De 5 a 50) ---
+    forma_pago = models.CharField(max_length=50, default='03', verbose_name="Forma de Pago SAT")
+    
     num_operacion = models.CharField(max_length=100, blank=True, null=True, verbose_name="Número de Operación")
     archivo_pdf = models.FileField(upload_to='pagos/pdf/', blank=True, null=True)
     archivo_xml = models.FileField(upload_to='pagos/xml/', blank=True, null=True)
