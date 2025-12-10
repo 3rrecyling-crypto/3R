@@ -7,6 +7,8 @@ import dj_database_url
 # Base
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
 # Seguridad
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
@@ -19,7 +21,9 @@ ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
     "192.168.10.226",
-    "threer-recycling.onrender.com",
+    "threer-recycling.onrender.com",  
+    "www.3recycling.com.mx",
+    "3recycling.com.mx",
 ]
 
 # Apps
@@ -39,6 +43,7 @@ INSTALLED_APPS = [
     'compras',
     "widget_tweaks",
     'cuentas_por_pagar',
+    'facturacion',
 ]
 
 MIDDLEWARE = [
@@ -160,6 +165,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CSRF_TRUSTED_ORIGINS = [
     "https://threer-recycling.onrender.com",
+    "https://www.3recycling.com.mx",
+    "https://3recycling.com.mx",
 ]
 
 

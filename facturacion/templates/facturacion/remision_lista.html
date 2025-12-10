@@ -1,0 +1,28 @@
+<form action="{% url 'prefacturar_remisiones' %}" method="POST">
+    {% csrf_token %}
+    
+    <div class="mb-3">
+        <button type="submit" class="btn btn-outline-primary">
+            <i class="fas fa-file-invoice"></i> Facturar Seleccionadas
+        </button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th><input type="checkbox" id="selectAll"></th>
+                <th>Folio</th>
+                </tr>
+        </thead>
+        <tbody>
+            {% for remision in remisiones %}
+            <tr>
+                <td>
+                    <input type="checkbox" name="remisiones_ids" value="{{ remision.id }}">
+                </td>
+                <td>{{ remision.remision }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</form>

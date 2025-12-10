@@ -1,0 +1,58 @@
+{% extends 'ternium/base.html' %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow border-0">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-cogs me-2"></i> Configuración de Facturación</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="alert alert-info border-0 bg-info-subtle text-info-emphasis">
+                        <i class="fas fa-info-circle me-2"></i>
+                        El sistema necesita saber <strong>cuáles son tus datos fiscales</strong> para emitir facturas.
+                    </div>
+                    
+                    <p class="text-muted small mb-4">
+                        Selecciona de tu lista de Lugares (Patios/Sucursales) cuál corresponde a <strong>TU EMPRESA</strong>. Se copiarán el RFC, Razón Social y Domicilio para usarlos como Emisor.
+                    </p>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        {% if form.errors %}
+                            <div class="alert alert-danger">
+                                {{ form.errors }}
+                            </div>
+                        {% endif %}
+
+                        <div class="mb-4">
+                            <label for="{{ form.lugar_origen.id_for_label }}" class="form-label fw-bold text-dark">
+                                Selecciona tu Lugar/Patio Fiscal:
+                            </label>
+                            
+                            {{ form.lugar_origen }}
+                            
+                            {% if form.lugar_origen.help_text %}
+                            <div class="form-text mt-2">
+                                <i class="fas fa-arrow-right small me-1"></i> {{ form.lugar_origen.help_text }}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg shadow-sm">
+                                <i class="fas fa-save me-2"></i> Guardar Configuración
+                            </button>
+                            <a href="{% url 'dashboard_facturacion' %}" class="btn btn-outline-secondary">
+                                Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

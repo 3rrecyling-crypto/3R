@@ -1,130 +1,204 @@
-<!-- lugar_form.html -->
 {% extends 'ternium/base.html' %}
 {% load static %}
 
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header p-3 bg-primary text-white">
-                    <h5 class="mb-0">
-                        <i class="fas fa-map-marker-alt me-2"></i>
-                        {{ titulo|default:"Lugar" }}
-                    </h5>
+    <div class="row justify-content-center">
+        <div class="col-lg-11 col-xl-10">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger shadow-sm mb-4">
+                    {% for error in form.non_field_errors %}
+                        <p class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>{{ error }}</p>
+                    {% endfor %}
                 </div>
-                <div class="card-body p-4">
-                    <form method="post" novalidate>
-                        {% csrf_token %}
-                        
-                        {% if form.non_field_errors %}
-                        <div class="alert alert-danger">
-                            {% for error in form.non_field_errors %}
-                                <p class="mb-0">{{ error }}</p>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-                        
+                {% endif %}
+
+                <div class="card shadow mb-4">
+                    <div class="card-header p-3 bg-dark text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-map-marker-alt me-2"></i>
+                            {% if form.instance.pk %}Editar Lugar{% else %}Registrar Nuevo Lugar{% endif %}
+                        </h5>
+                        <small class="text-white-50">Configuración Operativa</small>
+                    </div>
+                    <div class="card-body p-4">
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="{{ form.nombre.id_for_label }}" class="form-label fw-semibold">Nombre</label>
+                                <label class="form-label fw-bold">Nombre del Lugar (Alias)</label>
                                 {{ form.nombre }}
-                                {% if form.nombre.errors %}
-                                    <div class="invalid-feedback d-block">
-                                        {{ form.nombre.errors }}
-                                    </div>
-                                {% endif %}
+                                <div class="form-text">Nombre corto para uso interno (Ej. Patio Norte).</div>
+                                {% if form.nombre.errors %}<div class="text-danger small">{{ form.nombre.errors }}</div>{% endif %}
                             </div>
-                            
                             <div class="col-md-6 mb-3">
-                                <label for="{{ form.tipo.id_for_label }}" class="form-label fw-semibold">Tipo</label>
+                                <label class="form-label fw-bold">Tipo de Lugar</label>
                                 {{ form.tipo }}
-                                {% if form.tipo.errors %}
-                                    <div class="invalid-feedback d-block">
-                                        {{ form.tipo.errors }}
-                                    </div>
-                                {% endif %}
                             </div>
                         </div>
-                        
-                        <div class="row">
-                            <div class="col-md-12 mb-3">
-                                <div class="form-check form-switch">
-                                    {{ form.es_patio }}
-                                    <label class="form-check-label fw-semibold" for="{{ form.es_patio.id_for_label }}">
-                                        Es Patio de Inventario
-                                    </label>
-                                </div>
-                                {% if form.es_patio.errors %}
-                                    <div class="invalid-feedback d-block">
-                                        {{ form.es_patio.errors }}
-                                    </div>
-                                {% endif %}
-                            </div>
+
+                        <div class="form-check form-switch bg-light p-3 rounded border mb-3">
+                            {{ form.es_patio }}
+                            <label class="form-check-label fw-bold text-primary ms-2" for="switch_es_patio">
+                                ¿Este lugar es un Patio de Inventario?
+                            </label>
+                            <div class="form-text ms-2 mt-1">Actívalo si aquí almacenas material (Stock).</div>
                         </div>
-                        
-                        {% if not form.instance.es_patio %}
-                        <div class="row">
-                            <div class="col-md-12 mb-3">
-                                <label class="form-label fw-semibold mb-3">Empresas Asociadas</label>
-                                <div class="border rounded p-3 bg-light">
-                                    <div class="row">
-                                        {% for checkbox in form.empresas %}
-                                        <div class="col-md-6 col-lg-4 mb-2">
-                                            <div class="form-check">
-                                                {{ checkbox.tag }}
-                                                <label class="form-check-label" for="{{ checkbox.id_for_label }}">
-                                                    {{ checkbox.choice_label }}
-                                                </label>
-                                            </div>
+
+                        <div id="seccion-empresas">
+                            <label class="form-label fw-bold">Empresas (Unidades de Negocio) Asociadas</label>
+                            <div class="border rounded p-3 bg-white" style="max-height: 150px; overflow-y: auto;">
+                                <div class="row">
+                                    {% for checkbox in form.empresas %}
+                                    <div class="col-md-4 col-lg-3 mb-1">
+                                        <div class="form-check">
+                                            {{ checkbox.tag }}
+                                            <label class="form-check-label small" for="{{ checkbox.id_for_label }}">
+                                                {{ checkbox.choice_label }}
+                                            </label>
                                         </div>
-                                        {% endfor %}
                                     </div>
+                                    {% endfor %}
                                 </div>
-                                {% if form.empresas.errors %}
-                                    <div class="invalid-feedback d-block">
-                                        {{ form.empresas.errors }}
-                                    </div>
-                                {% endif %}
+                            </div>
+                            <div class="form-text">Selecciona qué unidades de negocio pueden operar en este lugar.</div>
+                        </div>
+                        
+                        <div id="mensaje-patio" style="display:none;" class="alert alert-info mt-3 border-info">
+                            <i class="fas fa-info-circle me-2"></i> 
+                            Al ser un <strong>Patio de Inventario</strong>, estará disponible globalmente para gestionar stock.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow mb-4">
+                    <div class="card-header p-3 bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>Datos Fiscales (Para Facturación)</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="alert alert-light border-primary mb-4">
+                            <i class="fas fa-lightbulb text-warning me-2"></i>
+                            Llena estos datos si este lugar requiere facturación (Emisor o Cliente).
+                        </div>
+
+                        <h6 class="text-primary fw-bold border-bottom pb-2 mb-3">Identidad Fiscal</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Razón Social</label>
+                                {{ form.razon_social }}
+                                <div class="form-text">Sin régimen de capital (Ej. TRANSPORTES DEL NORTE).</div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">R.F.C.</label>
+                                {{ form.rfc }}
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">C.P. (Fiscal)</label>
+                                {{ form.codigo_postal }}
                             </div>
                         </div>
-                        {% else %}
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            Este lugar es un patio de inventario, por lo que está disponible para todas las empresas.
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Régimen Fiscal</label>
+                                {{ form.regimen_fiscal }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Uso de CFDI</label>
+                                {{ form.uso_cfdi }}
+                            </div>
                         </div>
-                        {% endif %}
+
+                        <h6 class="text-primary fw-bold border-bottom pb-2 mb-3 mt-4">Domicilio Fiscal Detallado</h6>
                         
-                        <div class="d-flex justify-content-end mt-4 gap-2">
-                            <a href="{% url 'lista_lugares' %}" class="btn btn-secondary">
-                                <i class="fas fa-times me-1"></i> Cancelar
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-1"></i> Guardar
-                            </button>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label small text-muted">Calle</label>
+                                {{ form.calle }}
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label small text-muted">No. Exterior</label>
+                                {{ form.numero_exterior }}
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label small text-muted">No. Interior</label>
+                                {{ form.numero_interior }}
+                            </div>
                         </div>
-                    </form>
+
+                        <div class="row">
+                            <div class="col-md-5 mb-3">
+                                <label class="form-label small text-muted">Colonia</label>
+                                {{ form.colonia }}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label small text-muted">Localidad / Ciudad</label>
+                                {{ form.localidad }}
+                            </div>
+                             <div class="col-md-3 mb-3">
+                                <label class="form-label small text-muted">País</label>
+                                {{ form.pais }}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label small text-muted">Municipio / Alcaldía</label>
+                                {{ form.municipio }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label small text-muted">Estado</label>
+                                {{ form.estado }}
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+
+                <div class="d-flex justify-content-end gap-2 mb-5">
+                    <a href="{% url 'lista_lugares' %}" class="btn btn-secondary px-4">
+                        <i class="fas fa-times me-1"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-primary px-5 fw-bold">
+                        <i class="fas fa-save me-2"></i> Guardar Lugar
+                    </button>
+                </div>
+
+            </form>
         </div>
     </div>
 </div>
 
 <style>
-.form-check-input {
-    width: 1.2em;
-    height: 1.2em;
-    margin-top: 0.15em;
-}
-.form-check-input:checked {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
-}
-.form-check-label {
-    margin-left: 0.5em;
-}
-.form-switch .form-check-input {
-    width: 3em;
+/* Estilos para los checkboxes y selects */
+.form-check-input { cursor: pointer; }
+.form-switch .form-check-input { width: 3em; height: 1.5em; margin-right: 0.5em; }
+.form-control:focus, .form-select:focus {
+    border-color: #4e73df;
+    box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
 }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const switchPatio = document.getElementById('switch_es_patio');
+    const seccionEmpresas = document.getElementById('seccion-empresas');
+    const mensajePatio = document.getElementById('mensaje-patio');
+    
+    function toggle() {
+        if(switchPatio.checked) {
+            seccionEmpresas.style.display='none'; 
+            mensajePatio.style.display='block';
+        } else {
+            seccionEmpresas.style.display='block'; 
+            mensajePatio.style.display='none';
+        }
+    }
+    
+    // Inicializar y escuchar cambios
+    if(switchPatio) {
+        toggle();
+        switchPatio.addEventListener('change', toggle);
+    }
+});
+</script>
 {% endblock %}

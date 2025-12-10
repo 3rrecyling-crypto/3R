@@ -8,7 +8,9 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.exceptions import ValidationError, PermissionDenied
 from django.db.models.signals import post_save
+from django.contrib.auth.forms import AuthenticationForm
 from django.dispatch import receiver
+
 
 
 # --- FUNCIONES UPLOAD_TO (CENTRALIZADAS) ---
@@ -145,6 +147,18 @@ class Operador(models.Model):
 class Material(models.Model):
     """Representa un tipo de material y su unidad de negocio."""
     search_fields = ['nombre']
+    
+    # --- CAMBIO AQUÍ ---
+    # Quitamos el default y permitimos que esté vacío
+    clave_sat = models.CharField(
+        max_length=15, 
+        blank=True, 
+        null=True, 
+        help_text="Clave de producto servicio del SAT"
+    )
+    # -------------------
+
+    clave_unidad_sat = models.CharField(max_length=5, default="KGM", help_text="Clave de unidad SAT (ej. KGM, H87)")
     nombre = models.CharField(max_length=150, unique=True, help_text="Nombre o descripción del material")
     empresas = models.ManyToManyField(
         Empresa,
@@ -266,16 +280,71 @@ class Contenedor(models.Model):
 
 
 class Lugar(models.Model):
-    """Representa un Origen, un Destino o ambos, y puede ser un patio de inventario."""
-    search_fields = ['nombre']
+    # ==============================================================================
+    # 1. CATÁLOGOS SAT (LISTAS OFICIALES COMPLETAS)
+    # ==============================================================================
+    
+    REGIMEN_FISCAL_CHOICES = [
+        ('601', '601 - General de Ley Personas Morales'),
+        ('603', '603 - Personas Morales con Fines no Lucrativos'),
+        ('605', '605 - Sueldos y Salarios e Ingresos Asimilados a Salarios'),
+        ('606', '606 - Arrendamiento'),
+        ('607', '607 - Régimen de Enajenación o Adquisición de Bienes'),
+        ('608', '608 - Demás ingresos'),
+        ('610', '610 - Residentes en el Extranjero sin Establecimiento Permanente en México'),
+        ('611', '611 - Ingresos por Dividendos (socios y accionistas)'),
+        ('612', '612 - Personas Físicas con Actividades Empresariales y Profesionales'),
+        ('614', '614 - Ingresos por intereses'),
+        ('615', '615 - Régimen de los ingresos por obtención de premios'),
+        ('616', '616 - Sin obligaciones fiscales'),
+        ('620', '620 - Sociedades Cooperativas de Producción que optan por diferir sus ingresos'),
+        ('621', '621 - Incorporación Fiscal'),
+        ('622', '622 - Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras'),
+        ('623', '623 - Opcional para Grupos de Sociedades'),
+        ('624', '624 - Coordinados'),
+        ('625', '625 - Régimen de las Actividades Empresariales con ingresos a través de Plataformas Tecnológicas'),
+        ('626', '626 - Régimen Simplificado de Confianza'),
+    ]
+
+    USO_CFDI_CHOICES = [
+        ('G01', 'G01 - Adquisición de mercancías'),
+        ('G02', 'G02 - Devoluciones, descuentos o bonificaciones'),
+        ('G03', 'G03 - Gastos en general'),
+        ('I01', 'I01 - Construcciones'),
+        ('I02', 'I02 - Mobiliario y equipo de oficina por inversiones'),
+        ('I03', 'I03 - Equipo de transporte'),
+        ('I04', 'I04 - Equipo de computo y accesorios'),
+        ('I05', 'I05 - Dados, troqueles, moldes, matrices y herramental'),
+        ('I06', 'I06 - Comunicaciones telefónicas'),
+        ('I07', 'I07 - Comunicaciones satelitales'),
+        ('I08', 'I08 - Otra maquinaria y equipo'),
+        ('D01', 'D01 - Honorarios médicos, dentales y gastos hospitalarios'),
+        ('D02', 'D02 - Gastos médicos por incapacidad o discapacidad'),
+        ('D03', 'D03 - Gastos funerales'),
+        ('D04', 'D04 - Donativos'),
+        ('D05', 'D05 - Intereses reales efectivamente pagados por créditos hipotecarios'),
+        ('D06', 'D06 - Aportaciones voluntarias al SAR'),
+        ('D07', 'D07 - Primas por seguros de gastos médicos'),
+        ('D08', 'D08 - Gastos de transportación escolar obligatoria'),
+        ('D09', 'D09 - Depósitos en cuentas para el ahorro, primas que tengan como base planes de pensiones'),
+        ('D10', 'D10 - Pagos por servicios educativos (colegiaturas)'),
+        ('S01', 'S01 - Sin efectos fiscales'),
+        ('CP01', 'CP01 - Pagos'),
+        ('CN01', 'CN01 - Nómina'),
+    ]
+
     TIPO_CHOICES = [
         ('ORIGEN', 'Origen'),
         ('DESTINO', 'Destino'),
         ('AMBOS', 'Ambos'),
     ]
 
-    nombre = models.CharField(max_length=100, unique=True)
-    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES)
+    # ==============================================================================
+    # 2. DATOS OPERATIVOS
+    # ==============================================================================
+    
+    nombre = models.CharField(max_length=100, unique=True, help_text="Nombre corto o alias operativo del lugar")
+    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, default='DESTINO')
     es_patio = models.BooleanField(
         default=False,
         verbose_name="¿Es un patio de inventario?",
@@ -288,12 +357,63 @@ class Lugar(models.Model):
         verbose_name="Empresas Asociadas"
     )
 
+    # ==============================================================================
+    # 3. DATOS FISCALES (FACTURACIÓN)
+    # ==============================================================================
+    
+    razon_social = models.CharField("Razón Social", max_length=200, blank=True, null=True, help_text="Nombre legal tal cual aparece en la Constancia de Situación Fiscal")
+    rfc = models.CharField("RFC", max_length=13, blank=True, null=True, help_text="Registro Federal de Contribuyentes (Sin guiones)")
+    
+    regimen_fiscal = models.CharField(
+        "Régimen Fiscal", 
+        max_length=5, 
+        choices=REGIMEN_FISCAL_CHOICES, 
+        blank=True, null=True
+    )
+    
+    uso_cfdi = models.CharField(
+        "Uso de CFDI", 
+        max_length=5, 
+        choices=USO_CFDI_CHOICES, 
+        default='G03', 
+        blank=True, null=True
+    )
+
+    # ==============================================================================
+    # 4. DIRECCIÓN FISCAL DESGLOSADA
+    # ==============================================================================
+    
+    calle = models.CharField("Calle", max_length=150, blank=True, null=True)
+    numero_exterior = models.CharField("No. Exterior", max_length=20, blank=True, null=True)
+    numero_interior = models.CharField("No. Interior", max_length=20, blank=True, null=True)
+    colonia = models.CharField("Colonia", max_length=100, blank=True, null=True)
+    codigo_postal = models.CharField("Código Postal (CP)", max_length=10, blank=True, null=True)
+    
+    localidad = models.CharField("Localidad / Ciudad", max_length=100, blank=True, null=True)
+    municipio = models.CharField("Municipio / Alcaldía", max_length=100, blank=True, null=True)
+    estado = models.CharField("Estado", max_length=50, blank=True, null=True)
+    pais = models.CharField("País", max_length=50, default="México", blank=True, null=True)
+    
+    # Campo de búsqueda para el admin
+    search_fields = ['nombre', 'rfc', 'razon_social']
+
     def __str__(self):
         return self.nombre
 
+    def direccion_completa(self):
+        """Retorna la dirección formateada en una sola línea."""
+        partes = [
+            f"{self.calle} {self.numero_exterior}" if self.calle else None,
+            f"Int. {self.numero_interior}" if self.numero_interior else None,
+            f"Col. {self.colonia}" if self.colonia else None,
+            f"CP {self.codigo_postal}" if self.codigo_postal else None,
+            f"{self.municipio}, {self.estado}" if self.municipio else None
+        ]
+        return ", ".join(filter(None, partes))
+
     class Meta:
-        verbose_name = "Lugar (Origen/Destino/Patio)"
-        verbose_name_plural = "Lugares (Orígenes, Destinos y Patios)"
+        verbose_name = "Lugar (Cliente/Origen)"
+        verbose_name_plural = "Lugares"
         ordering = ['nombre']
 
 
@@ -777,3 +897,5 @@ def save_user_profile(sender, instance, **kwargs):
     if hasattr(instance, 'ternium_profile'):
         instance.ternium_profile.save()
         
+        
+

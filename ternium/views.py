@@ -34,7 +34,8 @@ from openpyxl.utils import get_column_letter
 from django.db.models import Max # <-- Añadir esta importación
 from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-
+from django.views.decorators.clickjacking import xframe_options_sameorigin
+from django.views.decorators.clickjacking import xframe_options_exempt
 # === IMPORTS ADICIONALES PARA CARGA MANUAL A S3 ===
 import boto3
 from botocore.exceptions import BotoCoreError, NoCredentialsError
@@ -1248,7 +1249,36 @@ class ContenedorCreateView(CreateView): model = Contenedor; form_class = Contene
 class ContenedorDetailView(DetailView): model = Contenedor
 class ContenedorUpdateView(UpdateView): model = Contenedor; form_class = ContenedorForm; success_url = reverse_lazy('lista_contenedores')
 
-class LugarListView(CatalogoListView): model = Lugar
+class LugarListView(CatalogoListView): 
+    model = Lugar
+    template_name = 'ternium/lugar_lista.html'
+    context_object_name = 'lugares'
+    paginate_by = 20
+
+    def get_queryset(self):
+        # 1. Obtener queryset base
+        queryset = super().get_queryset().prefetch_related('empresas')
+        
+        # 2. Obtener el ID de la empresa del filtro (si existe)
+        empresa_id = self.request.GET.get('empresa')
+        
+        # 3. Filtrar
+        if empresa_id:
+            queryset = queryset.filter(empresas__id=empresa_id)
+            
+        return queryset.order_by('nombre')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Pasamos la lista de todas las empresas para el "Select" del HTML
+        context['empresas_list'] = Empresa.objects.all().order_by('nombre')
+        
+        # Pasamos la empresa seleccionada actualmente para mantener el filtro activo visualmente
+        selected_empresa = self.request.GET.get('empresa')
+        if selected_empresa:
+            context['selected_empresa_id'] = int(selected_empresa)
+            
+        return context
 class LugarCreateView(CreateView): model = Lugar; form_class = LugarForm; success_url = reverse_lazy('lista_lugares')
 class LugarDetailView(DetailView): model = Lugar
 class LugarUpdateView(UpdateView): model = Lugar; form_class = LugarForm; success_url = reverse_lazy('lista_lugares')
@@ -2596,20 +2626,18 @@ def dashboard_remisiones_view(request):
 
 from django.contrib.auth import login
 from django.contrib.auth.views import LoginView
-from .forms import LoginForm
+from .forms import CustomLoginForm  # <--- CORREGIDO
 
 class CustomLoginView(LoginView):
-    form_class = LoginForm
+    form_class = CustomLoginForm    # <--- CORREGIDO
     template_name = 'registration/login.html'
 
     def form_valid(self, form):
         # Lógica de "Recordar sesión"
         remember_me = form.cleaned_data.get('remember_me')
         if not remember_me:
-            # Si NO marcó recordar, la sesión expira al cerrar el navegador
             self.request.session.set_expiry(0)
         else:
-            # Si SÍ marcó, usa la duración de SESSION_COOKIE_AGE (2 semanas)
             self.request.session.modified = True
         
         return super().form_valid(form)
@@ -2655,3 +2683,9 @@ def cancelar_remision(request, pk):
         messages.error(request, f'Error al cancelar: {e}')
         
     return redirect('remision_lista')
+
+@xframe_options_exempt  # <--- AGREGA ESTA LÍNEA AQUÍ
+@login_required
+def detalle_remision(request, pk):
+    remision = get_object_or_404(Remision, pk=pk)
+    return render(request, 'ternium/detalle_remision.html', {'remision': remision})

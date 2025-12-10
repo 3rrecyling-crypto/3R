@@ -1,0 +1,325 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="container-fluid py-4"> <div class="row">
+        <div class="col-lg-9">
+            <div class="card shadow border-primary h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-file-invoice me-2"></i>Generador de Factura</h5>
+                </div>
+                
+                <div class="card-body">
+                    {% if not receptor %}
+                    <div class="alert alert-warning d-flex align-items-center mb-3">
+                        <i class="fas fa-exclamation-triangle me-3 fs-4"></i>
+                        <div>
+                            <strong>Sin Datos Fiscales:</strong> El cliente {{ cliente.nombre }} no tiene RFC configurado.
+                            <a href="{% url 'configurar_cliente_fiscal' cliente.id %}" class="alert-link">Configurar aquí</a>.
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <form action="{% url 'generar_factura_accion' %}" method="POST" id="invoiceForm">
+                        {% csrf_token %}
+
+                        <div class="row g-2 mb-4 p-3 bg-light rounded border mx-0">
+                            <div class="col-md-2">
+                                <label class="small fw-bold">Moneda</label>
+                                {{ form.moneda }}
+                            </div>
+                            <div class="col-md-2">
+                                <label class="small fw-bold">T. Cambio</label>
+                                {{ form.tipo_cambio }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small fw-bold">Uso CFDI</label>
+                                {{ form.uso_cfdi }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small fw-bold">Método Pago</label>
+                                {{ form.metodo_pago }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small fw-bold">Forma Pago</label>
+                                {{ form.forma_pago }}
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <div class="form-check form-switch pb-2">
+                                    {{ form.aplicar_retencion }}
+                                    <label class="form-check-label small" for="{{ form.aplicar_retencion.id_for_label }}">
+                                        Aplicar Retención (6%)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold text-primary mb-2">Conceptos de Factura</h6>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-sm align-middle" id="tablaFactura">
+                                <thead class="table-light text-center">
+                                    <tr>
+                                        <th width="8%">Cant.</th>
+                                        <th width="10%">Unidad</th>
+                                        <th width="10%">Clave</th>
+                                        <th width="40%">Descripción</th>
+                                        <th width="15%">Precio</th>
+                                        <th width="15%">Importe</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for r in remisiones %}
+                                    <tr id="row-{{ r.id }}">
+                                        <input type="hidden" name="remision_id" value="{{ r.id }}">
+                                        
+                                        <td>
+                                            <input type="number" 
+                                                   name="cantidad_{{ r.id }}" 
+                                                   class="form-control text-center fw-bold cantidad-factura" 
+                                                   value="1.00" 
+                                                   step="0.01"
+                                                   oninput="calcularFilaFactura('{{ r.id }}')">
+                                        </td>
+
+                                        <td>
+                                            <input type="text" 
+                                                   name="unidad_{{ r.id }}" 
+                                                   class="form-control text-center" 
+                                                   value="{{ r.detalles.first.material.clave_unidad_sat|default:'E48' }}" 
+                                                   placeholder="E48">
+                                        </td>
+
+                                        <td>
+                                            <input type="text" 
+                                                   name="clave_sat_{{ r.id }}" 
+                                                   class="form-control text-center" 
+                                                   value="{{ r.detalles.first.material.clave_sat|default:'01010101' }}" 
+                                                   placeholder="Clave">
+                                        </td>
+
+                                        <td>
+                                            <textarea name="descripcion_{{ r.id }}" class="form-control form-control-sm" rows="2">{{ r.detalles.first.material.nombre|default:"Flete" }} - Remisión: {{ r.remision }}</textarea>
+                                        </td>
+
+                                        <td>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text">$</span>
+                                                <input type="number" 
+                                                       step="0.01" 
+                                                       name="precio_{{ r.id }}" 
+                                                       id="precio-input-{{ r.id }}"
+                                                       class="form-control text-end precio-factura" 
+                                                       placeholder="0.00"
+                                                       oninput="calcularFilaFactura('{{ r.id }}')"
+                                                       required>
+                                            </div>
+                                        </td>
+
+                                        <td class="text-end bg-light">
+                                            <strong class="importe-texto" id="importe-txt-{{ r.id }}">$0.00</strong>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="6" class="text-center">No hay datos.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="row justify-content-end mt-3">
+                            <div class="col-md-5">
+                                <table class="table table-sm table-borderless">
+                                    <tr>
+                                        <td class="text-end">Subtotal:</td>
+                                        <td class="text-end fw-bold" id="lblSubtotal">$0.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-end">IVA (16%):</td>
+                                        <td class="text-end fw-bold" id="lblIVA">$0.00</td>
+                                    </tr>
+                                    <tr id="rowRetencion" style="display:none;">
+                                        <td class="text-end text-danger">Retención:</td>
+                                        <td class="text-end text-danger fw-bold" id="lblRetencion">-$0.00</td>
+                                    </tr>
+                                    <tr class="border-top">
+                                        <td class="text-end fs-5">Total:</td>
+                                        <td class="text-end fs-5 fw-bold text-success" id="lblTotal">$0.00</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <a href="{% url 'remisiones_por_facturar' %}" class="btn btn-outline-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-success px-4 fw-bold" {% if not receptor %}disabled{% endif %}>
+                                <i class="fas fa-check me-2"></i>TIMBRAR FACTURA
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3">
+            <div class="card shadow border-info sticky-top" style="top: 20px;">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0 small"><i class="fas fa-calculator me-2"></i>Datos de Origen (Remisión)</h6>
+                </div>
+                <div class="card-body bg-light p-2" style="max-height: 80vh; overflow-y: auto;">
+                    <p class="small text-muted mb-2 text-center">
+                        Ingresa la tarifa para calcular el precio de la factura automáticamente.
+                    </p>
+
+                    {% for r in remisiones %}
+                    <div class="card mb-2 border-0 shadow-sm">
+                        <div class="card-body p-2">
+                            
+                            {% with material=r.detalles.first.material %}
+
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="badge bg-secondary">Rem: {{ r.remision }}</span>
+                                <span class="badge bg-light text-dark border">{{ material.clave_unidad_sat|default:"Kg" }}</span>
+                            </div>
+
+                            <div class="mb-2">
+                                <small class="fw-bold text-dark d-block">{{ material.nombre|default:"Sin Material" }}</small>
+                                
+                                {% if material %}
+                                    {% if not material.clave_sat %}
+                                        <div class="alert alert-danger p-1 mb-0 mt-1" style="font-size: 0.7rem; line-height: 1.2;">
+                                            <div class="d-flex align-items-center mb-1">
+                                                <i class="fas fa-exclamation-circle me-1"></i>
+                                                <strong>Sin Clave SAT</strong>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center border-top border-danger pt-1">
+                                                <a href="{% url 'editar_material' material.id %}" target="_blank" class="fw-bold text-danger text-decoration-underline">
+                                                    Asignar
+                                                </a>
+                                                <a href="javascript:location.reload()" class="fw-bold text-danger text-decoration-none" title="Recargar página">
+                                                    <i class="fas fa-sync-alt"></i> Recargar
+                                                </a>
+                                            </div>
+                                        </div>
+                                    
+                                    {% elif material.clave_sat == '01010101' %}
+                                        <div class="alert alert-warning p-1 mb-0 mt-1" style="font-size: 0.7rem; line-height: 1.2;">
+                                            <div class="d-flex align-items-start">
+                                                <i class="fas fa-info-circle me-1 mt-1"></i>
+                                                <span class="text-dark">Auto-asignado: <strong>01010101</strong></span>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center mt-1 border-top border-warning pt-1">
+                                                <a href="{% url 'editar_material' material.id %}" target="_blank" class="fw-bold text-dark text-decoration-underline">
+                                                    ¿Cambiar?
+                                                </a>
+                                                <a href="javascript:location.reload()" class="fw-bold text-dark text-decoration-none" title="Recargar página">
+                                                    <i class="fas fa-sync-alt"></i> Recargar
+                                                </a>
+                                            </div>
+                                        </div>
+
+                                    {% else %}
+                                        <small class="text-muted" style="font-size: 0.7rem;">
+                                            <i class="fas fa-check-circle text-success me-1"></i>SAT: {{ material.clave_sat }}
+                                        </small>
+                                    {% endif %}
+                                {% else %}
+                                    <small class="text-muted">Material no definido</small>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label text-muted text-xs mb-0">Peso / Cantidad Real</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" 
+                                           class="form-control fw-bold text-center bg-white" 
+                                           value="{{ r.total_peso_dlv|floatformat:2 }}" 
+                                           readonly 
+                                           id="peso-ref-{{ r.id }}">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="form-label text-primary text-xs mb-0 fw-bold">Tarifa Unit. (x Peso)</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-white text-primary">$</span>
+                                    <input type="number" 
+                                           step="0.01" 
+                                           class="form-control text-end border-primary" 
+                                           placeholder="Ej. 0.85"
+                                           oninput="calcularDesdeReferencia('{{ r.id }}', this.value)">
+                                </div>
+                            </div>
+                            
+                            {% endwith %}
+
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const checkRet = document.getElementById('{{ form.aplicar_retencion.id_for_label }}');
+        if(checkRet) checkRet.addEventListener('change', recalcularTotalesGlobales);
+    });
+
+    function calcularDesdeReferencia(id, tarifaValor) {
+        const peso = parseFloat(document.getElementById('peso-ref-' + id).value) || 0;
+        const tarifa = parseFloat(tarifaValor) || 0;
+        const totalSugerido = peso * tarifa;
+        const inputPrecioFactura = document.getElementById('precio-input-' + id);
+        if(inputPrecioFactura) {
+            inputPrecioFactura.value = totalSugerido.toFixed(2);
+            calcularFilaFactura(id);
+        }
+    }
+
+    function calcularFilaFactura(id) {
+        const row = document.getElementById('row-' + id);
+        const cantidad = parseFloat(row.querySelector('.cantidad-factura').value) || 0;
+        const precio = parseFloat(row.querySelector('.precio-factura').value) || 0;
+        const importe = cantidad * precio;
+        document.getElementById('importe-txt-' + id).textContent = '$' + importe.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        recalcularTotalesGlobales();
+    }
+
+    function recalcularTotalesGlobales() {
+        let subtotal = 0;
+        document.querySelectorAll('tr[id^="row-"]').forEach(row => {
+            const cant = parseFloat(row.querySelector('.cantidad-factura').value) || 0;
+            const prec = parseFloat(row.querySelector('.precio-factura').value) || 0;
+            subtotal += (cant * prec);
+        });
+
+        const checkRet = document.getElementById('{{ form.aplicar_retencion.id_for_label }}');
+        const aplicaRetencion = checkRet ? checkRet.checked : false;
+
+        const iva = subtotal * 0.16;
+        const retencion = aplicaRetencion ? (subtotal * 0.06) : 0;
+        const total = subtotal + iva - retencion;
+
+        document.getElementById('lblSubtotal').textContent = '$' + subtotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('lblIVA').textContent = '$' + iva.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('lblTotal').textContent = '$' + total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        
+        const rowRet = document.getElementById('rowRetencion');
+        if (aplicaRetencion) {
+            rowRet.style.display = 'table-row';
+            document.getElementById('lblRetencion').textContent = '-$' + retencion.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        } else {
+            rowRet.style.display = 'none';
+        }
+    }
+</script>
+
+<style>
+    .text-xs { font-size: 0.75rem; }
+    .precio-factura { font-weight: bold; color: #2c3e50; }
+</style>
+
+{% endblock %}

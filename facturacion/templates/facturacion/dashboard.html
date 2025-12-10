@@ -1,0 +1,563 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+
+{% block title %}Dashboard Facturación{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    .select2-container--bootstrap-5 .select2-selection {
+        border-color: #dee2e6;
+    }
+    
+    /* Estadísticas mejoradas */
+    .stat-card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        overflow: hidden;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+    }
+    
+    .stat-icon {
+        transition: transform 0.3s ease;
+    }
+    
+    .stat-card:hover .stat-icon {
+        transform: scale(1.1);
+    }
+    
+    /* Tabla mejorada */
+    .table-hover tbody tr {
+        transition: background-color 0.2s ease;
+    }
+    
+    .table-hover tbody tr:hover {
+        background-color: #f8f9fa !important;
+    }
+    
+    .badge-remision {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+        margin: 0.1rem;
+        display: inline-block;
+    }
+    
+    /* Estado mejorado */
+    .status-badge {
+        padding: 0.35rem 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        min-width: 100px;
+        display: inline-block;
+    }
+    
+    /* Botones de acción */
+    .action-btn {
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }
+    
+    .action-btn:hover {
+        transform: translateY(-2px);
+    }
+    
+    /* Filtros */
+    .filter-card .card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .stat-card .card-body {
+            padding: 1rem !important;
+        }
+        
+        .table-responsive {
+            font-size: 0.9rem;
+        }
+        
+        .btn-group-sm .btn {
+            padding: 0.25rem 0.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 bg-light bg-opacity-50">
+
+    <!-- Header con estadísticas -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h1 class="h3 fw-bold text-dark mb-0">
+                    <i class="fas fa-chart-line text-primary me-2"></i>Dashboard de Facturación
+                </h1>
+                <div class="d-flex gap-2">
+                    <span class="badge bg-light text-dark border">
+                        <i class="fas fa-calendar-day me-1"></i>
+                        {% now "d/m/Y" %}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tarjetas de estadísticas -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm border-start border-success border-5 h-100 stat-card">
+                <div class="card-body d-flex align-items-center justify-content-between">
+                    <div>
+                        <h6 class="text-uppercase text-muted small fw-bold mb-1">
+                            <i class="fas fa-check-circle me-1"></i>TIMBRADAS
+                        </h6>
+                        <h2 class="mb-1 fw-bold text-success">{{ total_timbradas }}</h2>
+                        <p class="small text-muted mb-0">Facturas timbradas correctamente</p>
+                    </div>
+                    <div class="bg-success bg-opacity-10 p-3 rounded-circle text-success stat-icon">
+                        <i class="fas fa-file-invoice-dollar fs-3"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm border-start border-warning border-5 h-100 stat-card">
+                <div class="card-body d-flex align-items-center justify-content-between">
+                    <div>
+                        <h6 class="text-uppercase text-muted small fw-bold mb-1">
+                            <i class="fas fa-clock me-1"></i>PENDIENTES
+                        </h6>
+                        <h2 class="mb-1 fw-bold text-warning">{{ total_pendientes }}</h2>
+                        <p class="small text-muted mb-0">Facturas en estado borrador</p>
+                    </div>
+                    <div class="bg-warning bg-opacity-10 p-3 rounded-circle text-warning stat-icon">
+                        <i class="fas fa-edit fs-3"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm border-start border-danger border-5 h-100 stat-card">
+                <div class="card-body d-flex align-items-center justify-content-between">
+                    <div>
+                        <h6 class="text-uppercase text-muted small fw-bold mb-1">
+                            <i class="fas fa-ban me-1"></i>CANCELADAS
+                        </h6>
+                        <h2 class="mb-1 fw-bold text-danger">{{ total_canceladas }}</h2>
+                        <p class="small text-muted mb-0">Facturas canceladas</p>
+                    </div>
+                    <div class="bg-danger bg-opacity-10 p-3 rounded-circle text-danger stat-icon">
+                        <i class="fas fa-times-circle fs-3"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel de filtros y acciones -->
+    <div class="card shadow-sm border-0 mb-4 filter-card">
+        <div class="card-header bg-white py-3 border-bottom">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-0 fw-bold text-dark">
+                        <i class="fas fa-sliders-h me-2 text-primary"></i>Filtros Avanzados
+                    </h6>
+                    <small class="text-muted">Filtra el historial de facturas según tus necesidades</small>
+                </div>
+                
+                <div class="d-flex gap-2">
+                    <a href="{% url 'remisiones_por_facturar' %}" class="btn btn-primary fw-bold shadow-sm d-flex align-items-center">
+                        <i class="fas fa-file-invoice me-2"></i>
+                        <span class="d-none d-md-inline">Por Facturar</span>
+                    </a>
+                    <a href="{% url 'crear_factura_nueva' %}" class="btn btn-success fw-bold shadow-sm d-flex align-items-center">
+                        <i class="fas fa-plus-circle me-2"></i>
+                        <span class="d-none d-md-inline">Nueva Factura</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-body bg-light">
+            <form method="GET" id="filterForm" class="row g-3 align-items-end">
+                
+                <!-- Filtro por cliente -->
+                <div class="col-lg-4 col-md-6">
+                    <label class="form-label small fw-bold text-muted mb-1">
+                        <i class="fas fa-user me-1"></i>Cliente / Receptor
+                    </label>
+                    <select name="q_cliente" class="form-select select2-filter" data-placeholder="Selecciona un cliente">
+                        <option value="">Todos los Clientes</option>
+                        {% for nombre in clientes_combo %}
+                            <option value="{{ nombre }}" {% if q_cliente == nombre %}selected{% endif %}>
+                                {{ nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Filtro por folio -->
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label small fw-bold text-muted mb-1">
+                        <i class="fas fa-hashtag me-1"></i>Folio Factura
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0">
+                            <i class="fas fa-search text-muted"></i>
+                        </span>
+                        <input type="text" name="q_folio" class="form-control border-start-0" 
+                               placeholder="Ej. F-102" value="{{ q_folio|default:'' }}">
+                    </div>
+                </div>
+
+                <!-- Filtro por estado -->
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label small fw-bold text-muted mb-1">
+                        <i class="fas fa-tag me-1"></i>Estado
+                    </label>
+                    <select name="q_estado" class="form-select">
+                        <option value="">Todos los estados</option>
+                        <option value="timbrado" {% if q_estado == 'timbrado' %}selected{% endif %}>Timbrado</option>
+                        <option value="pendiente" {% if q_estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                        <option value="cancelada" {% if q_estado == 'cancelada' %}selected{% endif %}>Cancelada</option>
+                    </select>
+                </div>
+
+                <!-- Botones de acción -->
+                <div class="col-lg-2 col-md-6 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary fw-bold flex-grow-1 d-flex align-items-center justify-content-center">
+                        <i class="fas fa-filter me-2"></i>
+                        <span class="d-none d-md-inline">Filtrar</span>
+                    </button>
+                </div>
+
+                <!-- Botones adicionales -->
+                <div class="col-12 mt-3 pt-3 border-top">
+                    <div class="d-flex flex-wrap gap-2 justify-content-between">
+                        <div>
+                            <a href="{% url 'dashboard_facturacion' %}" class="btn btn-outline-secondary fw-bold">
+                                <i class="fas fa-undo me-2"></i>Limpiar Filtros
+                            </a>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" onclick="descargarMasivoXML()" class="btn btn-success fw-bold d-flex align-items-center">
+                                <i class="fas fa-file-archive me-2"></i>
+                                <span class="d-none d-md-inline">Descargar XMLs</span>
+                            </button>
+                            
+                            <button type="button" onclick="exportarExcel()" class="btn btn-outline-success fw-bold d-flex align-items-center">
+                                <i class="fas fa-file-excel me-2"></i>
+                                <span class="d-none d-md-inline">Exportar Excel</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabla de facturas -->
+    <div class="card shadow border-0">
+        <div class="card-header bg-white py-3 border-bottom">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0 fw-bold text-dark">
+                        <i class="fas fa-file-invoice me-2 text-secondary"></i>Historial de Facturas
+                    </h5>
+                    <small class="text-muted">{{ facturas|length }} facturas encontradas</small>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-light text-dark border">
+                        <i class="fas fa-sync-alt me-1"></i>
+                        Actualizado: {% now "H:i" %}
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light text-secondary small text-uppercase">
+                    <tr>
+                        <th class="py-3 px-3 fw-semibold">Folio</th>
+                        <th class="py-3 fw-semibold">Fecha</th>
+                        <th class="py-3 fw-semibold">Cliente</th>
+                        <th class="py-3 fw-semibold">Remisiones</th> 
+                        <th class="py-3 fw-semibold text-end">Total</th>
+                        <th class="py-3 fw-semibold text-center">Estado</th>
+                        <th class="py-3 fw-semibold text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in facturas %}
+                    <tr class="{% if f.estado == 'cancelada' %}opacity-75{% endif %}">
+                        <td class="fw-bold px-3">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-file-invoice text-primary me-2"></i>
+                                <span class="text-dark">{{ f.folio }}</span>
+                            </div>
+                        </td>
+                        
+                        <td>
+                            <div class="d-flex flex-column">
+                                <span class="fw-medium text-dark">{{ f.fecha_emision|date:"d/m/Y" }}</span>
+                                <small class="text-muted">{{ f.fecha_emision|date:"H:i" }}</small>
+                            </div>
+                        </td>
+                        
+                        <td>
+                            <div class="d-flex flex-column">
+                                <span class="fw-bold text-dark d-block text-truncate" style="max-width: 250px;">
+                                    {{ f.receptor.razon_social }}
+                                </span>
+                                <small class="text-muted" style="font-size: 0.75rem;">
+                                    <i class="fas fa-id-card me-1"></i>{{ f.receptor.rfc }}
+                                </small>
+                            </div>
+                        </td>
+                        
+                        <td>
+                            {% if f.remisiones.all %}
+                                <div class="d-flex flex-wrap gap-1" style="max-width: 200px;">
+                                    {% for remision in f.remisiones.all|slice:":3" %}
+                                        <span class="badge bg-light text-dark border badge-remision">
+                                            {{ remision.remision }}
+                                        </span>
+                                    {% endfor %}
+                                    {% if f.remisiones.all|length > 3 %}
+                                        <span class="badge bg-light text-muted border badge-remision">
+                                            +{{ f.remisiones.all|length|add:"-3" }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span class="text-muted small">-</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="text-end">
+                            <span class="fw-bold text-dark fs-6">
+                                ${{ f.monto_total|floatformat:2|intcomma }}
+                            </span>
+                            {% if f.moneda != 'MXN' %}
+                                <small class="text-muted d-block">{{ f.moneda }}</small>
+                            {% endif %}
+                        </td>
+
+                        <td class="text-center">
+                            {% if f.estado == 'timbrado' %}
+                                <span class="badge bg-success bg-opacity-25 text-success status-badge border border-success">
+                                    <i class="fas fa-check-circle me-1"></i>TIMBRADO
+                                </span>
+                            {% elif f.estado == 'pendiente' %}
+                                <span class="badge bg-warning bg-opacity-25 text-warning status-badge border border-warning">
+                                    <i class="fas fa-clock me-1"></i>BORRADOR
+                                </span>
+                            {% elif f.estado == 'cancelada' %}
+                                <span class="badge bg-danger bg-opacity-25 text-danger status-badge border border-danger">
+                                    <i class="fas fa-ban me-1"></i>CANCELADA
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary status-badge">{{ f.estado }}</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="text-center">
+                            <div class="d-flex justify-content-center gap-1">
+                                <a href="{% url 'detalle_factura_cliente' f.pk %}" 
+                                   class="action-btn btn btn-outline-primary" 
+                                   title="Ver detalle"
+                                   data-bs-toggle="tooltip">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                
+                                <a href="{% url 'factura_pdf_cliente' f.pk %}" 
+                                   target="_blank" 
+                                   class="action-btn btn btn-outline-danger"
+                                   title="Descargar PDF"
+                                   data-bs-toggle="tooltip">
+                                    <i class="fas fa-file-pdf"></i>
+                                </a>
+                                
+                                {% if f.archivo_xml %}
+                                    <a href="{{ f.archivo_xml.url }}" 
+                                       download 
+                                       class="action-btn btn btn-outline-success"
+                                       title="Descarga Masiva XML"
+                                       data-bs-toggle="tooltip">
+                                        <i class="fas fa-file-code"></i>
+                                    </a>
+                                {% else %}
+                                    <button class="action-btn btn btn-outline-secondary disabled"
+                                            title="Sin XML disponible"
+                                            data-bs-toggle="tooltip">
+                                        <i class="fas fa-file-code"></i>
+                                    </button>
+                                {% endif %}
+                                
+                                {% if f.estado == 'pendiente' %}
+                                    <a href="#" 
+                                       class="action-btn btn btn-outline-warning"
+                                       title="Editar factura"
+                                       data-bs-toggle="tooltip">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5">
+                            <div class="py-4">
+                                <i class="fas fa-inbox fa-3x mb-3 text-light" style="opacity: 0.3;"></i>
+                                <h6 class="text-muted mb-2">No se encontraron facturas</h6>
+                                <p class="text-muted small mb-0">Intenta ajustar los filtros o crea una nueva factura</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if facturas.has_other_pages %}
+        <div class="card-footer bg-white py-3">
+            <nav aria-label="Paginación de facturas">
+                <ul class="pagination justify-content-center mb-0">
+                    {% if facturas.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ facturas.previous_page_number }}" aria-label="Anterior">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                    {% endif %}
+                    
+                    {% for i in facturas.paginator.page_range %}
+                        {% if facturas.number == i %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ i }}</span>
+                            </li>
+                        {% else %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ i }}">{{ i }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if facturas.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ facturas.next_page_number }}" aria-label="Siguiente">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Inicializar Select2
+        $('.select2-filter').select2({
+            theme: 'bootstrap-5',
+            placeholder: "Selecciona un cliente...",
+            allowClear: true,
+            width: '100%',
+            dropdownParent: $('.filter-card')
+        });
+        
+        // Inicializar tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+        
+        // Auto-submit en algunos filtros
+        $('select[name="q_estado"]').change(function() {
+            if($(this).val() !== '') {
+                $('#filterForm').submit();
+            }
+        });
+    });
+
+    // Función Descarga Masiva XML
+    function descargarMasivoXML() {
+        const form = document.getElementById('filterForm');
+        const params = new URLSearchParams(new FormData(form));
+        params.append('exportar', 'xml_masivo');
+        
+        // Mostrar loading
+        const btn = event.target.closest('button');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Preparando...';
+        btn.disabled = true;
+        
+        // Redirigir para descargar
+        window.location.href = "?" + params.toString();
+        
+        // Restaurar botón después de 3 segundos
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        }, 3000);
+    }
+    
+    // Función Exportar a Excel
+    function exportarExcel() {
+        const form = document.getElementById('filterForm');
+        const params = new URLSearchParams(new FormData(form));
+        params.append('exportar', 'excel');
+        
+        // Mostrar loading
+        const btn = event.target.closest('button');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generando...';
+        btn.disabled = true;
+        
+        // Redirigir para descargar
+        window.location.href = "?" + params.toString();
+        
+        // Restaurar botón después de 3 segundos
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        }, 3000);
+    }
+    
+    // Función para copiar filtros al portapapeles
+    function copiarFiltros() {
+        const form = document.getElementById('filterForm');
+        const params = new URLSearchParams(new FormData(form));
+        const url = window.location.origin + window.location.pathname + '?' + params.toString();
+        
+        navigator.clipboard.writeText(url).then(() => {
+            // Mostrar notificación de éxito
+            alert('Enlace de filtros copiado al portapapeles');
+        });
+    }
+</script>
+{% endblock %}

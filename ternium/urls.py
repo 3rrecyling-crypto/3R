@@ -2,7 +2,8 @@
 
 from django.urls import path
 from . import views
-from .forms import LoginForm # Importa tu form nuevo
+from django.urls import path, include
+from .forms import CustomLoginForm  # <--- Nombre correcto
 from .views import (
     UnidadDetailView, UnidadUpdateView, LugarDetailView, LugarUpdateView, 
     EmpresaDetailView, EmpresaUpdateView, ContenedorDetailView, ContenedorUpdateView,
@@ -141,7 +142,8 @@ urlpatterns = [
     path('portal/', views.home_portal_view, name='home_portal'),
     path('login/', auth_views.LoginView.as_view(
     template_name='registration/login.html',
-    authentication_form=LoginForm # <--- USA TU FORM AQUÍ
+    authentication_form=CustomLoginForm
 ), name='login'),
     path('remision/<int:pk>/cancelar/', views.cancelar_remision, name='cancelar_remision'),
+    path('facturacion/', include('facturacion.urls')),
 ]

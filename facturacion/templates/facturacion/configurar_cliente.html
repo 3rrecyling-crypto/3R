@@ -1,0 +1,40 @@
+{% extends 'ternium/base.html' %}
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Datos Fiscales: {{ cliente.nombre }}</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Razón Social</label>
+                            {{ form.razon_social }}
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">R.F.C.</label>
+                            {{ form.rfc }}
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">C.P.</label>
+                                {{ form.codigo_postal }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Régimen Fiscal</label>
+                                {{ form.regimen_fiscal }}
+                            </div>
+                        </div>
+                        <div class="d-grid mt-3">
+                            <button type="submit" class="btn btn-success">Guardar y Regresar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,220 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold mb-0 text-primary">
+                <i class="fas fa-truck-loading me-2"></i>Remisión: {{ remision.remision }}
+            </h4>
+            <span class="text-muted small">
+                <i class="far fa-calendar-alt me-1"></i> {{ remision.fecha|date:"d \d\e F Y" }}
+            </span>
+        </div>
+        
+        <div>
+            {% if remision.status == 'PENDIENTE' %}
+                <span class="badge bg-warning text-dark fs-6">Pendiente</span>
+            {% elif remision.status == 'TERMINADO' %}
+                <span class="badge bg-info text-dark fs-6">Terminado</span>
+            {% elif remision.status == 'AUDITADO' %}
+                <span class="badge bg-success fs-6"><i class="fas fa-check-circle me-1"></i>Auditado</span>
+            {% elif remision.status == 'CANCELADO' %}
+                <span class="badge bg-danger fs-6">Cancelado</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-map-signs me-2 text-secondary"></i>Logística del Viaje</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        
+                        <div class="col-md-4">
+                            <label class="small text-muted fw-bold">ORIGEN (SALIDA)</label>
+                            <div class="d-flex align-items-start mt-2">
+                                <div class="bg-info bg-opacity-10 p-2 rounded me-2 text-info">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                </div>
+                                <div>
+                                    <span class="d-block fw-bold text-dark">{{ remision.origen.nombre|default:"No especificado" }}</span>
+                                    {% if remision.origen.direccion_completa %}
+                                        <small class="text-muted" style="font-size: 0.75rem; line-height: 1.2;">{{ remision.origen.direccion_completa }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="small text-muted fw-bold">DESTINO (LLEGADA)</label>
+                            <div class="d-flex align-items-start mt-2">
+                                <div class="bg-success bg-opacity-10 p-2 rounded me-2 text-success">
+                                    <i class="fas fa-flag-checkered"></i>
+                                </div>
+                                <div>
+                                    <span class="d-block fw-bold text-dark">{{ remision.destino.nombre|default:"No especificado" }}</span>
+                                    {% if remision.destino.direccion_completa %}
+                                        <small class="text-muted" style="font-size: 0.75rem; line-height: 1.2;">{{ remision.destino.direccion_completa }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="small text-muted fw-bold">CLIENTE COMERCIAL</label>
+                            <div class="d-flex align-items-center mt-2">
+                                <div class="bg-primary bg-opacity-10 p-2 rounded me-2 text-primary">
+                                    <i class="fas fa-user-tie"></i>
+                                </div>
+                                <div>
+                                    <span class="fw-bold text-dark">{{ remision.cliente.nombre|default:"Sin Cliente" }}</span>
+                                    <div class="small text-muted" style="font-size: 0.75rem;">Entidad a Facturar</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-12 border-top my-3"></div>
+
+                        <div class="col-md-4">
+                            <label class="small text-muted fw-bold">UNIDAD / TRACTO</label>
+                            <p class="mb-0 fw-bold text-dark">{{ remision.unidad.internal_id|default:"-" }} <span class="text-muted small fw-normal">({{ remision.unidad.license_plate }})</span></p>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="small text-muted fw-bold">OPERADOR</label>
+                            <p class="mb-0 fw-bold text-dark">{{ remision.operador.nombre|default:"Sin asignar" }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="small text-muted fw-bold">LÍNEA TRANSPORTE</label>
+                            <p class="mb-0 fw-bold text-dark">{{ remision.linea_transporte.nombre|default:"Propio" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-balance-scale me-2 text-secondary"></i>Detalle de Carga</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead class="bg-light text-secondary small text-uppercase">
+                            <tr>
+                                <th class="ps-4">Material</th>
+                                <th class="text-center">Peso Carga (Ton)</th>
+                                <th class="text-center">Peso Descarga (Ton)</th>
+                                <th class="text-end pe-4">Estatus</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for detalle in remision.detalles.all %}
+                            <tr>
+                                <td class="ps-4 fw-bold text-dark">{{ detalle.material.nombre }}</td>
+                                <td class="text-center text-muted">{{ detalle.peso_ld|floatformat:3 }}</td>
+                                <td class="text-center text-muted">{{ detalle.peso_dlv|floatformat:3 }}</td>
+                                <td class="text-end pe-4">
+                                    {% if detalle.peso_ld > detalle.peso_dlv %}
+                                        <span class="badge bg-danger bg-opacity-10 text-danger">Merma Detectada</span>
+                                    {% elif detalle.peso_dlv > detalle.peso_ld %}
+                                        <span class="badge bg-success bg-opacity-10 text-success">Ganancia</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary bg-opacity-10 text-secondary">Exacto</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted">Sin materiales registrados</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="bg-light border-top">
+                            <tr>
+                                <td class="ps-4 fw-bold text-dark text-uppercase">Totales:</td>
+                                <td class="text-center fw-bold text-dark">{{ remision.total_peso_ld|floatformat:3 }}</td>
+                                <td class="text-center fw-bold text-dark">{{ remision.total_peso_dlv|floatformat:3 }}</td>
+                                <td class="text-end pe-4 fw-bold text-dark">{{ remision.diff|floatformat:3 }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-camera me-2 text-secondary"></i>Evidencia Fotográfica</h6>
+                </div>
+                <div class="card-body">
+                    
+                    <div class="mb-4">
+                        <label class="small fw-bold text-muted mb-2 d-block">EVIDENCIA DE CARGA</label>
+                        {% if remision.evidencia_carga %}
+                            <a href="{{ remision.evidencia_carga.url }}" target="_blank" class="d-block position-relative group-hover">
+                                <img src="{{ remision.evidencia_carga.url }}" class="img-fluid rounded border shadow-sm w-100" style="max-height: 200px; object-fit: cover;" alt="Carga">
+                                <div class="position-absolute top-50 start-50 translate-middle badge bg-dark bg-opacity-75">Click para ver</div>
+                            </a>
+                        {% else %}
+                            <div class="bg-light rounded border border-dashed p-4 text-center text-muted">
+                                <i class="fas fa-image fa-2x mb-2 opacity-25"></i>
+                                <p class="small mb-0">Sin foto de carga</p>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label class="small fw-bold text-muted mb-2 d-block">EVIDENCIA DE DESCARGA</label>
+                        {% if remision.evidencia_descarga %}
+                            <a href="{{ remision.evidencia_descarga.url }}" target="_blank" class="d-block position-relative">
+                                <img src="{{ remision.evidencia_descarga.url }}" class="img-fluid rounded border shadow-sm w-100" style="max-height: 200px; object-fit: cover;" alt="Descarga">
+                                <div class="position-absolute top-50 start-50 translate-middle badge bg-dark bg-opacity-75">Click para ver</div>
+                            </a>
+                        {% else %}
+                            <div class="bg-light rounded border border-dashed p-4 text-center text-muted">
+                                <i class="fas fa-image fa-2x mb-2 opacity-25"></i>
+                                <p class="small mb-0">Sin foto de descarga</p>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white py-3">
+                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-clock me-2 text-secondary"></i>Tiempos Registrados</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0 small">
+                        <li class="mb-2 d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Inicio Carga:</span>
+                            <span class="fw-bold font-monospace">{{ remision.inicia_ld|date:"d/m/Y H:i"|default:"--" }}</span>
+                        </li>
+                        <li class="mb-2 d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Fin Carga:</span>
+                            <span class="fw-bold font-monospace">{{ remision.termina_ld|date:"d/m/Y H:i"|default:"--" }}</span>
+                        </li>
+                        <li class="border-top my-2"></li>
+                        <li class="mb-2 d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Inicio Descarga:</span>
+                            <span class="fw-bold font-monospace">{{ remision.inicia_dlv|date:"d/m/Y H:i"|default:"--" }}</span>
+                        </li>
+                        <li class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Fin Descarga:</span>
+                            <span class="fw-bold font-monospace">{{ remision.termina_dlv|date:"d/m/Y H:i"|default:"--" }}</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

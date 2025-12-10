@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Factura {{ factura.folio }}</title>
+    <style>
+        @page { size: letter; margin: 1cm; }
+        body { font-family: Helvetica, Arial, sans-serif; font-size: 11px; color: #333; line-height: 1.4; }
+        
+        .header-container { width: 100%; border-bottom: 2px solid #0056b3; padding-bottom: 10px; margin-bottom: 20px; }
+        .logo-area { width: 60%; float: left; }
+        .factura-info { width: 38%; float: right; text-align: right; }
+        
+        .h1-title { color: #0056b3; font-size: 20px; margin: 0; text-transform: uppercase; }
+        .folio { font-size: 16px; color: #cc0000; font-weight: bold; margin-top: 5px; }
+        
+        .fiscal-row { clear: both; width: 100%; margin-bottom: 20px; display: table; }
+        .box { display: table-cell; width: 48%; vertical-align: top; border: 1px solid #ddd; padding: 10px; background-color: #f8f9fa; border-radius: 4px; }
+        .spacer { display: table-cell; width: 4%; }
+        
+        .box h3 { margin: 0 0 5px 0; font-size: 12px; color: #0056b3; border-bottom: 1px solid #ccc; padding-bottom: 3px; text-transform: uppercase; }
+        
+        table.conceptos { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        table.conceptos th { background-color: #0056b3; color: white; padding: 6px; text-align: left; font-size: 10px; font-weight: bold; }
+        table.conceptos td { border-bottom: 1px solid #eee; padding: 6px; font-size: 10px; }
+        
+        .text-end { text-align: right; }
+        .text-center { text-align: center; }
+        
+        .totales-container { width: 40%; float: right; margin-top: 15px; }
+        .totales-row { width: 100%; border-bottom: 1px solid #eee; padding: 3px 0; }
+        .total-final { border-top: 2px solid #333; font-weight: bold; font-size: 14px; margin-top: 5px; padding-top: 5px; }
+        
+        .footer-sat { clear: both; margin-top: 40px; border-top: 1px dashed #999; padding-top: 10px; font-size: 9px; color: #666; }
+        .uuid-tag { font-family: monospace; background: #eee; padding: 2px 5px; }
+    </style>
+</head>
+<body>
+
+    <div class="header-container">
+        <div class="logo-area">
+            <div class="h1-title">FACTURA DE INGRESO</div>
+            <div style="font-size: 10px; margin-top: 5px;">
+                Este documento es una representación impresa de un CFDI 4.0
+            </div>
+        </div>
+        <div class="factura-info">
+            <div class="folio">{{ factura.folio|default:"SIN FOLIO" }}</div>
+            <div><strong>Fecha:</strong> {{ factura.fecha_emision|date:"d/m/Y H:i" }}</div>
+            <div><strong>Tipo de Comprobante:</strong> I - Ingreso</div>
+            <div><strong>Lugar de Expedición:</strong> {{ factura.emisor.codigo_postal }}</div>
+        </div>
+    </div>
+    <div style="clear:both;"></div>
+
+    <div class="fiscal-row">
+        <div class="box">
+            <h3>Emisor (Nosotros)</h3>
+            <strong>{{ factura.emisor.razon_social }}</strong><br>
+            RFC: {{ factura.emisor.rfc }}<br>
+            Régimen Fiscal: {{ factura.emisor.regimen_fiscal }}<br>
+            <br>
+            <span style="color:#666;">{{ factura.emisor.direccion }}</span>
+        </div>
+        
+        <div class="spacer"></div>
+        
+        <div class="box">
+            <h3>Cliente</h3>
+            <strong>{{ factura.receptor.razon_social }}</strong><br>
+            RFC: {{ factura.receptor.rfc }}<br>
+            Uso CFDI: {{ factura.uso_cfdi }}<br>
+            CP: {{ factura.receptor.codigo_postal }}<br>
+            <span style="color:#666;">{{ factura.receptor.direccion }}</span>
+        </div>
+    </div>
+
+    <table class="conceptos">
+        <thead>
+            <tr>
+                <th width="10%">Clave SAT</th>
+                <th width="10%" class="text-center">Cant</th>
+                <th width="10%" class="text-center">Unidad</th>
+                <th width="45%">Descripción</th>
+                <th width="12%" class="text-end">Precio Unit.</th>
+                <th width="13%" class="text-end">Importe</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in factura.conceptos.all %}
+            <tr>
+                <td>{{ c.clave_prod_serv }}</td>
+                <td class="text-center">{{ c.cantidad }}</td>
+                <td class="text-center">{{ c.clave_unidad }}</td>
+                <td>{{ c.descripcion }}</td>
+                <td class="text-end">{{ c.valor_unitario|floatformat:2 }}</td>
+                <td class="text-end">{{ c.importe|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="totales-container">
+        <div class="totales-row">
+            <span style="float:left;">Subtotal:</span>
+            <span style="float:right;">$ {{ factura.subtotal|floatformat:2 }}</span>
+            <div style="clear:both;"></div>
+        </div>
+        <div class="totales-row">
+            <span style="float:left;">IVA Trasladado (16%):</span>
+            <span style="float:right;">$ {{ factura.impuestos_trasladados|floatformat:2 }}</span>
+            <div style="clear:both;"></div>
+        </div>
+        {% if factura.impuestos_retenidos > 0 %}
+        <div class="totales-row" style="color: #a00;">
+            <span style="float:left;">(-) Retención IVA:</span>
+            <span style="float:right;">$ {{ factura.impuestos_retenidos|floatformat:2 }}</span>
+            <div style="clear:both;"></div>
+        </div>
+        {% endif %}
+        <div class="totales-row total-final">
+            <span style="float:left;">TOTAL A COBRAR:</span>
+            <span style="float:right;">$ {{ factura.monto_total|floatformat:2 }}</span>
+            <div style="clear:both;"></div>
+        </div>
+        
+        <div style="margin-top: 20px; font-size: 10px; color: #666; text-align: right;">
+            <strong>Moneda:</strong> {{ factura.moneda }} | <strong>TC:</strong> {{ factura.tipo_cambio }}<br>
+            <strong>Método Pago:</strong> {{ factura.metodo_pago }} | <strong>Forma Pago:</strong> {{ factura.forma_pago }}
+        </div>
+    </div>
+    
+    <div class="footer-sat">
+        {% if factura.folio_fiscal %}
+            <strong>Folio Fiscal (UUID):</strong> <span class="uuid-tag">{{ factura.folio_fiscal }}</span><br>
+            <p>Sello Digital del CFDI: ... (Aquí iría la cadena larga si la tuvieras en la BD)</p>
+        {% else %}
+            <p><em>Vista previa sin valor fiscal. Documento no timbrado.</em></p>
+        {% endif %}
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,149 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="text-primary mb-0">Factura de Ingreso <small class="text-muted">{{ factura.folio|default:"(Sin Folio)" }}</small></h2>
+            <span class="badge bg-info text-dark">Cuentas por Cobrar</span>
+        </div>
+        <div>
+            <a href="{% url 'factura_pdf_cliente' factura.pk %}" class="btn btn-danger shadow-sm" target="_blank">
+                <i class="fas fa-file-pdf"></i> Descargar PDF
+            </a>
+            <a href="{% url 'dashboard_facturacion' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Volver al Listado
+            </a>
+        </div>
+    </div>
+
+    <div class="card mb-4 border-left-{{ factura.estado }}">
+        <div class="card-body d-flex justify-content-between align-items-center py-2">
+            <div>
+                <strong>Estado SAT:</strong> 
+                {% if factura.estado == 'timbrado' %}
+                    <span class="text-success"><i class="fas fa-check-circle"></i> Timbrada / Vigente</span>
+                {% elif factura.estado == 'cancelada' %}
+                    <span class="text-danger"><i class="fas fa-ban"></i> Cancelada</span>
+                {% else %}
+                    <span class="text-warning"><i class="fas fa-clock"></i> Pendiente</span>
+                {% endif %}
+            </div>
+            <div>
+                <strong>Fecha Emisión:</strong> {{ factura.fecha_emision|date:"d/m/Y H:i" }}
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-header bg-white font-weight-bold text-secondary">
+                    <i class="fas fa-building"></i> Emisor (Mi Empresa)
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title text-dark">{{ factura.emisor.razon_social }}</h5>
+                    <ul class="list-unstyled text-muted small">
+                        <li><strong>RFC:</strong> {{ factura.emisor.rfc }}</li>
+                        <li><strong>Régimen Fiscal:</strong> {{ factura.emisor.regimen_fiscal }}</li>
+                        <li><strong>CP:</strong> {{ factura.emisor.codigo_postal }}</li>
+                        <li><strong>Dirección:</strong> {{ factura.emisor.direccion }}</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-header bg-white font-weight-bold text-primary">
+                    <i class="fas fa-user-tie"></i> Cliente (Receptor)
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title text-primary">{{ factura.receptor.razon_social }}</h5>
+                    <ul class="list-unstyled text-muted small">
+                        <li><strong>RFC:</strong> {{ factura.receptor.rfc }}</li>
+                        <li><strong>Uso de CFDI:</strong> {{ factura.uso_cfdi }} ({{ factura.get_uso_cfdi_display }})</li>
+                        <li><strong>CP:</strong> {{ factura.receptor.codigo_postal }}</li>
+                        <li><strong>Dirección:</strong> {{ factura.receptor.direccion|default:"Dirección no registrada" }}</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-light">
+            <strong>Conceptos de Facturación</strong>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr class="text-muted small text-uppercase">
+                        <th>Clave SAT</th>
+                        <th>Cant.</th>
+                        <th>Unidad</th>
+                        <th>Descripción</th>
+                        <th class="text-end">Precio Unit.</th>
+                        <th class="text-end">Importe</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for concepto in factura.conceptos.all %}
+                    <tr>
+                        <td class="text-monospace">{{ concepto.clave_prod_serv }}</td>
+                        <td>{{ concepto.cantidad|floatformat:2 }}</td>
+                        <td>{{ concepto.clave_unidad }}</td>
+                        <td>{{ concepto.descripcion }}</td>
+                        <td class="text-end text-muted">${{ concepto.valor_unitario|floatformat:2 }}</td>
+                        <td class="text-end fw-bold">${{ concepto.importe|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">No hay conceptos registrados en esta factura.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer bg-white">
+            <div class="row">
+                <div class="col-md-6 text-muted small">
+                    <p class="mb-1"><strong>Método de Pago:</strong> {{ factura.metodo_pago }}</p>
+                    <p class="mb-1"><strong>Forma de Pago:</strong> {{ factura.forma_pago }}</p>
+                    <p class="mb-0"><strong>Moneda:</strong> {{ factura.moneda }} (TC: {{ factura.tipo_cambio }})</p>
+                </div>
+                <div class="col-md-6">
+                    <table class="table table-sm table-borderless text-end mb-0">
+                        <tr>
+                            <td>Subtotal:</td>
+                            <td class="fw-bold">${{ factura.subtotal|floatformat:2 }}</td>
+                        </tr>
+                        <tr>
+                            <td>IVA Trasladado (16%):</td>
+                            <td>${{ factura.impuestos_trasladados|floatformat:2 }}</td>
+                        </tr>
+                        {% if factura.impuestos_retenidos > 0 %}
+                        <tr>
+                            <td class="text-danger">(-) Retención IVA:</td>
+                            <td class="text-danger">-${{ factura.impuestos_retenidos|floatformat:2 }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr class="border-top">
+                            <td class="h5 pt-2">Total a Cobrar:</td>
+                            <td class="h5 pt-2 text-primary">${{ factura.monto_total|floatformat:2 }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if factura.folio_fiscal %}
+    <div class="alert alert-secondary small">
+        <strong>Folio Fiscal (UUID):</strong> {{ factura.folio_fiscal }} <br>
+        <strong>Serie/Folio Interno:</strong> {{ factura.folio }}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

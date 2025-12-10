@@ -47,19 +47,19 @@
             line-height: 1.6;
         }
 
-        /* Navbar */
+        /* Navbar - CORREGIDO Z-INDEX PARA EVITAR BLOQUEOS */
         .navbar {
             background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             padding: 0.5rem 1rem;
             position: sticky;
             top: 0;
-            z-index: 1030;
+            z-index: 10000; /* Aumentado drásticamente para estar sobre cualquier gráfico */
         }
 
         .navbar-brand {
             font-weight: 700;
-            font-size: 1.8rem; /* AUMENTADO */
+            font-size: 1.8rem;
             display: flex;
             align-items: center;
             color: white !important;
@@ -110,12 +110,12 @@
             color: white !important;
         }
 
-        /* User Profile - FOTO MÁS GRANDE */
+        /* User Profile */
         .user-profile {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 0.2rem 0.5rem; /* Ajustado padding */
+            padding: 0.2rem 0.5rem;
             border-radius: 8px;
             transition: var(--transition-base);
             position: relative;
@@ -124,8 +124,8 @@
         .user-profile:hover { background: rgba(255, 255, 255, 0.15); }
 
         .user-avatar {
-            width: 85px;  /* AUMENTADO (Antes 40px) */
-            height: 85px; /* AUMENTADO (Antes 40px) */
+            width: 85px;
+            height: 85px;
             border-radius: 50%;
             object-fit: cover;
             border: 3px solid rgba(255, 255, 255, 0.6);
@@ -152,6 +152,7 @@
         .dropdown-menu-dark {
             background-color: #343a40;
             border: 1px solid rgba(0,0,0,0.15);
+            z-index: 10001; /* Asegura que el desplegable flote sobre todo */
         }
         
         .dropdown-menu-user {
@@ -162,6 +163,7 @@
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
             margin-top: 8px;
             border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 10001;
         }
 
         .dropdown-menu-user .dropdown-header {
@@ -198,6 +200,8 @@
             margin-bottom: 40px;
             flex: 1;
             animation: fadeIn 0.5s ease-out;
+            position: relative; /* Contexto de apilamiento seguro */
+            z-index: 1;
         }
 
         @keyframes fadeIn {
@@ -236,7 +240,7 @@
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container-fluid">
             <a class="navbar-brand" href="{% url 'home' %}">
-                <img src="{% static 'r3_recycling/img/logo.png' %}" alt="Logo" height="85" class="d-inline-block align-text-top loading="lazy">
+                <img src="{% static 'r3_recycling/img/logo.png' %}" alt="Logo" height="85" class="d-inline-block align-text-top" loading="lazy">
                 <span>3R RECYCLING</span>
             </a>
             
@@ -281,22 +285,40 @@
                                 <i class="fas fa-tachometer-alt fa-fw me-2"></i> Dashboard CXP
                             </a></li>
                             <li><a class="dropdown-item" href="{% url 'lista_facturas' %}">
-                                <i class="fas fa-receipt fa-fw me-2"></i> Facturas
+                                <i class="fas fa-receipt fa-fw me-2"></i> Facturas (CxP)
                             </a></li>
                             <li><a class="dropdown-item" href="{% url 'lista_pagos' %}">
-                                <i class="fas fa-cash-register fa-fw me-2"></i> Pagos
+                                <i class="fas fa-cash-register fa-fw me-2"></i> Pagos (CxP)
                             </a></li>
                         </ul>
                     </li>
                     {% endif %}
 
+                    {% if perms.facturacion.view_factura or user.is_staff %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navFacturacion" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-file-invoice-dollar me-1"></i> Facturación
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navFacturacion">
+                            <li><h6 class="dropdown-header text-white small text-white">Gestión Fiscal</h6></li>
+                            <li><a class="dropdown-item" href="{% url 'dashboard_facturacion' %}">
+                                <i class="fas fa-tachometer-alt fa-fw me-2"></i> Dashboard
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header text-uppercase small text-white">Configuración</h6></li>
+                             <li><a class="dropdown-item disabled" href="#">
+                                <i class="fas fa-cog fa-fw me-2"></i> Datos Fiscales
+                            </a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
                     {% if perms.compras.acceso_compras %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navCompras" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-shopping-cart me-1"></i> Compras
                         </a>
                         <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navCompras">
-                            <li><h6 class="dropdown-header text-uppercase small text-muted">Gestión</h6></li>
+                             <li><h6 class="dropdown-header text-uppercase small text-white">Gestión</h6></li>
                             <li><a class="dropdown-item" href="{% url 'dashboard_compras' %}">
                                 <i class="fas fa-chart-bar fa-fw me-2"></i> Dashboard
                             </a></li>
@@ -308,7 +330,7 @@
                             </a></li>
                             
                             <li><hr class="dropdown-divider"></li>
-                            <li><h6 class="dropdown-header text-uppercase small text-muted">Catálogos</h6></li>
+                             <li><h6 class="dropdown-header text-uppercase small text-muted">Catálogos</h6></li>
                             <li><a class="dropdown-item" href="{% url 'lista_proveedores' %}"><i class="fas fa-truck fa-fw me-2"></i> Proveedores</a></li>
                             <li><a class="dropdown-item" href="{% url 'lista_articulos' %}"><i class="fas fa-boxes fa-fw me-2"></i> Artículos / Servicios</a></li>
                             <li><a class="dropdown-item" href="{% url 'lista_categorias' %}"><i class="fas fa-tags fa-fw me-2"></i> Categorías</a></li>
@@ -322,14 +344,14 @@
                             <i class="fas fa-database me-1"></i> Catálogos
                         </a>
                         <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navCatalogos">
-                            <li><h6 class="dropdown-header text-uppercase small text-muted">Operativos</h6></li>
+                             <li><h6 class="dropdown-header text-uppercase small text-white">Operativos</h6></li>
                             <li><a class="dropdown-item" href="{% url 'lista_empresas' %}"><i class="fas fa-building fa-fw me-2"></i> Empresas / Folios</a></li>
                             <li><a class="dropdown-item" href="{% url 'lista_lugares' %}"><i class="fas fa-map-marker-alt fa-fw me-2"></i> Orígenes y Destinos</a></li>
                             <li><a class="dropdown-item" href="{% url 'lista_lineas_transporte' %}"><i class="fas fa-truck-fast fa-fw me-2"></i> Líneas de Transporte</a></li>
                             
                             <li><hr class="dropdown-divider"></li>
                             
-                            <li><h6 class="dropdown-header text-uppercase small text-muted">Recursos</h6></li>
+                             <li><h6 class="dropdown-header text-uppercase small text-white">Recursos</h6></li>
                             <li><a class="dropdown-item" href="{% url 'lista_operadores' %}"><i class="fas fa-id-card fa-fw me-2"></i> Operadores</a></li>
                             <li><a class="dropdown-item" href="{% url 'lista_unidades' %}"><i class="fas fa-truck fa-fw me-2"></i> Unidades</a></li>
                             <li><a class="dropdown-item" href="{% url 'lista_contenedores' %}"><i class="fas fa-box fa-fw me-2"></i> Contenedores</a></li>

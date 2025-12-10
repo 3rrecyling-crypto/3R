@@ -9,7 +9,6 @@ from .models import (
     Operador, Material, Unidad, Contenedor, DetalleRemision, Descarga,
     RegistroLogistico
 )
-from .models import Empresa, Origen
 
 
 class OperadorForm(forms.ModelForm):
@@ -23,13 +22,21 @@ class OperadorForm(forms.ModelForm):
 class MaterialForm(forms.ModelForm):
     class Meta:
         model = Material
-        fields = ['nombre', 'empresas']
+        # AGREGAMOS 'clave_unidad_sat' AQUI ABAJO:
+        fields = ['nombre', 'clave_sat', 'clave_unidad_sat', 'empresas'] 
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej. Chatarra de Acero #1'}),
+            'clave_sat': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej. 01010101'}),
+            # WIDGET NUEVO PARA LA UNIDAD
+            'clave_unidad_sat': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej. KGM'}), 
             'empresas': forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
         }
-        labels = {'nombre': 'Nombre del Material', 'empresas': 'Unidades de Negocio (Empresas)'}
-
+        labels = {
+            'nombre': 'Nombre del Material', 
+            'clave_sat': 'Clave SAT (Prod/Serv)',
+            'clave_unidad_sat': 'Clave Unidad (H87/KGM)', # Etiqueta opcional
+            'empresas': 'Unidades de Negocio (Empresas)'
+        }
 
 class UnidadForm(forms.ModelForm):
     class Meta:
@@ -91,25 +98,56 @@ class LineaTransporteForm(forms.ModelForm):
 
 
 class LugarForm(forms.ModelForm):
+    """
+    Formulario para Lugares (Clientes/Proveedores).
+    Aquí es donde SÍ van los datos fiscales.
+    """
     class Meta:
         model = Lugar
-        fields = ['nombre', 'tipo', 'es_patio', 'empresas']
+        # Agregamos los campos fiscales que tienes en tu modelo Lugar
+        fields = [
+            'nombre', 'tipo', 'es_patio', 'empresas',
+            'razon_social', 'rfc', 'regimen_fiscal', 'uso_cfdi',
+            'calle', 'numero_exterior', 'numero_interior', 
+            'colonia', 'codigo_postal', 'municipio', 'estado', 'pais'
+        ]
         widgets = {
-            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
+            # Datos Operativos
+            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre corto (Alias)'}),
             'tipo': forms.Select(attrs={'class': 'form-select'}),
             'es_patio': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'empresas': forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+            
+            # Datos Fiscales
+            'razon_social': forms.TextInput(attrs={'class': 'form-control'}),
+            'rfc': forms.TextInput(attrs={'class': 'form-control'}),
+            'regimen_fiscal': forms.Select(attrs={'class': 'form-select'}),
+            'uso_cfdi': forms.Select(attrs={'class': 'form-select'}),
+            
+            # Dirección
+            'calle': forms.TextInput(attrs={'class': 'form-control'}),
+            'numero_exterior': forms.TextInput(attrs={'class': 'form-control'}),
+            'numero_interior': forms.TextInput(attrs={'class': 'form-control'}),
+            'colonia': forms.TextInput(attrs={'class': 'form-control'}),
+            'codigo_postal': forms.TextInput(attrs={'class': 'form-control'}),
+            'municipio': forms.TextInput(attrs={'class': 'form-control'}),
+            'estado': forms.TextInput(attrs={'class': 'form-control'}),
+            'pais': forms.TextInput(attrs={'class': 'form-control'}),
         }
-        labels = {'nombre': 'Nombre del Lugar', 'tipo': 'Tipo', 'es_patio': 'Es Patio de Inventario', 'empresas': 'Empresas Asociadas'}
+        labels = {
+            'nombre': 'Nombre Operativo', 
+            'es_patio': '¿Es Patio de Inventario?',
+            'empresas': 'Unidades de Negocio Asociadas'
+        }
 
 
 class RemisionForm(forms.ModelForm):
     class Meta:
         model = Remision
-        # 'remision' ya está (correctamente) en exclude
-        exclude = ['status', 'auditado_por', 'auditado_en', 'remision']
+        exclude = ['status', 'auditado_por', 'auditado_en']
         widgets = {
             'empresa': forms.Select(attrs={'class': 'form-select'}),
+            'remision': forms.TextInput(attrs={'class': 'form-control'}),
             'fecha': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'linea_transporte': forms.Select(attrs={'class': 'form-select'}),
             'operador': forms.Select(attrs={'class': 'form-select'}),
@@ -130,15 +168,18 @@ class RemisionForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        # Extraemos 'empresa' de los argumentos, si se proporciona desde la vista
         empresa = kwargs.pop('empresa', None)
         super().__init__(*args, **kwargs)
 
+        # Si se pasó una empresa, filtramos los QuerySets de los campos relacionados
         if empresa:
             self.fields['linea_transporte'].queryset = LineaTransporte.objects.filter(empresas=empresa)
             self.fields['unidad'].queryset = Unidad.objects.filter(empresas=empresa)
             self.fields['contenedor'].queryset = Contenedor.objects.filter(empresas=empresa)
             self.fields['origen'].queryset = Lugar.objects.filter(empresas=empresa, tipo__in=['ORIGEN', 'AMBOS'])
             self.fields['destino'].queryset = Lugar.objects.filter(empresas=empresa, tipo__in=['DESTINO', 'AMBOS'])
+        # Si no hay empresa (al crear una remisión nueva), los campos aparecen vacíos
         else:
             self.fields['linea_transporte'].queryset = LineaTransporte.objects.none()
             self.fields['unidad'].queryset = Unidad.objects.none()
@@ -146,21 +187,15 @@ class RemisionForm(forms.ModelForm):
             self.fields['origen'].queryset = Lugar.objects.none()
             self.fields['destino'].queryset = Lugar.objects.none()
 
+        # Nota: El campo 'operador' no está relacionado a 'Empresa' en el modelo,
+        # por lo que muestra todos los operadores disponibles.
         self.fields['operador'].queryset = Operador.objects.all()
-
-        # --- INICIO DE LA MODIFICACIÓN ---
-        # Si la instancia ya existe (es un formulario de edición),
-        # deshabilitamos el campo 'empresa'.
-        if self.instance and self.instance.pk:
-            self.fields['empresa'].disabled = True
-        # --- FIN DE LA MODIFICACIÓN ---
 
         if self.instance and self.instance.pk and self.instance.status == 'AUDITADO':
             for field in self.fields:
                 self.fields[field].disabled = True
     
     def clean(self):
-        # ... (Tu método clean() se queda exactamente igual que en la versión anterior)
         cleaned_data = super().clean()
         origen = cleaned_data.get('origen')
         destino = cleaned_data.get('destino')
@@ -168,7 +203,7 @@ class RemisionForm(forms.ModelForm):
         patios_exentos = ["PATIO MONTERREY", "PATIO NUEVO LAREDO"]
 
         is_completing = all([
-            cleaned_data.get('fecha'), cleaned_data.get('linea_transporte'),
+            cleaned_data.get('remision'), cleaned_data.get('fecha'), cleaned_data.get('linea_transporte'),
             cleaned_data.get('operador'), cleaned_data.get('unidad'), origen, destino,
             cleaned_data.get('folio_ld'), cleaned_data.get('folio_dlv')
         ])
@@ -325,17 +360,22 @@ class EntradaMaquilaForm(forms.ModelForm):
         return cleaned_data
 
 class EmpresaForm(forms.ModelForm):
+    """
+    Formulario para Unidades de Negocio (Solo nombre y prefijo).
+    """
     class Meta:
         model = Empresa
-        # Solo incluye los nuevos campos
-        fields = ['nombre', 'prefijo']
+        # Solo pedimos los campos que realmente existen en el modelo Empresa
+        fields = ['nombre', 'prefijo', 'origenes'] 
         widgets = {
-            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej. MONTERREY'}),
+            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej. R3 Recycling Solutions'}),
             'prefijo': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej. MTY'}),
+            'origenes': forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
         }
         labels = {
-            'nombre': 'Nombre Completo*',
-            'prefijo': 'Prefijo*',
+            'nombre': 'Nombre de la Unidad de Negocio',
+            'prefijo': 'Prefijo para Folios',
+            'origenes': 'Orígenes Permitidos'
         }
 
 
@@ -428,38 +468,43 @@ class RegistroLogisticoForm(forms.ModelForm):
         
         return cleaned_data
     
+from django.contrib.auth.forms import AuthenticationForm
+
+class CustomLoginForm(AuthenticationForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['username'].widget.attrs.update({
+            'class': 'form-control', 
+            'placeholder': 'Usuario'
+        })
+        self.fields['password'].widget.attrs.update({
+            'class': 'form-control', 
+            'placeholder': 'Contraseña'
+        })
+        
 class EmpresaOrigenesForm(forms.ModelForm):
     """
-    Este formulario se usa para editar una Empresa
-    y asignar sus Orígenes.
+    Formulario específico para vincular orígenes a una empresa.
     """
     class Meta:
         model = Empresa
-        # Solo nos interesa mostrar el campo ManyToMany
-        fields = ['origenes'] 
-        
+        fields = ['origenes']
         widgets = {
-            # Usamos CheckboxSelectMultiple para que sea más fácil de usar
-            'origenes': forms.CheckboxSelectMultiple,
+            'origenes': forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
         }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        
-        # Nos aseguramos de que el campo muestre todos los orígenes disponibles
-        self.fields['origenes'].queryset = Origen.objects.all().order_by('nombre')
-        self.fields['origenes'].label = "Orígenes Vinculados a esta Empresa"
-        self.fields['origenes'].help_text = "Selecciona todos los orígenes que esta empresa puede usar."
+        labels = {
+            'origenes': 'Seleccione los orígenes permitidos para esta unidad de negocio:'
+        }
         
 class ImportarRemisionesForm(forms.Form):
+    """
+    Formulario simple para subir archivos Excel de remisiones.
+    No está vinculado a un modelo directamente.
+    """
     archivo_excel = forms.FileField(
-        label="Selecciona el archivo Excel (.xlsx)",
-        help_text="El archivo debe tener las columnas correctas: Remision, Fecha, Empresa, Operador, etc."
+        label="Seleccionar Archivo Excel (.xlsx)",
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': '.xlsx, .xls'
+        })
     )
-    
-    
-from django.contrib.auth.forms import AuthenticationForm
-from django import forms
-
-class LoginForm(AuthenticationForm):
-    remember_me = forms.BooleanField(required=False, label="Recordar sesión")
