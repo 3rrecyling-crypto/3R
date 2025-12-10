@@ -10,6 +10,15 @@
         border-color: #dee2e6;
         padding: 0.375rem 0.75rem;
     }
+
+    /* === SOLUCIÓN DE CAPAS (Z-INDEX) === */
+    /* Forzamos que la cortina oscura y el modal estén por encima de la Navbar (que tiene 10000) */
+    .modal-backdrop {
+        z-index: 10050 !important;
+    }
+    .modal {
+        z-index: 10055 !important;
+    }
 </style>
 {% endblock %}
 
@@ -319,6 +328,10 @@
         const spinner = document.getElementById('modalSpinner');
         const contentDiv = document.getElementById('ajaxContent');
         const modalEl = document.getElementById('modalDetalleRemision');
+        
+        // === FIX IMPORTANTE: Mover modal al body para evitar conflictos de Z-Index ===
+        document.body.appendChild(modalEl);
+        // =========================================================================
         
         // Limpiar
         contentDiv.innerHTML = '';
