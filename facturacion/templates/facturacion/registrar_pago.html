@@ -1,0 +1,50 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="card shadow-sm mw-600 mx-auto" style="max-width: 600px;">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Registrar Pago (Complemento)</h5>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <strong>Factura:</strong> {{ factura.folio }} <br>
+                <strong>Total Factura:</strong> ${{ factura.monto_total|intcomma }} <br>
+                <strong>Saldo Pendiente:</strong> ${{ saldo_actual|intcomma }}
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label class="form-label">Fecha de Pago</label>
+                    {{ form.fecha_pago }}
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Monto a Pagar</label>
+                        {{ form.monto }}
+                        <div class="form-text">No puede ser mayor a ${{ saldo_actual|intcomma }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Forma de Pago</label>
+                        {{ form.forma_pago }}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Número de Operación / Referencia</label>
+                    {{ form.num_operacion }}
+                </div>
+
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="{% url 'detalle_factura_cliente' factura.pk %}" class="btn btn-secondary">Cancelar</a>
+                    <button type="submit" class="btn btn-success">Registrar Pago</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

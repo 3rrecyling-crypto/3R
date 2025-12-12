@@ -1,6 +1,7 @@
 from django import forms
 from .models import Factura, DatosFiscales, ComplementoPago
 from ternium.models import Lugar
+from django.db.models import Sum
 
 USO_CFDI_CHOICES = [
     ('G03', 'G03 - Gastos en general'),
@@ -53,14 +54,20 @@ class GenerarFacturaForm(forms.ModelForm):
             'tipo_cambio': forms.NumberInput(attrs={'class': 'form-control', 'value': '1.0', 'step': '0.0001'}),
         }
 class PagoForm(forms.ModelForm):
+    # --- CORRECCIÓN AQUÍ TAMBIÉN ---
+    forma_pago = forms.ChoiceField(
+        choices=FORMA_PAGO_CHOICES, 
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Forma de Pago"
+    )
+
     class Meta:
         model = ComplementoPago
-        fields = ['fecha_pago', 'monto', 'forma_pago', 'num_operacion']
+        fields = ['fecha_pago', 'forma_pago', 'monto_total', 'num_operacion']
         widgets = {
             'fecha_pago': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
-            'monto': forms.NumberInput(attrs={'class': 'form-control'}),
-            'forma_pago': forms.Select(attrs={'class': 'form-select'}),
-            'num_operacion': forms.TextInput(attrs={'class': 'form-control'}),
+            'monto_total': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'num_operacion': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej. Referencia bancaria'}),
         }
         
 class NuevaFacturaLibreForm(forms.ModelForm):
@@ -112,4 +119,76 @@ class DatosFiscalesClienteForm(forms.ModelForm):
             'codigo_postal': forms.TextInput(attrs={'class': 'form-control'}),
             # Si quieres agregar widget para uso_cfdi:
             'uso_cfdi': forms.Select(attrs={'class': 'form-select'}),
+        
+        }
+        
+    
+class PagoForm(forms.ModelForm):
+    class Meta:
+        model = ComplementoPago
+        # CAMBIO: Usamos 'monto_total' en lugar de 'monto'
+        fields = ['fecha_pago', 'forma_pago', 'monto_total', 'num_operacion']
+        widgets = {
+            'fecha_pago': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'forma_pago': forms.Select(attrs={'class': 'form-select'}),
+            'monto_total': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'num_operacion': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej. Referencia bancaria'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.factura_obj = kwargs.pop('factura_obj', None)
+        super().__init__(*args, **kwargs)
+
+    # CAMBIO: Renombramos la validación a clean_monto_total
+    def clean_monto_total(self):
+        monto = self.cleaned_data.get('monto_total')
+        if self.factura_obj and monto:
+            # CAMBIO: Calculamos historial usando la nueva relación 'pagos_recibidos'
+            pagos_anteriores = self.factura_obj.pagos_recibidos.aggregate(total=Sum('importe_pagado'))['total'] or 0
+            saldo_pendiente = self.factura_obj.monto_total - pagos_anteriores
+            
+            saldo_pendiente = round(saldo_pendiente, 2)
+            
+            if monto > saldo_pendiente:
+                raise forms.ValidationError(f"El monto excede el saldo pendiente (${saldo_pendiente:,.2f})")
+            if monto <= 0:
+                raise forms.ValidationError("El monto debe ser mayor a 0.")
+        return monto
+
+    def clean(self):
+        cleaned_data = super().clean()
+        fecha_pago = cleaned_data.get('fecha_pago')
+
+        if self.factura_obj:
+            if self.factura_obj.estado == 'cancelada':
+                raise forms.ValidationError("No se pueden registrar pagos a una factura CANCELADA.")
+
+            if fecha_pago and fecha_pago.date() < self.factura_obj.fecha_emision.date():
+                self.add_error('fecha_pago', f"La fecha de pago no puede ser anterior a la fecha de la factura.")
+
+        return cleaned_data
+    
+    
+class ComplementoPagoCabeceraForm(forms.ModelForm):
+    cliente = forms.ModelChoiceField(
+        queryset=DatosFiscales.objects.filter(es_emisor=False),
+        widget=forms.Select(attrs={'class': 'form-select select2', 'id': 'select-cliente'}),
+        label="Cliente"
+    )
+    
+    # --- CORRECCIÓN AQUÍ: Definimos explícitamente el campo con sus opciones ---
+    forma_pago = forms.ChoiceField(
+        choices=FORMA_PAGO_CHOICES, 
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Forma de Pago SAT"
+    )
+
+    class Meta:
+        model = ComplementoPago
+        fields = ['fecha_pago', 'forma_pago', 'monto_total', 'num_operacion']
+        widgets = {
+            'fecha_pago': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            # Ya no definimos forma_pago aquí porque lo hicimos arriba
+            'monto_total': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'id': 'input-monto-total'}),
+            'num_operacion': forms.TextInput(attrs={'class': 'form-control'}),
         }

@@ -2,7 +2,8 @@
 {% load humanize %}
 
 {% block content %}
-<div class="container-fluid py-4"> <div class="row">
+<div class="container-fluid py-4">
+    <div class="row">
         <div class="col-lg-9">
             <div class="card shadow border-primary h-100">
                 <div class="card-header bg-primary text-white">
@@ -59,11 +60,11 @@
                             <table class="table table-bordered table-sm align-middle" id="tablaFactura">
                                 <thead class="table-light text-center">
                                     <tr>
-                                        <th width="8%">Cant.</th>
+                                        <th width="12%">Cant. (Peso)</th>
                                         <th width="10%">Unidad</th>
-                                        <th width="10%">Clave</th>
-                                        <th width="40%">Descripción</th>
-                                        <th width="15%">Precio</th>
+                                        <th width="10%">Clave SAT</th>
+                                        <th width="38%">Descripción</th>
+                                        <th width="15%">Precio Unit.</th>
                                         <th width="15%">Importe</th>
                                     </tr>
                                 </thead>
@@ -75,18 +76,18 @@
                                         <td>
                                             <input type="number" 
                                                    name="cantidad_{{ r.id }}" 
-                                                   class="form-control text-center fw-bold cantidad-factura" 
-                                                   value="1.00" 
-                                                   step="0.01"
-                                                   oninput="calcularFilaFactura('{{ r.id }}')">
+                                                   class="form-control text-center fw-bold cantidad-factura bg-light" 
+                                                   value="{{ r.total_peso_dlv|stringformat:'f' }}" 
+                                                   readonly
+                                                   step="0.01">
                                         </td>
 
                                         <td>
                                             <input type="text" 
                                                    name="unidad_{{ r.id }}" 
                                                    class="form-control text-center" 
-                                                   value="{{ r.detalles.first.material.clave_unidad_sat|default:'E48' }}" 
-                                                   placeholder="E48">
+                                                   value="{{ r.detalles.first.material.clave_unidad_sat|default:'KGM' }}" 
+                                                   readonly>
                                         </td>
 
                                         <td>
@@ -94,11 +95,11 @@
                                                    name="clave_sat_{{ r.id }}" 
                                                    class="form-control text-center" 
                                                    value="{{ r.detalles.first.material.clave_sat|default:'01010101' }}" 
-                                                   placeholder="Clave">
+                                                   readonly>
                                         </td>
 
                                         <td>
-                                            <textarea name="descripcion_{{ r.id }}" class="form-control form-control-sm" rows="2">{{ r.detalles.first.material.nombre|default:"Flete" }} - Remisión: {{ r.remision }}</textarea>
+                                            <textarea name="descripcion_{{ r.id }}" class="form-control form-control-sm" rows="2">{{ r.detalles.first.material.nombre|default:"Material" }} - Nota {{ r.remision }}</textarea>
                                         </td>
 
                                         <td>
@@ -110,6 +111,7 @@
                                                        id="precio-input-{{ r.id }}"
                                                        class="form-control text-end precio-factura" 
                                                        placeholder="0.00"
+                                                       value="{{ r.tarifa|default:'' }}"
                                                        oninput="calcularFilaFactura('{{ r.id }}')"
                                                        required>
                                             </div>
@@ -163,99 +165,58 @@
         <div class="col-lg-3">
             <div class="card shadow border-info sticky-top" style="top: 20px;">
                 <div class="card-header bg-info text-white">
-                    <h6 class="mb-0 small"><i class="fas fa-calculator me-2"></i>Datos de Origen (Remisión)</h6>
+                    <h6 class="mb-0 small"><i class="fas fa-calculator me-2"></i>Tarifas de Referencia</h6>
                 </div>
                 <div class="card-body bg-light p-2" style="max-height: 80vh; overflow-y: auto;">
                     <p class="small text-muted mb-2 text-center">
-                        Ingresa la tarifa para calcular el precio de la factura automáticamente.
+                        Ingresa el precio por kilo.
                     </p>
 
                     {% for r in remisiones %}
                     <div class="card mb-2 border-0 shadow-sm">
                         <div class="card-body p-2">
-                            
                             {% with material=r.detalles.first.material %}
-
+                            
                             <div class="d-flex justify-content-between align-items-center mb-1">
                                 <span class="badge bg-secondary">Rem: {{ r.remision }}</span>
-                                <span class="badge bg-light text-dark border">{{ material.clave_unidad_sat|default:"Kg" }}</span>
+                                <span class="badge bg-light text-dark border">{{ material.clave_unidad_sat|default:"KGM" }}</span>
                             </div>
 
                             <div class="mb-2">
                                 <small class="fw-bold text-dark d-block">{{ material.nombre|default:"Sin Material" }}</small>
                                 
-                                {% if material %}
-                                    {% if not material.clave_sat %}
-                                        <div class="alert alert-danger p-1 mb-0 mt-1" style="font-size: 0.7rem; line-height: 1.2;">
-                                            <div class="d-flex align-items-center mb-1">
-                                                <i class="fas fa-exclamation-circle me-1"></i>
-                                                <strong>Sin Clave SAT</strong>
-                                            </div>
-                                            <div class="d-flex justify-content-between align-items-center border-top border-danger pt-1">
-                                                <a href="{% url 'editar_material' material.id %}" target="_blank" class="fw-bold text-danger text-decoration-underline">
-                                                    Asignar
-                                                </a>
-                                                <a href="javascript:location.reload()" class="fw-bold text-danger text-decoration-none" title="Recargar página">
-                                                    <i class="fas fa-sync-alt"></i> Recargar
-                                                </a>
-                                            </div>
-                                        </div>
-                                    
-                                    {% elif material.clave_sat == '01010101' %}
-                                        <div class="alert alert-warning p-1 mb-0 mt-1" style="font-size: 0.7rem; line-height: 1.2;">
-                                            <div class="d-flex align-items-start">
-                                                <i class="fas fa-info-circle me-1 mt-1"></i>
-                                                <span class="text-dark">Auto-asignado: <strong>01010101</strong></span>
-                                            </div>
-                                            <div class="d-flex justify-content-between align-items-center mt-1 border-top border-warning pt-1">
-                                                <a href="{% url 'editar_material' material.id %}" target="_blank" class="fw-bold text-dark text-decoration-underline">
-                                                    ¿Cambiar?
-                                                </a>
-                                                <a href="javascript:location.reload()" class="fw-bold text-dark text-decoration-none" title="Recargar página">
-                                                    <i class="fas fa-sync-alt"></i> Recargar
-                                                </a>
-                                            </div>
-                                        </div>
-
-                                    {% else %}
-                                        <small class="text-muted" style="font-size: 0.7rem;">
-                                            <i class="fas fa-check-circle text-success me-1"></i>SAT: {{ material.clave_sat }}
-                                        </small>
-                                    {% endif %}
-                                {% else %}
-                                    <small class="text-muted">Material no definido</small>
+                                {% if not material.clave_sat or material.clave_sat == '01010101' %}
+                                    <div class="alert alert-warning p-1 mb-0 mt-1" style="font-size: 0.7rem;">
+                                        <i class="fas fa-exclamation-circle"></i> Clave SAT genérica
+                                    </div>
                                 {% endif %}
                             </div>
 
                             <div class="mb-2">
-                                <label class="form-label text-muted text-xs mb-0">Peso / Cantidad Real</label>
-                                <div class="input-group input-group-sm">
-                                    <input type="text" 
-                                           class="form-control fw-bold text-center bg-white" 
-                                           value="{{ r.total_peso_dlv|floatformat:2 }}" 
-                                           readonly 
-                                           id="peso-ref-{{ r.id }}">
-                                </div>
+                                <label class="form-label text-muted text-xs mb-0">Peso Neto (Kg)</label>
+                                <input type="text" 
+                                       class="form-control fw-bold text-center bg-white" 
+                                       value="{{ r.total_peso_dlv|floatformat:2 }}" 
+                                       readonly 
+                                       id="peso-ref-{{ r.id }}">
                             </div>
 
                             <div>
-                                <label class="form-label text-primary text-xs mb-0 fw-bold">Tarifa Unit. (x Peso)</label>
+                                <label class="form-label text-primary text-xs mb-0 fw-bold">Tarifa Unit. ($/Kg)</label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text bg-white text-primary">$</span>
                                     <input type="number" 
                                            step="0.01" 
                                            class="form-control text-end border-primary" 
-                                           placeholder="Ej. 0.85"
+                                           placeholder="Ej. 1.00"
+                                           value="{{ r.tarifa|default:'' }}"
                                            oninput="calcularDesdeReferencia('{{ r.id }}', this.value)">
                                 </div>
                             </div>
-                            
                             {% endwith %}
-
                         </div>
                     </div>
                     {% endfor %}
-                    
                 </div>
             </div>
         </div>
@@ -264,32 +225,55 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
+        // Escuchar cambios en el checkbox de retención
         const checkRet = document.getElementById('{{ form.aplicar_retencion.id_for_label }}');
         if(checkRet) checkRet.addEventListener('change', recalcularTotalesGlobales);
+        
+        // Calcular totales iniciales (por si hay datos precargados)
+        recalcularTotalesGlobales();
+        
+        // Inicializar filas individuales
+        {% for r in remisiones %}
+            calcularFilaFactura('{{ r.id }}');
+        {% endfor %}
     });
 
+    // CORRECCIÓN CRÍTICA EN JS
     function calcularDesdeReferencia(id, tarifaValor) {
-        const peso = parseFloat(document.getElementById('peso-ref-' + id).value) || 0;
-        const tarifa = parseFloat(tarifaValor) || 0;
-        const totalSugerido = peso * tarifa;
+        // Obtenemos el input de Precio Unitario de la tabla principal
         const inputPrecioFactura = document.getElementById('precio-input-' + id);
+        
         if(inputPrecioFactura) {
-            inputPrecioFactura.value = totalSugerido.toFixed(2);
+            // AQUÍ ESTABA EL ERROR: Antes multiplicabas (peso * tarifa).
+            // AHORA: Solo copiamos la tarifa, porque el sistema multiplica después (peso * precio).
+            inputPrecioFactura.value = tarifaValor;
+            
+            // Recalculamos la fila visualmente
             calcularFilaFactura(id);
         }
     }
 
     function calcularFilaFactura(id) {
         const row = document.getElementById('row-' + id);
+        if (!row) return;
+
+        // Obtenemos cantidad (peso) y precio (tarifa)
         const cantidad = parseFloat(row.querySelector('.cantidad-factura').value) || 0;
         const precio = parseFloat(row.querySelector('.precio-factura').value) || 0;
+        
+        // Importe = Peso * Precio
         const importe = cantidad * precio;
+        
+        // Actualizar texto de importe en la fila
         document.getElementById('importe-txt-' + id).textContent = '$' + importe.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        
         recalcularTotalesGlobales();
     }
 
     function recalcularTotalesGlobales() {
         let subtotal = 0;
+        
+        // Sumar todos los importes calculados
         document.querySelectorAll('tr[id^="row-"]').forEach(row => {
             const cant = parseFloat(row.querySelector('.cantidad-factura').value) || 0;
             const prec = parseFloat(row.querySelector('.precio-factura').value) || 0;
@@ -303,6 +287,7 @@
         const retencion = aplicaRetencion ? (subtotal * 0.06) : 0;
         const total = subtotal + iva - retencion;
 
+        // Actualizar etiquetas de totales
         document.getElementById('lblSubtotal').textContent = '$' + subtotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         document.getElementById('lblIVA').textContent = '$' + iva.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         document.getElementById('lblTotal').textContent = '$' + total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -320,6 +305,8 @@
 <style>
     .text-xs { font-size: 0.75rem; }
     .precio-factura { font-weight: bold; color: #2c3e50; }
+    /* Fondo amarillo suave cuando se edita el precio */
+    .precio-factura:focus { background-color: #fff3cd; }
 </style>
 
 {% endblock %}

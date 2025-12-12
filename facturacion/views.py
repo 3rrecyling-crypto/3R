@@ -3,6 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from decimal import Decimal, ROUND_HALF_UP # <--- IMPORTANTE
 from django.utils import timezone
 from django.http import HttpResponse
 from django.template.loader import render_to_string
@@ -10,8 +11,7 @@ from django.db.models import Sum, Count, Q # <--- Asegúrate de importar esto
 # Modelos
 from .models import Factura, ConceptoFactura, DatosFiscales
 from ternium.models import Remision, Cliente, Lugar
-
-import csv
+from .models import Factura, ConceptoFactura, DatosFiscales, ComplementoPago, PagoDoctoRelacionado
 from django.shortcuts import render
 
 # Formularios
@@ -19,7 +19,9 @@ from .forms import (
     GenerarFacturaForm, 
     NuevaFacturaLibreForm, 
     ConfigurarEmisorForm, 
-    DatosFiscalesClienteForm
+    DatosFiscalesClienteForm,
+    PagoForm,
+    ComplementoPagoCabeceraForm  # <--- AGREGA ESTO
 )
 
 try:
@@ -37,66 +39,53 @@ def get_emisor_fiscal():
 def dashboard_facturacion(request):
     """
     Dashboard principal de facturación.
-    - Filtros por Cliente (Combo) y Folio.
-    - Descarga Masiva de XML en ZIP.
-    - KPIs.
     """
-    # 1. Query Base
+    # 1. Query Base Facturas
     facturas = Factura.objects.all().select_related('receptor').prefetch_related('remisiones').order_by('-fecha_emision')
 
-    # 2. Filtros
+    # 2. Query Base Pagos (CORREGIDO PARA NUEVO MODELO)
+    # Ya no existe 'factura' en ComplementoPago. Ahora traemos el 'receptor'
+    # y "pre-cargamos" los documentos relacionados para evitar lentitud.
+    pagos = ComplementoPago.objects.select_related('receptor')\
+        .prefetch_related('documentos_relacionados', 'documentos_relacionados__factura')\
+        .all().order_by('-fecha_pago')
+
+    # 3. Filtros
     q_cliente = request.GET.get('q_cliente')
     q_folio = request.GET.get('q_folio')
 
     if q_cliente:
-        # Filtramos por Razón Social del Receptor
+        # Filtro en facturas
         facturas = facturas.filter(receptor__razon_social__icontains=q_cliente)
+        # Filtro en pagos (El cliente está directo en el encabezado ahora)
+        pagos = pagos.filter(receptor__razon_social__icontains=q_cliente)
     
     if q_folio:
+        # Filtro en facturas
         facturas = facturas.filter(folio__icontains=q_folio)
+        
+        # Filtro en pagos (CORREGIDO):
+        # Buscamos si alguno de los documentos relacionados tiene ese folio de factura
+        pagos = pagos.filter(documentos_relacionados__factura__folio__icontains=q_folio).distinct()
 
     # --- DESCARGA MASIVA XML (ZIP) ---
     if request.GET.get('exportar') == 'xml_masivo':
-        # Creamos el buffer en memoria
-        buffer = BytesIO()
-        with zipfile.ZipFile(buffer, 'w') as zip_file:
-            count = 0
-            for f in facturas:
-                # Verificamos que tenga archivo XML asociado
-                if f.archivo_xml:
-                    try:
-                        # Leemos el archivo y lo metemos al ZIP
-                        with f.archivo_xml.open('rb') as xml_file:
-                            filename = f"{f.folio}_{f.receptor.rfc}.xml"
-                            zip_file.writestr(filename, xml_file.read())
-                            count += 1
-                    except Exception as e:
-                        print(f"Error al comprimir XML de {f.folio}: {e}")
-        
-        # Si no hubo archivos
-        if count == 0:
-            messages.warning(request, "No se encontraron archivos XML en las facturas filtradas.")
-            return redirect('dashboard_facturacion')
+        # ... (Tu código de exportación existente) ...
+        pass 
 
-        # Preparamos la respuesta de descarga
-        buffer.seek(0)
-        response = HttpResponse(buffer, content_type='application/zip')
-        response['Content-Disposition'] = 'attachment; filename="facturas_xml_masivo.zip"'
-        return response
-
-    # 3. KPIs
+    # 4. KPIs
     total_timbradas = Factura.objects.filter(estado='timbrado').count()
     total_pendientes = Factura.objects.filter(estado='pendiente').count()
     total_canceladas = Factura.objects.filter(estado='cancelada').count()
 
-    # 4. Datos para el ComboBox (Solo clientes que tienen facturas)
-    # Buscamos en DatosFiscales usados como receptor y obtenemos los nombres únicos
+    # 5. Datos para el ComboBox
     clientes_combo = DatosFiscales.objects.filter(
         facturas_recibidas__isnull=False
     ).values_list('razon_social', flat=True).distinct().order_by('razon_social')
 
     context = {
         'facturas': facturas,
+        'pagos': pagos,
         'total_timbradas': total_timbradas,
         'total_pendientes': total_pendientes,
         'total_canceladas': total_canceladas,
@@ -525,3 +514,181 @@ def crear_factura_nueva(request):
         form = NuevaFacturaLibreForm()
 
     return render(request, 'facturacion/crear_factura.html', {'form': form})
+
+# views.py
+
+@login_required
+@transaction.atomic
+def registrar_pago(request, factura_id):
+    """
+    Registra un pago INDIVIDUAL (botón en dashboard).
+    Crea internamente un ComplementoPago (Encabezado) y un PagoDoctoRelacionado (Detalle).
+    """
+    factura = get_object_or_404(Factura, pk=factura_id)
+    
+    if factura.metodo_pago != 'PPD':
+        messages.warning(request, "Solo se pueden agregar complementos de pago a facturas PPD.")
+        return redirect('detalle_factura_cliente', pk=factura.pk)
+
+    # 1. Calcular Saldo Actual usando la nueva relación
+    total_pagado = factura.pagos_recibidos.aggregate(suma=Sum('importe_pagado'))['suma'] or 0
+    saldo_actual = factura.monto_total - total_pagado
+    
+    if saldo_actual <= 0:
+        messages.warning(request, "Esta factura ya está pagada totalmente.")
+        return redirect('detalle_factura_cliente', pk=factura.pk)
+
+    if request.method == 'POST':
+        form = PagoForm(request.POST, factura_obj=factura)
+        
+        if form.is_valid():
+            # Datos del formulario (Monto Total, Fecha, etc.)
+            datos_pago = form.cleaned_data
+            monto_recibido = datos_pago['monto_total']
+
+            try:
+                # --- PASO A: Crear Encabezado (ComplementoPago) ---
+                ultimo_folio = ComplementoPago.objects.order_by('-folio').first()
+                nuevo_folio = (ultimo_folio.folio + 1) if ultimo_folio else 1
+                
+                complemento = form.save(commit=False)
+                complemento.usuario = request.user
+                complemento.receptor = factura.receptor  # El cliente es el receptor de la factura
+                complemento.serie = 'CP'
+                complemento.folio = nuevo_folio
+                complemento.save()
+
+                # --- PASO B: Crear Detalle (PagoDoctoRelacionado) ---
+                # Cálculos de alta precisión
+                saldo_ant_dec = Decimal(str(saldo_actual)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                imp_pagado_dec = Decimal(str(monto_recibido)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                
+                saldo_ins_calc = saldo_ant_dec - imp_pagado_dec
+                if saldo_ins_calc < 0: saldo_ins_calc = Decimal('0.00')
+
+                # Calcular número de parcialidad
+                num_parcialidad = factura.pagos_recibidos.count() + 1
+
+                PagoDoctoRelacionado.objects.create(
+                    complemento=complemento,
+                    factura=factura,
+                    numero_parcialidad=num_parcialidad,
+                    saldo_anterior=saldo_ant_dec,
+                    importe_pagado=imp_pagado_dec,
+                    saldo_insoluto=saldo_ins_calc
+                )
+
+                # --- PASO C: Actualizar Estado Factura ---
+                if saldo_ins_calc <= 0:
+                    factura.estado = 'pagada'
+                    factura.save()
+
+                messages.success(request, f"Pago registrado correctamente (CP-{nuevo_folio}).")
+                return redirect('detalle_factura_cliente', pk=factura.pk)
+
+            except Exception as e:
+                messages.error(request, f"Error al guardar el pago: {e}")
+
+    else:
+        form = PagoForm()
+
+    return render(request, 'facturacion/registrar_pago.html', {
+        'factura': factura,
+        'form': form,
+        'saldo_actual': saldo_actual
+    })
+    
+@login_required
+@transaction.atomic
+def nuevo_complemento_pago(request):
+    """
+    Genera un Complemento de Pago (REP) que puede pagar múltiples facturas.
+    """
+    # Obtenemos facturas pendientes para mostrar si se selecciona un cliente
+    facturas_pendientes = []
+    cliente_id = request.GET.get('cliente_id') # Para recargar la página con datos
+    
+    if cliente_id:
+        facturas_pendientes = Factura.objects.filter(
+            receptor_id=cliente_id,
+            metodo_pago='PPD',
+            estado__in=['timbrado', 'pendiente'] # Solo vigentes
+        ).exclude(estado='pagada').order_by('fecha_emision')
+
+        # Calculamos saldo real actual para cada factura
+        for f in facturas_pendientes:
+            pagado = f.pagos_recibidos.aggregate(suma=Sum('importe_pagado'))['suma'] or 0
+            f.saldo_pendiente = f.monto_total - pagado
+
+    if request.method == 'POST':
+        form = ComplementoPagoCabeceraForm(request.POST)
+        if form.is_valid():
+            try:
+                data = form.cleaned_data
+                receptor = data['cliente'] # Viene del select
+                
+                # 1. Crear Encabezado (ComplementoPago)
+                ultimo_folio = ComplementoPago.objects.order_by('-folio').first()
+                nuevo_folio = (ultimo_folio.folio + 1) if ultimo_folio else 1
+                
+                complemento = form.save(commit=False)
+                complemento.usuario = request.user
+                complemento.receptor = receptor
+                complemento.folio = nuevo_folio
+                complemento.serie = 'CP'
+                complemento.save()
+
+                # 2. Procesar Facturas Seleccionadas
+                facturas_ids = request.POST.getlist('facturas_seleccionadas')
+                total_aplicado = Decimal('0.00')
+
+                for f_id in facturas_ids:
+                    monto_a_pagar = Decimal(request.POST.get(f'pago_factura_{f_id}', '0'))
+                    
+                    if monto_a_pagar > 0:
+                        factura = Factura.objects.get(id=f_id)
+                        
+                        # Cálculos de saldos
+                        historial_pagos = factura.pagos_recibidos.aggregate(suma=Sum('importe_pagado'))['suma'] or Decimal('0')
+                        saldo_ant = factura.monto_total - historial_pagos
+                        saldo_ins = saldo_ant - monto_a_pagar
+                        
+                        # Validar parcialidad
+                        parcialidad = factura.pagos_recibidos.count() + 1
+                        
+                        # Crear Relación
+                        PagoDoctoRelacionado.objects.create(
+                            complemento=complemento,
+                            factura=factura,
+                            numero_parcialidad=parcialidad,
+                            saldo_anterior=saldo_ant,
+                            importe_pagado=monto_a_pagar,
+                            saldo_insoluto=saldo_ins
+                        )
+                        
+                        # Actualizar estado factura si se liquida
+                        if saldo_ins <= 0.01: # Margen de error 1 centavo
+                            factura.estado = 'pagada'
+                            factura.save()
+                        
+                        total_aplicado += monto_a_pagar
+
+                # Validar que no se asigne más dinero del recibido
+                if total_aplicado > complemento.monto_total:
+                    raise Exception("El total aplicado a las facturas supera el monto recibido.")
+                
+                messages.success(request, f"Complemento CP-{nuevo_folio} generado exitosamente.")
+                return redirect('dashboard_facturacion')
+
+            except Exception as e:
+                messages.error(request, f"Error al guardar: {str(e)}")
+    else:
+        form = ComplementoPagoCabeceraForm()
+        if cliente_id:
+            form.fields['cliente'].initial = cliente_id
+
+    return render(request, 'facturacion/nuevo_complemento.html', {
+        'form': form,
+        'facturas': facturas_pendientes,
+        'cliente_seleccionado': int(cliente_id) if cliente_id else None
+    })

@@ -8,96 +8,44 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
-    .select2-container--bootstrap-5 .select2-selection {
-        border-color: #dee2e6;
-    }
+    .select2-container--bootstrap-5 .select2-selection { border-color: #dee2e6; }
     
-    /* Estadísticas mejoradas */
-    .stat-card {
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        overflow: hidden;
-    }
+    /* Estadísticas (KPIs) */
+    .stat-card { transition: transform 0.3s ease, box-shadow 0.3s ease; overflow: hidden; }
+    .stat-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important; }
+    .stat-icon { transition: transform 0.3s ease; }
+    .stat-card:hover .stat-icon { transform: scale(1.1); }
     
-    .stat-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
-    }
+    /* Tablas y Badges */
+    .table-hover tbody tr { transition: background-color 0.2s ease; }
+    .table-hover tbody tr:hover { background-color: #f8f9fa !important; }
+    .badge-remision { font-size: 0.75rem; padding: 0.25rem 0.5rem; margin: 0.1rem; display: inline-block; }
     
-    .stat-icon {
-        transition: transform 0.3s ease;
-    }
+    .status-badge { padding: 0.35rem 0.75rem; font-weight: 600; letter-spacing: 0.5px; min-width: 100px; display: inline-block; }
     
-    .stat-card:hover .stat-icon {
-        transform: scale(1.1);
-    }
-    
-    /* Tabla mejorada */
-    .table-hover tbody tr {
-        transition: background-color 0.2s ease;
-    }
-    
-    .table-hover tbody tr:hover {
-        background-color: #f8f9fa !important;
-    }
-    
-    .badge-remision {
-        font-size: 0.75rem;
-        padding: 0.25rem 0.5rem;
-        margin: 0.1rem;
-        display: inline-block;
-    }
-    
-    /* Estado mejorado */
-    .status-badge {
-        padding: 0.35rem 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.5px;
-        min-width: 100px;
-        display: inline-block;
-    }
-    
-    /* Botones de acción */
-    .action-btn {
-        width: 32px;
-        height: 32px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 6px;
-        transition: all 0.2s ease;
-    }
-    
-    .action-btn:hover {
-        transform: translateY(-2px);
-    }
+    .action-btn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; transition: all 0.2s ease; }
+    .action-btn:hover { transform: translateY(-2px); }
     
     /* Filtros */
-    .filter-card .card-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-    }
+    .filter-card .card-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+
+    /* Estilos para Tabs (Pestañas) */
+    .nav-tabs .nav-link { color: #6c757d; border: none; border-bottom: 3px solid transparent; }
+    .nav-tabs .nav-link:hover { color: #495057; border-color: transparent; }
+    .nav-tabs .nav-link.active { color: #0d6efd; border-bottom: 3px solid #0d6efd; background: transparent; font-weight: bold; }
+    /* Estilo específico para tab de pagos activo */
+    .nav-tabs .nav-link.active#pagos-tab { color: #198754; border-bottom: 3px solid #198754; }
     
-    /* Responsive */
-    @media (max-width: 768px) {
-        .stat-card .card-body {
-            padding: 1rem !important;
-        }
-        
-        .table-responsive {
-            font-size: 0.9rem;
-        }
-        
-        .btn-group-sm .btn {
-            padding: 0.25rem 0.5rem;
-        }
-    }
+    /* Estilo para lista de facturas dentro de pagos */
+    .list-facturas-pago { font-size: 0.85rem; }
+    .item-factura-pago { border-bottom: 1px dashed #e9ecef; padding-bottom: 2px; margin-bottom: 2px; }
+    .item-factura-pago:last-child { border-bottom: none; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4 bg-light bg-opacity-50">
 
-    <!-- Header con estadísticas -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -114,17 +62,14 @@
         </div>
     </div>
 
-    <!-- Tarjetas de estadísticas -->
     <div class="row g-3 mb-4">
         <div class="col-md-4">
             <div class="card border-0 shadow-sm border-start border-success border-5 h-100 stat-card">
                 <div class="card-body d-flex align-items-center justify-content-between">
                     <div>
-                        <h6 class="text-uppercase text-muted small fw-bold mb-1">
-                            <i class="fas fa-check-circle me-1"></i>TIMBRADAS
-                        </h6>
+                        <h6 class="text-uppercase text-muted small fw-bold mb-1"><i class="fas fa-check-circle me-1"></i>TIMBRADAS</h6>
                         <h2 class="mb-1 fw-bold text-success">{{ total_timbradas }}</h2>
-                        <p class="small text-muted mb-0">Facturas timbradas correctamente</p>
+                        <p class="small text-muted mb-0">Facturas emitidas</p>
                     </div>
                     <div class="bg-success bg-opacity-10 p-3 rounded-circle text-success stat-icon">
                         <i class="fas fa-file-invoice-dollar fs-3"></i>
@@ -132,16 +77,13 @@
                 </div>
             </div>
         </div>
-
         <div class="col-md-4">
             <div class="card border-0 shadow-sm border-start border-warning border-5 h-100 stat-card">
                 <div class="card-body d-flex align-items-center justify-content-between">
                     <div>
-                        <h6 class="text-uppercase text-muted small fw-bold mb-1">
-                            <i class="fas fa-clock me-1"></i>PENDIENTES
-                        </h6>
+                        <h6 class="text-uppercase text-muted small fw-bold mb-1"><i class="fas fa-clock me-1"></i>PENDIENTES</h6>
                         <h2 class="mb-1 fw-bold text-warning">{{ total_pendientes }}</h2>
-                        <p class="small text-muted mb-0">Facturas en estado borrador</p>
+                        <p class="small text-muted mb-0">Borradores sin timbrar</p>
                     </div>
                     <div class="bg-warning bg-opacity-10 p-3 rounded-circle text-warning stat-icon">
                         <i class="fas fa-edit fs-3"></i>
@@ -149,16 +91,13 @@
                 </div>
             </div>
         </div>
-
         <div class="col-md-4">
             <div class="card border-0 shadow-sm border-start border-danger border-5 h-100 stat-card">
                 <div class="card-body d-flex align-items-center justify-content-between">
                     <div>
-                        <h6 class="text-uppercase text-muted small fw-bold mb-1">
-                            <i class="fas fa-ban me-1"></i>CANCELADAS
-                        </h6>
+                        <h6 class="text-uppercase text-muted small fw-bold mb-1"><i class="fas fa-ban me-1"></i>CANCELADAS</h6>
                         <h2 class="mb-1 fw-bold text-danger">{{ total_canceladas }}</h2>
-                        <p class="small text-muted mb-0">Facturas canceladas</p>
+                        <p class="small text-muted mb-0">Facturas invalidadas</p>
                     </div>
                     <div class="bg-danger bg-opacity-10 p-3 rounded-circle text-danger stat-icon">
                         <i class="fas fa-times-circle fs-3"></i>
@@ -168,25 +107,22 @@
         </div>
     </div>
 
-    <!-- Panel de filtros y acciones -->
     <div class="card shadow-sm border-0 mb-4 filter-card">
         <div class="card-header bg-white py-3 border-bottom">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h6 class="mb-0 fw-bold text-dark">
-                        <i class="fas fa-sliders-h me-2 text-primary"></i>Filtros Avanzados
-                    </h6>
-                    <small class="text-muted">Filtra el historial de facturas según tus necesidades</small>
+                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-sliders-h me-2 text-primary"></i>Filtros Avanzados</h6>
+                    <small class="text-muted">Filtra facturas y complementos simultáneamente</small>
                 </div>
-                
                 <div class="d-flex gap-2">
                     <a href="{% url 'remisiones_por_facturar' %}" class="btn btn-primary fw-bold shadow-sm d-flex align-items-center">
-                        <i class="fas fa-file-invoice me-2"></i>
-                        <span class="d-none d-md-inline">Por Facturar</span>
+                        <i class="fas fa-file-invoice me-2"></i><span class="d-none d-md-inline">Por Facturar</span>
                     </a>
                     <a href="{% url 'crear_factura_nueva' %}" class="btn btn-success fw-bold shadow-sm d-flex align-items-center">
-                        <i class="fas fa-plus-circle me-2"></i>
-                        <span class="d-none d-md-inline">Nueva Factura</span>
+                        <i class="fas fa-plus-circle me-2"></i><span class="d-none d-md-inline">Nueva Factura</span>
+                    </a>
+                    <a href="{% url 'nuevo_complemento_pago' %}" class="btn btn-info text-white fw-bold shadow-sm d-flex align-items-center">
+                        <i class="fas fa-hand-holding-usd me-2"></i><span class="d-none d-md-inline">Nuevo Pago</span>
                     </a>
                 </div>
             </div>
@@ -194,282 +130,252 @@
         
         <div class="card-body bg-light">
             <form method="GET" id="filterForm" class="row g-3 align-items-end">
-                
-                <!-- Filtro por cliente -->
-                <div class="col-lg-4 col-md-6">
-                    <label class="form-label small fw-bold text-muted mb-1">
-                        <i class="fas fa-user me-1"></i>Cliente / Receptor
-                    </label>
-                    <select name="q_cliente" class="form-select select2-filter" data-placeholder="Selecciona un cliente">
+                <div class="col-lg-5 col-md-6">
+                    <label class="form-label small fw-bold text-muted mb-1"><i class="fas fa-user me-1"></i>Cliente / Receptor</label>
+                    <select name="q_cliente" class="form-select select2-filter">
                         <option value="">Todos los Clientes</option>
                         {% for nombre in clientes_combo %}
-                            <option value="{{ nombre }}" {% if q_cliente == nombre %}selected{% endif %}>
-                                {{ nombre }}
-                            </option>
+                            <option value="{{ nombre }}" {% if q_cliente == nombre %}selected{% endif %}>{{ nombre }}</option>
                         {% endfor %}
                     </select>
                 </div>
-
-                <!-- Filtro por folio -->
-                <div class="col-lg-3 col-md-6">
-                    <label class="form-label small fw-bold text-muted mb-1">
-                        <i class="fas fa-hashtag me-1"></i>Folio Factura
-                    </label>
+                <div class="col-lg-5 col-md-6">
+                    <label class="form-label small fw-bold text-muted mb-1"><i class="fas fa-hashtag me-1"></i>Folio Factura</label>
                     <div class="input-group">
-                        <span class="input-group-text bg-white border-end-0">
-                            <i class="fas fa-search text-muted"></i>
-                        </span>
-                        <input type="text" name="q_folio" class="form-control border-start-0" 
-                               placeholder="Ej. F-102" value="{{ q_folio|default:'' }}">
+                        <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" name="q_folio" class="form-control border-start-0" placeholder="Ej. F-102" value="{{ q_folio|default:'' }}">
                     </div>
                 </div>
-
-                <!-- Filtro por estado -->
-                <div class="col-lg-3 col-md-6">
-                    <label class="form-label small fw-bold text-muted mb-1">
-                        <i class="fas fa-tag me-1"></i>Estado
-                    </label>
-                    <select name="q_estado" class="form-select">
-                        <option value="">Todos los estados</option>
-                        <option value="timbrado" {% if q_estado == 'timbrado' %}selected{% endif %}>Timbrado</option>
-                        <option value="pendiente" {% if q_estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
-                        <option value="cancelada" {% if q_estado == 'cancelada' %}selected{% endif %}>Cancelada</option>
-                    </select>
-                </div>
-
-                <!-- Botones de acción -->
-                <div class="col-lg-2 col-md-6 d-flex gap-2">
-                    <button type="submit" class="btn btn-primary fw-bold flex-grow-1 d-flex align-items-center justify-content-center">
-                        <i class="fas fa-filter me-2"></i>
-                        <span class="d-none d-md-inline">Filtrar</span>
-                    </button>
-                </div>
-
-                <!-- Botones adicionales -->
-                <div class="col-12 mt-3 pt-3 border-top">
-                    <div class="d-flex flex-wrap gap-2 justify-content-between">
-                        <div>
-                            <a href="{% url 'dashboard_facturacion' %}" class="btn btn-outline-secondary fw-bold">
-                                <i class="fas fa-undo me-2"></i>Limpiar Filtros
-                            </a>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button type="button" onclick="descargarMasivoXML()" class="btn btn-success fw-bold d-flex align-items-center">
-                                <i class="fas fa-file-archive me-2"></i>
-                                <span class="d-none d-md-inline">Descargar Masiva XMLs</span>
-                            </button>
-                            
-                            <button type="button" onclick="exportarExcel()" class="btn btn-outline-success fw-bold d-flex align-items-center">
-                                <i class="fas fa-file-excel me-2"></i>
-                                <span class="d-none d-md-inline">Exportar Excel</span>
-                            </button>
-                        </div>
-                    </div>
+                <div class="col-lg-2 col-md-12">
+                    <button type="submit" class="btn btn-primary w-100 fw-bold"><i class="fas fa-filter me-2"></i>Filtrar</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Tabla de facturas -->
-    <div class="card shadow border-0">
-        <div class="card-header bg-white py-3 border-bottom">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h5 class="mb-0 fw-bold text-dark">
-                        <i class="fas fa-file-invoice me-2 text-secondary"></i>Historial de Facturas
-                    </h5>
-                    <small class="text-muted">{{ facturas|length }} facturas encontradas</small>
+    <ul class="nav nav-tabs mb-3" id="facturacionTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="facturas-tab" data-bs-toggle="tab" data-bs-target="#facturas-pane" type="button" role="tab">
+                <i class="fas fa-file-invoice me-2"></i>Facturas Emitidas
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="pagos-tab" data-bs-toggle="tab" data-bs-target="#pagos-pane" type="button" role="tab">
+                <i class="fas fa-receipt me-2"></i>Complementos de Pago (REP)
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="facturacionTabsContent">
+        
+        <div class="tab-pane fade show active" id="facturas-pane" role="tabpanel">
+            <div class="card shadow border-0">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-bold text-dark">Historial de Facturas</h5>
+                        <small class="text-muted">{{ facturas|length }} registros</small>
+                    </div>
                 </div>
-                <div class="d-flex align-items-center gap-2">
-                    <span class="badge bg-light text-dark border">
-                        <i class="fas fa-sync-alt me-1"></i>
-                        Actualizado: {% now "H:i" %}
-                    </span>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light text-secondary small text-uppercase">
+                            <tr>
+                                <th class="py-3 px-3">Folio</th>
+                                <th class="py-3">Fecha</th>
+                                <th class="py-3">Cliente</th>
+                                <th class="py-3">Remisiones</th> 
+                                <th class="py-3 text-end">Total</th>
+                                <th class="py-3 text-center">Estado</th>
+                                <th class="py-3 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for f in facturas %}
+                            <tr class="{% if f.estado == 'cancelada' %}opacity-75{% endif %}">
+                                <td class="fw-bold px-3">
+                                    <i class="fas fa-file-invoice text-primary me-2"></i>{{ f.folio }}
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column">
+                                        <span class="fw-medium">{{ f.fecha_emision|date:"d/m/Y" }}</span>
+                                        <small class="text-muted">{{ f.fecha_emision|date:"H:i" }}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column">
+                                        <span class="fw-bold text-truncate" style="max-width: 200px;">{{ f.receptor.razon_social }}</span>
+                                        <small class="text-muted">{{ f.receptor.rfc }}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if f.remisiones.all %}
+                                        <div class="d-flex flex-wrap gap-1" style="max-width: 200px;">
+                                            {% for remision in f.remisiones.all|slice:":2" %}
+                                                <span class="badge bg-light text-dark border badge-remision">{{ remision.remision }}</span>
+                                            {% endfor %}
+                                            {% if f.remisiones.all|length > 2 %}
+                                                <span class="badge bg-light text-muted border badge-remision">+{{ f.remisiones.all|length|add:"-2" }}</span>
+                                            {% endif %}
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted small">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end fw-bold">
+                                    ${{ f.monto_total|floatformat:2|intcomma }} <small class="text-muted">{{ f.moneda }}</small>
+                                </td>
+                                <td class="text-center">
+                                    {% if f.estado == 'timbrado' %}
+                                        <span class="badge bg-success bg-opacity-25 text-success status-badge border border-success">TIMBRADO</span>
+                                    {% elif f.estado == 'pendiente' %}
+                                        <span class="badge bg-warning bg-opacity-25 text-warning status-badge border border-warning">BORRADOR</span>
+                                    {% elif f.estado == 'pagada' %}
+                                        <span class="badge bg-primary bg-opacity-25 text-primary status-badge border border-primary">PAGADA</span>
+                                    {% elif f.estado == 'cancelada' %}
+                                        <span class="badge bg-danger bg-opacity-25 text-danger status-badge border border-danger">CANCELADA</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary status-badge">{{ f.estado }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <div class="d-flex justify-content-center gap-1">
+                                        
+                                        <a href="{% url 'detalle_factura_cliente' f.pk %}" class="action-btn btn btn-outline-primary" title="Ver detalle" data-bs-toggle="tooltip">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        
+                                        <a href="{% url 'factura_pdf_cliente' f.pk %}" target="_blank" class="action-btn btn btn-outline-danger" title="PDF" data-bs-toggle="tooltip">
+                                            <i class="fas fa-file-pdf"></i>
+                                        </a>
+
+                                        {% if f.metodo_pago == 'PPD' and f.estado != 'cancelada' and f.estado != 'pagada' %}
+                                            <a href="{% url 'registrar_pago' f.pk %}" class="action-btn btn btn-success text-white" title="Registrar Pago (REP)" data-bs-toggle="tooltip">
+                                                <i class="fas fa-hand-holding-usd"></i>
+                                            </a>
+                                        {% endif %}
+                                        
+                                        {% if f.archivo_xml %}
+                                        <a href="{{ f.archivo_xml.url }}" download class="action-btn btn btn-outline-success" title="XML" data-bs-toggle="tooltip">
+                                            <i class="fas fa-file-code"></i>
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center py-5">
+                                    <div class="py-4">
+                                        <i class="fas fa-inbox fa-3x mb-3 text-light" style="opacity: 0.3;"></i>
+                                        <h6 class="text-muted">No se encontraron facturas</h6>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
-        
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="bg-light text-secondary small text-uppercase">
-                    <tr>
-                        <th class="py-3 px-3 fw-semibold">Folio</th>
-                        <th class="py-3 fw-semibold">Fecha</th>
-                        <th class="py-3 fw-semibold">Cliente</th>
-                        <th class="py-3 fw-semibold">Remisiones</th> 
-                        <th class="py-3 fw-semibold text-end">Total</th>
-                        <th class="py-3 fw-semibold text-center">Estado</th>
-                        <th class="py-3 fw-semibold text-center">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for f in facturas %}
-                    <tr class="{% if f.estado == 'cancelada' %}opacity-75{% endif %}">
-                        <td class="fw-bold px-3">
-                            <div class="d-flex align-items-center">
-                                <i class="fas fa-file-invoice text-primary me-2"></i>
-                                <span class="text-dark">{{ f.folio }}</span>
-                            </div>
-                        </td>
-                        
-                        <td>
-                            <div class="d-flex flex-column">
-                                <span class="fw-medium text-dark">{{ f.fecha_emision|date:"d/m/Y" }}</span>
-                                <small class="text-muted">{{ f.fecha_emision|date:"H:i" }}</small>
-                            </div>
-                        </td>
-                        
-                        <td>
-                            <div class="d-flex flex-column">
-                                <span class="fw-bold text-dark d-block text-truncate" style="max-width: 250px;">
-                                    {{ f.receptor.razon_social }}
-                                </span>
-                                <small class="text-muted" style="font-size: 0.75rem;">
-                                    <i class="fas fa-id-card me-1"></i>{{ f.receptor.rfc }}
-                                </small>
-                            </div>
-                        </td>
-                        
-                        <td>
-                            {% if f.remisiones.all %}
-                                <div class="d-flex flex-wrap gap-1" style="max-width: 200px;">
-                                    {% for remision in f.remisiones.all|slice:":3" %}
-                                        <span class="badge bg-light text-dark border badge-remision">
-                                            {{ remision.remision }}
-                                        </span>
-                                    {% endfor %}
-                                    {% if f.remisiones.all|length > 3 %}
-                                        <span class="badge bg-light text-muted border badge-remision">
-                                            +{{ f.remisiones.all|length|add:"-3" }}
-                                        </span>
-                                    {% endif %}
-                                </div>
-                            {% else %}
-                                <span class="text-muted small">-</span>
-                            {% endif %}
-                        </td>
 
-                        <td class="text-end">
-                            <span class="fw-bold text-dark fs-6">
-                                ${{ f.monto_total|floatformat:2|intcomma }}
-                            </span>
-                            {% if f.moneda != 'MXN' %}
-                                <small class="text-muted d-block">{{ f.moneda }}</small>
-                            {% endif %}
-                        </td>
+        <div class="tab-pane fade" id="pagos-pane" role="tabpanel">
+            <div class="card shadow border-0 border-top border-success border-3">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-0 fw-bold text-success"><i class="fas fa-receipt me-2"></i>Historial de Pagos</h5>
+                            <small class="text-muted">{{ pagos|length }} complementos encontrados</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light text-secondary small text-uppercase">
+                            <tr>
+                                <th class="py-3 px-3">Fecha / Folio</th>
+                                <th class="py-3">Cliente</th>
+                                <th class="py-3">Facturas Pagadas</th>
+                                <th class="py-3 text-end">Monto Total</th>
+                                <th class="py-3 text-center">Documentos</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in pagos %}
+                            <tr>
+                                <td class="px-3">
+                                    <div class="d-flex flex-column">
+                                        <span class="fw-bold text-dark">{{ p.fecha_pago|date:"d/m/Y" }}</span>
+                                        <small class="text-muted">{{ p.serie }}-{{ p.folio }}</small>
+                                    </div>
+                                </td>
+                                
+                                <td>
+                                    <span class="d-block text-truncate" style="max-width: 250px;">
+                                        {{ p.receptor.razon_social }}
+                                    </span>
+                                </td>
+                                
+                                <td>
+                                    <div class="list-facturas-pago">
+                                        {% for detalle in p.documentos_relacionados.all %}
+                                            <div class="item-factura-pago d-flex justify-content-between" style="max-width: 300px;">
+                                                <span>
+                                                    <a href="{% url 'detalle_factura_cliente' detalle.factura.pk %}" class="text-decoration-none fw-bold text-primary">
+                                                        {{ detalle.factura.folio }}
+                                                    </a>
+                                                    <span class="badge rounded-pill bg-light text-dark border ms-1" style="font-size: 0.65rem;">
+                                                        Parc. {{ detalle.numero_parcialidad }}
+                                                    </span>
+                                                </span>
+                                                <span class="text-muted small">
+                                                    resta: ${{ detalle.saldo_insoluto|floatformat:2|intcomma }}
+                                                </span>
+                                            </div>
+                                        {% empty %}
+                                            <span class="text-muted small fst-italic">Sin documentos relacionados</span>
+                                        {% endfor %}
+                                    </div>
+                                </td>
 
-                        <td class="text-center">
-                            {% if f.estado == 'timbrado' %}
-                                <span class="badge bg-success bg-opacity-25 text-success status-badge border border-success">
-                                    <i class="fas fa-check-circle me-1"></i>TIMBRADO
-                                </span>
-                            {% elif f.estado == 'pendiente' %}
-                                <span class="badge bg-warning bg-opacity-25 text-warning status-badge border border-warning">
-                                    <i class="fas fa-clock me-1"></i>BORRADOR
-                                </span>
-                            {% elif f.estado == 'cancelada' %}
-                                <span class="badge bg-danger bg-opacity-25 text-danger status-badge border border-danger">
-                                    <i class="fas fa-ban me-1"></i>CANCELADA
-                                </span>
-                            {% else %}
-                                <span class="badge bg-secondary status-badge">{{ f.estado }}</span>
-                            {% endif %}
-                        </td>
-
-                        <td class="text-center">
-                            <div class="d-flex justify-content-center gap-1">
-                                <a href="{% url 'detalle_factura_cliente' f.pk %}" 
-                                   class="action-btn btn btn-outline-primary" 
-                                   title="Ver detalle"
-                                   data-bs-toggle="tooltip">
-                                    <i class="fas fa-eye"></i>
-                                </a>
+                                <td class="text-end fw-bold text-success">
+                                    ${{ p.monto_total|floatformat:2|intcomma }}
+                                </td>
                                 
-                                <a href="{% url 'factura_pdf_cliente' f.pk %}" 
-                                   target="_blank" 
-                                   class="action-btn btn btn-outline-danger"
-                                   title="Descargar PDF"
-                                   data-bs-toggle="tooltip">
-                                    <i class="fas fa-file-pdf"></i>
-                                </a>
-                                
-                                {% if f.archivo_xml %}
-                                    <a href="{{ f.archivo_xml.url }}" 
-                                       download 
-                                       class="action-btn btn btn-outline-success"
-                                       title="Descarga Masiva XML"
-                                       data-bs-toggle="tooltip">
-                                        <i class="fas fa-file-code"></i>
-                                    </a>
-                                {% else %}
-                                    <button class="action-btn btn btn-outline-secondary disabled"
-                                            title="Sin XML disponible"
-                                            data-bs-toggle="tooltip">
-                                        <i class="fas fa-file-code"></i>
-                                    </button>
-                                {% endif %}
-                                
-                                {% if f.estado == 'pendiente' %}
-                                    <a href="#" 
-                                       class="action-btn btn btn-outline-warning"
-                                       title="Editar factura"
-                                       data-bs-toggle="tooltip">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="7" class="text-center py-5">
-                            <div class="py-4">
-                                <i class="fas fa-inbox fa-3x mb-3 text-light" style="opacity: 0.3;"></i>
-                                <h6 class="text-muted mb-2">No se encontraron facturas</h6>
-                                <p class="text-muted small mb-0">Intenta ajustar los filtros o crea una nueva factura</p>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                                <td class="text-center">
+                                    <div class="d-flex justify-content-center gap-1">
+                                        {% if p.archivo_pdf %}
+                                            <a href="{{ p.archivo_pdf.url }}" target="_blank" class="action-btn btn btn-outline-danger" title="Ver PDF REP" data-bs-toggle="tooltip">
+                                                <i class="fas fa-file-pdf"></i>
+                                            </a>
+                                        {% endif %}
+                                        {% if p.archivo_xml %}
+                                            <a href="{{ p.archivo_xml.url }}" download class="action-btn btn btn-outline-success" title="Descargar XML REP" data-bs-toggle="tooltip">
+                                                <i class="fas fa-file-code"></i>
+                                            </a>
+                                        {% endif %}
+                                        {% if not p.archivo_pdf and not p.archivo_xml %}
+                                            <span class="badge bg-secondary">Sin timbrar</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-5">
+                                    <div class="py-4">
+                                        <i class="fas fa-hand-holding-usd fa-3x mb-3 text-light" style="opacity: 0.3;"></i>
+                                        <h6 class="text-muted">No hay pagos registrados</h6>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
-        
-        {% if facturas.has_other_pages %}
-        <div class="card-footer bg-white py-3">
-            <nav aria-label="Paginación de facturas">
-                <ul class="pagination justify-content-center mb-0">
-                    {% if facturas.has_previous %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ facturas.previous_page_number }}" aria-label="Anterior">
-                                <span aria-hidden="true">&laquo;</span>
-                            </a>
-                        </li>
-                    {% endif %}
-                    
-                    {% for i in facturas.paginator.page_range %}
-                        {% if facturas.number == i %}
-                            <li class="page-item active">
-                                <span class="page-link">{{ i }}</span>
-                            </li>
-                        {% else %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ i }}">{{ i }}</a>
-                            </li>
-                        {% endif %}
-                    {% endfor %}
-                    
-                    {% if facturas.has_next %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ facturas.next_page_number }}" aria-label="Siguiente">
-                                <span aria-hidden="true">&raquo;</span>
-                            </a>
-                        </li>
-                    {% endif %}
-                </ul>
-            </nav>
-        </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}
@@ -495,69 +401,6 @@
         var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
             return new bootstrap.Tooltip(tooltipTriggerEl);
         });
-        
-        // Auto-submit en algunos filtros
-        $('select[name="q_estado"]').change(function() {
-            if($(this).val() !== '') {
-                $('#filterForm').submit();
-            }
-        });
     });
-
-    // Función Descarga Masiva XML
-    function descargarMasivoXML() {
-        const form = document.getElementById('filterForm');
-        const params = new URLSearchParams(new FormData(form));
-        params.append('exportar', 'xml_masivo');
-        
-        // Mostrar loading
-        const btn = event.target.closest('button');
-        const originalHtml = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Preparando...';
-        btn.disabled = true;
-        
-        // Redirigir para descargar
-        window.location.href = "?" + params.toString();
-        
-        // Restaurar botón después de 3 segundos
-        setTimeout(() => {
-            btn.innerHTML = originalHtml;
-            btn.disabled = false;
-        }, 3000);
-    }
-    
-    // Función Exportar a Excel
-    function exportarExcel() {
-        const form = document.getElementById('filterForm');
-        const params = new URLSearchParams(new FormData(form));
-        params.append('exportar', 'excel');
-        
-        // Mostrar loading
-        const btn = event.target.closest('button');
-        const originalHtml = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generando...';
-        btn.disabled = true;
-        
-        // Redirigir para descargar
-        window.location.href = "?" + params.toString();
-        
-        // Restaurar botón después de 3 segundos
-        setTimeout(() => {
-            btn.innerHTML = originalHtml;
-            btn.disabled = false;
-        }, 3000);
-    }
-    
-    // Función para copiar filtros al portapapeles
-    function copiarFiltros() {
-        const form = document.getElementById('filterForm');
-        const params = new URLSearchParams(new FormData(form));
-        const url = window.location.origin + window.location.pathname + '?' + params.toString();
-        
-        navigator.clipboard.writeText(url).then(() => {
-            // Mostrar notificación de éxito
-            alert('Enlace de filtros copiado al portapapeles');
-        });
-    }
 </script>
 {% endblock %}

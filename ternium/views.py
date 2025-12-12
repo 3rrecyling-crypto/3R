@@ -2689,3 +2689,128 @@ def cancelar_remision(request, pk):
 def detalle_remision(request, pk):
     remision = get_object_or_404(Remision, pk=pk)
     return render(request, 'ternium/detalle_remision.html', {'remision': remision})
+
+
+from openpyxl import Workbook
+from openpyxl.worksheet.table import Table, TableStyleInfo
+from openpyxl.styles import Alignment, PatternFill, Font
+from openpyxl.utils import get_column_letter
+import datetime
+
+@login_required
+def export_catalogo_excel(request, model_name):
+    """
+    Exporta a Excel cualquier catálogo simple basándose en el nombre del modelo.
+    """
+    # 1. Configuración de Modelos y Columnas
+    config = {
+        'empresa': {
+            'model': Empresa,
+            'headers': ['ID', 'Nombre', 'Prefijo', 'Contacto', 'Teléfono', 'Email'],
+            'fields': ['id', 'nombre', 'prefijo', 'contacto_principal', 'telefono', 'email']
+        },
+        'lugar': {
+            'model': Lugar,
+            'headers': ['ID', 'Nombre', 'Tipo', 'Es Patio', 'RFC', 'Razón Social', 'Dirección Completa'],
+            'fields': ['id', 'nombre', 'tipo', 'es_patio', 'rfc', 'razon_social', 'direccion_completa'] # direccion_completa es un método
+        },
+        'lineatransporte': {
+            'model': LineaTransporte,
+            'headers': ['ID', 'Nombre', 'Empresas Asociadas'],
+            'fields': ['id', 'nombre', 'empresas_str'] # Calculado
+        },
+        'operador': {
+            'model': Operador,
+            'headers': ['ID', 'Nombre'],
+            'fields': ['id', 'nombre']
+        },
+        'material': {
+            'model': Material,
+            'headers': ['ID', 'Nombre', 'Clave SAT', 'Unidad SAT'],
+            'fields': ['id', 'nombre', 'clave_sat', 'clave_unidad_sat']
+        },
+        'unidad': {
+            'model': Unidad,
+            'headers': ['ID Interno', 'Placas', 'Marca/Modelo', 'Tipo', 'Estatus', 'Dueño'],
+            'fields': ['internal_id', 'license_plate', 'make_model', 'asset_type', 'operational_status', 'ownership']
+        },
+        'contenedor': {
+            'model': Contenedor,
+            'headers': ['ID/Nombre', 'Placas'],
+            'fields': ['nombre', 'placas']
+        }
+    }
+
+    conf = config.get(model_name.lower())
+    if not conf:
+        messages.error(request, "Modelo no válido para exportación.")
+        return redirect('home')
+
+    # 2. Obtener Queryset (Filtrado por Empresa si aplica)
+    model = conf['model']
+    queryset = model.objects.all()
+    
+    # Filtro por empresa (si viene en la URL)
+    empresa_id = request.GET.get('empresa')
+    if empresa_id and hasattr(model, 'empresas'):
+        queryset = queryset.filter(empresas__id=empresa_id)
+    
+    # Filtro de búsqueda general (q)
+    query = request.GET.get('q')
+    if query:
+        if hasattr(model, 'search_fields'):
+            q_objects = Q()
+            for field in model.search_fields:
+                q_objects |= Q(**{f'{field}__icontains': query})
+            queryset = queryset.filter(q_objects).distinct()
+        elif hasattr(model, 'nombre'):
+             queryset = queryset.filter(nombre__icontains=query)
+
+    # 3. Crear Excel
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Catálogo {model._meta.verbose_name_plural}"
+    
+    # Escribir encabezados
+    ws.append(conf['headers'])
+
+    # Escribir datos
+    for obj in queryset:
+        row = []
+        for field in conf['fields']:
+            # Lógica especial para campos calculados o ManyToMany
+            if field == 'empresas_str':
+                val = ", ".join([e.nombre for e in obj.empresas.all()])
+            elif field == 'direccion_completa' and hasattr(obj, 'direccion_completa'):
+                val = obj.direccion_completa()
+            else:
+                val = getattr(obj, field, '')
+                if val is None: val = ""
+            row.append(str(val))
+        ws.append(row)
+
+    # 4. Formato de Tabla
+    last_col = get_column_letter(len(conf['headers']))
+    last_row = ws.max_row
+    if last_row > 1:
+        tab = Table(displayName=f"Tabla{model_name}", ref=f"A1:{last_col}{last_row}")
+        style = TableStyleInfo(name="TableStyleMedium9", showFirstColumn=False, showLastColumn=False, showRowStripes=True, showColumnStripes=False)
+        tab.tableStyleInfo = style
+        ws.add_table(tab)
+        
+        # Ajustar ancho de columnas
+        for col in ws.columns:
+            max_length = 0
+            column = col[0].column_letter
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except: pass
+            ws.column_dimensions[column].width = (max_length + 2)
+
+    # 5. Respuesta
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="Catalogo_{model_name}_{datetime.date.today()}.xlsx"'
+    wb.save(response)
+    return response

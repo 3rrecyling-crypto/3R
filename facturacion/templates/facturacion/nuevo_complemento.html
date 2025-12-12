@@ -1,0 +1,155 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="card shadow border-0">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="fas fa-hand-holding-usd me-2"></i>Nuevo Complemento de Pago (Multifactura)</h5>
+        </div>
+        
+        <div class="card-body">
+            <form method="post" id="form-pago">
+                {% csrf_token %}
+                
+                <div class="row g-3 mb-4 p-3 bg-light rounded border">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Cliente</label>
+                        {{ form.cliente }} </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Fecha Pago</label>
+                        {{ form.fecha_pago }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Monto TOTAL Recibido</label>
+                        {{ form.monto_total }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Forma de Pago</label>
+                        {{ form.forma_pago }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">No. Operación</label>
+                        {{ form.num_operacion }}
+                    </div>
+                </div>
+
+                <h6 class="text-primary fw-bold mb-3"><i class="fas fa-list me-2"></i>Facturas Pendientes (PPD)</h6>
+                
+                {% if facturas %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle border">
+                            <thead class="table-light">
+                                <tr>
+                                    <th width="5%" class="text-center">✔</th>
+                                    <th>Folio</th>
+                                    <th>Fecha</th>
+                                    <th class="text-end">Total Factura</th>
+                                    <th class="text-end text-danger">Saldo Pendiente</th>
+                                    <th width="20%" class="text-end">Monto a Aplicar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for f in facturas %}
+                                <tr>
+                                    <td class="text-center">
+                                        <input type="checkbox" name="facturas_seleccionadas" value="{{ f.id }}" class="form-check-input check-factura" id="check_{{ f.id }}">
+                                    </td>
+                                    <td class="fw-bold">{{ f.folio }}</td>
+                                    <td>{{ f.fecha_emision|date:"d/m/Y" }}</td>
+                                    <td class="text-end text-muted">${{ f.monto_total|intcomma }}</td>
+                                    <td class="text-end text-danger fw-bold" id="saldo_{{ f.id }}" data-saldo="{{ f.saldo_pendiente }}">
+                                        ${{ f.saldo_pendiente|floatformat:2|intcomma }}
+                                    </td>
+                                    <td>
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text">$</span>
+                                            <input type="number" step="0.01" 
+                                                   name="pago_factura_{{ f.id }}" 
+                                                   class="form-control text-end input-aplicar" 
+                                                   placeholder="0.00" disabled>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="bg-light fw-bold">
+                                    <td colspan="5" class="text-end">Total Asignado:</td>
+                                    <td class="text-end text-success" id="total-asignado">$0.00</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info text-center">
+                        {% if cliente_seleccionado %}
+                            Este cliente no tiene facturas PPD con saldo pendiente.
+                        {% else %}
+                            Seleccione un cliente para ver sus facturas pendientes.
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <a href="{% url 'dashboard_facturacion' %}" class="btn btn-secondary">Cancelar</a>
+                    <button type="submit" class="btn btn-success fw-bold px-4">
+                        <i class="fas fa-save me-2"></i>Generar Complemento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 1. Recargar al cambiar cliente
+        const selectCliente = document.getElementById('select-cliente');
+        if(selectCliente) {
+            selectCliente.addEventListener('change', function() {
+                window.location.href = "?cliente_id=" + this.value;
+            });
+            // Mantener seleccionado
+            const urlParams = new URLSearchParams(window.location.search);
+            const clienteId = urlParams.get('cliente_id');
+            if(clienteId) selectCliente.value = clienteId;
+        }
+
+        // 2. Lógica de Checkboxes e Inputs
+        const checkboxes = document.querySelectorAll('.check-factura');
+        const totalAsignadoLabel = document.getElementById('total-asignado');
+
+        function actualizarTotal() {
+            let total = 0;
+            document.querySelectorAll('.input-aplicar:not([disabled])').forEach(input => {
+                total += parseFloat(input.value) || 0;
+            });
+            totalAsignadoLabel.textContent = '$' + total.toLocaleString('es-MX', {minimumFractionDigits: 2});
+        }
+
+        checkboxes.forEach(chk => {
+            chk.addEventListener('change', function() {
+                const row = this.closest('tr');
+                const input = row.querySelector('.input-aplicar');
+                const saldo = parseFloat(row.querySelector('[data-saldo]').dataset.saldo);
+                
+                if (this.checked) {
+                    input.disabled = false;
+                    input.value = saldo.toFixed(2); // Sugerir pagar todo el saldo
+                    input.focus();
+                } else {
+                    input.disabled = true;
+                    input.value = '';
+                }
+                actualizarTotal();
+            });
+        });
+
+        // Actualizar total al escribir
+        document.querySelectorAll('.input-aplicar').forEach(input => {
+            input.addEventListener('input', actualizarTotal);
+        });
+    });
+</script>
+{% endblock %}

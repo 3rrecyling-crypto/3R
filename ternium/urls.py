@@ -146,4 +146,5 @@ urlpatterns = [
 ), name='login'),
     path('remision/<int:pk>/cancelar/', views.cancelar_remision, name='cancelar_remision'),
     path('facturacion/', include('facturacion.urls')),
+    path('exportar-catalogo/<str:model_name>/', views.export_catalogo_excel, name='export_catalogo_excel'),
 ]

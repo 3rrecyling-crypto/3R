@@ -112,21 +112,68 @@ class ConceptoFactura(models.Model):
     iva_ret_importe = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
 class ComplementoPago(models.Model):
-    factura = models.ForeignKey(Factura, on_delete=models.CASCADE, related_name='complementos_pago')
-    fecha_pago = models.DateTimeField(default=timezone.now)
-    monto = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Monto Pagado")
+    """
+    ENCABEZADO DEL PAGO (Nivel CFDI)
+    Representa la recepción del dinero (bancario).
+    Puede pagar una o muchas facturas.
+    """
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    # Cambiamos la relación: El pago se hace a un CLIENTE (Receptor), no a una factura específica
+    receptor = models.ForeignKey(DatosFiscales, on_delete=models.PROTECT, verbose_name="Cliente que paga")
     
-    # --- CORREGIDO AQUI (De 5 a 50) ---
+    # --- Consecutivo Interno (CP-1, CP-2...) ---
+    serie = models.CharField(max_length=10, default='CP')
+    folio = models.PositiveIntegerField(verbose_name="Folio Interno")
+    
+    # --- Datos del Pago ---
+    fecha_pago = models.DateTimeField(default=timezone.now, verbose_name="Fecha de Pago")
     forma_pago = models.CharField(max_length=50, default='03', verbose_name="Forma de Pago SAT")
+    moneda = models.CharField(max_length=10, default='MXN')
+    tipo_cambio = models.DecimalField(max_digits=10, decimal_places=4, default=1.0)
+    
+    # ESTE ES EL CAMPO QUE DABA ERROR (Antes se llamaba 'monto')
+    monto_total = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Monto Total Recibido")
     
     num_operacion = models.CharField(max_length=100, blank=True, null=True, verbose_name="Número de Operación")
+    
+    # --- Campos SAT 2025 ---
+    version = models.CharField(max_length=10, default='2.0', editable=False)
+    tipo_cadena_pago = models.CharField(max_length=2, blank=True, null=True)
+    certificado_pago = models.TextField(blank=True, null=True)
+    sello_pago = models.TextField(blank=True, null=True)
+    
+    # --- Timbrado ---
+    uuid = models.CharField(max_length=100, blank=True, null=True, verbose_name="Folio Fiscal (UUID)")
     archivo_pdf = models.FileField(upload_to='pagos/pdf/', blank=True, null=True)
     archivo_xml = models.FileField(upload_to='pagos/xml/', blank=True, null=True)
-    uuid_pago = models.CharField(max_length=100, blank=True, null=True, verbose_name="UUID del Complemento")
+    timbrado = models.BooleanField(default=False)
+    fecha_timbrado = models.DateTimeField(blank=True, null=True)
+    no_certificado_sat = models.CharField(max_length=20, blank=True, null=True)
+    sello_sat = models.TextField(blank=True, null=True)
 
     def __str__(self):
-        return f"Pago de ${self.monto} para Factura {self.factura.id}"
+        return f"{self.serie}-{self.folio} (${self.monto_total})"
 
     class Meta:
-        verbose_name = "Complemento de Pago"
-        verbose_name_plural = "Complementos de Pago"
+        verbose_name = "Complemento de Pago (REP)"
+        verbose_name_plural = "Complementos de Pago (REP)"
+
+class PagoDoctoRelacionado(models.Model):
+    """
+    DETALLE DEL PAGO (Documentos Relacionados)
+    Aquí se desglosa cuánto dinero se va a cada factura.
+    """
+    complemento = models.ForeignKey(ComplementoPago, on_delete=models.CASCADE, related_name='documentos_relacionados')
+    factura = models.ForeignKey(Factura, on_delete=models.PROTECT, related_name='pagos_recibidos')
+    
+    # --- Cálculos SAT ---
+    numero_parcialidad = models.PositiveIntegerField()
+    saldo_anterior = models.DecimalField(max_digits=12, decimal_places=2)
+    importe_pagado = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Importe aplicado")
+    saldo_insoluto = models.DecimalField(max_digits=12, decimal_places=2)
+    
+    moneda_dr = models.CharField(max_length=10, default='MXN')
+    equivalencia_dr = models.DecimalField(max_digits=10, decimal_places=6, default=1.0)
+
+    def __str__(self):
+        return f"Pago a F-{self.factura.folio} (${self.importe_pagado})"

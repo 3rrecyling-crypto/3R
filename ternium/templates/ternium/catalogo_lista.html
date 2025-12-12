@@ -305,11 +305,18 @@
                     <p class="mb-0 text-white-80">Gestión avanzada de {{ verbose_name_plural }} con búsqueda inteligente</p>
                 </div>
                 
-                {% with 'crear_'|add:model_name as create_url_name %}
-                    <a href="{% url create_url_name %}" class="btn btn-light btn-lg rounded-pill px-4 animate-slide-in-right">
-                        <i class="fas fa-plus-circle me-2"></i>Nuevo {{ verbose_name|capfirst }}
+                <div class="d-flex gap-2">
+                    <a href="{% url 'export_catalogo_excel' model_name %}?empresa={{ request.GET.empresa }}&q={{ request.GET.q }}" 
+                       class="btn btn-success btn-lg rounded-pill px-4 animate-slide-in-right shadow-sm">
+                        <i class="fas fa-file-excel me-2"></i>Excel
                     </a>
-                {% endwith %}
+
+                    {% with 'crear_'|add:model_name as create_url_name %}
+                        <a href="{% url create_url_name %}" class="btn btn-light btn-lg rounded-pill px-4 animate-slide-in-right shadow-sm">
+                            <i class="fas fa-plus-circle me-2"></i>Nuevo {{ verbose_name|capfirst }}
+                        </a>
+                    {% endwith %}
+                </div>
             </div>
         </div>
         
@@ -597,14 +604,10 @@ document.addEventListener('DOMContentLoaded', function() {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
     
-    // --- LÓGICA DE FILTROS ELIMINADA ---
-    
     // --- Envío del formulario de búsqueda principal ---
     searchForm.addEventListener('submit', function(e) {
         // Muestra el overlay solo cuando se envía el formulario
         loadingOverlay.style.display = 'flex';
-        
-        // --- LÓGICA DE AÑADIR FILTRO OCULTO ELIMINADA ---
     });
     
     // --- Lógica para mostrar detalles en el modal ---
@@ -630,8 +633,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 modalBody.innerHTML = html;
                 
                 // --- CORRECCIÓN: Generar la URL de edición de forma robusta ---
-                // Usamos el tag 'url' de Django para crear una URL plantilla
-                // y reemplazamos el '999' con el ID real.
                 const editUrl = "{% url 'editar_'|add:model_name 999 %}".replace('999', objectId);
                 modalEditBtn.href = editUrl;
             })
@@ -640,9 +641,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 modalBody.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Error al cargar los detalles.</div>`;
             });
     }
-
-    // --- CÓDIGO DE BÚSQUEDA EN TIEMPO REAL ELIMINADO ---
-    
 });
 </script>
 {% endblock extra_js %}
