@@ -155,6 +155,7 @@ class RemisionForm(forms.ModelForm):
             'contenedor': forms.Select(attrs={'class': 'form-select'}),
             'origen': forms.Select(attrs={'class': 'form-select'}),
             'destino': forms.Select(attrs={'class': 'form-select'}),
+            'cliente': forms.Select(attrs={'class': 'form-select'}), # Asegúrate de tener este widget
             'inicia_ld': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'termina_ld': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'folio_ld': forms.TextInput(attrs={'class': 'form-control'}),
@@ -168,27 +169,46 @@ class RemisionForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        # Extraemos 'empresa' de los argumentos, si se proporciona desde la vista
+        # 1. Extraemos el usuario y la empresa preseleccionada
+        self.user = kwargs.pop('user', None)
         empresa = kwargs.pop('empresa', None)
         super().__init__(*args, **kwargs)
 
-        # Si se pasó una empresa, filtramos los QuerySets de los campos relacionados
+        # 2. FILTRO DE SEGURIDAD: Restringir el campo 'empresa' según el usuario
+        if self.user and not self.user.is_superuser:
+            if hasattr(self.user, 'ternium_profile'):
+                # Solo mostramos las empresas que están en 'empresas_autorizadas' del perfil
+                qs_autorizadas = self.user.ternium_profile.empresas_autorizadas.all()
+                self.fields['empresa'].queryset = qs_autorizadas
+            else:
+                # Si no tiene perfil, no ve ninguna empresa
+                self.fields['empresa'].queryset = Empresa.objects.none()
+
+        # 3. Lógica de filtrado de catálogos dependientes (Cascada)
         if empresa:
-            self.fields['linea_transporte'].queryset = LineaTransporte.objects.filter(empresas=empresa)
-            self.fields['unidad'].queryset = Unidad.objects.filter(empresas=empresa)
-            self.fields['contenedor'].queryset = Contenedor.objects.filter(empresas=empresa)
-            self.fields['origen'].queryset = Lugar.objects.filter(empresas=empresa, tipo__in=['ORIGEN', 'AMBOS'])
-            self.fields['destino'].queryset = Lugar.objects.filter(empresas=empresa, tipo__in=['DESTINO', 'AMBOS'])
-        # Si no hay empresa (al crear una remisión nueva), los campos aparecen vacíos
+            # Validación extra: si el usuario no es superuser, verificamos que la empresa pasada sea válida
+            if self.user and not self.user.is_superuser:
+                if not self.fields['empresa'].queryset.filter(pk=empresa.pk).exists():
+                    # Si intenta forzar una empresa no autorizada, limpiamos la selección
+                    empresa = None
+            
+            if empresa:
+                self.fields['linea_transporte'].queryset = LineaTransporte.objects.filter(empresas=empresa)
+                self.fields['unidad'].queryset = Unidad.objects.filter(empresas=empresa)
+                self.fields['contenedor'].queryset = Contenedor.objects.filter(empresas=empresa)
+                self.fields['origen'].queryset = Lugar.objects.filter(empresas=empresa, tipo__in=['ORIGEN', 'AMBOS'])
+                self.fields['destino'].queryset = Lugar.objects.filter(empresas=empresa, tipo__in=['DESTINO', 'AMBOS'])
+                # Si tienes un modelo Cliente relacionado a empresas, fíltralo aquí también
+                # self.fields['cliente'].queryset = Cliente.objects.filter(empresas=empresa)
         else:
+            # Si no hay empresa seleccionada, los campos dependientes aparecen vacíos
             self.fields['linea_transporte'].queryset = LineaTransporte.objects.none()
             self.fields['unidad'].queryset = Unidad.objects.none()
             self.fields['contenedor'].queryset = Contenedor.objects.none()
             self.fields['origen'].queryset = Lugar.objects.none()
             self.fields['destino'].queryset = Lugar.objects.none()
 
-        # Nota: El campo 'operador' no está relacionado a 'Empresa' en el modelo,
-        # por lo que muestra todos los operadores disponibles.
+        # Operador suele ser global, pero puedes filtrarlo si tiene relación M2M
         self.fields['operador'].queryset = Operador.objects.all()
 
         if self.instance and self.instance.pk and self.instance.status == 'AUDITADO':

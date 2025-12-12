@@ -17,8 +17,17 @@ class DetalleRemisionInline(admin.TabularInline):
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'area', 'empresa', 'telefono')
+    # MODIFICADO: Cambiamos 'empresa' por 'get_empresas_autorizadas' para evitar el error E108
+    list_display = ('user', 'area', 'telefono', 'get_empresas_autorizadas')
     search_fields = ('user__username', 'user__email', 'area')
+    
+    # MODIFICADO: Agregamos esto para ver el selector de empresas de izquierda a derecha
+    filter_horizontal = ('empresas_autorizadas',) 
+
+    # Función auxiliar para mostrar las empresas en la lista (Django no muestra M2M directo)
+    def get_empresas_autorizadas(self, obj):
+        return ", ".join([e.nombre for e in obj.empresas_autorizadas.all()])
+    get_empresas_autorizadas.short_description = 'Empresas Asignadas'
 
 @admin.register(Origen)
 class OrigenAdmin(admin.ModelAdmin):
@@ -29,7 +38,7 @@ class OrigenAdmin(admin.ModelAdmin):
 class EmpresaAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'prefijo', 'creado_en')
     search_fields = ('nombre', 'prefijo')
-    filter_horizontal = ('origenes',)  # Widget mejorado para selección múltiple
+    filter_horizontal = ('origenes',)
 
 @admin.register(LineaTransporte)
 class LineaTransporteAdmin(admin.ModelAdmin):

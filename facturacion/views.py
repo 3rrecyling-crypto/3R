@@ -1,18 +1,18 @@
 # facturacion/views.py
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required 
 from django.db import transaction
-from decimal import Decimal, ROUND_HALF_UP # <--- IMPORTANTE
+from decimal import Decimal, ROUND_HALF_UP
 from django.utils import timezone
 from django.http import HttpResponse
 from django.template.loader import render_to_string
-from django.db.models import Sum, Count, Q # <--- Asegúrate de importar esto
+from django.db.models import Sum, Count, Q
+import csv
+
 # Modelos
-from .models import Factura, ConceptoFactura, DatosFiscales
-from ternium.models import Remision, Cliente, Lugar
 from .models import Factura, ConceptoFactura, DatosFiscales, ComplementoPago, PagoDoctoRelacionado
-from django.shortcuts import render
+from ternium.models import Remision, Cliente, Lugar
 
 # Formularios
 from .forms import (
@@ -21,7 +21,7 @@ from .forms import (
     ConfigurarEmisorForm, 
     DatosFiscalesClienteForm,
     PagoForm,
-    ComplementoPagoCabeceraForm  # <--- AGREGA ESTO
+    ComplementoPagoCabeceraForm
 )
 
 try:
@@ -36,6 +36,7 @@ def get_emisor_fiscal():
 # --- VISTAS ---
 
 @login_required
+@permission_required('facturacion.view_factura', raise_exception=True)
 def dashboard_facturacion(request):
     """
     Dashboard principal de facturación.
@@ -43,9 +44,7 @@ def dashboard_facturacion(request):
     # 1. Query Base Facturas
     facturas = Factura.objects.all().select_related('receptor').prefetch_related('remisiones').order_by('-fecha_emision')
 
-    # 2. Query Base Pagos (CORREGIDO PARA NUEVO MODELO)
-    # Ya no existe 'factura' en ComplementoPago. Ahora traemos el 'receptor'
-    # y "pre-cargamos" los documentos relacionados para evitar lentitud.
+    # 2. Query Base Pagos
     pagos = ComplementoPago.objects.select_related('receptor')\
         .prefetch_related('documentos_relacionados', 'documentos_relacionados__factura')\
         .all().order_by('-fecha_pago')
@@ -55,22 +54,16 @@ def dashboard_facturacion(request):
     q_folio = request.GET.get('q_folio')
 
     if q_cliente:
-        # Filtro en facturas
         facturas = facturas.filter(receptor__razon_social__icontains=q_cliente)
-        # Filtro en pagos (El cliente está directo en el encabezado ahora)
         pagos = pagos.filter(receptor__razon_social__icontains=q_cliente)
     
     if q_folio:
-        # Filtro en facturas
         facturas = facturas.filter(folio__icontains=q_folio)
-        
-        # Filtro en pagos (CORREGIDO):
-        # Buscamos si alguno de los documentos relacionados tiene ese folio de factura
         pagos = pagos.filter(documentos_relacionados__factura__folio__icontains=q_folio).distinct()
 
     # --- DESCARGA MASIVA XML (ZIP) ---
     if request.GET.get('exportar') == 'xml_masivo':
-        # ... (Tu código de exportación existente) ...
+        # Aquí iría tu lógica de exportación si la tienes implementada
         pass 
 
     # 4. KPIs
@@ -97,6 +90,7 @@ def dashboard_facturacion(request):
     return render(request, 'facturacion/dashboard.html', context)
 
 @login_required
+@permission_required('facturacion.change_datosfiscales', raise_exception=True)
 def configurar_emisor(request):
     if request.method == 'POST':
         form = ConfigurarEmisorForm(request.POST)
@@ -126,6 +120,7 @@ def configurar_emisor(request):
     return render(request, 'facturacion/configurar_emisor.html', {'form': form})
 
 @login_required
+@permission_required('facturacion.add_factura', raise_exception=True)
 def prefacturar_remisiones(request):
     """
     Vista clave: Detecta datos fiscales del Lugar(Destino) si el Cliente no tiene.
@@ -137,7 +132,6 @@ def prefacturar_remisiones(request):
             messages.error(request, "Selecciona al menos una remisión.")
             return redirect('remisiones_por_facturar')
 
-        # 1. DEFINIR LA VARIABLE 'remisiones' (Crucial para evitar NameError)
         remisiones = Remision.objects.filter(id__in=remision_ids)\
             .select_related('cliente', 'destino')\
             .prefetch_related('detalles__material')
@@ -146,39 +140,36 @@ def prefacturar_remisiones(request):
             messages.error(request, "No se encontraron las remisiones seleccionadas.")
             return redirect('remisiones_por_facturar')
 
-        # 2. Validar Cliente
+        # Validar Cliente
         cliente = remisiones.first().cliente
         if any(r.cliente != cliente for r in remisiones):
             messages.error(request, "Todas las remisiones deben ser del mismo cliente.")
             return redirect('remisiones_por_facturar')
 
-        # 3. Validar Emisor
+        # Validar Emisor
         emisor = get_emisor_fiscal()
         if not emisor:
             messages.warning(request, "Configura tu Emisor primero (Tus datos fiscales).")
             return redirect('configurar_emisor')
 
-        # 4. Buscar Receptor (Datos Fiscales del Cliente)
+        # Buscar Receptor
         try:
             receptor = cliente.datos_fiscales
         except:
             receptor = None
 
-        # 5. AUTO-DESCUBRIMIENTO (Si el cliente no tiene datos, buscamos en los Lugares)
+        # AUTO-DESCUBRIMIENTO
         if not receptor:
             lugar_con_datos = None
-            # Buscamos en las remisiones si alguna tiene un destino con RFC
             for r in remisiones:
                 if r.destino and r.destino.rfc:
                     lugar_con_datos = r.destino
                     break
             
             if lugar_con_datos:
-                # Construimos la dirección completa en una sola cadena
                 direccion_completa = f"{lugar_con_datos.calle or ''} {lugar_con_datos.numero_exterior or ''} {lugar_con_datos.numero_interior or ''}, Col. {lugar_con_datos.colonia or ''}, {lugar_con_datos.municipio or ''}, {lugar_con_datos.estado or ''}"
                 direccion_completa = direccion_completa.replace(" ,", ",").strip(", ")
 
-                # Creamos los datos fiscales
                 receptor = DatosFiscales.objects.create(
                     es_emisor=False,
                     cliente_interno=cliente,
@@ -191,7 +182,6 @@ def prefacturar_remisiones(request):
                 )
                 messages.info(request, f"Datos fiscales importados automáticamente del lugar '{lugar_con_datos.nombre}'.")
 
-        # 6. Preparar formulario y renderizar
         form = GenerarFacturaForm()
         if receptor:
             form.initial['uso_cfdi'] = receptor.uso_cfdi
@@ -204,11 +194,12 @@ def prefacturar_remisiones(request):
             'form': form
         })
 
-    # RETORNO PARA GET (Evita el ValueError)
     messages.warning(request, "Acceso inválido a prefacturación.")
     return redirect('remisiones_por_facturar')
+
 @login_required
 @transaction.atomic
+@permission_required('facturacion.add_factura', raise_exception=True)
 def generar_factura_accion(request):
     if request.method == 'POST':
         form = GenerarFacturaForm(request.POST)
@@ -229,7 +220,6 @@ def generar_factura_accion(request):
                 messages.error(request, "Error: El cliente sigue sin datos fiscales.")
                 return redirect('remisiones_por_facturar')
 
-            # Crear Encabezado de Factura
             factura = Factura.objects.create(
                 emisor=emisor,
                 receptor=receptor,
@@ -256,11 +246,8 @@ def generar_factura_accion(request):
                 except ValueError:
                     precio_unitario = 0.0
                 
-                # --- NUEVO: GUARDAR PRECIO EN LA REMISIÓN ---
-                # Esto cumple tu requerimiento de "que se guarde el precio"
                 r.tarifa = precio_unitario
                 r.save() 
-                # ---------------------------------------------
 
                 cantidad = float(r.total_peso_dlv)
                 importe = cantidad * precio_unitario
@@ -302,6 +289,7 @@ def generar_factura_accion(request):
     return redirect('dashboard_facturacion')
 
 @login_required
+@permission_required('facturacion.change_datosfiscales', raise_exception=True)
 def configurar_cliente_fiscal(request, cliente_id):
     cliente = get_object_or_404(Cliente, pk=cliente_id)
     try:
@@ -323,13 +311,11 @@ def configurar_cliente_fiscal(request, cliente_id):
 
     return render(request, 'facturacion/configurar_cliente.html', {'form': form, 'cliente': cliente})
 
-
-# Asegúrate de importar Paginator al inicio
 from django.core.paginator import Paginator
 
 @login_required
+@permission_required('facturacion.add_factura', raise_exception=True)
 def remisiones_por_facturar(request):
-    # 1. Query Base
     queryset = Remision.objects.filter(
         status__in=['TERMINADO', 'AUDITADO']
     ).exclude(
@@ -338,7 +324,6 @@ def remisiones_por_facturar(request):
         destino__nombre__icontains="PATIO"
     ).select_related('cliente', 'destino', 'origen').prefetch_related('detalles__material').order_by('-fecha')
 
-    # 2. Filtros
     q_cliente = request.GET.get('q_cliente')
     fecha_inicio = request.GET.get('fecha_inicio')
     fecha_fin = request.GET.get('fecha_fin')
@@ -349,7 +334,6 @@ def remisiones_por_facturar(request):
     if fecha_inicio and fecha_fin:
         queryset = queryset.filter(fecha__range=[fecha_inicio, fecha_fin])
 
-    # --- EXPORTAR A EXCEL ---
     if request.GET.get('exportar') == 'excel':
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="remisiones_pendientes.csv"'
@@ -359,7 +343,6 @@ def remisiones_por_facturar(request):
         writer.writerow(['Folio', 'Fecha', 'Cliente', 'Origen', 'Destino', 'Material', 'Peso Neto (kg)'])
 
         for r in queryset:
-            # Aquí SÍ podemos usar .total_peso_dlv porque estamos en un bucle de Python, no en una consulta SQL directa
             material_nombre = r.detalles.first().material.nombre if r.detalles.exists() else "N/A"
             writer.writerow([
                 r.remision,
@@ -372,21 +355,16 @@ def remisiones_por_facturar(request):
             ])
         return response
 
-    # 3. CÁLCULOS OPTIMIZADOS (CORREGIDO)
     total_pendientes = queryset.count()
 
-    # Quitamos 'peso_total' del annotate porque 'total_peso_dlv' no es un campo de BD.
-    # Solo contamos los viajes por cliente, que es muy rápido.
     resumen_clientes = queryset.values('cliente__nombre').annotate(
         conteo=Count('id')
     ).order_by('-conteo')
 
-    # 4. PAGINACIÓN
     paginator = Paginator(queryset, 50) 
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    # 5. DATOS PARA EL COMBOBOX
     clientes_combo = Cliente.objects.filter(
         remision__status__in=['TERMINADO', 'AUDITADO'],
         remision__facturas__isnull=True
@@ -403,11 +381,15 @@ def remisiones_por_facturar(request):
     }
     
     return render(request, 'facturacion/por_facturar.html', context)
+
+@login_required
+@permission_required('facturacion.view_factura', raise_exception=True)
 def detalle_factura(request, pk):
     factura = get_object_or_404(Factura, pk=pk)
     return render(request, 'facturacion/detalle.html', {'factura': factura})
 
 @login_required
+@permission_required('facturacion.view_factura', raise_exception=True)
 def generar_pdf(request, pk):
     factura = get_object_or_404(Factura, pk=pk)
     html_string = render_to_string('facturacion/pdf_factura.html', {'factura': factura})
@@ -420,13 +402,13 @@ def generar_pdf(request, pk):
 
 @login_required
 @transaction.atomic
+@permission_required('facturacion.add_factura', raise_exception=True)
 def crear_factura_nueva(request):
     if request.method == 'POST':
         form = NuevaFacturaLibreForm(request.POST)
         
         if form.is_valid():
             try:
-                # ... (Tu código de validación de emisor y creación de encabezado sigue igual) ...
                 emisor = get_emisor_fiscal()
                 if not emisor:
                     messages.error(request, "No tienes configurados tus datos fiscales como Emisor.")
@@ -441,12 +423,9 @@ def crear_factura_nueva(request):
                 factura.monto_total = 0
                 factura.save()
 
-                # --- AQUI EMPIEZA EL CAMBIO EN LOS CONCEPTOS ---
-                
-                # Recibimos las listas del HTML
                 cantidades = request.POST.getlist('cantidad[]')
-                unidades = request.POST.getlist('unidad[]')       # <--- NUEVO
-                claves_sat = request.POST.getlist('clave_sat[]')  # <--- NUEVO
+                unidades = request.POST.getlist('unidad[]')
+                claves_sat = request.POST.getlist('clave_sat[]')
                 descripciones = request.POST.getlist('descripcion[]')
                 valores = request.POST.getlist('valor_unitario[]')
                 
@@ -456,7 +435,6 @@ def crear_factura_nueva(request):
                 aplicar_ret = form.cleaned_data.get('aplicar_retencion', False)
 
                 for i in range(len(descripciones)):
-                    # Validar que la línea tenga datos esenciales
                     if not descripciones[i] or not cantidades[i] or not valores[i]:
                         continue
                         
@@ -464,9 +442,7 @@ def crear_factura_nueva(request):
                     val = float(valores[i])
                     desc = descripciones[i]
                     
-                    # Recuperamos Unidad y Clave SAT ingresadas
                     uni = unidades[i] if i < len(unidades) and unidades[i] else "Pieza"
-                    # Clave Prod/Serv (Ej: 84111506)
                     c_sat = claves_sat[i] if i < len(claves_sat) and claves_sat[i] else "01010101"
                     
                     importe = cant * val
@@ -476,9 +452,9 @@ def crear_factura_nueva(request):
                     ConceptoFactura.objects.create(
                         factura=factura,
                         cantidad=cant,
-                        unidad=uni,                # Guardamos la unidad del input
-                        clave_prod_serv=c_sat,     # Guardamos la clave SAT del input
-                        clave_unidad="H87",        # Puedes dejar H87 por defecto o agregar otro input hidden
+                        unidad=uni,
+                        clave_prod_serv=c_sat,
+                        clave_unidad="H87",
                         descripcion=desc,
                         valor_unitario=val,
                         importe=importe,
@@ -490,7 +466,6 @@ def crear_factura_nueva(request):
                     impuestos += iva
                     retenciones += ret
 
-                # ... (El resto del código de guardar totales sigue igual) ...
                 factura.subtotal = subtotal
                 factura.impuestos_trasladados = impuestos
                 factura.impuestos_retenidos = retenciones
@@ -505,7 +480,6 @@ def crear_factura_nueva(request):
 
             except Exception as e:
                 messages.error(request, f"Ocurrió un error al guardar: {e}")
-                # Es recomendable imprimir el error en consola para depurar
                 print(e)
         else:
             messages.error(request, "Formulario inválido.")
@@ -515,14 +489,12 @@ def crear_factura_nueva(request):
 
     return render(request, 'facturacion/crear_factura.html', {'form': form})
 
-# views.py
-
 @login_required
 @transaction.atomic
+@permission_required('facturacion.add_complementopago', raise_exception=True)
 def registrar_pago(request, factura_id):
     """
     Registra un pago INDIVIDUAL (botón en dashboard).
-    Crea internamente un ComplementoPago (Encabezado) y un PagoDoctoRelacionado (Detalle).
     """
     factura = get_object_or_404(Factura, pk=factura_id)
     
@@ -530,7 +502,6 @@ def registrar_pago(request, factura_id):
         messages.warning(request, "Solo se pueden agregar complementos de pago a facturas PPD.")
         return redirect('detalle_factura_cliente', pk=factura.pk)
 
-    # 1. Calcular Saldo Actual usando la nueva relación
     total_pagado = factura.pagos_recibidos.aggregate(suma=Sum('importe_pagado'))['suma'] or 0
     saldo_actual = factura.monto_total - total_pagado
     
@@ -542,31 +513,26 @@ def registrar_pago(request, factura_id):
         form = PagoForm(request.POST, factura_obj=factura)
         
         if form.is_valid():
-            # Datos del formulario (Monto Total, Fecha, etc.)
             datos_pago = form.cleaned_data
             monto_recibido = datos_pago['monto_total']
 
             try:
-                # --- PASO A: Crear Encabezado (ComplementoPago) ---
                 ultimo_folio = ComplementoPago.objects.order_by('-folio').first()
                 nuevo_folio = (ultimo_folio.folio + 1) if ultimo_folio else 1
                 
                 complemento = form.save(commit=False)
                 complemento.usuario = request.user
-                complemento.receptor = factura.receptor  # El cliente es el receptor de la factura
+                complemento.receptor = factura.receptor
                 complemento.serie = 'CP'
                 complemento.folio = nuevo_folio
                 complemento.save()
 
-                # --- PASO B: Crear Detalle (PagoDoctoRelacionado) ---
-                # Cálculos de alta precisión
                 saldo_ant_dec = Decimal(str(saldo_actual)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 imp_pagado_dec = Decimal(str(monto_recibido)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 
                 saldo_ins_calc = saldo_ant_dec - imp_pagado_dec
                 if saldo_ins_calc < 0: saldo_ins_calc = Decimal('0.00')
 
-                # Calcular número de parcialidad
                 num_parcialidad = factura.pagos_recibidos.count() + 1
 
                 PagoDoctoRelacionado.objects.create(
@@ -578,7 +544,6 @@ def registrar_pago(request, factura_id):
                     saldo_insoluto=saldo_ins_calc
                 )
 
-                # --- PASO C: Actualizar Estado Factura ---
                 if saldo_ins_calc <= 0:
                     factura.estado = 'pagada'
                     factura.save()
@@ -600,22 +565,21 @@ def registrar_pago(request, factura_id):
     
 @login_required
 @transaction.atomic
+@permission_required('facturacion.add_complementopago', raise_exception=True)
 def nuevo_complemento_pago(request):
     """
     Genera un Complemento de Pago (REP) que puede pagar múltiples facturas.
     """
-    # Obtenemos facturas pendientes para mostrar si se selecciona un cliente
     facturas_pendientes = []
-    cliente_id = request.GET.get('cliente_id') # Para recargar la página con datos
+    cliente_id = request.GET.get('cliente_id')
     
     if cliente_id:
         facturas_pendientes = Factura.objects.filter(
             receptor_id=cliente_id,
             metodo_pago='PPD',
-            estado__in=['timbrado', 'pendiente'] # Solo vigentes
+            estado__in=['timbrado', 'pendiente']
         ).exclude(estado='pagada').order_by('fecha_emision')
 
-        # Calculamos saldo real actual para cada factura
         for f in facturas_pendientes:
             pagado = f.pagos_recibidos.aggregate(suma=Sum('importe_pagado'))['suma'] or 0
             f.saldo_pendiente = f.monto_total - pagado
@@ -625,9 +589,8 @@ def nuevo_complemento_pago(request):
         if form.is_valid():
             try:
                 data = form.cleaned_data
-                receptor = data['cliente'] # Viene del select
+                receptor = data['cliente']
                 
-                # 1. Crear Encabezado (ComplementoPago)
                 ultimo_folio = ComplementoPago.objects.order_by('-folio').first()
                 nuevo_folio = (ultimo_folio.folio + 1) if ultimo_folio else 1
                 
@@ -638,7 +601,6 @@ def nuevo_complemento_pago(request):
                 complemento.serie = 'CP'
                 complemento.save()
 
-                # 2. Procesar Facturas Seleccionadas
                 facturas_ids = request.POST.getlist('facturas_seleccionadas')
                 total_aplicado = Decimal('0.00')
 
@@ -648,15 +610,12 @@ def nuevo_complemento_pago(request):
                     if monto_a_pagar > 0:
                         factura = Factura.objects.get(id=f_id)
                         
-                        # Cálculos de saldos
                         historial_pagos = factura.pagos_recibidos.aggregate(suma=Sum('importe_pagado'))['suma'] or Decimal('0')
                         saldo_ant = factura.monto_total - historial_pagos
                         saldo_ins = saldo_ant - monto_a_pagar
                         
-                        # Validar parcialidad
                         parcialidad = factura.pagos_recibidos.count() + 1
                         
-                        # Crear Relación
                         PagoDoctoRelacionado.objects.create(
                             complemento=complemento,
                             factura=factura,
@@ -666,14 +625,12 @@ def nuevo_complemento_pago(request):
                             saldo_insoluto=saldo_ins
                         )
                         
-                        # Actualizar estado factura si se liquida
-                        if saldo_ins <= 0.01: # Margen de error 1 centavo
+                        if saldo_ins <= 0.01:
                             factura.estado = 'pagada'
                             factura.save()
                         
                         total_aplicado += monto_a_pagar
 
-                # Validar que no se asigne más dinero del recibido
                 if total_aplicado > complemento.monto_total:
                     raise Exception("El total aplicado a las facturas supera el monto recibido.")
                 
@@ -692,3 +649,4 @@ def nuevo_complemento_pago(request):
         'facturas': facturas_pendientes,
         'cliente_seleccionado': int(cliente_id) if cliente_id else None
     })
+    

@@ -508,38 +508,44 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 
 # Busca la clase RemisionListView y modifícala así:
 class RemisionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
-    permission_required = 'ternium.acceso_remisiones' # <--- PROTECCIÓN
+    permission_required = 'ternium.acceso_remisiones' 
     model = Remision
     template_name = 'ternium/remision_lista.html'
     context_object_name = 'remisiones'
     paginate_by = 15
     
     def get_queryset(self):
-        # CAMBIO CRÍTICO AQUÍ:
-        # Usamos .order_by('-pk') en lugar de '-remision'.
-        # '-pk' ordena por el ID interno de la base de datos (el último creado aparece primero).
-        # Esto soluciona el error de que 999 aparezca antes que 1000.
+        # 1. Queryset base optimizado
         queryset = Remision.objects.select_related(
             'empresa', 'origen', 'destino'
         ).prefetch_related(
             'detalles__material'
         ).order_by('-pk') 
         
+        # 2. FILTRADO POR PERMISOS DE EMPRESA
+        if not self.request.user.is_superuser:
+            perfil = getattr(self.request.user, 'ternium_profile', None)
+            if perfil:
+                # Solo mostrar remisiones cuya empresa esté en 'empresas_autorizadas'
+                mis_empresas = perfil.empresas_autorizadas.all()
+                queryset = queryset.filter(empresa__in=mis_empresas)
+            else:
+                # Si no tiene perfil o empresas asignadas, no ve nada
+                queryset = queryset.none()
+
+        # 3. FILTROS DEL BUSCADOR (Misma lógica de siempre)
         self.search_params = self.request.GET.copy()
         
-        # Detectar si hay filtros activos
         filtros_activos = any(
             k.startswith('q_') and v for k, v in self.request.GET.items()
         )
         
-        # Lógica de fechas por defecto (Hoy y hace 1 mes) si no hay filtros
         if not filtros_activos:
             today = timezone.now().date()
             month_ago = today - datetime.timedelta(days=30)
             self.search_params['q_fecha_desde'] = month_ago.strftime('%Y-%m-%d')
             self.search_params['q_fecha_hasta'] = today.strftime('%Y-%m-%d')
 
-        # Aplicar filtros
         filters = {
             'remision__icontains': self.search_params.get('q_remision'),
             'empresa__prefijo__icontains': self.search_params.get('q_prefijo'),
@@ -562,15 +568,29 @@ class RemisionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Pasamos search_params para que los inputs de fecha en el HTML se llenen solos
         context['search_params'] = self.search_params 
         
-        context['prefijos'] = Empresa.objects.exclude(prefijo__isnull=True).exclude(prefijo='').values_list('prefijo', flat=True).distinct().order_by('prefijo')
+        # Opcional: Filtrar también los prefijos del dropdown de búsqueda
+        if not self.request.user.is_superuser:
+             perfil = getattr(self.request.user, 'ternium_profile', None)
+             if perfil:
+                 qs_empresas = perfil.empresas_autorizadas.exclude(prefijo__isnull=True).exclude(prefijo='')
+                 context['prefijos'] = qs_empresas.values_list('prefijo', flat=True).distinct().order_by('prefijo')
+             else:
+                 context['prefijos'] = []
+        else:
+             context['prefijos'] = Empresa.objects.exclude(prefijo__isnull=True).exclude(prefijo='').values_list('prefijo', flat=True).distinct().order_by('prefijo')
+             
         context['materiales'] = Material.objects.all().order_by('nombre')
         context['origenes'] = Lugar.objects.filter(tipo__in=['ORIGEN', 'AMBOS']).order_by('nombre')
         context['destinos'] = Lugar.objects.filter(tipo__in=['DESTINO', 'AMBOS']).order_by('nombre')
         context['estatus_choices'] = Remision.STATUS_CHOICES
-        context['all_remision_numbers'] = Remision.objects.values_list('remision', flat=True).distinct().order_by('remision')
+        # Ajustamos esto para que no revele remisiones ajenas en el autocompletado si lo usas
+        if not self.request.user.is_superuser:
+             context['all_remision_numbers'] = Remision.objects.filter(empresa__in=self.request.user.ternium_profile.empresas_autorizadas.all()).values_list('remision', flat=True).distinct().order_by('remision')
+        else:
+             context['all_remision_numbers'] = Remision.objects.values_list('remision', flat=True).distinct().order_by('remision')
+             
         return context
     
 def calcular_siguiente_folio(prefijo):
@@ -608,13 +628,20 @@ def calcular_siguiente_folio(prefijo):
 @login_required
 def get_next_remision_number(request, empresa_id):
     """
-    Esta es la vista que llama el JavaScript para obtener el folio.
+    Obtiene el siguiente folio para una empresa, verificando permisos.
     """
     try:
+        # 1. VERIFICACIÓN DE SEGURIDAD
+        if not request.user.is_superuser:
+            perfil = getattr(request.user, 'ternium_profile', None)
+            # Verificamos si la empresa solicitada está en las autorizadas del usuario
+            if not perfil or not perfil.empresas_autorizadas.filter(pk=empresa_id).exists():
+                return JsonResponse({'error': 'No tienes permiso para generar folios de esta empresa.'}, status=403)
+
         empresa = Empresa.objects.get(pk=empresa_id)
         
         if empresa.prefijo:
-            # Usamos la función auxiliar que definimos arriba
+            # Usamos la función auxiliar que ya tenías
             next_remision = calcular_siguiente_folio(empresa.prefijo)
             return JsonResponse({'next_remision': next_remision, 'is_manual': False})
         else:
@@ -639,7 +666,8 @@ def crear_remision(request):
             except (Empresa.DoesNotExist, ValueError):
                 pass
         
-        form = RemisionForm(request.POST, request.FILES, empresa=empresa_seleccionada)
+        # MODIFICADO: Pasamos user=request.user
+        form = RemisionForm(request.POST, request.FILES, empresa=empresa_seleccionada, user=request.user)
         
         material_qs = Material.objects.filter(empresas=empresa_seleccionada) if empresa_seleccionada else Material.objects.none()
         lugar_qs = Lugar.objects.filter(empresas=empresa_seleccionada, tipo__in=['DESTINO', 'AMBOS']) if empresa_seleccionada else Lugar.objects.none()
@@ -651,59 +679,52 @@ def crear_remision(request):
         )
 
         if form.is_valid() and formset.is_valid():
-            # --- SOLUCIÓN CONCURRENCIA: INTENTOS AUTOMÁTICOS ---
             max_intentos = 5
             guardado_exitoso = False
             intento_actual = 0
             
             while intento_actual < max_intentos and not guardado_exitoso:
                 try:
-                    # Iniciamos una transacción atómica para este intento
                     with transaction.atomic(): 
                         remision = form.save(commit=False)
                         
-                        # --- CÁLCULO DE FOLIO ---
+                        # Validación extra de seguridad: Verificar si la empresa seleccionada es válida para el usuario
+                        if not request.user.is_superuser and remision.empresa:
+                            perfil = getattr(request.user, 'ternium_profile', None)
+                            if not perfil or not perfil.empresas_autorizadas.filter(pk=remision.empresa.pk).exists():
+                                raise PermissionDenied("No tienes permiso para crear remisiones en esta empresa.")
+
                         if not empresa_seleccionada or not empresa_seleccionada.prefijo:
                             if not remision.remision:
                                 raise ValidationError("La empresa no tiene prefijo y no se ingresó folio manual.")
                         else:
-                            # Calculamos el folio AL MOMENTO de guardar
                             remision.remision = calcular_siguiente_folio(empresa_seleccionada.prefijo)
-                        # ------------------------
 
-                        # Intentamos guardar. Si el folio ya existe (por otro usuario), 
-                        # esto lanzará IntegrityError y saltaremos al 'except'
                         remision.save() 
-                        
                         formset.instance = remision
                         formset.save()
+                        remision.save() # Guardado final
                         
-                        # Guardado final para actualizar estatus
-                        remision.save()
-                        
-                        # Actualizar inventarios
                         _update_inventory_from_remision(remision, revert=False)
                         
-                        # Si llegamos aquí, todo salió bien
                         guardado_exitoso = True
                         messages.success(request, f'Remisión {remision.remision} creada exitosamente.')
                         return redirect('remision_lista')
                 
                 except IntegrityError:
-                    # ¡AQUÍ ESTÁ LA MAGIA!
-                    # Si falla porque el folio ya existe, incrementamos el contador 
-                    # y el 'while' volverá a ejecutar el código, calculando el folio SIGUIENTE.
                     intento_actual += 1
                     if intento_actual >= max_intentos:
                         messages.error(request, 'El sistema está recibiendo demasiadas solicitudes simultáneas. Por favor intente de nuevo.')
-                
+                except PermissionDenied as e:
+                    messages.error(request, str(e))
+                    break
                 except Exception as e:
-                    # Otros errores no relacionados con el folio rompen el bucle
                     messages.error(request, f'Ocurrió un error al guardar: {e}')
                     break 
                     
     else:
-        form = RemisionForm()
+        # MODIFICADO: Pasamos user=request.user
+        form = RemisionForm(user=request.user)
         formset = DetalleFormSet(
             prefix='detalles', 
             form_kwargs={'material_queryset': Material.objects.none(), 'lugar_queryset': Lugar.objects.none()}
@@ -720,6 +741,14 @@ def crear_remision(request):
 @login_required
 def editar_remision(request, pk):
     remision_original = get_object_or_404(Remision, pk=pk)
+    
+    # 1. SEGURIDAD: Verificar si el usuario tiene permiso sobre la empresa de esta remisión
+    if not request.user.is_superuser:
+        perfil = getattr(request.user, 'ternium_profile', None)
+        if not perfil or not perfil.empresas_autorizadas.filter(pk=remision_original.empresa.pk).exists():
+             messages.error(request, "No tienes permiso para acceder o editar remisiones de esta empresa.")
+             return redirect('remision_lista')
+
     if remision_original.status == 'AUDITADO':
         messages.error(request, 'No se puede editar una remisión auditada.')
         return redirect('detalle_remision', pk=remision_original.pk)
@@ -728,16 +757,11 @@ def editar_remision(request, pk):
         Remision, DetalleRemision, form=DetalleRemisionForm, extra=0, can_delete=True, min_num=1
     )
     
-    # --- INICIO DE LA MODIFICACIÓN ---
-    # La empresa SIEMPRE será la original. Ya no se lee del POST.
     empresa_para_form = remision_original.empresa
-    # --- FIN DE LA MODIFICACIÓN ---
 
     if request.method == 'POST':
-        # Ya no necesitamos buscar la 'empresa_id' en el POST
-        
-        # Pasamos la empresa original para una validación correcta de catálogos
-        form = RemisionForm(request.POST, request.FILES, instance=remision_original, empresa=empresa_para_form)
+        # MODIFICADO: Pasamos user=request.user
+        form = RemisionForm(request.POST, request.FILES, instance=remision_original, empresa=empresa_para_form, user=request.user)
         
         material_qs = Material.objects.filter(empresas=empresa_para_form) if empresa_para_form else Material.objects.none()
         lugar_qs = Lugar.objects.filter(empresas=empresa_para_form, tipo__in=['DESTINO', 'AMBOS']) if empresa_para_form else Lugar.objects.none()
@@ -755,23 +779,17 @@ def editar_remision(request, pk):
                     _update_inventory_from_remision(remision_original, revert=True)
                     
                     remision = form.save(commit=False)
-                    
-                    # --- INICIO DE LA MODIFICACIÓN ---
-                    # Usamos el folio original para las rutas de archivos
                     remision_num = remision_original.remision 
-                    # --- FIN DE LA MODIFICACIÓN ---
 
                     if 'evidencia_carga' in request.FILES:
                         _eliminar_archivo_de_s3(remision_original.evidencia_carga.name if remision_original.evidencia_carga else None)
                         archivo = request.FILES['evidencia_carga']
-                        # Usamos el remision_num (que es el original)
                         s3_path = f"remisiones/{remision_num}/carga_{archivo.name}"
                         remision.evidencia_carga = _subir_archivo_a_s3(archivo, s3_path)
                     
                     if 'evidencia_descarga' in request.FILES:
                         _eliminar_archivo_de_s3(remision_original.evidencia_descarga.name if remision_original.evidencia_descarga else None)
                         archivo = request.FILES['evidencia_descarga']
-                        # Usamos el remision_num (que es el original)
                         s3_path = f"remisiones/{remision_num}/descarga_{archivo.name}"
                         remision.evidencia_descarga = _subir_archivo_a_s3(archivo, s3_path)
 
@@ -786,8 +804,8 @@ def editar_remision(request, pk):
                 form.add_error(None, e)
                 messages.error(request, f'Error de validación: {e.message}')
     else:
-        # En GET, pasamos la empresa original para que los campos se carguen con las opciones correctas
-        form = RemisionForm(instance=remision_original, empresa=empresa_para_form)
+        # MODIFICADO: Pasamos user=request.user
+        form = RemisionForm(instance=remision_original, empresa=empresa_para_form, user=request.user)
         material_qs = Material.objects.filter(empresas=empresa_para_form) if empresa_para_form else Material.objects.none()
         lugar_qs = Lugar.objects.filter(empresas=empresa_para_form, tipo__in=['DESTINO', 'AMBOS']) if empresa_para_form else Lugar.objects.none()
         
@@ -800,9 +818,9 @@ def editar_remision(request, pk):
     context = {
         'form': form,
         'formset': formset,
-        'remision': remision_original, # <-- Pasamos la remisión al contexto
+        'remision': remision_original,
         'titulo': f'Editar Remisión {remision_original.remision}',
-        'is_editing': True  # <-- Se mantiene para el JS y el HTML
+        'is_editing': True 
     }
     return render(request, 'ternium/remision_formulario.html', context)
 
@@ -2712,12 +2730,12 @@ def export_catalogo_excel(request, model_name):
         'lugar': {
             'model': Lugar,
             'headers': ['ID', 'Nombre', 'Tipo', 'Es Patio', 'RFC', 'Razón Social', 'Dirección Completa'],
-            'fields': ['id', 'nombre', 'tipo', 'es_patio', 'rfc', 'razon_social', 'direccion_completa'] # direccion_completa es un método
+            'fields': ['id', 'nombre', 'tipo', 'es_patio', 'rfc', 'razon_social', 'direccion_completa']
         },
         'lineatransporte': {
             'model': LineaTransporte,
             'headers': ['ID', 'Nombre', 'Empresas Asociadas'],
-            'fields': ['id', 'nombre', 'empresas_str'] # Calculado
+            'fields': ['id', 'nombre', 'empresas_str']
         },
         'operador': {
             'model': Operador,
@@ -2746,11 +2764,12 @@ def export_catalogo_excel(request, model_name):
         messages.error(request, "Modelo no válido para exportación.")
         return redirect('home')
 
-    # 2. Obtener Queryset (Filtrado por Empresa si aplica)
+    # 2. Obtener Queryset Base
     model = conf['model']
     queryset = model.objects.all()
     
-    # Filtro por empresa (si viene en la URL)
+    # --- FILTROS COMUNES ---
+    # Filtro por empresa (si viene en la URL y el modelo lo soporta)
     empresa_id = request.GET.get('empresa')
     if empresa_id and hasattr(model, 'empresas'):
         queryset = queryset.filter(empresas__id=empresa_id)
@@ -2766,6 +2785,18 @@ def export_catalogo_excel(request, model_name):
         elif hasattr(model, 'nombre'):
              queryset = queryset.filter(nombre__icontains=query)
 
+    # --- CORRECCIÓN: FILTROS ESPECÍFICOS PARA UNIDAD ---
+    # Esto asegura que el Excel respete los filtros de Tipo y Estatus
+    if model_name.lower() == 'unidad':
+        asset_type = request.GET.get('asset_type')
+        status = request.GET.get('status')
+        
+        if asset_type:
+            queryset = queryset.filter(asset_type=asset_type)
+        if status:
+            queryset = queryset.filter(operational_status=status)
+    # ----------------------------------------------------
+
     # 3. Crear Excel
     wb = Workbook()
     ws = wb.active
@@ -2778,13 +2809,17 @@ def export_catalogo_excel(request, model_name):
     for obj in queryset:
         row = []
         for field in conf['fields']:
-            # Lógica especial para campos calculados o ManyToMany
             if field == 'empresas_str':
                 val = ", ".join([e.nombre for e in obj.empresas.all()])
             elif field == 'direccion_completa' and hasattr(obj, 'direccion_completa'):
                 val = obj.direccion_completa()
             else:
-                val = getattr(obj, field, '')
+                # Obtener valor, manejar campos con choices (get_FOO_display)
+                if hasattr(obj, f'get_{field}_display'):
+                    val = getattr(obj, f'get_{field}_display')()
+                else:
+                    val = getattr(obj, field, '')
+                
                 if val is None: val = ""
             row.append(str(val))
         ws.append(row)
@@ -2798,7 +2833,6 @@ def export_catalogo_excel(request, model_name):
         tab.tableStyleInfo = style
         ws.add_table(tab)
         
-        # Ajustar ancho de columnas
         for col in ws.columns:
             max_length = 0
             column = col[0].column_letter

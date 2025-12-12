@@ -158,7 +158,7 @@ class Material(models.Model):
     )
     # -------------------
 
-    clave_unidad_sat = models.CharField(max_length=5, default="KGM", help_text="Clave de unidad SAT (ej. KGM, H87)")
+    clave_unidad_sat = models.CharField(max_length=20, default="KGM", help_text="Clave de unidad SAT (ej. KGM, H87)")
     nombre = models.CharField(max_length=150, unique=True, help_text="Nombre o descripción del material")
     empresas = models.ManyToManyField(
         Empresa,
@@ -868,19 +868,18 @@ from django.dispatch import receiver
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='ternium_profile')
-    area = models.CharField(
-    max_length=100,
-    blank=True,
-    null=True,
-    default='General',
-    help_text="Área o departamento del usuario"
-)
-    empresa = models.CharField(max_length=100, blank=True, null=True, help_text="Empresa a la que pertenece el usuario")
-    telefono = models.CharField(max_length=20, blank=True, null=True, help_text="Número de teléfono de contacto")
-    
-    # --- LÍNEA MODIFICADA ---
-    # Se quita 'upload_to' y se añade 'max_length' para guardar la ruta de S3.
+    area = models.CharField(max_length=100, blank=True, null=True, default='General')
+    telefono = models.CharField(max_length=20, blank=True, null=True)
     avatar = models.ImageField(default='avatars/default-avatar.png', max_length=255)
+    
+    # --- NUEVO CAMPO DE PERMISOS ---
+    empresas_autorizadas = models.ManyToManyField(
+        'Empresa', 
+        blank=True, 
+        related_name='usuarios_autorizados',
+        help_text="Empresas con las que este usuario puede generar folios y ver información."
+    )
+    # -------------------------------
 
     def __str__(self):
         return f'Perfil de {self.user.username}'

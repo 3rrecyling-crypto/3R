@@ -294,7 +294,7 @@
                     </li>
                     {% endif %}
 
-                    {% if perms.facturacion.view_factura or user.is_staff %}
+                    {% if perms.facturacion.view_factura %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navFacturacion" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-file-invoice-dollar me-1"></i> Facturación
