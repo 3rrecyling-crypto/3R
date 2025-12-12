@@ -61,7 +61,19 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='datosfiscales',
             name='uso_cfdi',
-            field=models.CharField(choices=[('G01', 'G01 - Adquisición de mercancías'), ('G03', 'G03 - Gastos en general'), ('I01', 'I01 - Construcciones'), ('P01', 'P01 - Por definir'), ('S01', 'S01 - Sin efectos fiscales'), ('I04', 'I04 - Equipo de computo y accesorios')], default='G03', max_length=50, verbose_name='Uso de CFDI Preferido'),
+            field=models.CharField(
+                choices=[
+                    ('G01', 'G01 - Adquisición de mercancías'),
+                    ('G03', 'G03 - Gastos en general'),
+                    ('I01', 'I01 - Construcciones'),
+                    ('P01', 'P01 - Por definir'),
+                    ('S01', 'S01 - Sin efectos fiscales'),
+                    ('I04', 'I04 - Equipo de computo y accesorios')
+                ],
+                default='G03',
+                max_length=50,
+                verbose_name='Uso de CFDI Preferido'
+            ),
         ),
         migrations.AlterField(
             model_name='factura',
