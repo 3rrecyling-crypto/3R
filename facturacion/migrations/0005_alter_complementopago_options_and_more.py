@@ -14,7 +14,11 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # BLOQUE 1: Operaciones que "fingimos" ante la BD porque ya existen o causan conflicto
+        # -------------------------------------------------------------------------
+        # BLOQUE 1: FINGIR operaciones que ya existen (AddField, RemoveField, etc.)
+        # -------------------------------------------------------------------------
+        # Estas columnas ya existen en tu BD de Render, así que le decimos a Django
+        # que actualice su estado (state) pero NO ejecute nada en la DB (database=[]).
         migrations.SeparateDatabaseAndState(
             state_operations=[
                 migrations.AlterModelOptions(
@@ -131,45 +135,64 @@ class Migration(migrations.Migration):
                     ],
                 ),
             ],
-            database_operations=[], # No tocar la BD para estas operaciones
+            database_operations=[],
         ),
 
-        # BLOQUE 2: Operaciones REALES que SÍ deben ejecutarse en la BD.
-        # Estas operaciones expanden las columnas de max_length=5 a max_length=50.
-        # Si no las ejecutamos, Postgres se quejará de "value too long".
-        migrations.AlterField(
-            model_name='complementopago',
-            name='fecha_pago',
-            field=models.DateTimeField(default=django.utils.timezone.now, verbose_name='Fecha de Pago'),
-        ),
-        migrations.AlterField(
-            model_name='complementopago',
-            name='forma_pago',
-            field=models.CharField(default='03', max_length=50, verbose_name='Forma de Pago SAT'),
-        ),
-        migrations.AlterField(
-            model_name='datosfiscales',
-            name='uso_cfdi',
-            field=models.CharField(choices=[('G01', 'G01 - Adquisición de mercancías'), ('G03', 'G03 - Gastos en general'), ('I01', 'I01 - Construcciones'), ('P01', 'P01 - Por definir'), ('S01', 'S01 - Sin efectos fiscales'), ('I04', 'I04 - Equipo de computo y accesorios')], default='G03', max_length=50, verbose_name='Uso de CFDI Preferido'),
-        ),
-        migrations.AlterField(
-            model_name='factura',
-            name='forma_pago',
-            field=models.CharField(default='99', max_length=50),
-        ),
-        migrations.AlterField(
-            model_name='factura',
-            name='metodo_pago',
-            field=models.CharField(default='PPD', max_length=50),
-        ),
-        migrations.AlterField(
-            model_name='factura',
-            name='moneda',
-            field=models.CharField(default='MXN', max_length=50),
-        ),
-        migrations.AlterField(
-            model_name='factura',
-            name='uso_cfdi',
-            field=models.CharField(default='G03', max_length=50),
+        # -------------------------------------------------------------------------
+        # BLOQUE 2: FORZAR CAMBIO DE TAMAÑO CON SQL (AlterFields)
+        # -------------------------------------------------------------------------
+        # Aquí le decimos a Django que actualice el estado de los campos a 50 chars,
+        # pero usamos SQL manual para evitar el error "value too long".
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AlterField(
+                    model_name='complementopago',
+                    name='fecha_pago',
+                    field=models.DateTimeField(default=django.utils.timezone.now, verbose_name='Fecha de Pago'),
+                ),
+                migrations.AlterField(
+                    model_name='complementopago',
+                    name='forma_pago',
+                    field=models.CharField(default='03', max_length=50, verbose_name='Forma de Pago SAT'),
+                ),
+                migrations.AlterField(
+                    model_name='datosfiscales',
+                    name='uso_cfdi',
+                    field=models.CharField(choices=[('G01', 'G01 - Adquisición de mercancías'), ('G03', 'G03 - Gastos en general'), ('I01', 'I01 - Construcciones'), ('P01', 'P01 - Por definir'), ('S01', 'S01 - Sin efectos fiscales'), ('I04', 'I04 - Equipo de computo y accesorios')], default='G03', max_length=50, verbose_name='Uso de CFDI Preferido'),
+                ),
+                migrations.AlterField(
+                    model_name='factura',
+                    name='forma_pago',
+                    field=models.CharField(default='99', max_length=50),
+                ),
+                migrations.AlterField(
+                    model_name='factura',
+                    name='metodo_pago',
+                    field=models.CharField(default='PPD', max_length=50),
+                ),
+                migrations.AlterField(
+                    model_name='factura',
+                    name='moneda',
+                    field=models.CharField(default='MXN', max_length=50),
+                ),
+                migrations.AlterField(
+                    model_name='factura',
+                    name='uso_cfdi',
+                    field=models.CharField(default='G03', max_length=50),
+                ),
+            ],
+            database_operations=[
+                # SQL manual para forzar la expansión de las columnas sin quejas de Django
+                migrations.RunSQL(
+                    """
+                    ALTER TABLE facturacion_complementopago ALTER COLUMN forma_pago TYPE varchar(50);
+                    ALTER TABLE facturacion_datosfiscales ALTER COLUMN uso_cfdi TYPE varchar(50);
+                    ALTER TABLE facturacion_factura ALTER COLUMN forma_pago TYPE varchar(50);
+                    ALTER TABLE facturacion_factura ALTER COLUMN metodo_pago TYPE varchar(50);
+                    ALTER TABLE facturacion_factura ALTER COLUMN moneda TYPE varchar(50);
+                    ALTER TABLE facturacion_factura ALTER COLUMN uso_cfdi TYPE varchar(50);
+                    """
+                ),
+            ],
         ),
     ]
