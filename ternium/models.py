@@ -261,8 +261,15 @@ class Unidad(models.Model):
 class Contenedor(models.Model):
     """Representa un contenedor con sus placas."""
     search_fields = ['nombre', 'placas']
+    
+    # El nombre sigue siendo único para identificar el registro internamente
     nombre = models.CharField(max_length=100, unique=True, help_text="Nombre o identificador del contenedor (Ej: CAJA-SECA-04)")
-    placas = models.CharField(max_length=20, unique=True, help_text="Placas o número de identificación del contenedor")
+    
+    # --- CAMBIO REALIZADO AQUÍ ---
+    # Se eliminó "unique=True" para permitir placas repetidas en diferentes contenedores
+    placas = models.CharField(max_length=20, help_text="Placas o número de identificación del contenedor")
+    # -----------------------------
+
     empresas = models.ManyToManyField(
         Empresa,
         related_name="contenedores",
