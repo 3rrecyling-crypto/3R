@@ -18,18 +18,29 @@ class Migration(migrations.Migration):
             name='complementopago',
             options={'verbose_name': 'Complemento de Pago (REP)', 'verbose_name_plural': 'Complementos de Pago (REP)'},
         ),
-        migrations.RemoveField(
-            model_name='complementopago',
-            name='factura',
+        
+        # --- CORRECCIÓN PARA RENDER ---
+        # Usamos SeparateDatabaseAndState para evitar el error "column does not exist".
+        # Le decimos a Django que los quite de su memoria (state), pero no ejecutamos nada en SQL (database).
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.RemoveField(
+                    model_name='complementopago',
+                    name='factura',
+                ),
+                migrations.RemoveField(
+                    model_name='complementopago',
+                    name='monto',
+                ),
+                migrations.RemoveField(
+                    model_name='complementopago',
+                    name='uuid_pago',
+                ),
+            ],
+            database_operations=[], # No hacemos nada en la DB porque las columnas ya no existen
         ),
-        migrations.RemoveField(
-            model_name='complementopago',
-            name='monto',
-        ),
-        migrations.RemoveField(
-            model_name='complementopago',
-            name='uuid_pago',
-        ),
+        # ------------------------------
+
         migrations.AddField(
             model_name='complementopago',
             name='certificado_pago',
