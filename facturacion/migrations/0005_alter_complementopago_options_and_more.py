@@ -14,27 +14,13 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-
-        # ======================================================
-        # MIGRACIÓN DE SINCRONIZACIÓN (STATE ONLY – SAFE RENDER)
-        # ======================================================
+        # BLOQUE 1: Operaciones que "fingimos" ante la BD porque ya existen o causan conflicto
         migrations.SeparateDatabaseAndState(
             state_operations=[
-
-                # ----------------------------
-                # Opciones del modelo
-                # ----------------------------
                 migrations.AlterModelOptions(
                     name='complementopago',
-                    options={
-                        'verbose_name': 'Complemento de Pago (REP)',
-                        'verbose_name_plural': 'Complementos de Pago (REP)',
-                    },
+                    options={'verbose_name': 'Complemento de Pago (REP)', 'verbose_name_plural': 'Complementos de Pago (REP)'},
                 ),
-
-                # ----------------------------
-                # Campos eliminados (ya no existen en DB)
-                # ----------------------------
                 migrations.RemoveField(
                     model_name='complementopago',
                     name='factura',
@@ -47,11 +33,6 @@ class Migration(migrations.Migration):
                     model_name='complementopago',
                     name='uuid_pago',
                 ),
-
-                # ----------------------------
-                # Campos que YA existen en DB
-                # (no ejecutar SQL)
-                # ----------------------------
                 migrations.AddField(
                     model_name='complementopago',
                     name='certificado_pago',
@@ -65,7 +46,8 @@ class Migration(migrations.Migration):
                 migrations.AddField(
                     model_name='complementopago',
                     name='folio',
-                    field=models.PositiveIntegerField(verbose_name='Folio Interno'),
+                    field=models.PositiveIntegerField(default=1, verbose_name='Folio Interno'),
+                    preserve_default=False,
                 ),
                 migrations.AddField(
                     model_name='complementopago',
@@ -75,11 +57,8 @@ class Migration(migrations.Migration):
                 migrations.AddField(
                     model_name='complementopago',
                     name='monto_total',
-                    field=models.DecimalField(
-                        decimal_places=2,
-                        max_digits=12,
-                        verbose_name='Monto Total Recibido',
-                    ),
+                    field=models.DecimalField(decimal_places=2, default=1, max_digits=12, verbose_name='Monto Total Recibido'),
+                    preserve_default=False,
                 ),
                 migrations.AddField(
                     model_name='complementopago',
@@ -89,11 +68,8 @@ class Migration(migrations.Migration):
                 migrations.AddField(
                     model_name='complementopago',
                     name='receptor',
-                    field=models.ForeignKey(
-                        on_delete=django.db.models.deletion.PROTECT,
-                        to='facturacion.datosfiscales',
-                        verbose_name='Cliente que paga',
-                    ),
+                    field=models.ForeignKey(default=1, on_delete=django.db.models.deletion.PROTECT, to='facturacion.datosfiscales', verbose_name='Cliente que paga'),
+                    preserve_default=False,
                 ),
                 migrations.AddField(
                     model_name='complementopago',
@@ -123,149 +99,77 @@ class Migration(migrations.Migration):
                 migrations.AddField(
                     model_name='complementopago',
                     name='tipo_cambio',
-                    field=models.DecimalField(
-                        decimal_places=4,
-                        default=1.0,
-                        max_digits=10,
-                    ),
+                    field=models.DecimalField(decimal_places=4, default=1.0, max_digits=10),
                 ),
                 migrations.AddField(
                     model_name='complementopago',
                     name='usuario',
-                    field=models.ForeignKey(
-                        blank=True,
-                        null=True,
-                        on_delete=django.db.models.deletion.SET_NULL,
-                        to=settings.AUTH_USER_MODEL,
-                    ),
+                    field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL),
                 ),
                 migrations.AddField(
                     model_name='complementopago',
                     name='uuid',
-                    field=models.CharField(
-                        blank=True,
-                        max_length=100,
-                        null=True,
-                        verbose_name='Folio Fiscal (UUID)',
-                    ),
+                    field=models.CharField(blank=True, max_length=100, null=True, verbose_name='Folio Fiscal (UUID)'),
                 ),
                 migrations.AddField(
                     model_name='complementopago',
                     name='version',
-                    field=models.CharField(
-                        default='2.0',
-                        editable=False,
-                        max_length=10,
-                    ),
+                    field=models.CharField(default='2.0', editable=False, max_length=10),
                 ),
-
-                # ----------------------------
-                # Alteraciones SOLO de estado
-                # ----------------------------
-                migrations.AlterField(
-                    model_name='complementopago',
-                    name='fecha_pago',
-                    field=models.DateTimeField(
-                        default=django.utils.timezone.now,
-                        verbose_name='Fecha de Pago',
-                    ),
-                ),
-                migrations.AlterField(
-                    model_name='complementopago',
-                    name='forma_pago',
-                    field=models.CharField(
-                        default='03',
-                        max_length=50,
-                        verbose_name='Forma de Pago SAT',
-                    ),
-                ),
-
-                # ----------------------------
-                # FACTURA (evita varchar(5))
-                # ----------------------------
-                migrations.AlterField(
-                    model_name='factura',
-                    name='forma_pago',
-                    field=models.CharField(default='99', max_length=50),
-                ),
-                migrations.AlterField(
-                    model_name='factura',
-                    name='metodo_pago',
-                    field=models.CharField(default='PPD', max_length=50),
-                ),
-                migrations.AlterField(
-                    model_name='factura',
-                    name='moneda',
-                    field=models.CharField(default='MXN', max_length=50),
-                ),
-                migrations.AlterField(
-                    model_name='factura',
-                    name='uso_cfdi',
-                    field=models.CharField(default='G03', max_length=50),
-                ),
-
-                # ----------------------------
-                # Datos fiscales
-                # ----------------------------
-                migrations.AlterField(
-                    model_name='datosfiscales',
-                    name='uso_cfdi',
-                    field=models.CharField(
-                        choices=[
-                            ('G01', 'G01 - Adquisición de mercancías'),
-                            ('G03', 'G03 - Gastos en general'),
-                            ('I01', 'I01 - Construcciones'),
-                            ('P01', 'P01 - Por definir'),
-                            ('S01', 'S01 - Sin efectos fiscales'),
-                            ('I04', 'I04 - Equipo de computo y accesorios'),
-                        ],
-                        default='G03',
-                        max_length=50,
-                        verbose_name='Uso de CFDI Preferido',
-                    ),
-                ),
-
-                # ----------------------------
-                # Modelo REP relacionado
-                # ----------------------------
                 migrations.CreateModel(
                     name='PagoDoctoRelacionado',
                     fields=[
-                        ('id', models.BigAutoField(
-                            auto_created=True,
-                            primary_key=True,
-                            serialize=False,
-                            verbose_name='ID',
-                        )),
+                        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                         ('numero_parcialidad', models.PositiveIntegerField()),
                         ('saldo_anterior', models.DecimalField(decimal_places=2, max_digits=12)),
-                        ('importe_pagado', models.DecimalField(
-                            decimal_places=2,
-                            max_digits=12,
-                            verbose_name='Importe aplicado',
-                        )),
+                        ('importe_pagado', models.DecimalField(decimal_places=2, max_digits=12, verbose_name='Importe aplicado')),
                         ('saldo_insoluto', models.DecimalField(decimal_places=2, max_digits=12)),
                         ('moneda_dr', models.CharField(default='MXN', max_length=10)),
-                        ('equivalencia_dr', models.DecimalField(
-                            decimal_places=6,
-                            default=1.0,
-                            max_digits=10,
-                        )),
-                        ('complemento', models.ForeignKey(
-                            on_delete=django.db.models.deletion.CASCADE,
-                            related_name='documentos_relacionados',
-                            to='facturacion.complementopago',
-                        )),
-                        ('factura', models.ForeignKey(
-                            on_delete=django.db.models.deletion.PROTECT,
-                            related_name='pagos_recibidos',
-                            to='facturacion.factura',
-                        )),
+                        ('equivalencia_dr', models.DecimalField(decimal_places=6, default=1.0, max_digits=10)),
+                        ('complemento', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='documentos_relacionados', to='facturacion.complementopago')),
+                        ('factura', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='pagos_recibidos', to='facturacion.factura')),
                     ],
                 ),
             ],
+            database_operations=[], # No tocar la BD para estas operaciones
+        ),
 
-            # ❗ NO ejecutar NINGÚN SQL en PostgreSQL
-            database_operations=[],
+        # BLOQUE 2: Operaciones REALES que SÍ deben ejecutarse en la BD.
+        # Estas operaciones expanden las columnas de max_length=5 a max_length=50.
+        # Si no las ejecutamos, Postgres se quejará de "value too long".
+        migrations.AlterField(
+            model_name='complementopago',
+            name='fecha_pago',
+            field=models.DateTimeField(default=django.utils.timezone.now, verbose_name='Fecha de Pago'),
+        ),
+        migrations.AlterField(
+            model_name='complementopago',
+            name='forma_pago',
+            field=models.CharField(default='03', max_length=50, verbose_name='Forma de Pago SAT'),
+        ),
+        migrations.AlterField(
+            model_name='datosfiscales',
+            name='uso_cfdi',
+            field=models.CharField(choices=[('G01', 'G01 - Adquisición de mercancías'), ('G03', 'G03 - Gastos en general'), ('I01', 'I01 - Construcciones'), ('P01', 'P01 - Por definir'), ('S01', 'S01 - Sin efectos fiscales'), ('I04', 'I04 - Equipo de computo y accesorios')], default='G03', max_length=50, verbose_name='Uso de CFDI Preferido'),
+        ),
+        migrations.AlterField(
+            model_name='factura',
+            name='forma_pago',
+            field=models.CharField(default='99', max_length=50),
+        ),
+        migrations.AlterField(
+            model_name='factura',
+            name='metodo_pago',
+            field=models.CharField(default='PPD', max_length=50),
+        ),
+        migrations.AlterField(
+            model_name='factura',
+            name='moneda',
+            field=models.CharField(default='MXN', max_length=50),
+        ),
+        migrations.AlterField(
+            model_name='factura',
+            name='uso_cfdi',
+            field=models.CharField(default='G03', max_length=50),
         ),
     ]
