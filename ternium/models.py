@@ -373,14 +373,14 @@ class Lugar(models.Model):
     
     regimen_fiscal = models.CharField(
         "Régimen Fiscal", 
-        max_length=5, 
+        max_length=50, 
         choices=REGIMEN_FISCAL_CHOICES, 
         blank=True, null=True
     )
     
     uso_cfdi = models.CharField(
         "Uso de CFDI", 
-        max_length=5, 
+        max_length=50, 
         choices=USO_CFDI_CHOICES, 
         default='G03', 
         blank=True, null=True
