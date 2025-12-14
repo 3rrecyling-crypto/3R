@@ -15,21 +15,56 @@ class Migration(migrations.Migration):
 
     operations = [
         # -------------------------------------------------------------------------
-        # BLOQUE 1: FINGIR operaciones (State Only)
+        # PASO 1: FUERZA BRUTA (SQL REAL)
         # -------------------------------------------------------------------------
-        # Le decimos a Django que "cree" que estos campos se agregaron/borraron,
-        # pero pasamos database_operations=[] para NO tocar la base de datos,
-        # porque tus logs confirman que estas columnas YA existen o YA se borraron.
+        # Ejecutamos esto PRIMERO para asegurar que la base de datos tenga espacio (50 chars)
+        # antes de que Django intente hacer cualquier validación.
+        migrations.RunSQL(
+            sql="""
+            ALTER TABLE facturacion_complementopago ALTER COLUMN forma_pago TYPE varchar(50);
+            ALTER TABLE facturacion_datosfiscales ALTER COLUMN uso_cfdi TYPE varchar(50);
+            ALTER TABLE facturacion_factura ALTER COLUMN forma_pago TYPE varchar(50);
+            ALTER TABLE facturacion_factura ALTER COLUMN metodo_pago TYPE varchar(50);
+            ALTER TABLE facturacion_factura ALTER COLUMN moneda TYPE varchar(50);
+            ALTER TABLE facturacion_factura ALTER COLUMN uso_cfdi TYPE varchar(50);
+            """,
+            reverse_sql=""
+        ),
+
+        # -------------------------------------------------------------------------
+        # PASO 2: ACTUALIZAR EL ESTADO DE LOS ALTER FIELDS
+        # -------------------------------------------------------------------------
+        # Como ya hicimos el cambio real con SQL arriba, aquí solo le decimos a Django
+        # que actualice su "memoria" (state) sin tocar la base de datos (database=[]).
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AlterField(model_name='complementopago', name='fecha_pago', field=models.DateTimeField(default=django.utils.timezone.now, verbose_name='Fecha de Pago')),
+                migrations.AlterField(model_name='complementopago', name='forma_pago', field=models.CharField(default='03', max_length=50, verbose_name='Forma de Pago SAT')),
+                migrations.AlterField(model_name='datosfiscales', name='uso_cfdi', field=models.CharField(choices=[('G01', 'G01 - Adquisición de mercancías'), ('G03', 'G03 - Gastos en general'), ('I01', 'I01 - Construcciones'), ('P01', 'P01 - Por definir'), ('S01', 'S01 - Sin efectos fiscales'), ('I04', 'I04 - Equipo de computo y accesorios')], default='G03', max_length=50, verbose_name='Uso de CFDI Preferido')),
+                migrations.AlterField(model_name='factura', name='forma_pago', field=models.CharField(default='99', max_length=50)),
+                migrations.AlterField(model_name='factura', name='metodo_pago', field=models.CharField(default='PPD', max_length=50)),
+                migrations.AlterField(model_name='factura', name='moneda', field=models.CharField(default='MXN', max_length=50)),
+                migrations.AlterField(model_name='factura', name='uso_cfdi', field=models.CharField(default='G03', max_length=50)),
+            ],
+            database_operations=[]
+        ),
+
+        # -------------------------------------------------------------------------
+        # PASO 3: CAMPOS FANTASMA (Add/Remove)
+        # -------------------------------------------------------------------------
+        # Manejamos los campos que ya existen o se borraron para que no den error de duplicado.
         migrations.SeparateDatabaseAndState(
             state_operations=[
                 migrations.AlterModelOptions(
                     name='complementopago',
                     options={'verbose_name': 'Complemento de Pago (REP)', 'verbose_name_plural': 'Complementos de Pago (REP)'},
                 ),
+                # Eliminaciones
                 migrations.RemoveField(model_name='complementopago', name='factura'),
                 migrations.RemoveField(model_name='complementopago', name='monto'),
                 migrations.RemoveField(model_name='complementopago', name='uuid_pago'),
                 
+                # Adiciones
                 migrations.AddField(model_name='complementopago', name='certificado_pago', field=models.TextField(blank=True, null=True)),
                 migrations.AddField(model_name='complementopago', name='fecha_timbrado', field=models.DateTimeField(blank=True, null=True)),
                 migrations.AddField(model_name='complementopago', name='folio', field=models.PositiveIntegerField(default=1, verbose_name='Folio Interno'), preserve_default=False),
@@ -43,14 +78,10 @@ class Migration(migrations.Migration):
                 migrations.AddField(model_name='complementopago', name='timbrado', field=models.BooleanField(default=False)),
                 migrations.AddField(model_name='complementopago', name='tipo_cadena_pago', field=models.CharField(blank=True, max_length=2, null=True)),
                 migrations.AddField(model_name='complementopago', name='tipo_cambio', field=models.DecimalField(decimal_places=4, default=1.0, max_digits=10)),
-                migrations.AddField(model_name='complementopago', name='usuario', field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL),
-                ),
+                migrations.AddField(model_name='complementopago', name='usuario', field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL)),
                 migrations.AddField(model_name='complementopago', name='uuid', field=models.CharField(blank=True, max_length=100, null=True, verbose_name='Folio Fiscal (UUID)')),
                 migrations.AddField(model_name='complementopago', name='version', field=models.CharField(default='2.0', editable=False, max_length=10)),
                 
-                # Asumimos que la tabla ya existe o que no causará conflicto mayor.
-                # Si esto falla en runtime diciendo que la tabla no existe, la crearemos después,
-                # pero ahora la prioridad es que pase el deploy.
                 migrations.CreateModel(
                     name='PagoDoctoRelacionado',
                     fields=[
@@ -66,37 +97,6 @@ class Migration(migrations.Migration):
                     ],
                 ),
             ],
-            database_operations=[], # <--- ESTO EVITA EL ERROR "DUPLICATE COLUMN"
-        ),
-
-        # -------------------------------------------------------------------------
-        # BLOQUE 2: SOLUCIÓN AL ERROR "VALUE TOO LONG" (RunSQL)
-        # -------------------------------------------------------------------------
-        # Aquí forzamos a la base de datos a expandir las columnas de 5 a 50 caracteres
-        # usando SQL puro. Esto evita que Django intente validar los datos antes de tiempo.
-        migrations.SeparateDatabaseAndState(
-            state_operations=[
-                migrations.AlterField(model_name='complementopago', name='fecha_pago', field=models.DateTimeField(default=django.utils.timezone.now, verbose_name='Fecha de Pago')),
-                migrations.AlterField(model_name='complementopago', name='forma_pago', field=models.CharField(default='03', max_length=50, verbose_name='Forma de Pago SAT')),
-                migrations.AlterField(model_name='datosfiscales', name='uso_cfdi', field=models.CharField(choices=[('G01', 'G01 - Adquisición de mercancías'), ('G03', 'G03 - Gastos en general'), ('I01', 'I01 - Construcciones'), ('P01', 'P01 - Por definir'), ('S01', 'S01 - Sin efectos fiscales'), ('I04', 'I04 - Equipo de computo y accesorios')], default='G03', max_length=50, verbose_name='Uso de CFDI Preferido')),
-                migrations.AlterField(model_name='factura', name='forma_pago', field=models.CharField(default='99', max_length=50)),
-                migrations.AlterField(model_name='factura', name='metodo_pago', field=models.CharField(default='PPD', max_length=50)),
-                migrations.AlterField(model_name='factura', name='moneda', field=models.CharField(default='MXN', max_length=50)),
-                migrations.AlterField(model_name='factura', name='uso_cfdi', field=models.CharField(default='G03', max_length=50)),
-            ],
-            database_operations=[
-                migrations.RunSQL(
-                    sql="""
-                    ALTER TABLE facturacion_complementopago ALTER COLUMN forma_pago TYPE varchar(50);
-                    ALTER TABLE facturacion_datosfiscales ALTER COLUMN uso_cfdi TYPE varchar(50);
-                    ALTER TABLE facturacion_factura ALTER COLUMN forma_pago TYPE varchar(50);
-                    ALTER TABLE facturacion_factura ALTER COLUMN metodo_pago TYPE varchar(50);
-                    ALTER TABLE facturacion_factura ALTER COLUMN moneda TYPE varchar(50);
-                    ALTER TABLE facturacion_factura ALTER COLUMN uso_cfdi TYPE varchar(50);
-                    """,
-                    # El reverso es opcional en este caso de emergencia
-                    reverse_sql=""
-                ),
-            ],
+            database_operations=[], 
         ),
     ]
