@@ -635,7 +635,7 @@
                                                 {% if cuenta.moneda == 'USD' %}
                                                 <div style="font-size: 0.85rem; color: #666; font-weight: 500;">
                                                     <i class="fas fa-exchange-alt me-1" style="font-size: 0.75rem;"></i>
-                                                    ≈ ${{ cuenta.saldo_convertido_temp|floatform:2|intcomma }} MXN
+                                                    ≈ ${{ cuenta.saldo_convertido_temp|stringformat:".2f"|intcomma }} MXN
                                                 </div>
                                                 {% endif %}
                                                 </div>
@@ -753,7 +753,7 @@
                             <span>USD CONVERTIDO (MXN)</span>
                         </div>
                         <div class="currency-value">
-                            ${{ total_usd_convertido|floatform:2|intcomma }}
+                            ${{ total_usd_convertido|stringformat:".2f"|intcomma }}
                         </div>
                     </div>
                     <div class="mt-3">
