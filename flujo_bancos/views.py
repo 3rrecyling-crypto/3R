@@ -114,7 +114,9 @@ def obtener_tipo_cambio_banxico():
 # DASHBOARD
 # ---------------------------------------------------------
 def dashboard(request):
+    # ---------------------------------------------------------
     # 1. FILTROS DE FECHA
+    # ---------------------------------------------------------
     filtro_tiempo = request.GET.get('filtro', 'hoy')
     hoy = timezone.now().date()
     fecha_inicio = hoy
@@ -134,63 +136,75 @@ def dashboard(request):
             except ValueError:
                 pass
 
-    # 2. CALCULO DE KPIs
+    # ---------------------------------------------------------
+    # 2. CÁLCULO DE KPIs
+    # ---------------------------------------------------------
     movs_rango = Movimiento.objects.filter(fecha__range=[fecha_inicio, fecha_fin])
+    
+    # Usamos Coalesce o "or 0" para evitar None
     ingresos_periodo = movs_rango.aggregate(Sum('abono'))['abono__sum'] or 0
     egresos_periodo = movs_rango.aggregate(Sum('cargo'))['cargo__sum'] or 0
     balance_periodo = ingresos_periodo - egresos_periodo
     
-    # Contadores para las badges
     movimientos_ingresos_count = movs_rango.filter(abono__gt=0).count()
     movimientos_egresos_count = movs_rango.filter(cargo__gt=0).count()
 
-    # 3. CUENTAS Y ORDENAMIENTO (MAYOR A MENOR)
+    # ---------------------------------------------------------
+    # 3. CUENTAS Y TIPO DE CAMBIO (CORREGIDO)
+    # ---------------------------------------------------------
     todas_cuentas = Cuenta.objects.all()
     
-    cuentas_ordenadas = sorted(
-        todas_cuentas, 
-        key=lambda c: c.saldo_actual, 
-        reverse=True # De Mayor a Menor
-    )
+    # A) Primero obtenemos el Tipo de Cambio REAL
+    raw_tc = obtener_tipo_cambio_banxico()
+    
+    try:
+        if raw_tc:
+            tipo_cambio_actual = Decimal(str(raw_tc))
+        else:
+            # Fallback de seguridad (mejor 20 que 1)
+            tipo_cambio_actual = Decimal('20.00')
+    except Exception:
+        tipo_cambio_actual = Decimal('20.00')
 
-    # 4. TOTALES Y CONVERSIÓN BANXICO
+    # B) Calculamos los totales por moneda
     total_mxn = sum(c.saldo_actual for c in todas_cuentas if c.moneda == 'MXN')
     total_usd = sum(c.saldo_actual for c in todas_cuentas if c.moneda == 'USD')
     
-    # Obtenemos el TC real (debe devolver el valor completo, ej: 18.050)
-    raw_tc = obtener_tipo_cambio_banxico()
+    # C) Calculamos la conversión AQUÍ (en Python, con precisión)
+    total_usd_convertido = total_usd * tipo_cambio_actual
     
-    # --- CAMBIO: QUITAR REDONDEO ---
-    # Usamos Decimal(str(raw_tc)) para convertir el valor del TC 
-    # a un objeto Decimal sin errores de precisión de punto flotante.
-    try:
-        tipo_cambio_actual = Decimal(str(raw_tc))
-    except Exception:
-        # Fallback en caso de que raw_tc sea None o inválido
-        tipo_cambio_actual = Decimal('1.0000')
+    # D) Gran Total Consolidado
+    saldo_total_consolidado = total_mxn + total_usd_convertido
 
+    # E) Ordenamos cuentas para la vista
+    cuentas_ordenadas = sorted(
+        todas_cuentas, 
+        key=lambda c: c.saldo_actual, 
+        reverse=True
+    )
     
-    # Calculamos el gran total consolidado en pesos usando el TC completo
-    saldo_total_consolidado = total_mxn + (total_usd * tipo_cambio_actual)
-
-    # Cuentas separadas para los contadores del sidebar
     cuentas_mxn = [c for c in todas_cuentas if c.moneda == 'MXN']
     cuentas_usd = [c for c in todas_cuentas if c.moneda == 'USD']
 
-    # 5. MOVIMIENTOS RECIENTES
+    # ---------------------------------------------------------
+    # 4. MOVIMIENTOS RECIENTES
+    # ---------------------------------------------------------
     movimientos_recientes = Movimiento.objects.select_related('cuenta').order_by('-fecha', '-id')[:5]
 
+    # ---------------------------------------------------------
+    # 5. CONTEXTO
+    # ---------------------------------------------------------
     context = {
         'filtro_actual': filtro_tiempo,
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
+        
         'ingresos_periodo': ingresos_periodo,
         'egresos_periodo': egresos_periodo,
         'balance_periodo': balance_periodo,
         'movimientos_ingresos_count': movimientos_ingresos_count,
         'movimientos_egresos_count': movimientos_egresos_count,
         
-        # Pasamos la lista YA ordenada
         'cuentas': cuentas_ordenadas, 
         'cuentas_mxn': cuentas_mxn, 
         'cuentas_usd': cuentas_usd, 
@@ -199,7 +213,10 @@ def dashboard(request):
         'total_usd': total_usd,
         'saldo_total': saldo_total_consolidado, 
         
-        'tipo_cambio': tipo_cambio_actual, # Ahora con la precisión completa
+        # DATOS DE CONVERSIÓN CORREGIDOS
+        'tipo_cambio': tipo_cambio_actual,
+        'total_usd_convertido': total_usd_convertido, # <--- ¡IMPORTANTE!
+        
         'movimientos_recientes': movimientos_recientes,
     }
     return render(request, 'flujo_bancos/dashboard.html', context)

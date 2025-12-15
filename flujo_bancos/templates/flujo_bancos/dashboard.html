@@ -559,7 +559,6 @@
                         <div>
                             <div class="kpi-label">Dólares a Pesos</div>
                             <div class="kpi-value">
-                                {% widthratio total_usd 1 tipo_cambio as total_usd_convertido %}
                                 ${{ total_usd_convertido|default:0|intcomma }}
                             </div>
                         </div>
