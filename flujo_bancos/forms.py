@@ -48,7 +48,7 @@ class MovimientoForm(forms.ModelForm):
             'unidad_negocio', 'operacion', 
             'categoria', 'subcategoria', 'cuenta', 
             'iva', 'ret_iva', 'ret_isr', 'comentarios',
-            'comprobante' # <--- AGREGAR ESTE CAMPO
+            'comprobante' 
         ]
         
         widgets = {
@@ -70,6 +70,10 @@ class MovimientoForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
+        # --- MODIFICACIÓN: HACER IVA OPCIONAL ---
+        self.fields['iva'].required = False 
+        # ----------------------------------------
+        
         # Si estamos editando un registro existente (instance.pk existe)
         if self.instance and self.instance.pk:
             
@@ -88,29 +92,58 @@ class MovimientoForm(forms.ModelForm):
             self.fields['tipo_movimiento'].initial = initial_tipo
             
             # 2. Precargar el Tercero en el Combo Box
-            # Como en la BD guardas el NOMBRE (texto), debemos buscar el OBJETO para que el select lo reconozca
             if self.instance.tercero:
                 try:
                     tercero_encontrado = Tercero.objects.filter(nombre=self.instance.tercero).first()
                     if tercero_encontrado:
                         self.fields['tercero_obj'].initial = tercero_encontrado
                 except:
-                    pass # Si no encuentra el tercero, lo deja en blanco
+                    pass 
             
-            # 3. Filtrar Subcategorías (para que solo salgan las de la categoría seleccionada)
+            # 3. Filtrar Subcategorías 
             if self.instance.categoria:
                  self.fields['subcategoria'].queryset = SubCategoria.objects.filter(categoria=self.instance.categoria).order_by('nombre')
             else:
-                 # Si es nuevo, podrías dejarlo vacío o con todas. Generalmente vacío hasta que elijan categoría.
                  self.fields['subcategoria'].queryset = SubCategoria.objects.none()
 
-            # Si hay datos POST (cuando hay error de validación), permitir cargar las subcategorías correctas
+            # Si hay datos POST (cuando hay error de validación)
             if 'categoria' in self.data:
                 try:
                     categoria_id = int(self.data.get('categoria'))
                     self.fields['subcategoria'].queryset = SubCategoria.objects.filter(categoria_id=categoria_id).order_by('nombre')
                 except (ValueError, TypeError):
                     pass
+
+    # *** LÓGICA DE GUARDADO ***
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        
+        # 1. Convertir Combobox Tercero -> Texto para BD
+        tercero_seleccionado = self.cleaned_data.get('tercero_obj')
+        if tercero_seleccionado:
+            instance.tercero = tercero_seleccionado.nombre 
+        
+        # 2. Convertir Monto Base -> Cargo/Abono
+        tipo = self.cleaned_data.get('tipo_movimiento')
+        monto_base = self.cleaned_data.get('monto_total', 0)
+        
+        if tipo == 'egreso':
+            instance.cargo = monto_base
+            instance.abono = 0
+            cambio_saldo = -monto_base
+        else: 
+            instance.abono = monto_base
+            instance.cargo = 0
+            cambio_saldo = monto_base 
+
+        # 3. Recálculo simple de saldo (Solo referencia)
+        if instance.cuenta:
+             instance.saldo_banco = instance.cuenta.saldo_actual + cambio_saldo
+            
+        if commit:
+            instance.save()
+
+        return instance
 
     # *** LÓGICA DE GUARDADO ***
     def save(self, commit=True):

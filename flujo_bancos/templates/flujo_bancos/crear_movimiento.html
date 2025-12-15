@@ -250,11 +250,15 @@ $(document).ready(function() {
         } else {
             seccionImpuestos.style.opacity = '1';
             seccionImpuestos.style.pointerEvents = 'auto';
-            // Cálculo automático de IVA
-            if (iva === 0 && subtotal > 0) {
+            
+            // --- MODIFICADO: Bloque comentado para evitar cálculo automático ---
+            /* if (iva === 0 && subtotal > 0) {
                 iva = parseFloat((subtotal * 0.16).toFixed(2));
                 inputIva.value = iva;
             }
+            */
+            // -----------------------------------------------------------------
+
             totalNeto = subtotal + iva - (retIva + retIsr);
             saldoFinal -= totalNeto;
             iconoOperacion.innerHTML = '<i class="fas fa-arrow-circle-down me-1"></i>EGRESO';

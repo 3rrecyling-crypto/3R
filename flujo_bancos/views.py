@@ -220,14 +220,12 @@ def lista_transferencias(request):
 # CANCELAR TRANSFERENCIA (Elimina salida y entrada)
 # ---------------------------------------------------------
 def cancelar_transferencia(request, pk):
-    # Obtenemos la salida
     salida = get_object_or_404(Movimiento, pk=pk)
     
     if salida.auditado:
         messages.error(request, "No se puede cancelar una transferencia auditada.")
         return redirect('lista_transferencias')
 
-    # Intentamos buscar la entrada pareja para borrarla también
     concepto_base = salida.concepto.split(' (Envío a')[0]
     entrada = Movimiento.objects.filter(
         fecha=salida.fecha,
@@ -235,12 +233,19 @@ def cancelar_transferencia(request, pk):
         concepto__icontains=concepto_base
     ).exclude(id=salida.id).first()
 
-    # Eliminamos ambos movimientos
+    # --- BORRADO DE S3 ---
     if entrada:
+        if entrada.comprobante:
+            _eliminar_archivo_de_s3(str(entrada.comprobante))
         entrada.delete()
+    
+    if salida.comprobante:
+        _eliminar_archivo_de_s3(str(salida.comprobante))
+    # ---------------------
+
     salida.delete()
     
-    messages.success(request, "Transferencia cancelada y saldos revertidos.")
+    messages.success(request, "Transferencia cancelada y archivos eliminados.")
     return redirect('lista_transferencias')
 
 # ---------------------------------------------------------
@@ -613,14 +618,14 @@ def exportar_movimientos_excel(request):
     wb.save(response)
     return response
 
+
 def detalle_movimiento(request, pk):
     mov = get_object_or_404(Movimiento, pk=pk)
     
-    # === Lógica para visualizar el archivo de S3 ===
     s3_url = None
     es_imagen = False
     es_pdf = False
-    
+
     if mov.comprobante:
         try:
             s3_client = boto3.client(
@@ -630,36 +635,32 @@ def detalle_movimiento(request, pk):
                 region_name=settings.AWS_S3_REGION_NAME
             )
             
-            # Reconstruir la Key completa como en views t.py
-            # Nota: mov.comprobante es un FieldFile o string dependiendo de tu modelo, 
-            # forzamos a string por seguridad si guardamos manualmente la ruta.
-            ruta_str = str(mov.comprobante)
-            key = f"{settings.AWS_MEDIA_LOCATION}/{ruta_str}"
+            # Construir la llave completa (Igual que en _subir_archivo)
+            key = f"{settings.AWS_MEDIA_LOCATION}/{mov.comprobante}"
             
-            # Generar URL firmada (temporal por 1 hora) para visualizar archivos privados
+            # Generar URL temporal (válida por 1 hora)
             s3_url = s3_client.generate_presigned_url(
                 'get_object',
                 Params={'Bucket': settings.AWS_STORAGE_BUCKET_NAME, 'Key': key},
                 ExpiresIn=3600
             )
-            
-            # Determinar tipo de archivo para el template
-            ext = ruta_str.lower().split('.')[-1]
-            if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+
+            # Determinar tipo de archivo para la vista HTML
+            ext = str(mov.comprobante).lower()
+            if ext.endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')):
                 es_imagen = True
-            elif ext == 'pdf':
+            elif ext.endswith('.pdf'):
                 es_pdf = True
                 
         except Exception as e:
-            print(f"Error generando URL de visualización S3: {e}")
+            print(f"Error generando URL de S3: {e}")
 
     return render(request, 'flujo_bancos/detalle_movimiento.html', {
         'mov': mov,
-        's3_url': s3_url,     # URL temporal del archivo
+        's3_url': s3_url,
         'es_imagen': es_imagen,
         'es_pdf': es_pdf
     })
-
 # flujo_bancos/views.py
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -667,40 +668,46 @@ from .models import Movimiento
 from .forms import MovimientoForm # Asegúrate de importar el Formulario
 # Importa messages si lo usas
 
-def editar_movimiento(request, pk):
-    """Permite editar un movimiento existente."""
-    
-    # 1. Obtener el movimiento
-    movimiento = get_object_or_404(Movimiento, pk=pk)
-    
-    # 2. Impedir la edición si está auditado
-    if movimiento.auditado:
-        # Redirigir a detalle si el movimiento está bloqueado
-        return redirect('detalle_movimiento', pk=pk) 
-        
 
+def editar_movimiento(request, pk):
+    # Recuperamos el objeto original
+    movimiento_original = get_object_or_404(Movimiento, pk=pk)
+    
     if request.method == 'POST':
-        # 3. Si se envían datos, se pasa la instancia para actualizar el objeto
-        form = MovimientoForm(request.POST, instance=movimiento)
+        # IMPORTANTE: Agregar request.FILES
+        form = MovimientoForm(request.POST, request.FILES, instance=movimiento_original)
+        
         if form.is_valid():
+            # Guardamos sin commit para manipular el archivo
+            movimiento = form.save(commit=False)
             
-            # 4. Guardar y luego redirigir
-            form.save() 
+            # --- LÓGICA S3 TIPO views t.py ---
+            if 'comprobante' in request.FILES:
+                # 1. Eliminar archivo anterior si existe
+                if movimiento_original.comprobante:
+                    # Asumiendo que guardas la ruta relativa en el campo
+                    _eliminar_archivo_de_s3(str(movimiento_original.comprobante))
+                
+                # 2. Subir nuevo archivo
+                archivo = request.FILES['comprobante']
+                _nombre_base, extension = os.path.splitext(archivo.name)
+                s3_path = f"movimientos/{movimiento.pk}/comprobante{extension}"
+                
+                ruta_guardada = _subir_archivo_a_s3(archivo, s3_path)
+                
+                if ruta_guardada:
+                    movimiento.comprobante = ruta_guardada
             
-            # NOTA: Aquí debe ir la llamada a tu función de recalculo de saldos posteriores.
-            
-            return redirect('lista_movimientos') 
+            movimiento.save()
+            messages.success(request, 'Movimiento actualizado correctamente.')
+            return redirect('lista_movimientos')
     else:
-        # 5. Si es GET, se pasa la instancia para cargar los datos (disparando __init__)
-        form = MovimientoForm(instance=movimiento)
+        form = MovimientoForm(instance=movimiento_original)
 
     context = {
         'form': form,
-        'movimiento': movimiento,
-        # Asegúrate de incluir 'lista_conceptos' y 'unidades_negocio' si las usas en crear_movimiento.html
+        'movimiento': movimiento_original,
     }
-    
-    # 6. Usamos el template de creación/edición
     return render(request, 'flujo_bancos/crear_movimiento.html', context)
 
 
