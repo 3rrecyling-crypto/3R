@@ -2739,6 +2739,7 @@ import datetime
 def export_catalogo_excel(request, model_name):
     """
     Exporta a Excel cualquier catálogo simple basándose en el nombre del modelo.
+    Incluye la columna 'Empresas Asociadas' donde es aplicable.
     """
     # 1. Configuración de Modelos y Columnas
     config = {
@@ -2749,33 +2750,39 @@ def export_catalogo_excel(request, model_name):
         },
         'lugar': {
             'model': Lugar,
-            'headers': ['ID', 'Nombre', 'Tipo', 'Es Patio', 'RFC', 'Razón Social', 'Dirección Completa'],
-            'fields': ['id', 'nombre', 'tipo', 'es_patio', 'rfc', 'razon_social', 'direccion_completa']
+            # MODIFICADO para incluir Empresas
+            'headers': ['ID', 'Nombre', 'Tipo', 'Es Patio', 'RFC', 'Razón Social', 'Dirección Completa', 'Empresas Asociadas'],
+            'fields': ['id', 'nombre', 'tipo', 'es_patio', 'rfc', 'razon_social', 'direccion_completa', 'empresas_str']
         },
         'lineatransporte': {
             'model': LineaTransporte,
+            # Ya incluida, pero aseguramos el orden
             'headers': ['ID', 'Nombre', 'Empresas Asociadas'],
             'fields': ['id', 'nombre', 'empresas_str']
         },
         'operador': {
             'model': Operador,
-            'headers': ['ID', 'Nombre'],
-            'fields': ['id', 'nombre']
+            # MODIFICADO para incluir Empresas
+            'headers': ['ID', 'Nombre', 'Licencia', 'Teléfono', 'Empresas Asociadas'],
+            'fields': ['id', 'nombre', 'licencia', 'telefono', 'empresas_str']
         },
         'material': {
             'model': Material,
-            'headers': ['ID', 'Nombre', 'Clave SAT', 'Unidad SAT'],
-            'fields': ['id', 'nombre', 'clave_sat', 'clave_unidad_sat']
+            # MODIFICADO para incluir Empresas
+            'headers': ['ID', 'Nombre', 'Clave SAT', 'Unidad SAT', 'Empresas Asociadas'],
+            'fields': ['id', 'nombre', 'clave_sat', 'clave_unidad_sat', 'empresas_str']
         },
         'unidad': {
             'model': Unidad,
-            'headers': ['ID Interno', 'Placas', 'Marca/Modelo', 'Tipo', 'Estatus', 'Dueño'],
-            'fields': ['internal_id', 'license_plate', 'make_model', 'asset_type', 'operational_status', 'ownership']
+            # MODIFICADO para incluir Empresas y campos específicos de unidad
+            'headers': ['ID Interno', 'Placas', 'Marca/Modelo', 'Tipo', 'Estatus', 'Dueño', 'Empresas Asociadas'],
+            'fields': ['internal_id', 'license_plate', 'make_model', 'asset_type', 'operational_status', 'ownership', 'empresas_str']
         },
         'contenedor': {
             'model': Contenedor,
-            'headers': ['ID/Nombre', 'Placas'],
-            'fields': ['nombre', 'placas']
+            # MODIFICADO para incluir Empresas
+            'headers': ['ID/Nombre', 'Placas', 'Empresas Asociadas'],
+            'fields': ['nombre', 'placas', 'empresas_str']
         }
     }
 
@@ -2786,15 +2793,17 @@ def export_catalogo_excel(request, model_name):
 
     # 2. Obtener Queryset Base
     model = conf['model']
-    queryset = model.objects.all()
+    # Optimizamos la consulta si el modelo tiene la relación 'empresas'
+    if hasattr(model, 'empresas'):
+        queryset = model.objects.all().prefetch_related('empresas')
+    else:
+        queryset = model.objects.all()
     
-    # --- FILTROS COMUNES ---
-    # Filtro por empresa (si viene en la URL y el modelo lo soporta)
+    # --- FILTROS COMUNES (SIN CAMBIOS) ---
     empresa_id = request.GET.get('empresa')
     if empresa_id and hasattr(model, 'empresas'):
         queryset = queryset.filter(empresas__id=empresa_id)
     
-    # Filtro de búsqueda general (q)
     query = request.GET.get('q')
     if query:
         if hasattr(model, 'search_fields'):
@@ -2805,8 +2814,7 @@ def export_catalogo_excel(request, model_name):
         elif hasattr(model, 'nombre'):
              queryset = queryset.filter(nombre__icontains=query)
 
-    # --- CORRECCIÓN: FILTROS ESPECÍFICOS PARA UNIDAD ---
-    # Esto asegura que el Excel respete los filtros de Tipo y Estatus
+    # --- FILTROS ESPECÍFICOS PARA UNIDAD (SIN CAMBIOS) ---
     if model_name.lower() == 'unidad':
         asset_type = request.GET.get('asset_type')
         status = request.GET.get('status')
@@ -2815,7 +2823,6 @@ def export_catalogo_excel(request, model_name):
             queryset = queryset.filter(asset_type=asset_type)
         if status:
             queryset = queryset.filter(operational_status=status)
-    # ----------------------------------------------------
 
     # 3. Crear Excel
     wb = Workbook()
@@ -2829,8 +2836,13 @@ def export_catalogo_excel(request, model_name):
     for obj in queryset:
         row = []
         for field in conf['fields']:
+            # LÓGICA DE EXTRACCIÓN MODIFICADA/AÑADIDA
             if field == 'empresas_str':
-                val = ", ".join([e.nombre for e in obj.empresas.all()])
+                # Si el objeto tiene relación ManyToMany a 'empresas', la mostramos
+                if hasattr(obj, 'empresas'):
+                    val = ", ".join([e.nombre for e in obj.empresas.all()])
+                else:
+                    val = ""
             elif field == 'direccion_completa' and hasattr(obj, 'direccion_completa'):
                 val = obj.direccion_completa()
             else:
@@ -2844,7 +2856,7 @@ def export_catalogo_excel(request, model_name):
             row.append(str(val))
         ws.append(row)
 
-    # 4. Formato de Tabla
+    # 4. Formato de Tabla (SIN CAMBIOS)
     last_col = get_column_letter(len(conf['headers']))
     last_row = ws.max_row
     if last_row > 1:
@@ -2861,7 +2873,9 @@ def export_catalogo_excel(request, model_name):
                     if len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
                 except: pass
-            ws.column_dimensions[column].width = (max_length + 2)
+            # Aseguramos un ancho máximo razonable (ej. 70)
+            adjusted_width = min(max_length + 2, 70) 
+            ws.column_dimensions[column].width = adjusted_width
 
     # 5. Respuesta
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
