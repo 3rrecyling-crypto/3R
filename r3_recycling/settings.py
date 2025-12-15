@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "widget_tweaks",
     'cuentas_por_pagar',
     'facturacion',
+    'flujo_bancos', 
 ]
 
 MIDDLEWARE = [
@@ -181,3 +182,4 @@ DEFAULT_FROM_EMAIL = 'Soporte 3R Recycling <3rrecycling@gmail.com>'
 # TIEMPO DE SESIÓN (Para "Recordar sesión")
 SESSION_COOKIE_AGE = 1209600  # 2 semanas por defecto (en segundos)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True # Por defecto se cierra al salir, el checkbox cambiará esto
+BANXICO_API_TOKEN = os.environ.get('BANXICO_API_TOKEN')

@@ -1,0 +1,90 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-arrow-left-right text-primary"></i> Historial de Transferencias</h2>
+        <div>
+            <a href="{% url 'transfer_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Nueva
+            </a>
+            <a href="{% url 'exportar_transferencias_excel' %}" class="btn btn-success ms-2">
+                <i class="bi bi-file-earmark-excel"></i> Exportar
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4">Fecha</th>
+                            <th>Origen (Salida)</th>
+                            <th>Monto</th>
+                            <th>Destino (Entrada)</th>
+                            <th>Estado</th>
+                            <th class="text-end pe-4">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in transferencias %}
+                        <tr>
+                            <td class="ps-4 text-nowrap">{{ t.fecha|date:"d M Y" }}</td>
+                            <td>
+                                <div class="fw-bold text-dark">{{ t.cuenta.nombre }}</div>
+                                <small class="text-muted">Saldo post: ${{ t.saldo_banco|intcomma }}</small>
+                            </td>
+                            <td class="fw-bold text-primary">
+                                ${{ t.cargo|intcomma }} <span class="small text-muted">{{ t.cuenta.moneda }}</span>
+                            </td>
+                            <td>
+                                <i class="bi bi-arrow-right text-muted me-1"></i> 
+                                {{ t.concepto|cut:"(Envío a "|cut:")" }}
+                            </td>
+                            <td>
+                                {% if t.auditado %}
+                                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Auditado</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">Pendiente</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-4">
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'detalle_movimiento' t.id %}" class="btn btn-outline-secondary" title="Ver Detalles">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    
+                                    {% if not t.auditado %}
+                                        <a href="{% url 'auditar_movimiento' t.id %}" class="btn btn-outline-success" title="Auditar / Validar">
+                                            <i class="bi bi-check-lg"></i>
+                                        </a>
+                                        <a href="{% url 'cancelar_transferencia' t.id %}" 
+                                           class="btn btn-outline-danger" 
+                                           title="Cancelar y Revertir"
+                                           onclick="return confirm('¿Estás seguro de cancelar esta transferencia? Se eliminará la salida y la entrada de dinero.');">
+                                            <i class="bi bi-x-circle"></i>
+                                        </a>
+                                    {% else %}
+                                        <button class="btn btn-outline-secondary" disabled title="Bloqueado por auditoría"><i class="bi bi-lock"></i></button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="bi bi-inbox fs-1"></i>
+                                <p class="mt-2">No hay transferencias registradas.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

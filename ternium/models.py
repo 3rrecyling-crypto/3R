@@ -535,11 +535,16 @@ class Remision(models.Model):
             if old_instance.status == 'AUDITADO':
                 raise PermissionDenied("No se puede modificar una remisión auditada.")
 
-        if self.status != 'AUDITADO':
+        # --- CORRECCIÓN AQUÍ ---
+        # Antes decía: if self.status != 'AUDITADO':
+        # Ahora agregamos: and self.status != 'CANCELADO'
+        if self.status != 'AUDITADO' and self.status != 'CANCELADO':
             if self._is_terminado():
                 self.status = 'TERMINADO'
             else:
                 self.status = 'PENDIENTE'
+        # -----------------------
+
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
@@ -594,7 +599,17 @@ class Cliente(models.Model):
 
 class DetalleRemision(models.Model):
     remision = models.ForeignKey(Remision, on_delete=models.CASCADE, related_name='detalles')
-    material = models.ForeignKey(Material, on_delete=models.PROTECT, verbose_name="Material")
+    
+    # --- CAMBIO: Agregamos null=True y blank=True ---
+    material = models.ForeignKey(
+        Material, 
+        on_delete=models.PROTECT, 
+        verbose_name="Material",
+        null=True,  # Permite guardar NULL en la BD
+        blank=True  # Permite enviar el formulario vacío
+    )
+    # -----------------------------------------------
+
     cliente = models.ForeignKey(
         Lugar,
         on_delete=models.PROTECT,
@@ -607,7 +622,9 @@ class DetalleRemision(models.Model):
     peso_dlv = models.DecimalField(verbose_name="Peso Descarga (Ton)", max_digits=10, decimal_places=3, default=0)
 
     def __str__(self):
-        return f"{self.material.nombre} en remisión {self.remision.remision}"
+        # --- CAMBIO: Validación para evitar error si no hay material ---
+        nombre_mat = self.material.nombre if self.material else "Sin Material"
+        return f"{nombre_mat} en remisión {self.remision.remision}"
 
     class Meta:
         verbose_name = "Detalle de Remisión"

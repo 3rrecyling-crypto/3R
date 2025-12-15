@@ -1,27 +1,31 @@
 {% extends 'ternium/base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="text-primary fw-bold"><i class="fas fa-map-marked-alt me-2"></i>Catálogo de Lugares</h2>
+            <h2 class="text-primary fw-bold">
+                <i class="fas fa-map-marked-alt me-2"></i>Catálogo de Lugares
+            </h2>
             <p class="text-muted mb-0">Administra Orígenes, Destinos y sus Datos Fiscales</p>
         </div>
         <div>
-            <a href="{% url 'export_catalogo_excel' 'lugar' %}?empresa={{ request.GET.empresa }}&q={{ request.GET.q }}" class="btn btn-success btn-lg shadow-sm me-2">
+            <a href="{% url 'export_catalogo_excel' 'lugar' %}?q={{ request.GET.q }}&empresa={{ request.GET.empresa }}&tipo={{ request.GET.tipo }}" 
+               class="btn btn-success btn-lg shadow-sm me-2">
                 <i class="fas fa-file-excel me-2"></i>Excel
             </a>
             <a href="{% url 'crear_lugar' %}" class="btn btn-primary btn-lg shadow-sm">
-                <i class="fas fa-plus me-2"></i>Añadir Nuevo Lugar
+                <i class="fas fa-plus me-2"></i>Nuevo Lugar
             </a>
         </div>
     </div>
     
     {% if messages %}
     <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
-        <ul class="messages mb-0">
+        <ul class="messages mb-0 list-unstyled">
             {% for message in messages %}
-                <li>{{ message }}</li>
+                <li><i class="fas fa-check-circle me-2"></i>{{ message }}</li>
             {% endfor %}
         </ul>
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -30,13 +34,22 @@
 
     <div class="card shadow-sm mb-4 border-0 bg-light">
         <div class="card-body py-3">
-            <form method="get" class="row g-3 align-items-center">
-                <div class="col-md-auto">
-                    <label class="fw-bold text-secondary mb-0"><i class="fas fa-filter me-1"></i> Filtrar por Tu Empresa:</label>
-                </div>
+            <form method="get" class="row g-2 align-items-center">
+                
                 <div class="col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0 text-muted">
+                            <i class="fas fa-search"></i>
+                        </span>
+                        <input type="text" name="q" class="form-control border-start-0" 
+                               placeholder="Buscar por Nombre, RFC o Razón Social..." 
+                               value="{{ request.GET.q|default:'' }}">
+                    </div>
+                </div>
+
+                <div class="col-md-3">
                     <select name="empresa" class="form-select" onchange="this.form.submit()">
-                        <option value="">-- Ver Todas las Empresas --</option>
+                        <option value="">-- Todas las Empresas --</option>
                         {% for emp in empresas_list %}
                             <option value="{{ emp.id }}" {% if selected_empresa_id == emp.id %}selected{% endif %}>
                                 {{ emp.nombre }}
@@ -44,34 +57,44 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-4">
-                     {% if request.GET.q %}
-                     <input type="hidden" name="q" value="{{ request.GET.q }}">
-                     {% endif %}
-                     
-                     {% if selected_empresa_id %}
-                        <a href="{% url 'lista_lugares' %}" class="btn btn-outline-secondary btn-sm">
-                            <i class="fas fa-times me-1"></i> Quitar Filtro
+
+                <div class="col-md-2">
+                    <select name="tipo" class="form-select" onchange="this.form.submit()">
+                        <option value="">-- Tipo --</option>
+                        <option value="ORIGEN" {% if request.GET.tipo == 'ORIGEN' %}selected{% endif %}>Solo Origen</option>
+                        <option value="DESTINO" {% if request.GET.tipo == 'DESTINO' %}selected{% endif %}>Solo Destino</option>
+                        <option value="AMBOS" {% if request.GET.tipo == 'AMBOS' %}selected{% endif %}>Ambos</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3 text-end">
+                    <button type="submit" class="btn btn-primary shadow-sm">
+                        <i class="fas fa-filter me-1"></i> Filtrar
+                    </button>
+                    
+                    {% if request.GET.q or request.GET.empresa or request.GET.tipo %}
+                        <a href="{% url 'lista_lugares' %}" class="btn btn-outline-secondary shadow-sm ms-1" title="Limpiar Filtros">
+                            <i class="fas fa-eraser me-1"></i> Limpiar
                         </a>
-                     {% endif %}
+                    {% endif %}
                 </div>
             </form>
         </div>
     </div>
 
-    <div class="card shadow">
+    <div class="card shadow border-0">
         <div class="card-body p-0">
             {% if lugares %}
             <div class="table-responsive">
-                <table class="table table-striped table-hover mb-0 align-middle">
+                <table class="table table-hover table-striped mb-0 align-middle">
                     <thead class="bg-primary text-white">
                         <tr>
-                            <th class="ps-4">Nombre del Lugar (Alias)</th>
-                            <th>Datos Fiscales (Cliente)</th>
-                            <th>Empresas Asociadas (Mis Empresas)</th>
-                            <th>Tipo</th>
-                            <th class="text-center">Es Patio</th>
-                            <th class="text-center pe-4">Acciones</th>
+                            <th class="ps-4 py-3">Nombre Operativo (Alias)</th>
+                            <th class="py-3">Datos Fiscales</th>
+                            <th class="py-3">Empresas Asociadas</th>
+                            <th class="py-3 text-center">Tipo</th>
+                            <th class="py-3 text-center">Es Patio</th>
+                            <th class="py-3 text-end pe-4">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -82,40 +105,45 @@
                                     {{ lugar.nombre }}
                                 </a>
                             </td>
+                            
                             <td>
                                 {% if lugar.rfc %}
-                                    <div class="small fw-bold text-dark">{{ lugar.razon_social|default:"Sin Razón Social" }}</div>
-                                    <div class="badge bg-light text-dark border">{{ lugar.rfc }}</div>
+                                    <div class="fw-bold text-dark small">{{ lugar.razon_social|default:"Sin Razón Social" }}</div>
+                                    <span class="badge bg-light text-dark border font-monospace">{{ lugar.rfc }}</span>
                                 {% else %}
-                                    <span class="text-muted small fst-italic">Sin datos fiscales</span>
+                                    <span class="badge bg-light text-muted border fst-italic">Sin datos fiscales</span>
                                 {% endif %}
                             </td>
+                            
                             <td>
                                 {% for emp in lugar.empresas.all %}
-                                    <span class="badge bg-secondary mb-1">{{ emp.nombre }}</span>
+                                    <span class="badge bg-secondary opacity-75 mb-1">{{ emp.nombre }}</span>
                                 {% empty %}
-                                    <span class="badge bg-light text-muted border">No vinculada</span>
+                                    <span class="text-muted small">No vinculada</span>
                                 {% endfor %}
                             </td>
-                            <td>
+                            
+                            <td class="text-center">
                                 {% if lugar.tipo == 'ORIGEN' %}
-                                    <span class="badge bg-warning text-dark">Origen</span>
+                                    <span class="badge bg-warning text-dark border border-warning">Origen</span>
                                 {% elif lugar.tipo == 'DESTINO' %}
-                                    <span class="badge bg-info text-dark">Destino</span>
+                                    <span class="badge bg-info text-dark border border-info">Destino</span>
                                 {% else %}
-                                    <span class="badge bg-success">Ambos</span>
+                                    <span class="badge bg-success border border-success">Ambos</span>
                                 {% endif %}
                             </td>
+                            
                             <td class="text-center">
                                 {% if lugar.es_patio %}
-                                    <i class="fas fa-check-circle text-success fa-lg" title="Es Patio"></i>
+                                    <i class="fas fa-warehouse text-success fa-lg" title="Es Patio de Inventario"></i>
                                 {% else %}
-                                    <span class="text-muted">-</span>
+                                    <span class="text-muted opacity-25"><i class="fas fa-minus"></i></span>
                                 {% endif %}
                             </td>
-                            <td class="text-center pe-4">
-                                <div class="btn-group shadow-sm" role="group">
-                                    <a href="{% url 'editar_lugar' lugar.pk %}" class="btn btn-sm btn-outline-primary" title="Editar / Facturación">
+                            
+                            <td class="text-end pe-4">
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'editar_lugar' lugar.pk %}" class="btn btn-sm btn-outline-primary" title="Editar">
                                         <i class="fas fa-edit"></i>
                                     </a>
                                 </div>
@@ -131,11 +159,21 @@
                 <nav>
                     <ul class="pagination justify-content-center mb-0">
                         {% if page_obj.has_previous %}
-                            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&empresa={{ selected_empresa_id|default:'' }}">&laquo;</a></li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ request.GET.q }}&empresa={{ request.GET.empresa }}&tipo={{ request.GET.tipo }}">&laquo;</a>
+                            </li>
                         {% endif %}
-                        <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+                        
+                        <li class="page-item disabled">
+                            <span class="page-link text-dark">
+                                Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                            </span>
+                        </li>
+
                         {% if page_obj.has_next %}
-                            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&empresa={{ selected_empresa_id|default:'' }}">&raquo;</a></li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ request.GET.q }}&empresa={{ request.GET.empresa }}&tipo={{ request.GET.tipo }}">&raquo;</a>
+                            </li>
                         {% endif %}
                     </ul>
                 </nav>
@@ -143,14 +181,19 @@
             {% endif %}
 
             {% else %}
-            <div class="text-center text-muted p-5">
-                <i class="fas fa-map-marker-alt fa-3x mb-3 text-gray-300"></i>
-                <p class="h5">No se encontraron lugares.</p>
-                {% if selected_empresa_id %}
-                    <p>No hay lugares asociados a la empresa seleccionada.</p>
-                    <a href="{% url 'lista_lugares' %}" class="btn btn-secondary btn-sm">Ver todos</a>
+            <div class="text-center text-muted p-5 bg-white">
+                <div class="mb-3">
+                    <i class="fas fa-map-marker-alt fa-4x text-light"></i>
+                </div>
+                <h5>No se encontraron lugares</h5>
+                {% if request.GET.q or request.GET.empresa or request.GET.tipo %}
+                    <p class="small">Intenta ajustar tus filtros de búsqueda.</p>
+                    <a href="{% url 'lista_lugares' %}" class="btn btn-secondary btn-sm mt-2">
+                        <i class="fas fa-eraser me-1"></i>Limpiar Filtros
+                    </a>
                 {% else %}
-                    <a href="{% url 'crear_lugar' %}" class="btn btn-primary">Crear Primer Lugar</a>
+                    <p class="small">Aún no has registrado ningún lugar.</p>
+                    <a href="{% url 'crear_lugar' %}" class="btn btn-primary mt-2">Crear Primer Lugar</a>
                 {% endif %}
             </div>
             {% endif %}

@@ -1274,29 +1274,49 @@ class LugarListView(CatalogoListView):
     paginate_by = 20
 
     def get_queryset(self):
-        # 1. Obtener queryset base
-        queryset = super().get_queryset().prefetch_related('empresas')
+        # 1. Queryset base
+        queryset = Lugar.objects.prefetch_related('empresas').all()
         
-        # 2. Obtener el ID de la empresa del filtro (si existe)
+        # 2. Filtro por Búsqueda (q)
+        query = self.request.GET.get('q')
+        if query:
+            queryset = queryset.filter(
+                Q(nombre__icontains=query) | 
+                Q(rfc__icontains=query) |
+                Q(razon_social__icontains=query)
+            )
+
+        # 3. Filtro por Empresa
         empresa_id = self.request.GET.get('empresa')
-        
-        # 3. Filtrar
         if empresa_id:
             queryset = queryset.filter(empresas__id=empresa_id)
-            
+
+        # 4. Filtro por Tipo
+        tipo = self.request.GET.get('tipo')
+        if tipo:
+            queryset = queryset.filter(tipo=tipo)
+        
+        # --- AQUÍ ESTABA EL ERROR: FALTABA ESTE RETURN ---
         return queryset.order_by('nombre')
 
+    # --- CORRECCIÓN DE INDENTACIÓN: Este método va al mismo nivel que get_queryset ---
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Pasamos la lista de todas las empresas para el "Select" del HTML
+        
+        # Cargar lista para el dropdown
         context['empresas_list'] = Empresa.objects.all().order_by('nombre')
         
-        # Pasamos la empresa seleccionada actualmente para mantener el filtro activo visualmente
+        # Mantener seleccionado el filtro
         selected_empresa = self.request.GET.get('empresa')
         if selected_empresa:
-            context['selected_empresa_id'] = int(selected_empresa)
+            try:
+                context['selected_empresa_id'] = int(selected_empresa)
+            except ValueError:
+                pass
             
         return context
+            
+        
 class LugarCreateView(CreateView): model = Lugar; form_class = LugarForm; success_url = reverse_lazy('lista_lugares')
 class LugarDetailView(DetailView): model = Lugar
 class LugarUpdateView(UpdateView): model = Lugar; form_class = LugarForm; success_url = reverse_lazy('lista_lugares')

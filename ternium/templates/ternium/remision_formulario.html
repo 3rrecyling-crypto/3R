@@ -87,6 +87,12 @@
         font-size: 0.8rem;
         margin-top: 0.25rem;
     }
+    /* Clase para marcar visualmente los obligatorios */
+    .required-asterisk {
+        color: var(--danger-color);
+        margin-left: 3px;
+        font-weight: bold;
+    }
 </style>
 {% endblock %}
 
@@ -144,8 +150,22 @@
         <div class="card mb-4">
             <div class="card-header"><h5><i class="fas fa-route me-2"></i>Ruta y Operación</h5></div>
             <div class="card-body"><div class="row g-3">
-                <div class="col-md-6"><label for="{{ form.origen.id_for_label }}" class="form-label">{{ form.origen.label }}</label>{{ form.origen }}<div class="form-error">{{ form.origen.errors }}</div></div>
-                <div class="col-md-6"><label for="{{ form.destino.id_for_label }}" class="form-label">{{ form.destino.label }}</label>{{ form.destino }}<div class="form-error">{{ form.destino.errors }}</div></div>
+                <div class="col-md-6">
+                    <label for="{{ form.origen.id_for_label }}" class="form-label">
+                        {{ form.origen.label }} <span class="required-asterisk">*</span>
+                    </label>
+                    {{ form.origen }}
+                    <div class="form-error">{{ form.origen.errors }}</div>
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="{{ form.destino.id_for_label }}" class="form-label">
+                        {{ form.destino.label }} <span class="required-asterisk">*</span>
+                    </label>
+                    {{ form.destino }}
+                    <div class="form-error">{{ form.destino.errors }}</div>
+                </div>
+                
                 <hr class="my-3">
                 <div class="col-md-3"><label for="{{ form.inicia_ld.id_for_label }}" class="form-label">{{ form.inicia_ld.label }}</label>{{ form.inicia_ld }}<div class="form-error">{{ form.inicia_ld.errors }}</div></div>
                 <div class="col-md-3"><label for="{{ form.termina_ld.id_for_label }}" class="form-label">{{ form.termina_ld.label }}</label>{{ form.termina_ld }}<div class="form-error">{{ form.termina_ld.errors }}</div></div>
@@ -162,7 +182,7 @@
             <div class="card-body p-0">
                 {{ formset.management_form }}
                 <div class="row g-3 formset-header align-items-center d-none d-md-flex">
-                    <div class="col-md-3">MATERIAL</div><div class="col-md-2 text-end">CARGA (Ton)</div><div class="col-md-3">CLIENTE</div><div class="col-md-2 text-end">DESCARGA (Ton)</div><div class="col-md-1 text-center">+/-</div><div class="col-md-1"></div>
+                    <div class="col-md-3">MATERIAL</div><div class="col-md-2 text-end">CARGA (Ton)</div><div class="col-md-3">CLIENTE (Destino)</div><div class="col-md-2 text-end">DESCARGA (Ton)</div><div class="col-md-1 text-center">+/-</div><div class="col-md-1"></div>
                 </div>
                 <div id="form-container">
                     {% for form in formset %}<div class="detalle-form-row"><div class="row g-3 align-items-center">
@@ -270,13 +290,10 @@ $(document).ready(function() {
                     .then(response => response.json())
                     .then(data => {
                         if (data.is_manual) {
-                            // Si es manual, quitamos readonly para que el usuario escriba
                             remisionInput.prop('readonly', false);
                             remisionInput.val('');
                             remisionInput.attr('placeholder', 'Ingrese folio manualmente');
                         } else if (data.next_remision) {
-                            // Si es automático, ponemos el valor y readonly=true
-                            // IMPORTANTE: NO usamos disabled, así el valor se envía.
                             remisionInput.val(data.next_remision);
                             remisionInput.prop('readonly', true);
                             remisionInput.attr('placeholder', '');
@@ -317,7 +334,20 @@ $(document).ready(function() {
         }
     });
 
-    // --- LÓGICA DEL FORMSET ---
+    // --- LÓGICA DE SINCRONIZACIÓN DESTINO -> CLIENTE ---
+    $('#id_destino').on('change', function() {
+        const destinoId = $(this).val();
+        // Cuando cambia el destino, actualizamos TODOS los clientes del detalle
+        if (destinoId) {
+            // Recorremos todos los selects de cliente en el formset
+            $('#form-container .cliente-select').each(function() {
+                // Seteamos el valor y disparamos change para que Select2 se actualice
+                $(this).val(destinoId).trigger('change');
+            });
+        }
+    });
+
+    // --- LÓGICA DEL FORMSET (Agregar Fila) ---
     addButton.on('click', function() { 
         if (!empresaSelect.val()) {
             alert('Por favor, seleccione una Unidad de Negocio (Empresa) primero.'); return;
@@ -325,9 +355,19 @@ $(document).ready(function() {
         const formIndex = parseInt(totalFormsInput.val());
         const newRowHtml = emptyFormTemplate.replace(/__prefix__/g, formIndex);
         const newRow = $(newRowHtml);
+        
         formContainer.append(newRow);
+        
+        // Poblar selects con datos cacheados
         populateSelect(newRow.find('.material-select'), cachedCatalogData.materiales);
         populateSelect(newRow.find('.cliente-select'), cachedCatalogData.lugares);
+        
+        // --- AUTO-RELLENADO DE CLIENTE EN NUEVA FILA ---
+        const destinoActual = $('#id_destino').val();
+        if (destinoActual) {
+            newRow.find('.cliente-select').val(destinoActual); // Pre-seleccionar
+        }
+
         initializeSelect2(newRow);
         totalFormsInput.val(formIndex + 1);
     });

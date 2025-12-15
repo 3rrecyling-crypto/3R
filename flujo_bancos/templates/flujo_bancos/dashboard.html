@@ -1,0 +1,900 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %} 
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+<style>
+    :root {
+        --primary-color: #1a73e8;
+        --primary-dark: #0d62d1;
+        --secondary-color: #34a853;
+        --accent-color: #fbbc05;
+        --warning-color: #ea4335;
+        --info-color: #4285f4;
+        --dark-color: #202124;
+        --light-color: #f8f9fa;
+        --gray-color: #5f6368;
+        --card-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        --hover-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+        --transition-base: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    /* Estilos para el dashboard */
+    .dashboard-container {
+        padding: 0;
+    }
+
+    .dashboard-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+        border-radius: 0 0 15px 15px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    /* --- CAMBIO: KPI CARDS MÁS COMPACTAS --- */
+    .kpi-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1rem 1.25rem; /* Reducido de 1.5rem */
+        margin-bottom: 1rem;
+        box-shadow: var(--card-shadow);
+        transition: var(--transition-base);
+        border-left: 4px solid var(--primary-color);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .kpi-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--hover-shadow);
+    }
+
+    .kpi-card.ingresos { border-left-color: var(--secondary-color); }
+    .kpi-card.egresos { border-left-color: var(--warning-color); }
+    .kpi-card.balance { border-left-color: var(--info-color); }
+    .kpi-card.saldo { border-left-color: #6c5ce7; }
+    .kpi-card.tipo-cambio { border-left-color: #f39c12; }
+    .kpi-card.dolares { border-left-color: #9b59b6; }
+
+    .kpi-value {
+        font-size: 1.6rem; /* Reducido de 2rem */
+        font-weight: 700;
+        margin: 0.25rem 0; /* Margen reducido */
+        color: var(--dark-color);
+    }
+
+    .kpi-value.positive { color: var(--secondary-color); }
+    .kpi-value.negative { color: var(--warning-color); }
+    .kpi-value.neutral { color: var(--info-color); }
+
+    .kpi-label {
+        font-size: 0.8rem; /* Reducido levemente */
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--gray-color);
+        font-weight: 600;
+    }
+
+    .kpi-icon {
+        font-size: 2rem; /* Reducido de 2.5rem */
+        opacity: 0.8;
+        margin-bottom: 0.5rem; /* Margen reducido */
+    }
+
+    .kpi-icon.ingresos { color: var(--secondary-color); }
+    .kpi-icon.egresos { color: var(--warning-color); }
+    .kpi-icon.balance { color: var(--info-color); }
+    .kpi-icon.saldo { color: #6c5ce7; }
+    .kpi-icon.tipo-cambio { color: #f39c12; }
+    .kpi-icon.dolares { color: #9b59b6; }
+
+    /* Estilos para imágenes en las tarjetas KPI */
+    .kpi-icon-with-image {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.5rem; /* Margen reducido */
+    }
+
+    .kpi-icon-image {
+        width: 40px; /* Reducido de 48px */
+        height: 40px; /* Reducido de 48px */
+        border-radius: 10px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .kpi-icon-image.ingresos { 
+        background: linear-gradient(135deg, #34a853, #2e7d32); 
+    }
+    .kpi-icon-image.egresos { 
+        background: linear-gradient(135deg, #ea4335, #c62828); 
+    }
+    .kpi-icon-image.dolares { 
+        background: linear-gradient(135deg, #9b59b6, #8e44ad); 
+    }
+    .kpi-icon-image.tipo-cambio { 
+        background: linear-gradient(135deg, #f39c12, #e67e22); 
+    }
+
+    .kpi-icon-image img {
+        width: 20px; /* Reducido */
+        height: 20px;
+        filter: brightness(0) invert(1);
+    }
+    /* -------------------------------------- */
+
+    .account-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: var(--card-shadow);
+        transition: var(--transition-base);
+        border: 1px solid #e0e0e0;
+    }
+
+    .account-card:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--hover-shadow);
+        border-color: var(--primary-color);
+    }
+
+    .account-name {
+        font-weight: 600;
+        font-size: 1.1rem;
+        color: var(--dark-color);
+        margin-bottom: 0.5rem;
+    }
+
+    .account-balance {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0.5rem 0 0.2rem 0;
+    }
+
+    .account-balance.positive { color: var(--secondary-color); }
+    .account-balance.negative { color: var(--warning-color); }
+
+    .account-currency {
+        font-size: 0.9rem;
+        color: var(--gray-color);
+        background: #f8f9fa;
+        padding: 0.2rem 0.8rem;
+        border-radius: 20px;
+        display: inline-block;
+    }
+
+    .account-currency.mxn { background: #e3f2fd; color: #1565c0; }
+    .account-currency.usd { background: #fff3e0; color: #ef6c00; }
+
+    .progress-container {
+        background: #f5f5f5;
+        border-radius: 10px;
+        height: 10px;
+        margin: 1rem 0;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        height: 100%;
+        border-radius: 10px;
+        transition: width 1s ease-in-out;
+    }
+
+    .progress-bar.ingresos { background: linear-gradient(90deg, var(--secondary-color), #4cd964); }
+    .progress-bar.egresos { background: linear-gradient(90deg, var(--warning-color), #ff6b6b); }
+
+    .quick-actions {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: var(--card-shadow);
+        margin-bottom: 1.5rem;
+    }
+
+    .action-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        border-radius: 10px;
+        text-decoration: none;
+        color: white;
+        font-weight: 600;
+        transition: var(--transition-base);
+        text-align: center;
+    }
+
+    .action-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        color: white;
+    }
+
+    .action-btn i {
+        font-size: 1.2rem;
+        margin-right: 0.5rem;
+    }
+
+    .action-btn.primary { background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); }
+    .action-btn.success { background: linear-gradient(135deg, var(--secondary-color), #2e7d32); }
+    .action-btn.info { background: linear-gradient(135deg, var(--info-color), #0d47a1); }
+    .action-btn.warning { background: linear-gradient(135deg, var(--accent-color), #f57c00); }
+
+    .filter-buttons {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.5rem;
+    }
+
+    .filter-btn {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        border: 2px solid var(--primary-color);
+        background: transparent;
+        color: var(--primary-color);
+        font-weight: 600;
+        transition: var(--transition-base);
+    }
+
+    .filter-btn:hover, .filter-btn.active {
+        background: var(--primary-color);
+        color: white;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1rem;
+        box-shadow: var(--card-shadow);
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--dark-color);
+    }
+
+    .stat-label {
+        font-size: 0.9rem;
+        color: var(--gray-color);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .recent-transactions {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: var(--card-shadow);
+    }
+
+    .transaction-item {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        border-bottom: 1px solid #f0f0f0;
+        transition: var(--transition-base);
+    }
+
+    .transaction-item:last-child { border-bottom: none; }
+    .transaction-item:hover { background: #f8f9fa; }
+
+    .transaction-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 1rem;
+        font-size: 1.2rem;
+    }
+
+    .transaction-icon.ingreso { background: #e8f5e9; color: var(--secondary-color); }
+    .transaction-icon.egreso { background: #ffebee; color: var(--warning-color); }
+
+    .transaction-details {
+        flex: 1;
+    }
+
+    .transaction-concept {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+
+    .transaction-amount {
+        font-weight: 700;
+        font-size: 1.1rem;
+    }
+
+    .transaction-amount.ingreso { color: var(--secondary-color); }
+    .transaction-amount.egreso { color: var(--warning-color); }
+
+    .transaction-date {
+        font-size: 0.85rem;
+        color: var(--gray-color);
+    }
+
+    .currency-summary {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: var(--card-shadow);
+        margin-bottom: 1.5rem;
+    }
+
+    .currency-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .currency-item:last-child { border-bottom: none; }
+
+    .currency-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .currency-flag {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        overflow: hidden;
+    }
+
+    .currency-flag.mxn { background: #006847; }
+    .currency-flag.usd { background: #3c3b6e; }
+
+    .currency-value {
+        font-weight: 700;
+        font-size: 1.2rem;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .kpi-value { font-size: 1.5rem; }
+        .account-balance { font-size: 1.2rem; }
+        .filter-buttons { justify-content: center; }
+        .kpi-icon-image {
+            width: 36px;
+            height: 36px;
+        }
+        .kpi-icon-image img {
+            width: 18px;
+            height: 18px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-2"><i class="fas fa-chart-line me-2"></i>Panel de Control Financiero</h1>
+                    <p class="mb-0">
+                        <i class="fas fa-calendar-alt me-1"></i>
+                        {% now "j F Y" %}
+                        {% if filtro_actual != 'hoy' %}
+                        | Período: {{ fecha_inicio|date:"d/m/Y" }} al {{ fecha_fin|date:"d/m/Y" }}
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="btn-group" role="group">
+                        <a href="{% url 'crear_movimiento' %}" class="btn btn-light">
+                            <i class="fas fa-plus-circle me-1"></i> Nuevo Movimiento
+                        </a>
+                        <a href="{% url 'crear_transferencia' %}" class="btn btn-outline-light">
+                            <i class="fas fa-exchange-alt me-1"></i> Transferencia
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h5 class="card-title mb-3"><i class="fas fa-filter me-2"></i>Filtrar por Período</h5>
+                <div class="filter-buttons">
+                    <a href="?filtro=hoy" class="filter-btn {% if filtro_actual == 'hoy' %}active{% endif %}">
+                        <i class="fas fa-calendar-day me-1"></i> Hoy
+                    </a>
+                    <a href="?filtro=semana" class="filter-btn {% if filtro_actual == 'semana' %}active{% endif %}">
+                        <i class="fas fa-calendar-week me-1"></i> Esta Semana
+                    </a>
+                    <a href="?filtro=mes" class="filter-btn {% if filtro_actual == 'mes' %}active{% endif %}">
+                        <i class="fas fa-calendar-month me-1"></i> Este Mes
+                    </a>
+                </div>
+                
+                <form method="GET" class="row g-3 mt-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Fecha Inicio</label>
+                        <input type="date" name="fecha_inicio" class="form-control" 
+                               value="{{ fecha_inicio|date:'Y-m-d' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Fecha Fin</label>
+                        <input type="date" name="fecha_fin" class="form-control" 
+                               value="{{ fecha_fin|date:'Y-m-d' }}">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" name="filtro" value="custom" class="btn btn-primary me-2">
+                            <i class="fas fa-search me-1"></i> Filtrar
+                        </button>
+                        <a href="?" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i> Limpiar
+                        </a>
+                    </div>
+                    <input type="hidden" name="filtro" value="custom">
+                </form>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-xl-3 col-md-6">
+                <div class="kpi-card ingresos">
+                    <div class="kpi-icon-with-image">
+                        <div class="kpi-icon-image ingresos">
+                            <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" alt="Ingresos">
+                        </div>
+                        <div>
+                            <div class="kpi-label">Ingresos del Período</div>
+                            <div class="kpi-value positive">${{ ingresos_periodo|default:0|stringformat:".2f"|intcomma }}</div>
+                        </div>
+                    </div>
+                    <div class="mt-1">
+                        <span class="badge bg-success">
+                            <i class="fas fa-exchange-alt me-1"></i>
+                            {{ movimientos_ingresos_count|default:0 }} movs.
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-xl-3 col-md-6">
+                <div class="kpi-card egresos">
+                    <div class="kpi-icon-with-image">
+                        <div class="kpi-icon-image egresos">
+                            <img src="https://cdn-icons-png.flaticon.com/512/3135/3135753.png" alt="Egresos">
+                        </div>
+                        <div>
+                            <div class="kpi-label">Egresos del Período</div>
+                            <div class="kpi-value negative">${{ egresos_periodo|default:0|stringformat:".2f"|intcomma }}</div>
+                        </div>
+                    </div>
+                    <div class="mt-1">
+                        <span class="badge bg-warning">
+                            <i class="fas fa-exchange-alt me-1"></i>
+                            {{ movimientos_egresos_count|default:0 }} movs.
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-xl-3 col-md-6">
+                <div class="kpi-card balance">
+                    <div class="kpi-icon balance">
+                        <i class="fas fa-balance-scale"></i>
+                    </div>
+                    <div class="kpi-label">Balance del Período</div>
+                    <div class="kpi-value {% if balance_periodo > 0 %}positive{% elif balance_periodo < 0 %}negative{% else %}neutral{% endif %}">
+                        ${{ balance_periodo|default:0|stringformat:".2f"|intcomma }}
+                    </div>
+                    <div class="mt-1">
+                        {% if balance_periodo > 0 %}
+                        <span class="badge bg-success">Superávit</span>
+                        {% elif balance_periodo < 0 %}
+                        <span class="badge bg-danger">Déficit</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Equilibrio</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-xl-3 col-md-6">
+                <div class="kpi-card saldo">
+                    <div class="kpi-icon saldo">
+                        <i class="fas fa-university"></i>
+                    </div>
+                    <div class="kpi-label">Saldo Total General</div>
+                    <div class="kpi-value">${{ total_mxn|default:0|stringformat:".2f"|intcomma }}</div>
+                    <div class="mt-1">
+                        <span class="badge bg-primary">
+                            {{ cuentas.count }} cuentas
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-xl-3 col-md-6">
+                <div class="kpi-card tipo-cambio">
+                    <div class="kpi-icon-with-image">
+                        <div class="kpi-icon-image tipo-cambio">
+                            <img src="https://cdn-icons-png.flaticon.com/512/518/518705.png" alt="Tipo de Cambio">
+                        </div>
+                        <div>
+                            <div class="kpi-label">TC Banxico (USD)</div>
+                            <div class="kpi-value">${{ tipo_cambio|default:"20.50"|stringformat:".2f" }}</div>
+                        </div>
+                    </div>
+                    <div class="mt-1">
+                        <span class="badge" style="background-color: #f39c12;">
+                             Actualizado {% now "H:i" %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-xl-3 col-md-6">
+                <div class="kpi-card dolares">
+                    <div class="kpi-icon-with-image">
+                        <div class="kpi-icon-image dolares">
+                            <img src="https://cdn-icons-png.flaticon.com/512/555/555526.png" alt="Dólares">
+                        </div>
+                        <div>
+                            <div class="kpi-label">Dólares a Pesos</div>
+                            <div class="kpi-value">
+                                {% widthratio total_usd 1 tipo_cambio as total_usd_convertido %}
+                                ${{ total_usd_convertido|default:0|intcomma }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-1">
+                        <small class="text-muted" style="font-size: 0.75rem;">
+                            Total USD × {{ tipo_cambio|default:"20.50"|stringformat:".2f" }}
+                        </small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-xl-3 col-md-6">
+                <div class="kpi-card">
+                    <div class="kpi-icon saldo">
+                        <i class="fas fa-chart-bar"></i>
+                    </div>
+                    <div class="kpi-label">Total Consolidado</div>
+                    <div class="kpi-value {% if saldo_total > 0 %}positive{% elif saldo_total < 0 %}negative{% else %}neutral{% endif %}">
+                        ${{ saldo_total|default:0|stringformat:".2f"|intcomma }}
+                    </div>
+                    <div class="mt-1">
+                        <span class="badge bg-info">MXN + USD Conv.</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-xl-3 col-md-6">
+                <div class="kpi-card">
+                    <div class="kpi-icon">
+                        <i class="fas fa-coins"></i>
+                    </div>
+                    <div class="kpi-label">Saldo Total USD</div>
+                    <div class="kpi-value">${{ total_usd|default:0|stringformat:".2f"|intcomma }}</div>
+                    <div class="mt-1">
+                        <span class="badge" style="background-color: #3498db;">
+                            {{ cuentas_usd.count }} ctas. USD
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white border-0">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Distribución de Saldos por Cuenta</h5>
+                            <div>
+                                <a href="{% url 'exportar_movimientos_excel' %}?filtro={{ filtro_actual }}&fecha_inicio={{ fecha_inicio|date:'Y-m-d' }}&fecha_fin={{ fecha_fin|date:'Y-m-d' }}" 
+                                   class="btn btn-sm btn-info me-2">
+                                    <i class="fas fa-file-excel me-1"></i> Exportar
+                                </a>
+                                <span class="badge bg-primary">{{ cuentas.count }} cuentas</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {% if cuentas %}
+                            <div class="row">
+                                {% for cuenta in cuentas %}
+                                <div class="col-md-6 col-lg-4 mb-3">
+                                    <div class="account-card">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <div class="account-name">
+                                                    <i class="fas fa-university me-2 text-primary"></i>{{ cuenta.nombre }}
+                                                </div>
+                                                <div class="account-balance {% if cuenta.saldo_actual > 0 %}positive{% elif cuenta.saldo_actual < 0 %}negative{% endif %}">
+                                                    ${{ cuenta.saldo_actual|stringformat:".2f"|intcomma }}
+                                                </div>
+                                                
+                                                {% if cuenta.moneda == 'USD' %}
+                                                <div style="font-size: 0.85rem; color: #666; font-weight: 500;">
+                                                    <i class="fas fa-exchange-alt me-1" style="font-size: 0.75rem;"></i>
+                                                    {% widthratio cuenta.saldo_actual 1 tipo_cambio as saldo_convertido_cuenta %}
+                                                    ≈ ${{ saldo_convertido_cuenta|intcomma }} MXN
+                                                </div>
+                                                {% endif %}
+                                                </div>
+                                            <span class="account-currency {% if cuenta.moneda == 'MXN' %}mxn{% else %}usd{% endif %}">
+                                                {{ cuenta.moneda }}
+                                            </span>
+                                        </div>
+                                        
+                                        <div class="d-flex justify-content-between mt-3">
+                                            <a href="{% url 'lista_movimientos' %}?cuenta={{ cuenta.id }}" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye me-1"></i> Ver
+                                            </a>
+                                            <a href="{% url 'editar_cuenta' cuenta.id %}" 
+                                               class="btn btn-sm btn-outline-secondary">
+                                                <i class="fas fa-edit me-1"></i> Editar
+                                            </a>
+                                            <a href="{% url 'crear_movimiento' %}" 
+                                               class="btn btn-sm btn-success">
+                                                <i class="fas fa-plus me-1"></i> Movimiento
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-center py-5">
+                                <i class="fas fa-university text-muted" style="font-size: 4rem;"></i>
+                                <h5 class="mt-3 text-muted">No hay cuentas registradas</h5>
+                                <p class="text-muted">Agrega tu primera cuenta para comenzar</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-value">
+                                ${{ total_usd|default:0|stringformat:".2f"|intcomma }} USD
+                            </div>
+                            <div class="stat-label">
+                                <i class="fas fa-dollar-sign me-1"></i> Saldo Total USD
+                            </div>
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    En {{ cuentas_usd.count }} cuenta{{ cuentas_usd.count|pluralize }}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-value">
+                                {% widthratio total_usd 1 tipo_cambio as usd_convertido_stat %}
+                                ${{ usd_convertido_stat|default:0|intcomma }}
+                            </div>
+                            <div class="stat-label">
+                                <i class="fas fa-calculator me-1"></i> USD Convertido a MXN
+                            </div>
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    TC: {{ tipo_cambio|default:"20.50"|stringformat:".2f" }}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="quick-actions">
+                    <h5 class="mb-3"><i class="fas fa-bolt me-2"></i>Acciones Rápidas</h5>
+                    <a href="{% url 'crear_movimiento' %}" class="action-btn success">
+                        <i class="fas fa-plus-circle me-2"></i>Nuevo Movimiento
+                    </a>
+                    <a href="{% url 'lista_movimientos' %}" class="action-btn success">
+                        <i class="fas fas fa-book-open me-2"></i>Todos los Movimientos
+                    </a>
+                    <a href="{% url 'crear_transferencia' %}" class="action-btn primary">
+                        <i class="fas fa-exchange-alt me-2"></i>Transferencia
+                    </a>
+                    <a href="{% url 'exportar_movimientos_excel' %}?filtro={{ filtro_actual }}&fecha_inicio={{ fecha_inicio|date:'Y-m-d' }}&fecha_fin={{ fecha_fin|date:'Y-m-d' }}" 
+                       class="action-btn info">
+                        <i class="fas fa-file-excel me-2"></i>Reporte del Período
+                    </a>
+                    <a href="{% url 'lista_transferencias' %}" class="action-btn warning">
+                        <i class="fas fa-list-check me-2"></i>Ver Transferencias
+                    </a>
+                    <a href="{% url 'exportar_transferencias_excel' %}" class="action-btn" style="background: linear-gradient(135deg, #6c5ce7, #a29bfe);">
+                        <i class="fas fa-download me-2"></i>Exportar Transferencias
+                    </a>
+                </div>
+
+                <div class="currency-summary">
+                    <h5 class="mb-3"><i class="fas fa-coins me-2"></i>Resumen por Moneda</h5>
+                    <div class="currency-item">
+                        <div class="currency-label">
+                            <div class="currency-flag mxn"></div>
+                            <span>PESOS MEXICANOS (MXN)</span>
+                        </div>
+                        <div class="currency-value">${{ total_mxn|default:0|stringformat:".2f"|intcomma }}</div>
+                    </div>
+                    <div class="currency-item">
+                        <div class="currency-label">
+                            <div class="currency-flag usd"></div>
+                            <span>DÓLARES AMERICANOS (USD)</span>
+                        </div>
+                        <div class="currency-value">${{ total_usd|default:0|stringformat:".2f"|intcomma }} USD</div>
+                    </div>
+                    <div class="currency-item">
+                        <div class="currency-label">
+                            <div class="currency-flag usd"></div>
+                            <span>USD CONVERTIDO (MXN)</span>
+                        </div>
+                        <div class="currency-value">
+                            {% widthratio total_usd 1 tipo_cambio as usd_convertido_resumen %}
+                            ${{ usd_convertido_resumen|default:0|intcomma }}
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Total en {{ cuentas_mxn.count|add:cuentas_usd.count }} cuenta{{ cuentas_mxn.count|add:cuentas_usd.count|pluralize }}
+                            | TC: {{ tipo_cambio|default:"20.50"|stringformat:".2f" }}
+                        </small>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3"><i class="fas fa-server me-2"></i>Estado del Sistema</h5>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Total Cuentas</span>
+                            <span class="badge bg-primary">{{ cuentas.count }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Movimientos Hoy</span>
+                            <span class="badge bg-info">{{ movimientos_ingresos_count|add:movimientos_egresos_count }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Tipo de Cambio</span>
+                            <span class="fw-bold" style="color: #f39c12;">${{ tipo_cambio|default:"20.50"|stringformat:".2f" }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Última Actualización</span>
+                            <span class="text-muted">{% now "H:i" %}</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Saldo General</span>
+                            <span class="fw-bold {% if saldo_total > 0 %}text-success{% elif saldo_total < 0 %}text-danger{% endif %}">
+                                ${{ saldo_total|default:0|stringformat:".2f"|intcomma }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="recent-transactions">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0"><i class="fas fa-history me-2"></i>Movimientos Recientes</h5>
+                        <a href="{% url 'lista_movimientos' %}" class="btn btn-sm btn-outline-primary">
+                            Ver Todos <i class="fas fa-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                    
+                    {% if movimientos_recientes %}
+                        {% for mov in movimientos_recientes|slice:":5" %}
+                        <div class="transaction-item">
+                            <div class="transaction-icon {% if mov.abono > 0 %}ingreso{% else %}egreso{% endif %}">
+                                <i class="fas {% if mov.abono > 0 %}fa-arrow-up{% else %}fa-arrow-down{% endif %}"></i>
+                            </div>
+                            <div class="transaction-details">
+                                <div class="transaction-concept">{{ mov.concepto|truncatechars:40 }}</div>
+                                <div class="transaction-amount {% if mov.abono > 0 %}ingreso{% else %}egreso{% endif %}">
+                                    ${{ mov.abono|add:mov.cargo|stringformat:".2f"|intcomma }}
+                                </div>
+                                <div class="transaction-date">
+                                    {{ mov.fecha|date:"d/m/Y" }} | {{ mov.cuenta.nombre }}
+                                </div>
+                            </div>
+                            <a href="{% url 'detalle_movimiento' mov.id %}" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-exchange-alt text-muted" style="font-size: 3rem;"></i>
+                            <p class="mt-3 text-muted">No hay movimientos recientes</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-refresh cada 5 minutos para actualizar saldos
+    setTimeout(function() {
+        window.location.reload();
+    }, 300000); // 5 minutos
+
+    // Agregar parámetros de filtro a los enlaces de exportación
+    document.addEventListener('DOMContentLoaded', function() {
+        const exportLinks = document.querySelectorAll('a[href*="exportar_movimientos_excel"]');
+        const filtroActual = '{{ filtro_actual }}';
+        const fechaInicio = '{{ fecha_inicio|date:"Y-m-d" }}';
+        const fechaFin = '{{ fecha_fin|date:"Y-m-d" }}';
+        
+        exportLinks.forEach(link => {
+            if (!link.href.includes('?')) {
+                link.href += '?';
+            }
+            // Agregar parámetros si no están presentes
+            if (!link.href.includes('filtro=')) {
+                link.href += `&filtro=${filtroActual}`;
+            }
+            if (!link.href.includes('fecha_inicio=')) {
+                link.href += `&fecha_inicio=${fechaInicio}`;
+            }
+            if (!link.href.includes('fecha_fin=')) {
+                link.href += `&fecha_fin=${fechaFin}`;
+            }
+        });
+
+        // Efecto de animación en las tarjetas
+        const kpiCards = document.querySelectorAll('.kpi-card');
+        kpiCards.forEach((card, index) => {
+            setTimeout(() => {
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+
+        // Inicialmente ocultar tarjetas para animación
+        kpiCards.forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+        });
+    });
+
+    // Mostrar/ocultar detalles de cuenta
+    document.querySelectorAll('.account-card').forEach(card => {
+        card.addEventListener('click', function(e) {
+            if (!e.target.closest('a')) {
+                this.classList.toggle('expanded');
+            }
+        });
+    });
+</script>
+{% endblock %}

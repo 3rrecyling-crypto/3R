@@ -1,0 +1,329 @@
+{% extends 'ternium/base.html' %}
+{% load static humanize %}
+
+{% block extra_css %}
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+    
+    <style>
+        /* Mejoras visuales en Select2 */
+        .select2-container--bootstrap-5 .select2-selection {
+            min-height: 38px;
+            border-radius: 0.375rem;
+        }
+        /* Animación para el contenedor de impuestos */
+        #seccion-impuestos-contenedor {
+            transition: all 0.3s ease;
+        }
+        /* Sidebar Sticky para no perder de vista el saldo */
+        .sticky-card {
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+        }
+        /* Efecto de carga para el saldo */
+        .loading-text {
+            font-size: 0.8rem;
+            color: #6c757d;
+            font-style: italic;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-3 mb-4">
+            <div class="card shadow border-0 sticky-card">
+                <div class="card-header bg-dark text-white text-center py-3">
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-wallet me-2"></i>Estado de Cuenta</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4 text-center">
+                        <small class="text-muted text-uppercase fw-bold">Saldo Disponible</small>
+                        <h3 id="display-saldo-actual" class="fw-bold text-dark mt-1">$0.00</h3>
+                        <div id="saldo-loader" class="loading-text d-none">Consultando banco...</div>
+                    </div>
+                    <hr>
+                    
+                    <h6 class="text-primary fw-bold mb-3"><i class="fas fa-calculator me-2"></i>Desglose Proyectado</h6>
+                    <ul class="list-group list-group-flush small">
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-transparent">
+                            Monto Base
+                            <span id="resumen-subtotal" class="fw-bold text-dark">$0.00</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-transparent">
+                            (+) IVA
+                            <span id="resumen-iva" class="text-danger fw-bold">$0.00</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-transparent">
+                            (-) Retenciones
+                            <span id="resumen-ret" class="text-success fw-bold">$0.00</span>
+                        </li>
+                    </ul>
+
+                    <div class="alert alert-light border-primary border-dashed mt-3 text-center py-3">
+                        <small class="text-muted fw-bold">SALDO FINAL ESTIMADO</small>
+                        <h4 id="display-saldo-final" class="fw-bold mt-2 mb-0">$0.00</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-9">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-primary text-white py-3 d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0 fw-bold"><i class="fas fa-plus-circle me-2"></i>Nuevo Movimiento Bancario</h4>
+                    <span id="icono-operacion" class="badge bg-white text-primary fs-6 p-2 shadow-sm">Operación</span>
+                </div>
+                
+                <div class="card-body p-4">
+                    <form method="post" id="movimientoForm" novalidate enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold"><i class="fas fa-filter me-1 text-primary"></i>Tipo</label>
+                                {{ form.tipo_movimiento }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold"><i class="fas fa-university me-1 text-primary"></i>Cuenta Origen/Destino</label>
+                                {{ form.cuenta }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold"><i class="fas fa-calendar-alt me-1 text-primary"></i>Fecha</label>
+                                {{ form.fecha }}
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold" id="label-tercero">Tercero</label>
+                                <div class="input-group shadow-sm">
+                                    {{ form.tercero_obj }} 
+                                    <button type="button" onclick="abrirTerceroPopup('{% url 'crear_tercero' %}')" class="btn btn-primary" title="Agregar nuevo">
+                                        <i class="fas fa-user-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Concepto / Referencia</label>
+                                {{ form.concepto }}
+                                <datalist id="lista-conceptos">
+                                    {% for c in lista_conceptos %}<option value="{{ c }}">{% endfor %}
+                                </datalist>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Unidad de Negocio</label>
+                                {{ form.unidad_negocio }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Categoría</label>
+                                {{ form.categoria }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Subcategoría</label>
+                                {{ form.subcategoria }}
+                            </div>
+                        </div>
+
+                        <div class="card bg-light border-0 mb-4 shadow-sm">
+                            <div class="card-body">
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold text-dark">Subtotal (Importe Base)</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-white border-end-0"><i class="fas fa-dollar-sign text-success"></i></span>
+                                            {{ form.monto_total }}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-8" id="seccion-impuestos-contenedor">
+                                        <div class="row g-2">
+                                            <div class="col-4">
+                                                <label class="form-label small text-muted">IVA 16%</label>
+                                                {{ form.iva }}
+                                            </div>
+                                            <div class="col-4">
+                                                <label class="form-label small text-muted">Ret. IVA</label>
+                                                {{ form.ret_iva }}
+                                            </div>
+                                            <div class="col-4">
+                                                <label class="form-label small text-muted">Ret. ISR</label>
+                                                {{ form.ret_isr }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-7">
+                                <label class="form-label text-muted fw-bold">Observaciones Adicionales</label>
+                                {{ form.comentarios }}
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label fw-bold text-primary"><i class="fas fa-file-invoice me-1"></i>Adjuntar Comprobante (PDF/JPG)</label>
+                                <div class="bg-white p-2 border rounded shadow-sm">
+                                    {{ form.comprobante }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-3 pt-3 border-top">
+                            <a href="{% url 'lista_movimientos' %}" class="btn btn-light border px-4">Cancelar</a>
+                            <button type="submit" class="btn btn-success px-5 fw-bold shadow">
+                                <i class="fas fa-cloud-upload-alt me-2"></i>Finalizar y Guardar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+// FUNCIÓN PARA EL POPUP DE TERCEROS
+function abrirTerceroPopup(url) {
+    const w = 600;
+    const h = 700;
+    const left = (window.screen.width / 2) - (w / 2);
+    const top = (window.screen.height / 2) - (h / 2);
+    // Abre la ventana
+    window.open(url, "CrearTercero", `width=${w},height=${h},top=${top},left=${left},scrollbars=yes`);
+}
+
+$(document).ready(function() {
+    // Selectores
+    const $cuentaSelect = $('#id_cuenta');
+    const $tipoSelect = $('#id_tipo_movimiento');
+    const $terceroSelect = $('#id_tercero_obj');
+    const $categoriaSelect = $('#id_categoria');
+    const $subcategoriaSelect = $('#id_subcategoria');
+
+    const inputSubtotal = document.getElementById('id_monto_total');
+    const inputIva = document.getElementById('id_iva');
+    const inputRetIva = document.getElementById('id_ret_iva');
+    const inputRetIsr = document.getElementById('id_ret_isr');
+    
+    const seccionImpuestos = document.getElementById('seccion-impuestos-contenedor');
+    const displaySaldoActual = document.getElementById('display-saldo-actual');
+    const displaySaldoFinal = document.getElementById('display-saldo-final');
+    const resumenSubtotal = document.getElementById('resumen-subtotal');
+    const resumenIva = document.getElementById('resumen-iva');
+    const resumenRet = document.getElementById('resumen-ret');
+    const iconoOperacion = document.getElementById('icono-operacion');
+    const labelTercero = document.getElementById('label-tercero');
+    const loader = document.getElementById('saldo-loader');
+
+    let saldoBaseCuenta = 0;
+    const fmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
+
+    function actualizarCalculos() {
+        const subtotal = parseFloat(inputSubtotal.value) || 0;
+        let iva = parseFloat(inputIva.value) || 0;
+        const retIva = parseFloat(inputRetIva.value) || 0;
+        const retIsr = parseFloat(inputRetIsr.value) || 0;
+        const tipo = $tipoSelect.val();
+        
+        let totalNeto = 0;
+        let saldoFinal = saldoBaseCuenta;
+
+        if (tipo === 'ingreso') {
+            seccionImpuestos.style.opacity = '0.5'; // Visualmente deshabilitado
+            seccionImpuestos.style.pointerEvents = 'none';
+            iva = 0; 
+            totalNeto = subtotal;
+            saldoFinal += totalNeto;
+            iconoOperacion.innerHTML = '<i class="fas fa-arrow-circle-up me-1"></i>INGRESO';
+            iconoOperacion.className = "badge bg-white text-success fs-6 p-2 shadow-sm border border-success";
+            labelTercero.innerHTML = '<i class="fas fa-user-tie me-1"></i>Recibido de (Cliente)';
+        } else {
+            seccionImpuestos.style.opacity = '1';
+            seccionImpuestos.style.pointerEvents = 'auto';
+            // Cálculo automático de IVA
+            if (iva === 0 && subtotal > 0) {
+                iva = parseFloat((subtotal * 0.16).toFixed(2));
+                inputIva.value = iva;
+            }
+            totalNeto = subtotal + iva - (retIva + retIsr);
+            saldoFinal -= totalNeto;
+            iconoOperacion.innerHTML = '<i class="fas fa-arrow-circle-down me-1"></i>EGRESO';
+            iconoOperacion.className = "badge bg-white text-danger fs-6 p-2 shadow-sm border border-danger";
+            labelTercero.innerHTML = '<i class="fas fa-truck-loading me-1"></i>Pagado a (Proveedor)';
+        }
+
+        // Actualizar UI
+        displaySaldoActual.textContent = fmt.format(saldoBaseCuenta);
+        resumenSubtotal.textContent = fmt.format(subtotal);
+        resumenIva.textContent = fmt.format(iva);
+        resumenRet.textContent = fmt.format(retIva + retIsr);
+        displaySaldoFinal.textContent = fmt.format(saldoFinal);
+
+        // Alerta visual de saldo insuficiente
+        if (saldoFinal < 0) {
+            displaySaldoFinal.className = "fw-bold mt-2 mb-0 text-danger animate__animated animate__shakeX";
+        } else {
+            displaySaldoFinal.className = "fw-bold mt-2 mb-0 text-success";
+        }
+    }
+
+    function fetchSaldo() {
+        const cuentaId = $cuentaSelect.val();
+        if (!cuentaId) {
+            saldoBaseCuenta = 0;
+            actualizarCalculos();
+            return;
+        }
+
+        loader.classList.remove('d-none');
+        $.getJSON("{% url 'ajax_saldo_cuenta' %}", { cuenta_id: cuentaId }, function(data) {
+            saldoBaseCuenta = parseFloat(data.saldo) || 0;
+            loader.classList.add('d-none');
+            actualizarCalculos();
+        });
+    }
+
+    // AJAX para Subcategorías
+    $categoriaSelect.change(function() {
+        const categoriaId = $(this).val();
+        if (!categoriaId) {
+            $subcategoriaSelect.html('<option value="">---------</option>');
+            return;
+        }
+        $.getJSON("{% url 'ajax_load_subcategories' %}", { categoria_id: categoriaId }, function(data) {
+            let options = '<option value="">Seleccione...</option>';
+            data.forEach(item => {
+                options += `<option value="${item.id}">${item.nombre}</option>`;
+            });
+            $subcategoriaSelect.html(options);
+        });
+    });
+
+    // Inicializar Select2 con el tema Bootstrap 5
+    $cuentaSelect.select2({ theme: 'bootstrap-5', width: '100%' }).on('change', fetchSaldo);
+    $terceroSelect.select2({ theme: 'bootstrap-5', width: '100%' });
+    $categoriaSelect.select2({ theme: 'bootstrap-5', width: '100%' });
+    $subcategoriaSelect.select2({ theme: 'bootstrap-5', width: '100%' });
+    
+    // Listeners
+    $tipoSelect.on('change', actualizarCalculos);
+    [inputSubtotal, inputIva, inputRetIva, inputRetIsr].forEach(el => {
+        el.addEventListener('input', actualizarCalculos);
+    });
+
+    // Carga inicial
+    if ($cuentaSelect.val()) fetchSaldo();
+    actualizarCalculos();
+});
+</script>
+{% endblock %}

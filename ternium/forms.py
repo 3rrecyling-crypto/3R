@@ -163,7 +163,7 @@ class RemisionForm(forms.ModelForm):
             'contenedor': forms.Select(attrs={'class': 'form-select'}),
             'origen': forms.Select(attrs={'class': 'form-select'}),
             'destino': forms.Select(attrs={'class': 'form-select'}),
-            'cliente': forms.Select(attrs={'class': 'form-select'}), # Asegúrate de tener este widget
+            'cliente': forms.Select(attrs={'class': 'form-select'}),
             'inicia_ld': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'termina_ld': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'folio_ld': forms.TextInput(attrs={'class': 'form-control'}),
@@ -182,22 +182,38 @@ class RemisionForm(forms.ModelForm):
         empresa = kwargs.pop('empresa', None)
         super().__init__(*args, **kwargs)
 
+        # --- CONFIGURACIÓN DE OBLIGATORIEDAD ---
+        
+        # A) Campos OBLIGATORIOS (Solo Origen y Destino)
+        self.fields['origen'].required = True
+        self.fields['destino'].required = True
+
+        # B) Campos OPCIONALES (Todo lo demás)
+        campos_opcionales = [
+            'folio_ld', 'folio_dlv', 'linea_transporte', 'operador', 
+            'unidad', 'contenedor', 'cliente', 'inicia_ld', 'termina_ld', 
+            'inicia_dlv', 'termina_dlv', 'evidencia_carga', 'evidencia_descarga',
+            'comentario', 'descripcion'
+        ]
+        
+        for campo in campos_opcionales:
+            if campo in self.fields:
+                self.fields[campo].required = False
+
+        # --- FILTROS DE SEGURIDAD Y CASCADA ---
+
         # 2. FILTRO DE SEGURIDAD: Restringir el campo 'empresa' según el usuario
         if self.user and not self.user.is_superuser:
             if hasattr(self.user, 'ternium_profile'):
-                # Solo mostramos las empresas que están en 'empresas_autorizadas' del perfil
                 qs_autorizadas = self.user.ternium_profile.empresas_autorizadas.all()
                 self.fields['empresa'].queryset = qs_autorizadas
             else:
-                # Si no tiene perfil, no ve ninguna empresa
                 self.fields['empresa'].queryset = Empresa.objects.none()
 
         # 3. Lógica de filtrado de catálogos dependientes (Cascada)
         if empresa:
-            # Validación extra: si el usuario no es superuser, verificamos que la empresa pasada sea válida
             if self.user and not self.user.is_superuser:
                 if not self.fields['empresa'].queryset.filter(pk=empresa.pk).exists():
-                    # Si intenta forzar una empresa no autorizada, limpiamos la selección
                     empresa = None
             
             if empresa:
@@ -206,17 +222,13 @@ class RemisionForm(forms.ModelForm):
                 self.fields['contenedor'].queryset = Contenedor.objects.filter(empresas=empresa)
                 self.fields['origen'].queryset = Lugar.objects.filter(empresas=empresa, tipo__in=['ORIGEN', 'AMBOS'])
                 self.fields['destino'].queryset = Lugar.objects.filter(empresas=empresa, tipo__in=['DESTINO', 'AMBOS'])
-                # Si tienes un modelo Cliente relacionado a empresas, fíltralo aquí también
-                # self.fields['cliente'].queryset = Cliente.objects.filter(empresas=empresa)
         else:
-            # Si no hay empresa seleccionada, los campos dependientes aparecen vacíos
             self.fields['linea_transporte'].queryset = LineaTransporte.objects.none()
             self.fields['unidad'].queryset = Unidad.objects.none()
             self.fields['contenedor'].queryset = Contenedor.objects.none()
             self.fields['origen'].queryset = Lugar.objects.none()
             self.fields['destino'].queryset = Lugar.objects.none()
 
-        # Operador suele ser global, pero puedes filtrarlo si tiene relación M2M
         self.fields['operador'].queryset = Operador.objects.all()
 
         if self.instance and self.instance.pk and self.instance.status == 'AUDITADO':
@@ -225,26 +237,7 @@ class RemisionForm(forms.ModelForm):
     
     def clean(self):
         cleaned_data = super().clean()
-        origen = cleaned_data.get('origen')
-        destino = cleaned_data.get('destino')
-        
-        patios_exentos = ["PATIO MONTERREY", "PATIO NUEVO LAREDO"]
-
-        is_completing = all([
-            cleaned_data.get('remision'), cleaned_data.get('fecha'), cleaned_data.get('linea_transporte'),
-            cleaned_data.get('operador'), cleaned_data.get('unidad'), origen, destino,
-            cleaned_data.get('folio_ld'), cleaned_data.get('folio_dlv')
-        ])
-
-        if is_completing:
-            if origen and origen.nombre.upper() not in patios_exentos:
-                if not cleaned_data.get('evidencia_carga') and not (self.instance and self.instance.evidencia_carga):
-                    self.add_error('evidencia_carga', 'Se requiere la evidencia de carga para este origen.')
-
-            if destino and destino.nombre.upper() not in patios_exentos:
-                if not cleaned_data.get('evidencia_descarga') and not (self.instance and self.instance.evidencia_descarga):
-                    self.add_error('evidencia_descarga', 'Se requiere la evidencia de descarga para este destino.')
-
+        # Se ha eliminado la validación estricta de evidencias para permitir guardar sin fotos/folios
         return cleaned_data
 
 
@@ -266,6 +259,13 @@ class DetalleRemisionForm(forms.ModelForm):
         material_queryset = kwargs.pop('material_queryset', None)
         lugar_queryset = kwargs.pop('lugar_queryset', None)
         super().__init__(*args, **kwargs)
+        
+        # --- CAMBIO: Hacer el Material opcional en el formulario ---
+        self.fields['material'].required = False
+        self.fields['cliente'].required = False
+        self.fields['peso_ld'].required = False
+        self.fields['peso_dlv'].required = False
+        # -----------------------------------------------------------
         
         if material_queryset is not None:
             self.fields['material'].queryset = material_queryset

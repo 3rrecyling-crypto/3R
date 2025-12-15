@@ -1,0 +1,215 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %} 
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Historial de Movimientos</h3>
+        <div>
+            <a href="{% url 'exportar_movimientos_excel' %}?{{ request.GET.urlencode }}" class="btn btn-success me-2">
+                <i class="fas fa-file-excel"></i> Excel
+            </a>
+            <a href="{% url 'crear_movimiento' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Nuevo
+            </a>
+        </div>
+    </div>
+
+    <div class="card card-body bg-light mb-4 p-3 border-primary shadow-sm">
+        <form method="get" class="row g-2 align-items-end">
+            
+            <div class="col-md-3">
+                <label class="form-label fw-bold mb-0 small">Buscar Concepto/Tercero</label>
+                <input type="text" name="q" class="form-control form-control-sm" value="{{ request.GET.q }}" placeholder="Escribe...">
+            </div>
+            
+            <div class="col-md-2">
+                <label class="form-label fw-bold mb-0 small">Desde</label>
+                <input type="date" name="fecha_inicio" class="form-control form-control-sm" value="{{ request.GET.fecha_inicio }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-bold mb-0 small">Hasta</label>
+                <input type="date" name="fecha_fin" class="form-control form-control-sm" value="{{ request.GET.fecha_fin }}">
+            </div>
+            
+            <div class="col-md-2">
+                <label class="form-label fw-bold mb-0 small">Tipo</label>
+                <select name="tipo" class="form-select form-select-sm">
+                    <option value="">-- Todos --</option>
+                    <option value="ingreso" {% if request.GET.tipo == 'ingreso' %}selected{% endif %}>Ingreso</option>
+                    <option value="egreso" {% if request.GET.tipo == 'egreso' %}selected{% endif %}>Egreso</option>
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label fw-bold mb-0 small">Unidad Negocio</label>
+                <select name="unidad" class="form-select form-select-sm">
+                    <option value="">-- Todas --</option>
+                    {% for u in unidades_negocio %}
+                        <option value="{{ u.id }}" {% if request.GET.unidad == u.id|stringformat:"s" %}selected{% endif %}>{{ u.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label fw-bold mb-0 small">Operación</label>
+                <select name="operacion" class="form-select form-select-sm">
+                    <option value="">-- Todas --</option>
+                    {% for op in operaciones %}
+                        <option value="{{ op.id }}" {% if request.GET.operacion == op.id|stringformat:"s" %}selected{% endif %}>{{ op.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label fw-bold mb-0 small">Categoría</label>
+                <select name="categoria" id="filtro_categoria" class="form-select form-select-sm">
+                    <option value="">-- Todas --</option>
+                    {% for cat in categorias %}
+                        <option value="{{ cat.id }}" {% if request.GET.categoria == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label fw-bold mb-0 small">Subcategoría</label>
+                <select name="subcategoria" id="filtro_subcategoria" class="form-select form-select-sm">
+                    <option value="">-- Todas --</option>
+                    {% for sub in subcategorias %}
+                        <option value="{{ sub.id }}" data-cat-id="{{ sub.categoria.id }}" 
+                            {% if request.GET.subcategoria == sub.id|stringformat:"s" %}selected{% endif %}>
+                            {{ sub.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fas fa-filter"></i> Filtrar</button>
+                <a href="{% url 'lista_movimientos' %}" class="btn btn-outline-secondary btn-sm w-50" title="Limpiar"><i class="fas fa-undo"></i></a>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover table-bordered align-middle text-sm">
+            <thead class="table-dark">
+                <tr>
+                    <th>Fecha</th>
+                    <th>Concepto</th>
+                    <th class="text-end">Cargo</th>
+                    <th class="text-end">Abono</th>
+                    <th class="text-end">Saldo</th>
+                    <th>U. Negocio</th>
+                    <th>Operación</th>
+                    <th>Categoría</th>
+                    <th>Subcategoría</th> <th class="text-center">Estado</th>
+                    <th class="text-center" style="min-width: 120px;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for mov in movimientos %}
+                <tr>
+                    <td class="text-center small">{{ mov.fecha|date:"d/m/Y" }}</td>
+                    <td>
+                        {{ mov.concepto }}
+                        {% if mov.comentarios %}
+                            <br><small class="text-muted"><i class="fas fa-comment"></i> {{ mov.comentarios|truncatechars:20 }}</small>
+                        {% endif %}
+                        <div class="small text-secondary">{{ mov.tercero|default:"" }}</div>
+                    </td>
+                    
+                    <td class="text-end text-danger fw-bold">
+                        {% if mov.cargo > 0 %}-${{ mov.cargo|stringformat:".2f"|intcomma }}{% else %}-{% endif %}
+                    </td>
+                    
+                    <td class="text-end text-success fw-bold">
+                        {% if mov.abono > 0 %}+${{ mov.abono|stringformat:".2f"|intcomma }}{% else %}-{% endif %}
+                    </td>
+                    
+                    <td class="text-end fw-bold small">${{ mov.saldo_banco|default:0|stringformat:".2f"|intcomma }}</td>
+                    <td class="small">{{ mov.unidad_negocio|default_if_none:"-" }}</td>
+                    <td class="small">{{ mov.operacion|default_if_none:"-" }}</td>
+                    <td class="small">{{ mov.categoria|default_if_none:"-" }}</td>
+                    <td class="small">{{ mov.subcategoria.nombre|default_if_none:"-" }}</td> <td class="text-center">
+                        {% if mov.auditado %}
+                            <span class="badge bg-secondary"><i class="fas fa-lock"></i></span>
+                        {% else %}
+                            <span class="badge bg-info text-dark">Abierto</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="text-center">
+                        <div class="btn-group btn-group-sm">
+                            <a href="{% url 'detalle_movimiento' mov.id %}" class="btn btn-info text-white" title="Ver"><i class="fas fa-eye"></i></a>
+                            {% if not mov.auditado %}
+                                <a href="{% url 'editar_movimiento' mov.id %}" class="btn btn-warning" title="Editar"><i class="fas fa-pencil-alt"></i></a>
+                                <button onclick="confirmarAuditoria({{ mov.id }})" class="btn btn-dark" title="Auditar"><i class="fas fa-gavel"></i></button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="12" class="text-center py-4 text-muted">
+                        No se encontraron movimientos con los filtros seleccionados.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function confirmarAuditoria(id) {
+        if(confirm('¿Estás seguro de AUDITAR este movimiento? \n\nUna vez auditado, NO se podrá editar ni eliminar.')) {
+            window.location.href = "/movimientos/auditar/" + id + "/"; 
+        }
+    }
+
+    // --- SCRIPT PARA FILTRAR SUBCATEGORIAS DINÁMICAMENTE ---
+    document.addEventListener("DOMContentLoaded", function() {
+        const catSelect = document.getElementById('filtro_categoria');
+        const subSelect = document.getElementById('filtro_subcategoria');
+        const todasLasOpciones = Array.from(subSelect.options); // Guardamos copia de todas las opciones
+
+        function filtrarSubcategorias() {
+            const catId = catSelect.value;
+            const subIdSeleccionado = "{{ request.GET.subcategoria }}"; // Para mantener la selección tras filtrar
+
+            // Limpiamos el select actual
+            subSelect.innerHTML = '';
+
+            // 1. Siempre agregamos la opción "Todas"
+            const defaultOption = document.createElement('option');
+            defaultOption.value = "";
+            defaultOption.text = "-- Todas --";
+            subSelect.appendChild(defaultOption);
+
+            // 2. Filtramos y agregamos las opciones que coinciden
+            todasLasOpciones.forEach(option => {
+                // Si la opción tiene valor (no es el placeholder) y coincide la categoría o no hay categoría seleccionada
+                if (option.value) {
+                    const dataCat = option.getAttribute('data-cat-id');
+                    if (catId === "" || dataCat === catId) {
+                        subSelect.appendChild(option);
+                    }
+                }
+            });
+
+            // 3. Restaurar selección si existe
+            if (subIdSeleccionado) {
+                subSelect.value = subIdSeleccionado;
+            }
+        }
+
+        // Event listener
+        catSelect.addEventListener('change', filtrarSubcategorias);
+        
+        // Ejecutar al inicio por si ya viene una categoría seleccionada desde el servidor
+        filtrarSubcategorias();
+    });
+</script>
+
+{% endblock %}

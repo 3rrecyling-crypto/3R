@@ -1,0 +1,249 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0 text-gray-800">
+                <i class="fas fa-receipt text-primary me-2"></i>Detalle del Movimiento
+                <span class="text-muted fs-5">#{{ mov.pk }}</span>
+            </h2>
+        </div>
+        <div>
+            <span class="badge {% if mov.auditado %}bg-secondary{% else %}bg-info text-dark{% endif %} fs-6 p-2 shadow-sm">
+                <i class="fas {% if mov.auditado %}fa-lock{% else %}fa-unlock{% endif %} me-1"></i>
+                {% if mov.auditado %}Auditado{% else %}Abierto{% endif %}
+            </span>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-lg overflow-hidden">
+        <div class="card-header {% if mov.abono > 0 %}bg-success{% else %}bg-warning{% endif %} text-white py-4" 
+             style="background: linear-gradient(135deg, {% if mov.abono > 0 %}#1cc88a 0%, #13855c 100%{% else %}#f6c23e 0%, #dda20a 100%{% endif %});">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h5 class="opacity-75 text-uppercase ls-1 mb-1">Concepto</h5>
+                    <h1 class="display-6 fw-bold text-shadow mb-0">{{ mov.concepto }}</h1>
+                </div>
+                <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                    <h5 class="opacity-75 text-uppercase ls-1 mb-1">Monto Total</h5>
+                    <h1 class="display-5 fw-bold text-shadow">
+                        {% if mov.abono > 0 %}
+                            +${{ mov.abono|intcomma }}
+                        {% else %}
+                            -${{ mov.cargo|intcomma }}
+                        {% endif %}
+                    </h1>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body p-4 bg-white">
+            <div class="row g-4">
+                <div class="col-lg-6 border-end">
+                    <h6 class="text-primary fw-bold mb-3 text-uppercase small ls-1">Información General</h6>
+                    
+                    <div class="row mb-3">
+                        <div class="col-4 text-muted">Fecha:</div>
+                        <div class="col-8 fw-bold text-dark">{{ mov.fecha|date:"d \d\e F, Y" }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-4 text-muted">Cuenta:</div>
+                        <div class="col-8">
+                            <i class="fas fa-university me-1 text-secondary"></i>
+                            {{ mov.cuenta }}
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-4 text-muted">Tercero:</div>
+                        <div class="col-8">{{ mov.tercero|default:"-" }}</div>
+                    </div>
+
+                    <h6 class="text-primary fw-bold mt-4 mb-3 text-uppercase small ls-1">Clasificación</h6>
+                    <div class="row mb-3">
+                        <div class="col-4 text-muted">Unidad Negocio:</div>
+                        <div class="col-8">{{ mov.unidad_negocio|default:"-" }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-4 text-muted">Operación:</div>
+                        <div class="col-8">{{ mov.operacion|default:"-" }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-4 text-muted">Categoría:</div>
+                        <div class="col-8">
+                            <span class="badge bg-light text-dark border">{{ mov.categoria|default:"General" }}</span>
+                            {% if mov.subcategoria %}
+                                <i class="fas fa-chevron-right mx-1 small text-muted"></i>
+                                <span class="badge bg-light text-dark border">{{ mov.subcategoria }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if mov.comentarios %}
+                    <div class="mt-4 p-3 bg-light rounded border-start border-4 border-primary">
+                        <small class="text-muted d-block mb-1">Comentarios:</small>
+                        <p class="mb-0 fst-italic">{{ mov.comentarios }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="col-lg-6 ps-lg-4">
+                    <h6 class="text-primary fw-bold mb-3 text-uppercase small ls-1">Desglose Financiero</h6>
+                    
+                    <div class="card bg-info bg-opacity-10 border-info mb-4 shadow-sm">
+                        <div class="card-header bg-info text-white py-2 small fw-bold">
+                            <i class="fas fa-balance-scale-right me-1"></i> SALDOS DE LA CUENTA
+                        </div>
+                        <div class="card-body p-3">
+                            {% with monto_neto=mov.abono|default:0|add:mov.cargo|default:0 %}
+
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-muted small">Monto Neto del Movimiento:</span>
+                                    <span class="fw-bold fs-6">
+                                        {% if mov.abono > 0 %}
+                                            +${{ monto_neto|intcomma }} {{ mov.cuenta.moneda }}
+                                        {% else %}
+                                            -${{ monto_neto|intcomma }} {{ mov.cuenta.moneda }}
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <hr class="my-2">
+                                
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-muted">Saldo ANTES:</span>
+                                    
+                                    <span class="fw-bold">
+                                        {% if mov.abono > 0 %}
+                                            {# INGRESO: Saldo Final - Abono = Saldo Antes #}
+                                            {# Usamos widthratio para multiplicar abono por -1 y poder sumarlo (restar) #}
+                                            {% widthratio mov.abono 1 -1 as abono_negativo %}
+                                            ${{ mov.saldo_banco|add:abono_negativo|intcomma }} {{ mov.cuenta.moneda }}
+                                        {% else %}
+                                            {# EGRESO: Saldo Final + Cargo = Saldo Antes #}
+                                            ${{ mov.saldo_banco|add:mov.cargo|intcomma }} {{ mov.cuenta.moneda }}
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted fs-5">Saldo DESPUÉS:</span>
+                                    <span class="fw-bold fs-5 text-dark">${{ mov.saldo_banco|intcomma }} {{ mov.cuenta.moneda }}</span>
+                                </div>
+                            {% endwith %}
+                        </div>
+                    </div>
+                    <div class="card bg-light border-0">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>Subtotal (Base):</span>
+                                <span class="fw-bold text-dark">${{ mov.cargo|add:mov.abono|intcomma }}</span> 
+                            </div>
+                            
+                            {% if mov.iva > 0 %}
+                            <div class="d-flex justify-content-between mb-2 text-muted fs-sm">
+                                <span>IVA (16%):</span>
+                                <span>+${{ mov.iva|intcomma }}</span>
+                            </div>
+                            {% endif %}
+                            
+                            {% if mov.ret_iva > 0 or mov.ret_isr > 0 %}
+                            <div class="border-top my-2 pt-2"></div>
+                            <div class="d-flex justify-content-between mb-1 text-danger fs-sm">
+                                <span>Ret. IVA:</span>
+                                <span>-${{ mov.ret_iva|intcomma }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between text-danger fs-sm">
+                                <span>Ret. ISR:</span>
+                                <span>-${{ mov.ret_isr|intcomma }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <h6 class="text-muted small text-uppercase mb-2">Metadatos</h6>
+                        <ul class="list-unstyled small text-secondary">
+                            <li><i class="fas fa-fingerprint me-2"></i>ID Transacción: {{ mov.pk }}</li>
+                            <li><i class="fas fa-user-clock me-2"></i>Registrado: {{ mov.fecha_creacion|default:"Automático" }}</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="my-4">
+            <div class="row">
+                <div class="col-12">
+                    <h6 class="text-uppercase text-muted mb-3 fw-bold small ls-1">
+                        <i class="fas fa-paperclip me-2"></i>Comprobante Adjunto
+                    </h6>
+                    
+                    <div class="card bg-light border-0 shadow-sm">
+                        <div class="card-body text-center p-4">
+                            {% if s3_url %}
+                                
+                                {% if es_imagen %}
+                                    <div class="mb-3">
+                                        <img src="{{ s3_url }}" alt="Comprobante" class="img-fluid rounded shadow-sm border" style="max-height: 500px;">
+                                    </div>
+                                    <a href="{{ s3_url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-expand me-1"></i> Ver Imagen en Pestaña Nueva
+                                    </a>
+
+                                {% elif es_pdf %}
+                                    <div class="ratio ratio-16x9 mb-3 shadow-sm border" style="height: 600px;">
+                                        <iframe src="{{ s3_url }}" title="Comprobante PDF"></iframe>
+                                    </div>
+                                    <a href="{{ s3_url }}" target="_blank" class="btn btn-sm btn-outline-danger">
+                                        <i class="fas fa-file-pdf me-1"></i> Abrir PDF en Pestaña Nueva
+                                    </a>
+
+                                {% else %}
+                                    <div class="py-4">
+                                        <i class="fas fa-file-alt fa-3x text-secondary mb-3"></i>
+                                        <p class="text-muted mb-2">El archivo está disponible para descargar.</p>
+                                        <a href="{{ s3_url }}" class="btn btn-primary">
+                                            <i class="fas fa-download me-1"></i> Descargar Archivo
+                                        </a>
+                                    </div>
+                                {% endif %}
+
+                            {% else %}
+                                <div class="text-muted py-4">
+                                    <i class="fas fa-folder-open fa-3x mb-3 opacity-25"></i>
+                                    <p class="mb-0">No se ha adjuntado ningún comprobante digital a este movimiento.</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div>
+
+        <div class="card-footer bg-light py-3 px-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <a href="{% url 'lista_movimientos' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Volver
+                </a>
+                
+                <div class="d-flex gap-2">
+                    <a href="{% url 'auditar_movimiento' mov.pk %}" class="btn btn-outline-info" 
+                       onclick="return confirm('¿Marcar como auditado? Esto bloqueará ediciones futuras.')">
+                        <i class="fas fa-check-double me-1"></i> Auditar
+                    </a>
+                    
+                    {% if not mov.auditado %}
+                        <a href="{% url 'editar_movimiento' mov.pk %}" class="btn btn-primary">
+                            <i class="fas fa-edit me-1"></i> Editar
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .text-shadow { text-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .ls-1 { letter-spacing: 1px; }
+    .fs-sm { font-size: 0.9rem; }
+</style>
+{% endblock %}

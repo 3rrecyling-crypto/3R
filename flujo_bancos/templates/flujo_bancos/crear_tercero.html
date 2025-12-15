@@ -1,0 +1,36 @@
+{% extends 'ternium/base.html' %}
+
+{% block content %}
+<div class="container mt-3">
+    <div class="card shadow-sm">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">Nuevo Cliente / Proveedor</h5>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Nombre o Razón Social</label>
+                    {{ form.nombre }}
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Tipo</label>
+                        {{ form.tipo }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Celular</label>
+                        {{ form.celular }}
+                    </div>
+                </div>
+
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-success">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

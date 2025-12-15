@@ -47,14 +47,14 @@
             line-height: 1.6;
         }
 
-        /* Navbar - CORREGIDO Z-INDEX PARA EVITAR BLOQUEOS */
+        /* Navbar */
         .navbar {
             background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             padding: 0.5rem 1rem;
             position: sticky;
             top: 0;
-            z-index: 10000; /* Aumentado drásticamente para estar sobre cualquier gráfico */
+            z-index: 10000;
         }
 
         .navbar-brand {
@@ -152,7 +152,7 @@
         .dropdown-menu-dark {
             background-color: #343a40;
             border: 1px solid rgba(0,0,0,0.15);
-            z-index: 10001; /* Asegura que el desplegable flote sobre todo */
+            z-index: 10001;
         }
         
         .dropdown-menu-user {
@@ -200,7 +200,7 @@
             margin-bottom: 40px;
             flex: 1;
             animation: fadeIn 0.5s ease-out;
-            position: relative; /* Contexto de apilamiento seguro */
+            position: relative;
             z-index: 1;
         }
 
@@ -312,6 +312,7 @@
                         </ul>
                     </li>
                     {% endif %}
+
                     {% if perms.compras.acceso_compras %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navCompras" role="button" data-bs-toggle="dropdown">
@@ -338,6 +339,28 @@
                     </li>
                     {% endif %}
 
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navBancos" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-university me-1"></i> Bancos y Flujos
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navBancos">
+                             <li><h6 class="dropdown-header text-uppercase small text-white">Gestión Financiera</h6></li>
+                            <li><a class="dropdown-item" href="{% url 'dashboard_bancos' %}">
+                                <i class="fas fa-chart-line fa-fw me-2"></i> Dashboard Bancos
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'lista_movimientos' %}">
+                                <i class="fas fa-list fa-fw me-2"></i> Historial Movimientos
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header text-uppercase small text-white">Operaciones</h6></li>
+                            <li><a class="dropdown-item" href="{% url 'transaction_create' %}">
+                                <i class="fas fa-plus-circle fa-fw me-2"></i> Nuevo Movimiento
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'transfer_create' %}">
+                                <i class="fas fa-exchange-alt fa-fw me-2"></i> Transferencia
+                            </a></li>
+                        </ul>
+                    </li>
                     {% if perms.ternium.acceso_catalogos %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navCatalogos" role="button" data-bs-toggle="dropdown">
@@ -525,28 +548,25 @@
                                 statusIndicator.classList.add('bg-warning');
                             } else {
                                 statusIndicator.textContent = 'Desconectado';
-                                statusIndicator.classList.remove('bg-success', 'bg-warning');
+                                statusIndicator.classList.remove('bg-secondary', 'bg-warning');
                                 statusIndicator.classList.add('bg-secondary');
                             }
                         }
                     }
-                    
-                    if (data.type === 'chat_notification') {
-                        const badge = document.getElementById('chat-notification-badge');
-                        if (badge) {
-                            const currentCount = parseInt(badge.textContent) || 0;
-                            badge.textContent = currentCount + 1;
-                            badge.style.display = 'block';
-                        }
-                    }
+                };
+
+                presenceSocket.onerror = function(err) {
+                    console.error('Socket encountered error: ', err.message, 'Closing socket');
+                    presenceSocket.close();
                 };
             }
 
             connect();
 
-            ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'].forEach(eventName => {
-                document.addEventListener(eventName, resetInactivityTimer, false);
-            });
+            // Event listeners para resetear el timer de inactividad
+            window.onload = resetInactivityTimer;
+            document.onmousemove = resetInactivityTimer;
+            document.onkeypress = resetInactivityTimer;
         });
     </script>
     {% endif %}
