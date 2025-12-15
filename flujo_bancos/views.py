@@ -150,18 +150,18 @@ def dashboard(request):
     movimientos_egresos_count = movs_rango.filter(cargo__gt=0).count()
 
     # ---------------------------------------------------------
-    # 3. CUENTAS Y TIPO DE CAMBIO (CORREGIDO)
+    # 3. CUENTAS Y TIPO DE CAMBIO
     # ---------------------------------------------------------
     todas_cuentas = Cuenta.objects.all()
     
-    # A) Primero obtenemos el Tipo de Cambio REAL
+    # A) Obtener el Tipo de Cambio REAL de Banxico
     raw_tc = obtener_tipo_cambio_banxico()
     
     try:
         if raw_tc:
             tipo_cambio_actual = Decimal(str(raw_tc))
         else:
-            # Fallback de seguridad (mejor 20 que 1)
+            # Fallback de seguridad
             tipo_cambio_actual = Decimal('20.00')
     except Exception:
         tipo_cambio_actual = Decimal('20.00')
@@ -170,7 +170,7 @@ def dashboard(request):
     total_mxn = sum(c.saldo_actual for c in todas_cuentas if c.moneda == 'MXN')
     total_usd = sum(c.saldo_actual for c in todas_cuentas if c.moneda == 'USD')
     
-    # C) Calculamos la conversión AQUÍ (en Python, con precisión)
+    # C) Conversión Total (Para el KPI general)
     total_usd_convertido = total_usd * tipo_cambio_actual
     
     # D) Gran Total Consolidado
@@ -182,6 +182,16 @@ def dashboard(request):
         key=lambda c: c.saldo_actual, 
         reverse=True
     )
+    
+    # --- CORRECCIÓN CLAVE PARA EL HTML ---
+    # Recorremos las cuentas ordenadas y les "pegamos" el valor convertido
+    # Esto evita usar {% widthratio %} en el template que causa errores de redondeo o ceros.
+    for cuenta in cuentas_ordenadas:
+        if cuenta.moneda == 'USD':
+            cuenta.saldo_convertido_temp = cuenta.saldo_actual * tipo_cambio_actual
+        else:
+            cuenta.saldo_convertido_temp = 0
+    # -------------------------------------
     
     cuentas_mxn = [c for c in todas_cuentas if c.moneda == 'MXN']
     cuentas_usd = [c for c in todas_cuentas if c.moneda == 'USD']
@@ -205,6 +215,7 @@ def dashboard(request):
         'movimientos_ingresos_count': movimientos_ingresos_count,
         'movimientos_egresos_count': movimientos_egresos_count,
         
+        # Pasamos la lista ordenada que YA TIENE el atributo .saldo_convertido_temp
         'cuentas': cuentas_ordenadas, 
         'cuentas_mxn': cuentas_mxn, 
         'cuentas_usd': cuentas_usd, 
@@ -213,9 +224,8 @@ def dashboard(request):
         'total_usd': total_usd,
         'saldo_total': saldo_total_consolidado, 
         
-        # DATOS DE CONVERSIÓN CORREGIDOS
         'tipo_cambio': tipo_cambio_actual,
-        'total_usd_convertido': total_usd_convertido, # <--- ¡IMPORTANTE!
+        'total_usd_convertido': total_usd_convertido, 
         
         'movimientos_recientes': movimientos_recientes,
     }
