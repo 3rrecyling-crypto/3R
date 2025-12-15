@@ -5,6 +5,7 @@ from django.http import JsonResponse
 from .models import Movimiento, UnidadNegocio, Operacion, Categoria, SubCategoria
 from django.db.models import Sum
 from django.http import JsonResponse
+from django.contrib import messages
 from django.shortcuts import get_object_or_404
 from decimal import Decimal
 from .forms import CuentaForm # Importar el nuevo form
