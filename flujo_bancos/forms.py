@@ -13,6 +13,18 @@ class TerceroForm(forms.ModelForm):
         }
 
 # 2. FORMULARIO PRINCIPAL UNIFICADO
+# 1. FORMULARIO PARA ALTA RÁPIDA DE TERCEROS
+class TerceroForm(forms.ModelForm):
+    class Meta:
+        model = Tercero
+        fields = ['nombre', 'tipo', 'celular']
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej. Walmart'}),
+            'tipo': forms.Select(attrs={'class': 'form-select'}),
+            'celular': forms.TextInput(attrs={'class': 'form-select', 'placeholder': 'Opcional'}),
+        }
+
+# 2. FORMULARIO PRINCIPAL UNIFICADO
 class MovimientoForm(forms.ModelForm):
     # --- Campos EXTRAS para la interfaz (No existen en BD directo) ---
     TIPO_CHOICES = [
@@ -66,7 +78,7 @@ class MovimientoForm(forms.ModelForm):
             'comentarios': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
 
-    # *** INICIALIZACIÓN (AQUÍ ESTÁ LA MAGIA PARA QUE CARGUEN LOS DATOS) ***
+    # *** INICIALIZACIÓN ***
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
@@ -114,7 +126,7 @@ class MovimientoForm(forms.ModelForm):
                 except (ValueError, TypeError):
                     pass
 
-    # *** LÓGICA DE GUARDADO ***
+    # *** LÓGICA DE GUARDADO (SOLO UNA VEZ) ***
     def save(self, commit=True):
         instance = super().save(commit=False)
         
@@ -137,37 +149,6 @@ class MovimientoForm(forms.ModelForm):
             cambio_saldo = monto_base 
 
         # 3. Recálculo simple de saldo (Solo referencia)
-        if instance.cuenta:
-             instance.saldo_banco = instance.cuenta.saldo_actual + cambio_saldo
-            
-        if commit:
-            instance.save()
-
-        return instance
-
-    # *** LÓGICA DE GUARDADO ***
-    def save(self, commit=True):
-        instance = super().save(commit=False)
-        
-        # 1. Convertir Combobox Tercero -> Texto para BD
-        tercero_seleccionado = self.cleaned_data.get('tercero_obj')
-        if tercero_seleccionado:
-            instance.tercero = tercero_seleccionado.nombre 
-        
-        # 2. Convertir Monto Base -> Cargo/Abono
-        tipo = self.cleaned_data.get('tipo_movimiento')
-        monto_base = self.cleaned_data.get('monto_total', 0)
-        
-        if tipo == 'egreso':
-            instance.cargo = monto_base
-            instance.abono = 0
-            cambio_saldo = -monto_base
-        else: 
-            instance.abono = monto_base
-            instance.cargo = 0
-            cambio_saldo = monto_base 
-
-        # 3. Recálculo simple de saldo (Solo referencia, el recálculo real debe ser mas complejo)
         if instance.cuenta:
              instance.saldo_banco = instance.cuenta.saldo_actual + cambio_saldo
             
