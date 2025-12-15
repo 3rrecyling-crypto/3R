@@ -14,9 +14,17 @@ from .models import (
 class OperadorForm(forms.ModelForm):
     class Meta:
         model = Operador
-        fields = ['nombre']
-        widgets = {'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej. Juan Pérez'})}
-        labels = {'nombre': 'Nombre Completo del Operador'}
+        fields = ['nombre', 'folio', 'empresas'] # <--- Agregamos los campos
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej. Juan Pérez'}),
+            'folio': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej. LIC-123456'}),
+            'empresas': forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+        }
+        labels = {
+            'nombre': 'Nombre Completo',
+            'folio': 'Folio o Licencia',
+            'empresas': 'Unidades de Negocio (Empresas)'
+        }
 
 
 class MaterialForm(forms.ModelForm):

@@ -131,11 +131,34 @@ class LineaTransporte(models.Model):
 
 class Operador(models.Model):
     """Representa a un operador o conductor."""
-    search_fields = ['nombre']
+    # Agregamos 'folio' a los campos de búsqueda
+    search_fields = ['nombre', 'folio'] 
+    
     nombre = models.CharField(max_length=200, unique=True, help_text="Nombre completo del operador")
+    
+    # --- NUEVOS CAMPOS ---
+    folio = models.CharField(
+        max_length=50, 
+        blank=True, 
+        null=True, 
+        verbose_name="Folio / Licencia",
+        help_text="Número de licencia, gafete o ID interno"
+    )
+    
+    empresas = models.ManyToManyField(
+        Empresa,
+        related_name="operadores",
+        verbose_name="Unidades de Negocio (Empresas)",
+        blank=True
+    )
+    # ---------------------
+    
     creado_en = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
+        # Muestra el folio si existe
+        if self.folio:
+            return f"{self.nombre} ({self.folio})"
         return self.nombre
 
     class Meta:

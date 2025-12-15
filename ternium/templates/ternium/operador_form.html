@@ -1,53 +1,69 @@
-<!-- operador_form.html -->
 {% extends 'ternium/base.html' %}
 {% load static %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header p-3 bg-primary text-white">
-                    <h5 class="mb-0">
-                        <i class="fas fa-id-card me-2"></i>
-                        {{ titulo|default:"Operador" }}
-                    </h5>
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ titulo|default:"Gestión de Operador" }}</h2>
+        <a href="{% url 'lista_operadores' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Cancelar
+        </a>
+    </div>
+    
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                        <p class="mb-0">{{ error }}</p>
+                    {% endfor %}
                 </div>
-                <div class="card-body p-4">
-                    <form method="post" novalidate>
-                        {% csrf_token %}
-                        
-                        {% if form.non_field_errors %}
-                        <div class="alert alert-danger">
-                            {% for error in form.non_field_errors %}
-                                <p class="mb-0">{{ error }}</p>
-                            {% endfor %}
-                        </div>
+                {% endif %}
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.nombre.id_for_label }}" class="form-label fw-semibold">Nombre Completo</label>
+                        {{ form.nombre }}
+                        {% if form.nombre.errors %}
+                            <div class="invalid-feedback d-block">{{ form.nombre.errors }}</div>
                         {% endif %}
-                        
-                        <div class="row">
-                            <div class="col-md-12 mb-3">
-                                <label for="{{ form.nombre.id_for_label }}" class="form-label fw-semibold">Nombre Completo</label>
-                                {{ form.nombre }}
-                                {% if form.nombre.errors %}
-                                    <div class="invalid-feedback d-block">
-                                        {{ form.nombre.errors }}
-                                    </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        
-                        <div class="d-flex justify-content-end mt-4 gap-2">
-                            <a href="{% url 'lista_operadores' %}" class="btn btn-secondary">
-                                <i class="fas fa-times me-1"></i> Cancelar
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-1"></i> Guardar
-                            </button>
-                        </div>
-                    </form>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.folio.id_for_label }}" class="form-label fw-semibold">Folio / Licencia</label>
+                        {{ form.folio }}
+                        {% if form.folio.errors %}
+                            <div class="invalid-feedback d-block">{{ form.folio.errors }}</div>
+                        {% endif %}
+                    </div>
                 </div>
-            </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">{{ form.empresas.label }}</label>
+                    <div class="p-3 border rounded" style="max-height: 250px; overflow-y: auto;">
+                        {% for check in form.empresas %}
+                        <div class="form-check">
+                            {{ check.tag }}
+                            <label class="form-check-label" for="{{ check.id_for_label }}">
+                                {{ check.choice_label }}
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% if form.empresas.errors %}
+                        <div class="invalid-feedback d-block">{{ form.empresas.errors }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="d-flex justify-content-end mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i> Guardar Operador
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
