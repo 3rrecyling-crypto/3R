@@ -10,11 +10,14 @@ class FacturaForm(forms.ModelForm):
     class Meta:
         model = Factura
         fields = [
-            'orden_compra', 'numero_factura', 'fecha_emision', 
-            'fecha_vencimiento', 'monto', 'archivo_factura', 'notas'
+            'orden_compra', 'proveedor', 'numero_factura', 
+            'fecha_emision', 'fecha_vencimiento', 'monto', 
+            'archivo_factura', 'notas', 'cantidad_plazos'
         ]
         widgets = {
             'orden_compra': forms.Select(attrs={'class': 'form-select'}),
+            'proveedor': forms.Select(attrs={'class': 'form-select'}), # Nuevo
+            'cantidad_plazos': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}), # Nuevo
             'numero_factura': forms.TextInput(attrs={'class': 'form-control'}),
             'fecha_emision': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'fecha_vencimiento': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
@@ -25,22 +28,19 @@ class FacturaForm(forms.ModelForm):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Importación local para evitar circular imports
+        
+        # La Orden de Compra ya no es obligatoria
+        self.fields['orden_compra'].required = False
+        self.fields['proveedor'].required = True # El proveedor SI es obligatorio
+        
+        # Lógica existente para filtrar OCs
         try:
             from compras.models import OrdenCompra
-            # Filtra OCs auditadas o aprobadas que no tengan factura
             self.fields['orden_compra'].queryset = OrdenCompra.objects.filter(
                 estatus__in=['APROBADA', 'AUDITADA']
             ).exclude(factura_cxp__isnull=False)
-            
-            if self.instance and self.instance.pk:
-                # Si es edición, calcula fecha de vencimiento basado en OC
-                dias_credito = getattr(self.instance.orden_compra.proveedor, 'dias_credito', 30)
-                self.fields['fecha_vencimiento'].initial = self.instance.orden_compra.fecha_emision + timezone.timedelta(days=dias_credito)
         except ImportError:
-            # Si no se puede importar OrdenCompra, deshabilitar el campo
-            self.fields['orden_compra'].queryset = Factura.objects.none()
-            self.fields['orden_compra'].help_text = "No se pudo cargar las órdenes de compra"
+            pass
 
 class PagoForm(forms.ModelForm):
     numero_plazo = forms.IntegerField(
@@ -70,6 +70,39 @@ class PagoForm(forms.ModelForm):
             'referencia', 'archivo_comprobante', 'numero_plazo',
             'fecha_plazo_programado', 'notas'
         ]
+        # AQUÍ ES DONDE OCURRE LA MAGIA:
+        widgets = {
+            'numero_plazo': forms.NumberInput(attrs={
+                'class': 'form-control', 
+                'placeholder': '1'  # <--- NECESARIO para Floating Label
+            }),
+            'monto_pagado': forms.NumberInput(attrs={
+                'class': 'form-control', 
+                'placeholder': '0.00', # <--- NECESARIO
+                'step': '0.01'
+            }),
+            'fecha_pago': forms.DateInput(attrs={
+                'class': 'form-control', 
+                'type': 'date',
+                'placeholder': 'yyyy-mm-dd' # <--- NECESARIO (aunque sea date)
+            }),
+            'metodo_pago': forms.Select(attrs={
+                'class': 'form-select', # <--- OJO: Para selects usa 'form-select' no 'form-control'
+                'placeholder': 'Seleccione'
+            }),
+            'referencia': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'Ej: Transferencia 12345' # <--- NECESARIO
+            }),
+            'notas': forms.Textarea(attrs={
+                'class': 'form-control', 
+                'placeholder': 'Comentarios adicionales',
+                'rows': 3
+            }),
+            'archivo_comprobante': forms.FileInput(attrs={
+                'class': 'form-control' # Los archivos no usan placeholder, eso está bien
+            }),
+        }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -127,3 +160,28 @@ class PagoForm(forms.ModelForm):
                 )
         
         return cleaned_data
+    
+    
+class CXPManualForm(forms.ModelForm):
+    class Meta:
+        model = Factura
+        fields = [
+            'proveedor', 'numero_factura', 
+            'fecha_emision', 'monto', 
+            'cantidad_plazos', 'archivo_factura', 'notas'
+        ]
+        widgets = {
+            'proveedor': forms.Select(attrs={'class': 'form-select select2'}),
+            'numero_factura': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: F-90210 (Folio del Proveedor)'}),
+            'fecha_emision': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'monto': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': '0.00'}),
+            'cantidad_plazos': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'value': 1}),
+            'archivo_factura': forms.FileInput(attrs={'class': 'form-control'}),
+            'notas': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Fecha de vencimiento se calcula sola, no la pedimos en el form manual para no confundir
+        # El proveedor es obligatorio
+        self.fields['proveedor'].required = True

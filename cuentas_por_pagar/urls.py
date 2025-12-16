@@ -9,6 +9,9 @@ urlpatterns = [
     path('facturas/<int:pk>/eliminar/', views.FacturaDeleteView.as_view(), name='eliminar_factura'),
     path('facturas/<int:pk>/plazos/', views.gestionar_plazos_factura, name='gestionar_plazos_factura'),
     
+    # NUEVA RUTA: Creación manual de Cuenta por Pagar
+    path('nueva-cxp/', views.nueva_cuenta_por_pagar, name='nueva_cuenta_por_pagar'),
+    
     # Pagos
     path('pagos/', views.PagoListView.as_view(), name='lista_pagos'),
     path('pagos/nuevo/', views.PagoCreateView.as_view(), name='crear_pago'),

@@ -1,545 +1,495 @@
 {% extends 'ternium/base.html' %}
 {% load humanize %}
+{% load widget_tweaks %}
 
-{% block title %}Detalle de Factura - {{ factura.numero_factura }}{% endblock %}
+{% block title %}Factura {{ factura.numero_factura }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <!-- Header -->
-    <div class="row mb-4">
+<div class="container-fluid py-4 bg-light-subtle" style="min-height: 100vh;">
+    
+    <div class="row mb-4 animate__animated animate__fadeIn">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
                 <div>
-                    <h1 class="h3 mb-1 text-dark">Detalle de Factura</h1>
-                    <p class="text-muted mb-0">Información completa y gestión de pagos</p>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mb-1 small text-muted">
+                            <li class="breadcrumb-item"><a href="{% url 'lista_facturas' %}" class="text-decoration-none text-secondary">Facturas</a></li>
+                            <li class="breadcrumb-item active">{{ factura.numero_factura }}</li>
+                        </ol>
+                    </nav>
+                    <div class="d-flex align-items-center gap-3">
+                        <h2 class="fw-bold text-dark mb-0 ls-tight">
+                            {{ factura.numero_factura }}
+                        </h2>
+                        {% if factura.estatus == 'PAGADA' %}
+                            <span class="badge bg-success-subtle text-success fs-6 rounded-pill"><i class="fas fa-check-circle me-1"></i>Pagada</span>
+                        {% elif factura.estatus == 'VENCIDA' %}
+                            <span class="badge bg-danger-subtle text-danger fs-6 rounded-pill"><i class="fas fa-exclamation-circle me-1"></i>Vencida</span>
+                        {% else %}
+                            <span class="badge bg-primary-subtle text-primary fs-6 rounded-pill">{{ factura.get_estatus_display }}</span>
+                        {% endif %}
+                    </div>
                 </div>
-                <div>
-                    <a href="{% url 'lista_facturas' %}" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left me-2"></i>Volver
+                
+                <div class="d-flex gap-2">
+                    <a href="{% url 'lista_facturas' %}" class="btn btn-outline-secondary shadow-sm rounded-pill px-4 fw-medium">
+                        <i class="fas fa-arrow-left me-2"></i>Volver a la Lista
                     </a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row">
-        <!-- Información Principal de la Factura -->
-        <div class="col-lg-8">
-            <!-- NUEVA SECCIÓN: Sincronización con Compras -->
-            <div class="card border-0 shadow-sm mb-4 border-info">
-                <div class="card-header bg-info text-white border-0 py-3">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-sync-alt me-2"></i>
-                        Sincronización con Compras
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="me-3">
-                                    <i class="fas fa-file-contract fa-2x text-primary"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-1">Orden de Compra</h6>
-                                    <p class="mb-0">
-                                        <a href="{% url 'detalle_orden_compra' factura.orden_compra.pk %}" 
-                                           class="text-decoration-none fw-bold text-dark">
-                                            {{ factura.orden_compra.folio }}
-                                        </a>
-                                    </p>
-                                    <small class="text-muted">Estado: 
-                                        <span class="badge {% if factura.orden_compra.estatus == 'APROBADA' %}bg-success{% elif factura.orden_compra.estatus == 'AUDITADA' %}bg-primary{% elif factura.orden_compra.estatus == 'LISTA_PARA_AUDITAR' %}bg-warning{% else %}bg-secondary{% endif %}">
-                                            {{ factura.orden_compra.get_estatus_display }}
-                                        </span>
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="me-3">
-                                    <i class="fas fa-link fa-2x text-success"></i>
-                                </div>
-                                <div>
-                                    <h6 class="mb-1">Documentos Sincronizados</h6>
-                                    <div class="d-flex gap-3">
-                                        {% if factura.archivo_factura %}
-                                        <span class="badge bg-success">
-                                            <i class="fas fa-check me-1"></i>Factura
-                                        </span>
-                                        {% else %}
-                                        <span class="badge bg-secondary">
-                                            <i class="fas fa-times me-1"></i>Factura
-                                        </span>
-                                        {% endif %}
-                                        
-                                        {% if factura.orden_compra.comprobante_pago %}
-                                        <span class="badge bg-success">
-                                            <i class="fas fa-check me-1"></i>Comprobante
-                                        </span>
-                                        {% else %}
-                                        <span class="badge bg-secondary">
-                                            <i class="fas fa-times me-1"></i>Comprobante
-                                        </span>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                     
-                    <!-- Checklist de Auditoría -->
-                    <div class="mt-3 p-3 bg-light rounded">
-                        <h6 class="text-dark mb-2">
-                            <i class="fas fa-clipboard-check me-2 text-primary"></i>
-                            Progreso de Auditoría en Compras
-                        </h6>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" 
-                                           {% if factura.orden_compra.factura_subida %}checked{% endif %} disabled>
-                                    <label class="form-check-label {% if factura.orden_compra.factura_subida %}text-success{% endif %}">
-                                        Factura subida
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" 
-                                           {% if factura.orden_compra.comprobante_pago_subido %}checked{% endif %} disabled>
-                                    <label class="form-check-label {% if factura.orden_compra.comprobante_pago_subido %}text-success{% endif %}">
-                                        Comprobante subido
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="alert alert-sm {% if factura.orden_compra.lista_para_auditar %}alert-success{% else %}alert-warning{% endif %} mb-0">
-                                    <small>
-                                        <i class="fas {% if factura.orden_compra.lista_para_auditar %}fa-check-circle{% else %}fa-clock{% endif %} me-1"></i>
-                                        {% if factura.orden_compra.lista_para_auditar %}
-                                            Lista para auditoría
-                                        {% else %}
-                                            Pendiente de documentos
-                                        {% endif %}
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tarjeta de Información General -->
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white border-0 py-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0 text-dark">
-                            <i class="fas fa-file-invoice text-primary me-2"></i>
-                            Información de la Factura
-                        </h5>
-                        <div class="d-flex gap-2">
-                            <a href="{% url 'editar_factura' factura.pk %}" class="btn btn-warning btn-sm">
-                                <i class="fas fa-edit me-1"></i>Editar
-                            </a>
-                            <a href="{% url 'crear_pago' %}?factura={{ factura.pk }}" class="btn btn-success btn-sm">
-                                <i class="fas fa-hand-holding-usd me-1"></i>Registrar Pago
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <!-- Columna Izquierda -->
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label text-muted small mb-1">Número de Factura</label>
-                                <h5 class="text-dark mb-0">{{ factura.numero_factura }}</h5>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label text-muted small mb-1">Orden de Compra</label>
-                                <p class="mb-0">
-                                    <i class="fas fa-file-contract text-info me-2"></i>
-                                    {{ factura.orden_compra.folio }}
-                                </p>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label text-muted small mb-1">Proveedor</label>
-                                <p class="mb-0">
-                                    <i class="fas fa-building text-secondary me-2"></i>
-                                    {{ factura.orden_compra.proveedor.razon_social }}
-                                </p>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label text-muted small mb-1">Fechas</label>
-                                <div class="d-flex gap-3">
-                                    <div>
-                                        <small class="text-muted d-block">Emisión</small>
-                                        <strong>{{ factura.fecha_emision }}</strong>
-                                    </div>
-                                    <div>
-                                        <small class="text-muted d-block">Vencimiento</small>
-                                        <strong class="{% if factura.esta_vencida %}text-danger{% elif factura.esta_por_vencer %}text-warning{% endif %}">
-                                            {{ factura.fecha_vencimiento }}
-                                        </strong>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Columna Derecha -->
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label text-muted small mb-1">Estatus</label>
-                                <div>
-                                    <span class="badge {% if factura.estatus == 'PAGADA' %}bg-success{% elif factura.estatus == 'VENCIDA' %}bg-danger{% elif factura.estatus == 'POR_VENCER' %}bg-warning{% else %}bg-primary{% endif %} rounded-pill fs-6">
-                                        {{ factura.get_estatus_display }}
-                                    </span>
-                                    {% if factura.dias_restantes_credito %}
-                                    <small class="text-muted ms-2">
-                                        ({{ factura.dias_restantes_credito }} días)
-                                    </small>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label text-muted small mb-1">Montos</label>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span>Total:</span>
-                                    <strong class="text-dark">${{ factura.monto|floatformat:2|intcomma }}</strong>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span>Pagado:</span>
-                                    <strong class="text-success">${{ factura.monto_pagado|floatformat:2|intcomma }}</strong>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span>Pendiente:</span>
-                                    <strong class="{% if factura.monto_pendiente > 0 %}text-warning{% else %}text-success{% endif %}">
-                                        ${{ factura.monto_pendiente|floatformat:2|intcomma }}
-                                    </strong>
-                                </div>
-                            </div>
-                            
-                            <!-- Barra de Progreso MEJORADA -->
-                            <div class="mt-3">
-                                <label class="form-label text-muted small mb-2">Progreso de Pago</label>
-                                
-                                <!-- Usa la propiedad porcentaje_pagado del modelo -->
-                                <div class="progress" style="height: 8px;">
-                                    <div class="progress-bar {% if factura.pagada %}bg-success{% else %}bg-primary{% endif %}" 
-                                        role="progressbar" 
-                                        style="width: {{ factura.porcentaje_pagado|floatformat:0 }}%"
-                                        aria-valuenow="{{ factura.porcentaje_pagado|floatformat:0 }}" 
-                                        aria-valuemin="0" 
-                                        aria-valuemax="100">
-                                    </div>
-                                </div>
-                                <div class="d-flex justify-content-between mt-1">
-                                    <small class="text-muted">
-                                        {{ factura.porcentaje_pagado|floatformat:1 }}% completado
-                                    </small>
-                                    <small class="text-muted">
-                                        {{ factura.pagos.count }} pago{{ factura.pagos.count|pluralize }}
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- NUEVA: Información de Archivos -->
-                    <div class="row mt-4 pt-3 border-top">
-                        <div class="col-md-6">
-                            <h6 class="text-dark mb-3">
-                                <i class="fas fa-paperclip me-2 text-primary"></i>
-                                Archivos de Factura
-                            </h6>
-                            {% if factura.archivo_factura %}
-                            <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded">
-                                <div>
-                                    <i class="fas fa-file-pdf text-danger me-2"></i>
-                                    <span class="fw-semibold">{{ factura.archivo_factura.name|slice:"-20:" }}</span>
-                                </div>
-                                <a href="{{ factura.archivo_factura.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-download me-1"></i>Descargar
-                                </a>
-                            </div>
-                            {% else %}
-                            <div class="alert alert-warning">
-                                <i class="fas fa-exclamation-triangle me-2"></i>
-                                No se ha cargado archivo de factura
-                            </div>
-                            {% endif %}
-                        </div>
-                        <div class="col-md-6">
-                            <h6 class="text-dark mb-3">
-                                <i class="fas fa-sync-alt me-2 text-success"></i>
-                                Estado de Sincronización
-                            </h6>
-                            <div class="alert alert-info">
-                                <small>
-                                    <i class="fas fa-info-circle me-2"></i>
-                                    Los documentos cargados aquí se sincronizan automáticamente 
-                                    con la Orden de Compra en el módulo de Compras.
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Notas -->
-                    {% if factura.notas %}
-                    <div class="mt-4 pt-3 border-top">
-                        <label class="form-label text-muted small mb-2">Notas</label>
-                        <div class="alert alert-light border">
-                            <p class="mb-0">{{ factura.notas }}</p>
-                        </div>
-                    </div>
+                    {% if not factura.pagada %}
+                    <button type="button" class="btn btn-primary shadow-sm rounded-pill px-4 fw-medium" disabled>
+                        <i class="fas fa-info-circle me-2"></i>Gestione pagos en la tabla
+                    </button>
                     {% endif %}
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Panel Lateral - Resumen Rápido -->
-        <div class="col-lg-4">
-            <!-- Tarjeta de Resumen -->
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white border-0 py-3">
-                    <h6 class="card-title mb-0 text-dark">
-                        <i class="fas fa-chart-pie text-info me-2"></i>
-                        Resumen Rápido
-                    </h6>
+    <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+        <div class="card-body p-4">
+            <div class="position-relative m-4">
+                <div class="progress" style="height: 2px;">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ factura.porcentaje_pagado|floatformat:0 }}%;"></div>
                 </div>
-                <div class="card-body">
-                    <div class="list-group list-group-flush">
-                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
-                            <span class="text-muted">Estatus</span>
-                            <span class="badge {% if factura.estatus == 'PAGADA' %}bg-success{% elif factura.estatus == 'VENCIDA' %}bg-danger{% elif factura.estatus == 'POR_VENCER' %}bg-warning{% else %}bg-primary{% endif %}">
-                                {{ factura.get_estatus_display }}
-                            </span>
-                        </div>
-                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
-                            <span class="text-muted">Días Restantes</span>
-                            <strong class="{% if factura.dias_restantes_credito < 0 %}text-danger{% elif factura.dias_restantes_credito <= 3 %}text-warning{% else %}text-success{% endif %}">
-                                {{ factura.dias_restantes_credito }}
-                            </strong>
-                        </div>
-                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
-                            <span class="text-muted">Total Pagos</span>
-                            <strong>{{ factura.pagos.count }}</strong>
-                        </div>
-                        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
-                            <span class="text-muted">Creado por</span>
-                            <small class="text-muted">{{ factura.creado_por.username|default:"Sistema" }}</small>
-                        </div>
+                <div class="position-absolute top-0 start-0 translate-middle btn btn-sm rounded-pill {% if factura.pk %}btn-success{% else %}btn-secondary{% endif %}" style="width: 2rem; height:2rem; padding:0;">1</div>
+                <div class="position-absolute top-0 start-50 translate-middle btn btn-sm rounded-pill {% if factura.pagos.exists %}btn-success{% else %}btn-secondary{% endif %}" style="width: 2rem; height:2rem; padding:0;">2</div>
+                <div class="position-absolute top-0 start-100 translate-middle btn btn-sm rounded-pill {% if factura.pagada %}btn-success{% else %}btn-secondary{% endif %}" style="width: 2rem; height:2rem; padding:0;">3</div>
+                
+                <div class="position-absolute start-0 translate-middle-x mt-2 text-center" style="top: 10px;">
+                    <small class="fw-bold text-dark">Emisión</small><br>
+                    <small class="text-muted" style="font-size: 0.7rem;">{{ factura.fecha_emision|date:"d M" }}</small>
+                </div>
+                <div class="position-absolute start-50 translate-middle-x mt-2 text-center" style="top: 10px;">
+                    <small class="fw-bold text-dark">En Proceso</small><br>
+                    <small class="text-muted" style="font-size: 0.7rem;">{{ factura.porcentaje_pagado|floatformat:0 }}%</small>
+                </div>
+                <div class="position-absolute start-100 translate-middle-x mt-2 text-center" style="top: 10px;">
+                    <small class="fw-bold text-dark">Liquidada</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-body p-4 d-flex align-items-center">
+                    <div class="icon-square bg-primary bg-opacity-10 text-primary rounded-3 me-3">
+                        <i class="fas fa-file-invoice-dollar fa-lg"></i>
+                    </div>
+                    <div>
+                        <p class="text-muted text-uppercase small fw-bold mb-0">Monto Total</p>
+                        <h3 class="fw-bold text-dark mb-0">${{ factura.monto|floatformat:2|intcomma }}</h3>
                     </div>
                 </div>
             </div>
-
-            <!-- NUEVA: Tarjeta de Documentos Sincronizados -->
-            <div class="card border-0 shadow-sm mb-4 border-success">
-                <div class="card-header bg-success text-white border-0 py-3">
-                    <h6 class="card-title mb-0">
-                        <i class="fas fa-link me-2"></i>
-                        Enlace con Compras
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <div class="text-center mb-3">
-                        <i class="fas fa-sync-alt fa-2x text-success mb-2"></i>
-                        <h6 class="text-dark">Sincronización Activa</h6>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-body p-4 d-flex align-items-center">
+                    <div class="icon-square bg-success bg-opacity-10 text-success rounded-3 me-3">
+                        <i class="fas fa-wallet fa-lg"></i>
                     </div>
-                    <div class="d-grid gap-2">
-                        <a href="{% url 'detalle_orden_compra' factura.orden_compra.pk %}" 
-                           class="btn btn-outline-primary btn-sm">
-                            <i class="fas fa-external-link-alt me-2"></i>
-                            Ver Orden de Compra
-                        </a>
-                        <a href="{% url 'editar_factura' factura.pk %}" 
-                           class="btn btn-outline-success btn-sm">
-                            <i class="fas fa-upload me-2"></i>
-                            Cargar Documentos
-                        </a>
+                    <div>
+                        <p class="text-muted text-uppercase small fw-bold mb-0">Pagado</p>
+                        <h3 class="fw-bold text-success mb-0">${{ factura.monto_pagado|floatformat:2|intcomma }}</h3>
                     </div>
                 </div>
             </div>
-
-            <!-- Acciones Rápidas -->
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-0 py-3">
-                    <h6 class="card-title mb-0 text-dark">
-                        <i class="fas fa-bolt text-warning me-2"></i>
-                        Acciones Rápidas
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <a href="{% url 'crear_pago' %}?factura={{ factura.pk }}" class="btn btn-success">
-                            <i class="fas fa-hand-holding-usd me-2"></i>Registrar Pago
-                        </a>
-                        <a href="{% url 'editar_factura' factura.pk %}" class="btn btn-outline-warning">
-                            <i class="fas fa-edit me-2"></i>Editar Factura
-                        </a>
-                        <a href="{% url 'eliminar_factura' factura.pk %}" class="btn btn-outline-danger">
-                            <i class="fas fa-trash-alt me-2"></i>Eliminar Factura
-                        </a>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-body p-4 d-flex align-items-center">
+                    <div class="icon-square bg-warning bg-opacity-10 text-warning rounded-3 me-3">
+                        <i class="fas fa-hourglass-half fa-lg"></i>
+                    </div>
+                    <div>
+                        <p class="text-muted text-uppercase small fw-bold mb-0">Pendiente</p>
+                        <h3 class="fw-bold {% if factura.monto_pendiente > 0 %}text-warning{% else %}text-muted{% endif %} mb-0">
+                            ${{ factura.monto_pendiente|floatformat:2|intcomma }}
+                        </h3>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Sección de Pagos -->
-    <div class="row mt-2">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-0 py-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0 text-dark">
-                            <i class="fas fa-money-bill-wave text-success me-2"></i>
-                            Pagos Registrados
-                        </h5>
-                        <span class="badge bg-primary rounded-pill">{{ factura.pagos.count }}</span>
-                    </div>
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-header bg-white border-0 pt-4 px-4 pb-2">
+                    <h5 class="fw-bold text-dark mb-0">Datos Generales</h5>
                 </div>
-                <div class="card-body">
-                    {% if factura.pagos.all %}
+                <div class="card-body p-4">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item px-0 border-light pb-3">
+                            <small class="text-muted text-uppercase fw-bold">Proveedor</small>
+                            <div class="d-flex align-items-center mt-1">
+                                <div class="avatar-sm bg-light text-dark rounded-circle me-2 d-flex justify-content-center align-items-center fw-bold">
+                                    {{ factura.nombre_proveedor|slice:":1" }}
+                                </div>
+                                <span class="fw-medium text-dark">{{ factura.nombre_proveedor }}</span>
+                            </div>
+                        </li>
+                        <li class="list-group-item px-0 border-light py-3">
+                            <div class="row">
+                                <div class="col-6">
+                                    <small class="text-muted text-uppercase fw-bold">Emisión</small>
+                                    <p class="mb-0 text-dark fw-medium">{{ factura.fecha_emision|date:"d M, Y" }}</p>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted text-uppercase fw-bold">Vence</small>
+                                    <p class="mb-0 text-dark fw-medium">{{ factura.fecha_vencimiento|date:"d M, Y" }}</p>
+                                </div>
+                            </div>
+                        </li>
+                        {% if factura.orden_compra %}
+                        <li class="list-group-item px-0 border-light py-3">
+                            <small class="text-muted text-uppercase fw-bold">Orden de Compra</small>
+                            <div class="mt-1 p-2 bg-light rounded-3 d-flex justify-content-between align-items-center">
+                                <span class="fw-bold text-dark">{{ factura.orden_compra.folio }}</span>
+                                <a href="{% url 'detalle_orden_compra' factura.orden_compra.pk %}" class="btn btn-sm btn-white border shadow-sm">
+                                    <i class="fas fa-external-link-alt"></i>
+                                </a>
+                            </div>
+                        </li>
+                        {% endif %}
+                        {% if factura.notas %}
+                        <li class="list-group-item px-0 border-0 pt-3">
+                            <small class="text-muted text-uppercase fw-bold">Notas</small>
+                            <p class="small text-muted bg-light p-3 rounded-3 mt-1 fst-italic mb-0">{{ factura.notas|linebreaksbr }}</p>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-header bg-white border-0 pt-4 px-4 pb-2 d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold text-dark mb-0">Calendario de Pagos</h5>
+                    {% if factura.es_pago_plazos %}
+                        <span class="badge bg-light text-muted border rounded-pill">{{ factura.pagos.count }} / {{ factura.cantidad_plazos }} plazos</span>
+                    {% endif %}
+                </div>
+                <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead class="table-light">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light text-uppercase small text-muted">
                                 <tr>
-                                    <th class="border-0">Fecha</th>
-                                    <th class="border-0 text-end">Monto</th>
-                                    <th class="border-0">Método</th>
-                                    <th class="border-0">Referencia</th>
-                                    <th class="border-0">Comprobante</th>
-                                    <th class="border-0">Registrado por</th>
-                                    <th class="border-0 text-center">Acciones</th>
+                                    <th class="ps-4 py-3 border-0">Plazo</th>
+                                    <th class="py-3 border-0">Fecha Programada</th>
+                                    <th class="text-end py-3 border-0">Monto</th>
+                                    <th class="text-center py-3 border-0">Estado</th>
+                                    <th class="text-end pe-4 py-3 border-0">Acciones</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                {% for pago in factura.pagos.all %}
+                            <tbody class="border-top-0">
+                                {% for plazo in factura.plazos_programados %}
                                 <tr>
-                                    <td>
-                                        <i class="fas fa-calendar text-muted me-2"></i>
-                                        {{ pago.fecha_pago }}
+                                    <td class="ps-4 border-light">
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm rounded-circle d-flex align-items-center justify-content-center fw-bold me-3
+                                                {% if plazo.esta_pagado %}bg-success-subtle text-success{% else %}bg-secondary-subtle text-secondary{% endif %}"
+                                                style="width: 32px; height: 32px;">
+                                                {{ plazo.numero_plazo }}
+                                            </div>
+                                            {% if factura.cantidad_plazos == 1 %}
+                                                <span class="small text-muted ms-1">(Único)</span>
+                                            {% endif %}
+                                        </div>
                                     </td>
-                                    <td class="text-end">
-                                        <strong class="text-success">${{ pago.monto_pagado|floatformat:2|intcomma }}</strong>
+                                    <td class="border-light">
+                                        <div class="d-flex flex-column">
+                                            <span class="fw-medium text-dark">{{ plazo.fecha_programada|date:"d M, Y" }}</span>
+                                            {% if plazo.esta_vencido %}
+                                                <span class="text-danger x-small fw-bold">Vencido</span>
+                                            {% endif %}
+                                        </div>
                                     </td>
-                                    <td>
-                                        <span class="badge bg-info rounded-pill">{{ pago.get_metodo_pago_display }}</span>
+                                    <td class="text-end border-light font-monospace text-dark">
+                                        ${{ plazo.monto_programado|floatformat:2|intcomma }}
                                     </td>
-                                    <td>
-                                        <code class="text-muted">{{ pago.referencia|default:"-" }}</code>
-                                    </td>
-                                    <td>
-                                        {% if pago.archivo_comprobante %}
-                                        <a href="{{ pago.archivo_comprobante.url }}" target="_blank" class="btn btn-sm btn-outline-success">
-                                            <i class="fas fa-file-download me-1"></i>Descargar
-                                        </a>
+                                    <td class="text-center border-light">
+                                        {% if plazo.esta_pagado %}
+                                            <span class="badge bg-success-subtle text-success rounded-pill px-3">Pagado</span>
                                         {% else %}
-                                        <span class="badge bg-secondary">Sin archivo</span>
+                                            <span class="badge bg-secondary-subtle text-secondary rounded-pill px-3">Pendiente</span>
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        <small class="text-muted">{{ pago.registrado_por.username|default:"Sistema" }}</small>
+                                    <td class="text-end pe-4 border-light">
+                                        {% if plazo.esta_pagado %}
+                                            {% if plazo.pago.archivo_comprobante %}
+                                                <a href="{{ plazo.pago.archivo_comprobante.url }}" target="_blank" 
+                                                   class="btn btn-icon btn-sm btn-light text-danger me-1" 
+                                                   title="Descargar Comprobante">
+                                                    <i class="fas fa-file-pdf"></i>
+                                                </a>
+                                            {% endif %}
+
+                                            <button type="button" 
+                                                onclick="verDetallePago(
+                                                    '{{ plazo.numero_plazo }}',
+                                                    '{{ plazo.pago.monto_pagado }}',
+                                                    '{{ plazo.pago.fecha_pago|date:'Y-m-d' }}',
+                                                    '{{ plazo.pago.get_metodo_pago_display }}',
+                                                    '{{ plazo.pago.referencia|default:'-' }}',
+                                                    '{{ plazo.pago.notas|default:''|escapejs }}',
+                                                    '{% if plazo.pago.archivo_comprobante %}{{ plazo.pago.archivo_comprobante.url }}{% endif %}',
+                                                    '{{ plazo.pago.registrado_por.username|default:'Sistema' }}',
+                                                    '{{ plazo.pago.creado_en|date:'d/m/Y H:i' }}'
+                                                )"
+                                                class="btn btn-icon btn-sm btn-light rounded-circle text-muted" 
+                                                title="Ver Detalle del Pago">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        {% else %}
+                                            <button type="button" 
+                                                    onclick="prepararModal({{ plazo.numero_plazo }}, '{{ plazo.monto_programado|stringformat:'f' }}')"
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#modalPago"
+                                                    class="btn btn-sm btn-primary-soft rounded-pill px-3 fw-bold small">
+                                                Pagar
+                                            </button>
+                                        {% endif %}
                                     </td>
-                                    <td class="text-center">
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="{% url 'editar_pago' pago.pk %}" class="btn btn-outline-warning" title="Editar pago">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                            <a href="{% url 'eliminar_pago' pago.pk %}" class="btn btn-outline-danger" title="Eliminar pago">
-                                                <i class="fas fa-trash-alt"></i>
-                                            </a>
-                                        </div>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-5 text-muted">
+                                        <i class="fas fa-exclamation-circle mb-2"></i>
+                                        <p class="mb-0">No se encontraron plazos calculados. Verifique el monto de la factura.</p>
                                     </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
-                    {% else %}
-                    <div class="text-center py-5">
-                        <i class="fas fa-money-bill-wave fa-3x text-muted mb-3"></i>
-                        <h5 class="text-muted">No hay pagos registrados</h5>
-                        <p class="text-muted mb-4">Esta factura aún no tiene pagos asociados</p>
-                        <a href="{% url 'crear_pago' %}?factura={{ factura.pk }}" class="btn btn-success">
-                            <i class="fas fa-hand-holding-usd me-2"></i>Registrar Primer Pago
-                        </a>
-                    </div>
-                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
+</div> 
+
+<div class="modal fade" id="modalPago" tabindex="-1" aria-labelledby="modalPagoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0 bg-primary text-white px-4 py-3 rounded-top-4">
+                <h5 class="modal-title fw-bold" id="modalPagoLabel">
+                    <i class="fas fa-wallet me-2"></i>Registrar Pago
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <form method="post" action="{% url 'gestionar_plazos_factura' factura.pk %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body p-4 bg-white">
+                    {% if form_pago.errors %}
+                    <div class="alert alert-danger border-0 small rounded-3 mb-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Verifica los datos ingresados.
+                    </div>
+                    {% endif %}
+
+                    <input type="hidden" name="factura" value="{{ factura.pk }}">
+
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label small text-muted fw-bold">No. Plazo</label>
+                            {% render_field form_pago.numero_plazo class="form-control bg-light border" readonly="readonly" %}
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-muted fw-bold">Monto ($)</label>
+                            {% render_field form_pago.monto_pagado class="form-control bg-white border fw-bold text-dark" placeholder="0.00" %}
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label small text-muted fw-bold">Fecha de Pago</label>
+                            {% render_field form_pago.fecha_pago class="form-control bg-white border" type="date" %}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small text-muted fw-bold">Método de Pago</label>
+                            {% render_field form_pago.metodo_pago class="form-select bg-white border" %}
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label small text-muted fw-bold">Referencia / Folio</label>
+                            {% render_field form_pago.referencia class="form-control bg-white border" placeholder="Ej: Transferencia #12345" %}
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label small text-muted fw-bold">Comprobante (PDF/Imagen)</label>
+                            {% render_field form_pago.archivo_comprobante class="form-control bg-white border" %}
+                        </div>
+                        
+                        <div class="col-12">
+                            <label class="form-label small text-muted fw-bold">Notas Adicionales</label>
+                            {% render_field form_pago.notas class="form-control bg-white border" rows="2" placeholder="Opcional..." %}
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 p-3 pt-0 bg-white">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">
+                        <i class="fas fa-save me-2"></i>Guardar Pago
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
+
+<div class="modal fade" id="modalVerPago" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0 bg-success text-white px-4 py-3 rounded-top-4">
+                <h5 class="modal-title fw-bold">
+                    <i class="fas fa-check-circle me-2"></i>Detalle del Pago
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 bg-white">
+                <div class="alert alert-light border mb-3">
+                    <div class="d-flex justify-content-between">
+                        <small class="text-muted fw-bold">Factura:</small>
+                        <small class="text-dark">{{ factura.numero_factura }}</small>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <small class="text-muted fw-bold">Proveedor:</small>
+                        <small class="text-dark">{{ factura.nombre_proveedor }}</small>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <small class="text-muted fw-bold">Fecha Emisión:</small>
+                        <small class="text-dark">{{ factura.fecha_emision|date:"d/m/Y" }}</small>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-6">
+                        <label class="form-label small text-muted fw-bold">No. Plazo</label>
+                        <input type="text" id="ver_plazo" class="form-control bg-light border-0" readonly>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-muted fw-bold">Monto Pagado</label>
+                        <input type="text" id="ver_monto" class="form-control bg-light border-0 fw-bold text-success" readonly>
+                    </div>
+                    
+                    <div class="col-6">
+                        <label class="form-label small text-muted fw-bold">Fecha Pago</label>
+                        <input type="text" id="ver_fecha" class="form-control bg-light border-0" readonly>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-muted fw-bold">Método</label>
+                        <input type="text" id="ver_metodo" class="form-control bg-light border-0" readonly>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label small text-muted fw-bold">Referencia</label>
+                        <input type="text" id="ver_referencia" class="form-control bg-light border-0" readonly>
+                    </div>
+                    
+                    <div class="col-6">
+                        <label class="form-label small text-muted fw-bold">Registrado Por</label>
+                        <input type="text" id="ver_usuario" class="form-control bg-light border-0 small" readonly>
+                    </div>
+                     <div class="col-6">
+                        <label class="form-label small text-muted fw-bold">Fecha Registro</label>
+                        <input type="text" id="ver_creado" class="form-control bg-light border-0 small" readonly>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label small text-muted fw-bold">Notas</label>
+                        <textarea id="ver_notas" class="form-control bg-light border-0" rows="2" readonly></textarea>
+                    </div>
+
+                    <div class="col-12 mt-3" id="div_archivo_descarga" style="display: none;">
+                        <a href="#" id="link_archivo" target="_blank" class="btn btn-outline-danger w-100">
+                            <i class="fas fa-file-download me-2"></i>Ver/Descargar Comprobante
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-3 pt-0 bg-white">
+                <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_css %}
 <style>
-    .card {
-        transition: transform 0.2s ease-in-out;
-    }
+    /* Estilos Sutiles */
+    .bg-light-subtle { background-color: #f5f7fa !important; }
     
-    .card:hover {
-        transform: translateY(-1px);
+    .btn-white {
+        background: white; border: 1px solid #e5e7eb; transition: all 0.2s;
     }
+    .btn-white:hover { background: #f9fafb; transform: translateY(-1px); }
     
-    .progress {
-        background-color: #e9ecef;
-        border-radius: 10px;
+    .icon-square {
+        width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
     }
-    
-    .progress-bar {
-        border-radius: 10px;
-        transition: width 0.6s ease;
+
+    .btn-primary-soft {
+        background-color: rgba(99, 102, 241, 0.1); color: #6366f1; border: none; transition: all 0.2s;
     }
-    
-    .table th {
-        font-weight: 600;
-        font-size: 0.875rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .btn-group .btn {
-        border-radius: 6px;
-        margin: 0 2px;
-    }
-    
-    .list-group-item {
-        border: none;
-        padding: 0.75rem 0;
-    }
-    
-    .badge {
-        font-size: 0.75em;
-    }
-    
-    /* NUEVOS ESTILOS PARA SINCRONIZACIÓN */
-    .border-info {
-        border: 1px solid #0dcaf0 !important;
-    }
-    
-    .border-success {
-        border: 1px solid #198754 !important;
-    }
-    
-    .form-check-input:checked {
-        background-color: #198754;
-        border-color: #198754;
-    }
-    
-    @media (max-width: 768px) {
-        .d-flex.gap-3 {
-            flex-direction: column;
-            gap: 1rem !important;
-        }
-        
-        .btn-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-    }
+    .btn-primary-soft:hover { background-color: #6366f1; color: white; }
+
+    /* FIX Z-INDEX */
+    .modal-backdrop { z-index: 10050 !important; }
+    .modal { z-index: 10060 !important; }
 </style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Mover AMBOS modales al body para evitar problemas de z-index
+        var modalPago = document.getElementById('modalPago');
+        var modalVer = document.getElementById('modalVerPago');
+        if(modalPago) document.body.appendChild(modalPago);
+        if(modalVer) document.body.appendChild(modalVer);
+    });
+
+    // Función para el modal de PAGAR (Registro)
+    function prepararModal(plazo, monto) {
+        var inputPlazo = document.getElementById('{{ form_pago.numero_plazo.id_for_label }}');
+        var inputMonto = document.getElementById('{{ form_pago.monto_pagado.id_for_label }}');
+        
+        if(inputPlazo) {
+            inputPlazo.value = plazo;
+            inputPlazo.readOnly = true; 
+        }
+        if(inputMonto) inputMonto.value = parseFloat(monto).toFixed(2);
+    }
+
+    // Función para el modal de VER DETALLE
+    function verDetallePago(plazo, monto, fecha, metodo, referencia, notas, urlArchivo, usuario, creado) {
+        document.getElementById('ver_plazo').value = plazo;
+        document.getElementById('ver_monto').value = '$' + parseFloat(monto).toFixed(2);
+        document.getElementById('ver_fecha').value = fecha;
+        document.getElementById('ver_metodo').value = metodo;
+        document.getElementById('ver_referencia').value = referencia;
+        document.getElementById('ver_notas').value = notas;
+        
+        document.getElementById('ver_usuario').value = usuario;
+        document.getElementById('ver_creado').value = creado;
+
+        var divArchivo = document.getElementById('div_archivo_descarga');
+        var linkArchivo = document.getElementById('link_archivo');
+
+        if (urlArchivo && urlArchivo !== '') {
+            divArchivo.style.display = 'block';
+            linkArchivo.href = urlArchivo;
+        } else {
+            divArchivo.style.display = 'none';
+        }
+
+        var myModal = new bootstrap.Modal(document.getElementById('modalVerPago'));
+        myModal.show();
+    }
+</script>
 {% endblock %}

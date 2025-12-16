@@ -136,8 +136,21 @@ class Articulo(models.Model):
     unidad_medida = models.ForeignKey(UnidadMedida, on_delete=models.PROTECT, null=True, blank=True)
     tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, default='PRODUCTO')
     
-    lleva_iva = models.BooleanField(default=True, verbose_name="¿Aplica IVA?")
-    lleva_retencion_iva = models.BooleanField(default=False, verbose_name="¿Aplica retención de IVA?")
+    porcentaje_iva = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        default=0.00, 
+        verbose_name="% IVA",
+        help_text="Ej: 16.00"
+    )
+    porcentaje_retencion_iva = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        default=0.00, 
+        verbose_name="% Retención IVA",
+        help_text="Ej: 4.00"
+    )
+    # -
     
     proveedores = models.ManyToManyField(Proveedor, through='ArticuloProveedor', related_name='articulos_provistos')
     activo = models.BooleanField(default=True)
@@ -337,6 +350,8 @@ class OrdenCompra(models.Model):
         return f"Orden de Compra {self.folio} - {self.proveedor.razon_social}"
 
     # --- PROPIEDADES PARA PAGOS A PLAZOS ---
+    
+    
     @property
     def es_pago_plazos(self):
         return self.modalidad_pago == 'A_PLAZOS'
@@ -413,16 +428,20 @@ class OrdenCompra(models.Model):
     def total_iva(self):
         total = Decimal('0')
         for detalle in self.detalles.all():
-            if detalle.articulo and detalle.articulo.lleva_iva:
-                total += detalle.subtotal * Decimal('0.16')
+            # Cálculo basado en el porcentaje del artículo
+            if detalle.articulo and detalle.articulo.porcentaje_iva > 0:
+                tasa = detalle.articulo.porcentaje_iva / Decimal('100')
+                total += detalle.subtotal * tasa
         return total.quantize(Decimal('0.01'))
 
     @property
     def total_retenciones(self):
         total = Decimal('0')
         for detalle in self.detalles.all():
-            if detalle.articulo and detalle.articulo.lleva_retencion_iva:
-                total += detalle.subtotal * (Decimal('2') / Decimal('3')) * Decimal('0.16')
+            # Cálculo basado en el porcentaje del artículo
+            if detalle.articulo and detalle.articulo.porcentaje_retencion_iva > 0:
+                tasa = detalle.articulo.porcentaje_retencion_iva / Decimal('100')
+                total += detalle.subtotal * tasa
         return total.quantize(Decimal('0.01'))
 
     @property

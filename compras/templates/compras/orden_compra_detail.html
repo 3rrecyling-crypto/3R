@@ -1,6 +1,8 @@
 {% extends 'compras/compras_base.html' %}
 {% load humanize %}
-{% load static %} {% block compras_content %}
+{% load static %} 
+
+{% block compras_content %}
 <div class="container-fluid">
     <div class="row mb-4 align-items-center">
         <div class="col-md-6">
@@ -11,267 +13,15 @@
             <a href="{% url 'lista_ordenes_compra' %}" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left me-1"></i> Volver
             </a>
-            {% if object.estatus not in 'AUDITADA,CANCELADA' %}
-            <a href="{% url 'editar_archivos_oc' object.pk %}" class="btn btn-info text-white fw-bold">
-                <i class="fas fa-file-upload me-1"></i> Administrar Archivos
-            </a>
-            {% endif %}
             <a href="{% url 'orden_compra_pdf' object.pk %}" class="btn btn-secondary">
                 <i class="fas fa-file-pdf me-1"></i> Descargar PDF
             </a>
         </div>
     </div>
 
-    <!-- NUEVA SECCIÓN: Proceso de Auditoría Visual -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-primary text-white py-3">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-play-circle me-2"></i>Proceso de Auditoría
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <!-- Barra de Progreso Visual -->
-                    <div class="audit-progress-bar mb-5">
-                        <div class="progress-steps d-flex justify-content-between position-relative">
-                            <!-- Paso 1: OC Aprobada -->
-                            <div class="step completed text-center">
-                                <div class="step-icon">
-                                    <i class="fas fa-check-circle"></i>
-                                </div>
-                                <div class="step-label mt-2">
-                                    <small class="fw-bold">OC Aprobada</small>
-                                </div>
-                            </div>
-                            
-                            <!-- Paso 2: Subir Factura -->
-                            <div class="step {% if object.factura_subida %}completed{% elif object.estatus == 'APROBADA' %}current{% endif %} text-center">
-                                <div class="step-icon">
-                                    <i class="fas {% if object.factura_subida %}fa-check-circle{% else %}fa-file-invoice{% endif %}"></i>
-                                </div>
-                                <div class="step-label mt-2">
-                                    <small class="fw-bold">Factura</small>
-                                    {% if object.factura_subida %}
-                                    <br><small class="text-success">Completado</small>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            
-                            <!-- Paso 3: Subir Comprobante -->
-                            <div class="step {% if object.comprobante_pago_subido %}completed{% elif object.factura_subida %}current{% endif %} text-center">
-                                <div class="step-icon">
-                                    <i class="fas {% if object.comprobante_pago_subido %}fa-check-circle{% else %}fa-receipt{% endif %}"></i>
-                                </div>
-                                <div class="step-label mt-2">
-                                    <small class="fw-bold">Comprobante</small>
-                                    {% if object.comprobante_pago_subido %}
-                                    <br><small class="text-success">Completado</small>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            
-                            <!-- Paso 4: Auditar -->
-                            <div class="step {% if object.estatus == 'AUDITADA' %}completed{% elif object.lista_para_auditar %}current{% else %}pending{% endif %} text-center">
-                                <div class="step-icon">
-                                    <i class="fas {% if object.estatus == 'AUDITADA' %}fa-check-circle{% else %}fa-gavel{% endif %}"></i>
-                                </div>
-                                <div class="step-label mt-2">
-                                    <small class="fw-bold">Auditar</small>
-                                    {% if object.estatus == 'AUDITADA' %}
-                                    <br><small class="text-success">Completado</small>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            
-                            <!-- Paso 5: Finalizada -->
-                            <div class="step {% if object.estatus == 'AUDITADA' %}completed{% else %}pending{% endif %} text-center">
-                                <div class="step-icon">
-                                    <i class="fas {% if object.estatus == 'AUDITADA' %}fa-flag-checkered{% else %}fa-flag{% endif %}"></i>
-                                </div>
-                                <div class="step-label mt-2">
-                                    <small class="fw-bold">Finalizada</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Panel de Control de Documentos -->
-                    <div class="documents-control-panel">
-                        <div class="row">
-                            <!-- Factura -->
-                            <div class="col-md-6 mb-4">
-                                <div class="document-card {% if object.factura_subida %}completed{% else %}pending{% endif %}">
-                                    <div class="document-header d-flex align-items-center mb-3">
-                                        <div class="document-icon me-3">
-                                            <i class="fas fa-file-invoice fa-2x"></i>
-                                        </div>
-                                        <div>
-                                            <h6 class="mb-1 fw-bold">Factura</h6>
-                                            <span class="badge {% if object.factura_subida %}bg-success{% else %}bg-warning text-dark{% endif %}">
-                                                {% if object.factura_subida %}Subido{% else %}Pendiente{% endif %}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    
-                                    {% if object.factura_subida %}
-                                        <div class="document-info">
-                                            <small class="text-muted d-block">
-                                                <i class="fas fa-user me-1"></i>
-                                                {{ object.factura_subida_por|default:"Usuario" }}
-                                            </small>
-                                            <small class="text-muted d-block">
-                                                <i class="fas fa-clock me-1"></i>
-                                                {{ object.fecha_factura_subida|date:"d/m/Y H:i" }}
-                                            </small>
-                                        </div>
-                                        <div class="document-actions mt-3">
-                                            <a href="{{ object.factura.url }}" target="_blank" class="btn btn-sm btn-outline-primary me-2">
-                                                <i class="fas fa-eye me-1"></i>Ver
-                                            </a>
-                                            {% if object.estatus in 'APROBADA,LISTA_PARA_AUDITAR' %}
-                                                <form method="POST" action="{% url 'eliminar_documento_oc' object.pk 'factura' %}" class="d-inline">
-                                                    {% csrf_token %}
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Está seguro de eliminar la factura?')">
-                                                        <i class="fas fa-trash me-1"></i>Eliminar
-                                                    </button>
-                                                </form>
-                                            {% endif %}
-                                        </div>
-                                    {% else %}
-                                        <div class="document-upload mt-3">
-                                            {% if object.estatus in 'APROBADA,LISTA_PARA_AUDITAR' %}
-                                                <form method="POST" action="{% url 'subir_factura_oc' object.pk %}" enctype="multipart/form-data">
-                                                    {% csrf_token %}
-                                                    <div class="input-group">
-                                                        <input type="file" name="factura" class="form-control form-control-sm" 
-                                                               accept=".pdf,.xml,.jpg,.png" required>
-                                                        <button type="submit" class="btn btn-primary btn-sm">
-                                                            <i class="fas fa-upload me-1"></i>Subir
-                                                        </button>
-                                                    </div>
-                                                    <small class="form-text text-muted">Formatos: PDF, XML, JPG, PNG</small>
-                                                </form>
-                                            {% else %}
-                                                <p class="text-muted small mb-0">Disponible cuando la OC esté aprobada</p>
-                                            {% endif %}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-
-                            <!-- Comprobante de Pago -->
-                            <div class="col-md-6 mb-4">
-                                <div class="document-card {% if object.comprobante_pago_subido %}completed{% else %}pending{% endif %}">
-                                    <div class="document-header d-flex align-items-center mb-3">
-                                        <div class="document-icon me-3">
-                                            <i class="fas fa-receipt fa-2x"></i>
-                                        </div>
-                                        <div>
-                                            <h6 class="mb-1 fw-bold">Comprobante de Pago</h6>
-                                            <span class="badge {% if object.comprobante_pago_subido %}bg-success{% else %}bg-warning text-dark{% endif %}">
-                                                {% if object.comprobante_pago_subido %}Subido{% else %}Pendiente{% endif %}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    
-                                    {% if object.comprobante_pago_subido %}
-                                        <div class="document-info">
-                                            <small class="text-muted d-block">
-                                                <i class="fas fa-user me-1"></i>
-                                                {{ object.comprobante_subido_por|default:"Usuario" }}
-                                            </small>
-                                            <small class="text-muted d-block">
-                                                <i class="fas fa-clock me-1"></i>
-                                                {{ object.fecha_comprobante_subido|date:"d/m/Y H:i" }}
-                                            </small>
-                                        </div>
-                                        <div class="document-actions mt-3">
-                                            <a href="{{ object.comprobante_pago.url }}" target="_blank" class="btn btn-sm btn-outline-primary me-2">
-                                                <i class="fas fa-eye me-1"></i>Ver
-                                            </a>
-                                            {% if object.estatus in 'APROBADA,LISTA_PARA_AUDITAR' %}
-                                                <form method="POST" action="{% url 'eliminar_documento_oc' object.pk 'comprobante' %}" class="d-inline">
-                                                    {% csrf_token %}
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Está seguro de eliminar el comprobante?')">
-                                                        <i class="fas fa-trash me-1"></i>Eliminar
-                                                    </button>
-                                                </form>
-                                            {% endif %}
-                                        </div>
-                                    {% else %}
-                                        <div class="document-upload mt-3">
-                                            {% if object.estatus in 'APROBADA,LISTA_PARA_AUDITAR' %}
-                                                <form method="POST" action="{% url 'subir_comprobante_oc' object.pk %}" enctype="multipart/form-data">
-                                                    {% csrf_token %}
-                                                    <div class="input-group">
-                                                        <input type="file" name="comprobante_pago" class="form-control form-control-sm" 
-                                                               accept=".pdf,.jpg,.png" required>
-                                                        <button type="submit" class="btn btn-primary btn-sm">
-                                                            <i class="fas fa-upload me-1"></i>Subir
-                                                        </button>
-                                                    </div>
-                                                    <small class="form-text text-muted">Formatos: PDF, JPG, PNG</small>
-                                                </form>
-                                            {% else %}
-                                                <p class="text-muted small mb-0">Disponible cuando la OC esté aprobada</p>
-                                            {% endif %}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Acción de Auditoría -->
-                        <div class="audit-action-section text-center mt-4 p-4 bg-light rounded">
-                            {% if object.lista_para_auditar and object.estatus == 'LISTA_PARA_AUDITAR' %}
-                                <div class="alert alert-success mb-4">
-                                    <i class="fas fa-check-circle me-2"></i>
-                                    <strong>¡Todo listo!</strong> Todos los documentos están completos y la orden está lista para auditoría.
-                                </div>
-                                <form method="POST" action="{% url 'iniciar_auditoria_oc' object.pk %}">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-success btn-lg px-5">
-                                        <i class="fas fa-gavel me-2"></i>Marcar como Auditada
-                                    </button>
-                                    <p class="text-muted mt-2 mb-0">
-                                        Al auditar, la orden se marcará como finalizada y no podrá ser modificada.
-                                    </p>
-                                </form>
-                            {% elif object.estatus == 'AUDITADA' %}
-                                <div class="alert alert-primary">
-                                    <i class="fas fa-flag-checkered me-2"></i>
-                                    <strong>Auditoría Completada</strong> - Esta orden ha sido auditada y finalizada.
-                                </div>
-                            {% else %}
-                                <div class="alert alert-warning">
-                                    <i class="fas fa-clock me-2"></i>
-                                    <strong>Pendiente de documentos</strong> - Debe subir todos los documentos requeridos para proceder con la auditoría.
-                                </div>
-                                <div class="progress mb-3" style="height: 10px;">
-                                    <div class="progress-bar bg-warning" 
-                                         style="width: {% if object.factura_subida and object.comprobante_pago_subido %}100%{% elif object.factura_subida or object.comprobante_pago_subido %}50%{% else %}0%{% endif %}">
-                                    </div>
-                                </div>
-                                <p class="text-muted mb-0">
-                                    Documentos completados: 
-                                    <strong>
-                                        {% if object.factura_subida and object.comprobante_pago_subido %}2 de 2
-                                        {% elif object.factura_subida or object.comprobante_pago_subido %}1 de 2
-                                        {% else %}0 de 2
-                                        {% endif %}
-                                    </strong>
-                                </p>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div class="row">
         <div class="col-lg-8">
+            
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-body p-4">
                     <div class="row">
@@ -319,7 +69,6 @@
                             <p class="mt-2 mb-0"><strong class="text-muted">Fecha Emisión:</strong> {{ object.fecha_emision|date:"d/m/Y" }}</p>
                             <p class="mb-0"><strong class="text-muted">Entrega Esperada:</strong> {{ object.fecha_entrega_esperada|date:"d/m/Y" }}</p>
                             
-                            <!-- Recordatorio de Modalidad de Pago -->
                             {% if object.es_pago_plazos %}
                             <div class="mt-3 p-2 bg-info bg-opacity-10 rounded border border-info">
                                 <small class="text-info">
@@ -338,6 +87,7 @@
                     </div>
                 </div>
             </div>
+
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-light py-3 border-0">
                     <h5 class="card-title mb-0"><i class="fas fa-boxes me-2 text-primary"></i>Artículos en la Orden</h5>
@@ -360,7 +110,7 @@
                             <tbody>
                                 {% for detalle in object.detalles.all %}
                                 <tr data-subtotal="{{ detalle.subtotal }}" data-has-iva="{{ detalle.articulo.lleva_iva|yesno:'true,false' }}">
-                                <td class="ps-4">{{ detalle.articulo.sku|default:"N/A" }}</td>
+                                    <td class="ps-4">{{ detalle.articulo.sku|default:"N/A" }}</td>
                                     <td>
                                         {{ detalle.articulo.nombre }}
                                         {% if detalle.articulo.lleva_iva %}<span class="badge bg-light text-dark ms-1">IVA</span>{% endif %}
@@ -372,14 +122,14 @@
                                     <td class="text-end">{{ detalle.descuento|floatformat:2 }}%</td>
                                     <td class="text-end iva-item-cell">$0.00</td>
                                     <td class="text-end pe-4 fw-bold total-item-cell">${{ detalle.subtotal|floatformat:2|intcomma }}</td>
-                                    </tr>
+                                </tr>
                                 {% empty %}
                                 <tr>
                                     <td colspan="8" class="text-center py-4">No se encontraron artículos para esta orden.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
-                            </table>
+                        </table>
                     </div>
                 </div>
                 <div class="card-footer bg-white p-4">
@@ -404,7 +154,6 @@
                                     <strong class="text-primary">Total General:</strong>
                                     <strong class="text-primary">${{ object.total_general|floatformat:2|intcomma }}</strong>
                                 </li>
-                                <!-- Información de Modalidad de Pago en el Resumen -->
                                 {% if object.es_pago_plazos %}
                                 <li class="list-group-item d-flex justify-content-between bg-light">
                                     <small class="text-info">
@@ -421,9 +170,8 @@
                     </div>
                 </div>
             </div>
-            </div>
+        </div>
 
-        <!-- PANEL LATERAL ACTUALIZADO -->
         <div class="col-lg-4">
             <div class="card shadow-sm border-0 sticky-top" style="top: 20px;">
                 <div class="card-header bg-light py-3 border-0 d-flex align-items-center">
@@ -431,13 +179,10 @@
                     <h5 class="card-title mb-0">Estado y Acciones</h5>
                 </div>
                 <div class="card-body">
-                    <!-- Estado Visual Principal -->
                     <div class="text-center mb-4">
                         <div class="status-icon mb-3">
                             {% if object.estatus == 'AUDITADA' %}
                                 <i class="fas fa-flag-checkered fa-3x text-success"></i>
-                            {% elif object.estatus == 'LISTA_PARA_AUDITAR' %}
-                                <i class="fas fa-clipboard-check fa-3x text-warning"></i>
                             {% elif object.estatus == 'APROBADA' %}
                                 <i class="fas fa-check-circle fa-3x text-primary"></i>
                             {% elif object.estatus == 'BORRADOR' %}
@@ -446,30 +191,11 @@
                                 <i class="fas fa-times-circle fa-3x text-danger"></i>
                             {% endif %}
                         </div>
-                        <h4 class="fw-bold text-{% if object.estatus == 'AUDITADA' %}success{% elif object.estatus == 'LISTA_PARA_AUDITAR' %}warning{% elif object.estatus == 'APROBADA' %}primary{% elif object.estatus == 'BORRADOR' %}secondary{% else %}danger{% endif %}">
+                        <h4 class="fw-bold text-{% if object.estatus == 'AUDITADA' %}success{% elif object.estatus == 'APROBADA' %}primary{% elif object.estatus == 'BORRADOR' %}secondary{% else %}danger{% endif %}">
                             {{ object.get_estatus_display }}
                         </h4>
-                        
-                        <!-- Progreso Mini de Documentos -->
-                        <div class="mt-3">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <small class="text-muted">Progreso de documentos</small>
-                                <span class="badge bg-{% if object.factura_subida and object.comprobante_pago_subido %}success{% else %}warning{% endif %}">
-                                    {% if object.factura_subida and object.comprobante_pago_subido %}2/2 ✓
-                                    {% elif object.factura_subida or object.comprobante_pago_subido %}1/2
-                                    {% else %}0/2
-                                    {% endif %}
-                                </span>
-                            </div>
-                            <div class="progress" style="height: 6px;">
-                                <div class="progress-bar bg-{% if object.factura_subida and object.comprobante_pago_subido %}success{% else %}warning{% endif %}" 
-                                     style="width: {% if object.factura_subida and object.comprobante_pago_subido %}100%{% elif object.factura_subida or object.comprobante_pago_subido %}50%{% else %}0%{% endif %}">
-                                </div>
-                            </div>
-                        </div>
                     </div>
 
-                    <!-- Información de Tiempo -->
                     <div class="timeline-info mb-4">
                         <div class="row text-center">
                             <div class="col-6">
@@ -487,36 +213,14 @@
                         </div>
                     </div>
 
-                    <!-- Recordatorio de Plazos (si aplica) -->
-                    {% if object.es_pago_plazos %}
-                    <div class="alert alert-info mb-4">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-calendar-alt me-2 fa-lg"></i>
-                            <div>
-                                <small class="fw-bold d-block">Pago Programado a Plazos</small>
-                                <small class="d-block">{{ object.cantidad_plazos }} plazos</small>
-                                <small class="text-muted">Gestión en módulo CXP</small>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    <!-- Acciones Principales -->
                     <div class="d-grid gap-2">
-                        {% if object.estatus == 'APROBADA' %}
-                            {% if object.lista_para_auditar %}
-                                <form action="{% url 'iniciar_auditoria_oc' object.pk %}" method="post">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-success w-100 fw-bold py-2">
-                                        <i class="fas fa-gavel me-2"></i> Auditar OC
-                                    </button>
-                                </form>
-                            {% else %}
-                                <button type="button" class="btn btn-primary w-100 fw-bold py-2" disabled 
-                                        data-bs-toggle="tooltip" title="Debe completar todos los documentos para auditar">
-                                    <i class="fas fa-gavel me-2"></i> Pendiente de Documentos
+                        {% if object.estatus == 'APROBADA' or object.estatus == 'LISTA_PARA_AUDITAR' %}
+                            <form action="{% url 'iniciar_auditoria_oc' object.pk %}" method="post">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-success w-100 fw-bold py-2" onclick="return confirm('¿Confirmar auditoría de esta Orden de Compra?');">
+                                    <i class="fas fa-gavel me-2"></i> Auditar OC
                                 </button>
-                            {% endif %}
+                            </form>
                         {% endif %}
                         
                         {% if object.estatus == 'BORRADOR' or object.estatus == 'APROBADA' %}
@@ -537,24 +241,12 @@
                         {% endif %}
                     </div>
 
-                    <!-- Acciones Secundarias -->
                     <div class="mt-4 pt-3 border-top">
                         <div class="row g-2">
-                            <div class="col-6">
+                            <div class="col-12">
                                 <a href="{% url 'orden_compra_pdf' object.pk %}" class="btn btn-outline-secondary w-100 btn-sm">
-                                    <i class="fas fa-file-pdf me-1"></i> PDF
+                                    <i class="fas fa-file-pdf me-1"></i> Generar PDF
                                 </a>
-                            </div>
-                            <div class="col-6">
-                                {% if object.estatus not in 'AUDITADA,CANCELADA' %}
-                                <a href="{% url 'editar_archivos_oc' object.pk %}" class="btn btn-outline-info w-100 btn-sm">
-                                    <i class="fas fa-upload me-1"></i> Archivos
-                                </a>
-                                {% else %}
-                                <button class="btn btn-outline-secondary w-100 btn-sm" disabled>
-                                    <i class="fas fa-upload me-1"></i> Archivos
-                                </button>
-                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -563,91 +255,6 @@
         </div>
     </div>
 </div>
-
-<style>
-    /* Estilos para la barra de progreso visual */
-    .audit-progress-bar {
-        position: relative;
-    }
-    
-    .progress-steps::before {
-        content: '';
-        position: absolute;
-        top: 25px;
-        left: 10%;
-        right: 10%;
-        height: 4px;
-        background-color: #e9ecef;
-        z-index: 1;
-    }
-    
-    .step {
-        position: relative;
-        z-index: 2;
-        flex: 1;
-    }
-    
-    .step-icon {
-        width: 50px;
-        height: 50px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto;
-        background: white;
-        border: 3px solid #e9ecef;
-    }
-    
-    .step.completed .step-icon {
-        background-color: #28a745;
-        border-color: #28a745;
-        color: white;
-    }
-    
-    .step.current .step-icon {
-        background-color: #007bff;
-        border-color: #007bff;
-        color: white;
-    }
-    
-    .step.pending .step-icon {
-        background-color: #f8f9fa;
-        border-color: #e9ecef;
-        color: #6c757d;
-    }
-    
-    /* Estilos para las tarjetas de documentos */
-    .document-card {
-        border: 2px solid #e9ecef;
-        border-radius: 10px;
-        padding: 20px;
-        height: 100%;
-        transition: all 0.3s ease;
-    }
-    
-    .document-card.completed {
-        border-left-color: #28a745;
-        background-color: #f8fff9;
-    }
-    
-    .document-card.pending {
-        border-left-color: #ffc107;
-        background-color: #fffef0;
-    }
-    
-    .document-icon {
-        color: #6c757d;
-    }
-    
-    .document-card.completed .document-icon {
-        color: #28a745;
-    }
-    
-    .document-card.pending .document-icon {
-        color: #ffc107;
-    }
-</style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -670,7 +277,7 @@
 
         itemRows.forEach(row => {
             const subtotal = parseFloat(row.dataset.subtotal) || 0;
-            const hasIva = row.dataset.hasIva === 'true'; // 'True' o 'False' desde Python
+            const hasIva = row.dataset.hasIva === 'true'; 
             
             const ivaCell = row.querySelector('.iva-item-cell');
             const totalCell = row.querySelector('.total-item-cell');
@@ -680,14 +287,12 @@
                 ivaAmount = subtotal * 0.16; // 16% de IVA
             }
 
-            // El total de la línea SÍ incluye el IVA
             const totalAmount = subtotal + ivaAmount;
 
             if (ivaCell) {
                 ivaCell.textContent = formatCurrency(ivaAmount);
             }
             if (totalCell) {
-                // El total SÍ debe incluir el IVA
                 totalCell.textContent = formatCurrency(totalAmount);
             }
         });

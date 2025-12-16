@@ -73,23 +73,39 @@ class ArticuloForm(forms.ModelForm):
         # --- CAMPOS ACTIVADOS ---
         fields = [
             'empresa', 
-            'origen',  # <--- HABILITADO
+            'origen',
             'nombre', 'sku', 'descripcion', 'categoria', 
-            'unidad_medida', 'tipo', 'lleva_iva', 'lleva_retencion_iva', 'activo'
+            'unidad_medida', 'tipo', 
+            'porcentaje_iva',            # <--- NUEVO
+            'porcentaje_retencion_iva',  # <--- NUEVO
+            'activo'
         ]
         widgets = {
-            # --- IDs HABILITADOS ---
             'empresa': forms.Select(attrs={'class': 'form-select', 'id': 'id_empresa'}),
-            'origen': forms.Select(attrs={'class': 'form-select', 'id': 'id_origen'}), # <--- HABILITADO
-            
+            'origen': forms.Select(attrs={'class': 'form-select', 'id': 'id_origen'}),
             'nombre': forms.TextInput(attrs={'class': 'form-control'}),
             'sku': forms.TextInput(attrs={'class': 'form-control'}),
             'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'categoria': forms.Select(attrs={'class': 'form-select'}),
             'unidad_medida': forms.Select(attrs={'class': 'form-select'}),
             'tipo': forms.Select(attrs={'class': 'form-select'}),
-            'lleva_iva': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'lleva_retencion_iva': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            
+            # --- WIDGETS NUEVOS PARA PORCENTAJES ---
+            'porcentaje_iva': forms.NumberInput(attrs={
+                'class': 'form-control', 
+                'min': '0', 
+                'max': '100', 
+                'step': '0.01',
+                'placeholder': '16.00'
+            }),
+            'porcentaje_retencion_iva': forms.NumberInput(attrs={
+                'class': 'form-control', 
+                'min': '0', 
+                'max': '100', 
+                'step': '0.01',
+                'placeholder': '0.00'
+            }),
+            
             'activo': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
@@ -97,36 +113,26 @@ class ArticuloForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['categoria'].queryset = Categoria.objects.all().order_by('nombre')
         self.fields['unidad_medida'].queryset = UnidadMedida.objects.all().order_by('nombre')
-
-        # --- ¡INICIO DE LA LÓGICA MODIFICADA! ---
         
-        # El queryset ahora debe ser del modelo 'Lugar'
-        origen_queryset = Lugar.objects.none() # Iniciar vacío por defecto
+        # Lógica de filtrado para Origen
+        origen_queryset = Lugar.objects.none()
 
         if self.instance and self.instance.pk and self.instance.empresa:
-            # Caso 1: Editando un artículo que YA tiene una empresa
-            # (Usamos la misma lógica de la API)
             origen_queryset = Lugar.objects.filter(
                 empresas=self.instance.empresa, 
                 tipo='ORIGEN'
             ).order_by('nombre')
-        
         elif 'empresa' in self.data:
-            # Caso 2: El formulario se está enviando (POST)
             try:
                 empresa_id = int(self.data.get('empresa'))
                 empresa = Empresa.objects.get(pk=empresa_id)
-                
-                # (Usamos la misma lógica de la API)
                 origen_queryset = Lugar.objects.filter(
                     empresas=empresa, 
                     tipo='ORIGEN'
                 ).order_by('nombre')
-                
             except (ValueError, TypeError, Empresa.DoesNotExist):
-                pass # Mantener vacío si hay un error
+                pass 
         
-        # Asignamos el queryset filtrado (de Lugares) al campo 'origen'
         self.fields['origen'].queryset = origen_queryset
         # --- FIN LÓGICA HABILITADA ---     
 class ArticuloProveedorForm(forms.ModelForm):

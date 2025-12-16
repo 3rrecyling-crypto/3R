@@ -650,3 +650,10 @@ def nuevo_complemento_pago(request):
         'cliente_seleccionado': int(cliente_id) if cliente_id else None
     })
     
+    
+def nueva_cuenta_por_pagar(request):
+    # Asumiendo que usas DatosFiscales también para proveedores
+    proveedores = DatosFiscales.objects.all() # Filtra si tienes un campo 'es_proveedor'
+    return render(request, 'facturacion/nueva_cuenta_por_pagar.html', {
+        'proveedores': proveedores
+    })

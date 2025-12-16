@@ -46,11 +46,14 @@ def dashboard_compras(request):
     solicitudes_pendientes = SolicitudCompra.objects.filter(estatus='PENDIENTE_APROBACION').count()
     ordenes_abiertas = OrdenCompra.objects.filter(estatus='APROBADA').count()
     total_proveedores = Proveedor.objects.filter(activo=True).count()
+    # --- NUEVO: Conteo de artículos ---
+    total_articulos = Articulo.objects.filter(activo=True).count() 
 
     context = {
         'solicitudes_pendientes': solicitudes_pendientes,
         'ordenes_abiertas': ordenes_abiertas,
         'total_proveedores': total_proveedores,
+        'total_articulos': total_articulos, # <--- Agregado al contexto
     }
     return render(request, 'compras/dashboard.html', context)
 
@@ -419,7 +422,7 @@ def crear_solicitud(request):
                     formset.save() # Guardamos los detalles
                     
                     messages.success(request, f'Solicitud {solicitud.folio} enviada para aprobación.')
-                    return redirect('detalle_solicitud', pk=solicitud.pk)
+                    return redirect('lista_solicitudes')
             except Exception as e:
                 messages.error(request, f"Error al crear la solicitud: {e}")
         else:
@@ -681,6 +684,13 @@ def generar_orden_de_compra(request, pk):
         if form.is_valid() and formset.is_valid():
             with transaction.atomic():
                 oc = form.save(commit=False)
+                
+                # --- NUEVA LÓGICA: Sobrescribir condiciones si es a plazos ---
+                if oc.modalidad_pago == 'A_PLAZOS' and oc.cantidad_plazos:
+                    # Ignora los días de crédito y pone "# plazos"
+                    oc.condiciones_pago = f"{oc.cantidad_plazos} plazos"
+                # -------------------------------------------------------------
+
                 oc.estatus = 'APROBADA'
                 oc.save()
                 formset.save()
@@ -690,7 +700,8 @@ def generar_orden_de_compra(request, pk):
                     from cuentas_por_pagar.models import Factura
                     if hasattr(oc, 'factura_cxp'):
                         factura = oc.factura_cxp
-                        factura.monto = oc.total_general  # Actualizar monto por si cambió
+                        factura.monto = oc.total_general
+                        # Opcional: Si cambian las condiciones, tal vez quieras actualizar fecha vencimiento aquí también
                         factura.save()
                         messages.success(request, f"Orden de Compra {oc.folio} ha sido finalizada y aprobada exitosamente. Factura {factura.numero_factura} actualizada en CXP.")
                     else:

@@ -38,7 +38,8 @@
                 
                 <div class="row">
                     {% for field in form %}
-                        {% if field.field.widget_type != 'checkbox' %}
+                        {# Excluimos checkboxes y los campos de impuestos para ponerlos abajo #}
+                        {% if field.field.widget_type != 'checkbox' and field.name != 'porcentaje_iva' and field.name != 'porcentaje_retencion_iva' %}
                             <div class="col-md-6 mb-3">
                                 <label for="{{ field.id_for_label }}" class="form-label fw-semibold">
                                     {{ field.label }}
@@ -66,10 +67,48 @@
                 </div>
                 
                 <hr class="my-4">
+
+                <div class="row mb-4">
+                    <h6 class="fw-semibold mb-3 text-secondary">
+                        <i class="fas fa-percentage me-2"></i>Impuestos y Retenciones
+                    </h6>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.porcentaje_iva.id_for_label }}" class="form-label fw-semibold">
+                            {{ form.porcentaje_iva.label }}
+                        </label>
+                        <div class="input-group">
+                            {% render_field form.porcentaje_iva class="form-control" placeholder="0.00" %}
+                            <span class="input-group-text bg-light">%</span>
+                        </div>
+                        {% if form.porcentaje_iva.help_text %}
+                            <div class="form-text text-muted small">{{ form.porcentaje_iva.help_text }}</div>
+                        {% endif %}
+                        {% if form.porcentaje_iva.errors %}
+                            <div class="invalid-feedback d-block">{{ form.porcentaje_iva.errors|first }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.porcentaje_retencion_iva.id_for_label }}" class="form-label fw-semibold">
+                            {{ form.porcentaje_retencion_iva.label }}
+                        </label>
+                        <div class="input-group">
+                            {% render_field form.porcentaje_retencion_iva class="form-control" placeholder="0.00" %}
+                            <span class="input-group-text bg-light">%</span>
+                        </div>
+                        {% if form.porcentaje_retencion_iva.help_text %}
+                            <div class="form-text text-muted small">{{ form.porcentaje_retencion_iva.help_text }}</div>
+                        {% endif %}
+                        {% if form.porcentaje_retencion_iva.errors %}
+                            <div class="invalid-feedback d-block">{{ form.porcentaje_retencion_iva.errors|first }}</div>
+                        {% endif %}
+                    </div>
+                </div>
                 
                 <div class="row">
                     <h6 class="fw-semibold mb-3 text-secondary">
-                        <i class="fas fa-cog me-2"></i>Configuraciones
+                        <i class="fas fa-cog me-2"></i>Otras Configuraciones
                     </h6>
                     {% for field in form %}
                         {% if field.field.widget_type == 'checkbox' %}
@@ -233,12 +272,8 @@ const ArticuloFormManager = (function() {
         proveedorCount: document.getElementById('proveedor-count'),
         emptyFormTemplate: document.getElementById('empty-form-template').innerHTML,
         mainForm: document.getElementById('articulo-form'),
-        
-        // --- INICIO DE LA MODIFICACIÓN ---
-        // Elementos para los dropdowns dependientes
         empresaSelect: document.getElementById('id_empresa'),
         origenSelect: document.getElementById('id_origen')
-        // --- FIN DE LA MODIFICACIÓN ---
     };
     
     // Estado
@@ -252,12 +287,10 @@ const ArticuloFormManager = (function() {
             this.bindEvents();
             this.updateProveedorCount();
             
-            // --- INICIO DE LA MODIFICACIÓN ---
             // Deshabilita el dropdown de origen si no hay empresa seleccionada al cargar
             if (elements.origenSelect) {
                  elements.origenSelect.disabled = !elements.empresaSelect.value;
             }
-            // --- FIN DE LA MODIFICACIÓN ---
         },
         
         bindEvents: function() {
@@ -280,25 +313,16 @@ const ArticuloFormManager = (function() {
                 }
             });
             
-            // --- INICIO DE LA MODIFICACIÓN ---
             // Evento para actualizar orígenes cuando cambia la empresa
             if (elements.empresaSelect) {
                 elements.empresaSelect.addEventListener('change', () => this.updateOrigenesDropdown());
             }
-            // --- FIN DE LA MODIFICACIÓN ---
         },
         
-        // --- INICIO DE LA NUEVA FUNCIÓN AÑADIDA ---
-        /**
-         * Llama a la API para obtener los orígenes de la empresa seleccionada
-         * y actualiza el dropdown de 'Origen'.
-         */
         updateOrigenesDropdown: function() {
             const empresaId = elements.empresaSelect.value;
-            // Esta es la URL que definimos en compras/urls.py
             const url = `/compras/api/origenes_por_empresa/${empresaId}/`;
 
-            // Desactivar y limpiar dropdown de origen
             elements.origenSelect.disabled = true;
             elements.origenSelect.innerHTML = '<option value="">Cargando...</option>';
 
@@ -313,19 +337,15 @@ const ArticuloFormManager = (function() {
                     return response.json();
                 })
                 .then(data => {
-                    // Limpia el dropdown y añade la opción por defecto
                     elements.origenSelect.innerHTML = '<option value="">---------</option>'; 
                     
                     if (data.origenes && data.origenes.length > 0) {
                         data.origenes.forEach(origen => {
-                            // Crea y añade la nueva opción
                             const option = new Option(origen.nombre, origen.id);
                             elements.origenSelect.appendChild(option);
                         });
-                        // Habilita el dropdown
                         elements.origenSelect.disabled = false;
                     } else {
-                        // No se encontraron orígenes
                         elements.origenSelect.innerHTML = '<option value="">No hay orígenes para esta empresa</option>';
                     }
                 })
@@ -334,12 +354,10 @@ const ArticuloFormManager = (function() {
                     elements.origenSelect.innerHTML = '<option value="">Error al cargar</option>';
                 });
         },
-        // --- FIN DE LA NUEVA FUNCIÓN ---
         
         addForm: function() {
             const newFormHtml = elements.emptyFormTemplate.replace(/__prefix__/g, state.formCounter);
             
-            // Si no hay formularios, reemplazar el mensaje vacío
             const emptyState = elements.formContainer.querySelector('#empty-state');
             if (emptyState) {
                 emptyState.remove();
@@ -347,7 +365,6 @@ const ArticuloFormManager = (function() {
             
             elements.formContainer.insertAdjacentHTML('beforeend', newFormHtml);
             
-            // Animar el nuevo formulario
             const newForm = elements.formContainer.lastElementChild;
             this.animateFormAppearance(newForm);
 
@@ -361,11 +378,9 @@ const ArticuloFormManager = (function() {
             const deleteCheckbox = formToRemove.querySelector('input[type="checkbox"][name$="-DELETE"]');
             
             if (deleteCheckbox) {
-                // Formulario existente: marcamos para eliminar y ocultamos
                 deleteCheckbox.checked = true;
                 this.animateFormRemoval(formToRemove, true);
             } else {
-                // Formulario nuevo: eliminamos directamente
                 this.animateFormRemoval(formToRemove, false);
             }
         },
@@ -395,7 +410,6 @@ const ArticuloFormManager = (function() {
                 
                 this.updateProveedorCount();
                 
-                // Si no quedan formularios, mostrar mensaje
                 if (this.getVisibleForms().length === 0) {
                     elements.formContainer.innerHTML = `
                         <div class="text-center py-5 text-muted bg-light rounded" id="empty-state">
@@ -417,7 +431,6 @@ const ArticuloFormManager = (function() {
             const visibleForms = this.getVisibleForms().length;
             elements.proveedorCount.textContent = `${visibleForms} proveedor(es)`;
             
-            // Actualizar clase del badge según la cantidad
             if (visibleForms === 0) {
                 elements.proveedorCount.className = 'badge bg-danger text-white fs-6';
             } else {
@@ -428,14 +441,12 @@ const ArticuloFormManager = (function() {
         validateForm: function(e) {
             const visibleForms = this.getVisibleForms();
             
-            // Validar que al menos hay un proveedor activo
             if (visibleForms.length === 0) {
                 e.preventDefault();
                 this.showAlert('Debe agregar al menos un proveedor antes de guardar.', 'warning');
                 return false;
             }
             
-            // Validar que cada proveedor activo tenga datos completos
             let isValid = true;
             let emptyFields = [];
             
@@ -465,7 +476,6 @@ const ArticuloFormManager = (function() {
         },
         
         showAlert: function(message, type) {
-            // Crear alerta temporal
             const alertDiv = document.createElement('div');
             alertDiv.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
             alertDiv.style.top = '20px';
@@ -479,7 +489,6 @@ const ArticuloFormManager = (function() {
             
             document.body.appendChild(alertDiv);
             
-            // Auto-eliminar después de 5 segundos
             setTimeout(() => {
                 if (alertDiv.parentNode) {
                     alertDiv.remove();
@@ -489,7 +498,6 @@ const ArticuloFormManager = (function() {
     };
 })();
 
-// Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', function() {
     ArticuloFormManager.init();
 });
@@ -617,7 +625,6 @@ document.addEventListener('DOMContentLoaded', function() {
     padding: 0.35em 0.65em;
 }
 
-/* Responsive adjustments */
 @media (max-width: 768px) {
     .proveedor-form .col-lg-5,
     .proveedor-form .col-lg-2 {
