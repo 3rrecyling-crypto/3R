@@ -159,60 +159,45 @@ ArticuloProveedorFormSet = inlineformset_factory(
 class SolicitudCompraForm(forms.ModelForm):
     class Meta:
         model = SolicitudCompra
-        # --- INICIO MODIFICACIÓN ---
         fields = ['empresa', 'lugar', 'proveedor', 'motivo', 'prioridad', 'cotizacion']
         widgets = {
-            'empresa': forms.Select(attrs={'class': 'form-select', 'id': 'id_operacion'}), # ID cambiado
-            'lugar': forms.Select(attrs={'class': 'form-select', 'id': 'id_empresa_lugar'}), # Nuevo widget
-            'proveedor': forms.Select(attrs={'class': 'form-select', 'id': 'id_proveedor'}),
+            'empresa': forms.Select(attrs={'class': 'form-select', 'id': 'id_operacion'}),
+            'lugar': forms.Select(attrs={'class': 'form-select', 'id': 'id_empresa_lugar'}),
+            'proveedor': forms.Select(attrs={'class': 'form-select', 'id': 'id_proveedor'}), # ID CRÍTICO PARA JS
             'motivo': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'prioridad': forms.Select(attrs={'class': 'form-select'}),
             'cotizacion': forms.FileInput(attrs={'class': 'form-control'}),
         }
         labels = {
-            'empresa': 'Operación', # Etiqueta cambiada
-            'lugar': 'Empresa (Lugar de Origen)', # Nueva etiqueta
+            'empresa': 'Operación',
+            'lugar': 'Empresa (Lugar de Origen)',
         }
-        # --- FIN MODIFICACIÓN ---
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # Renombramos 'empresa' a 'operacion' para claridad
         self.fields['empresa'].queryset = Empresa.objects.all().order_by('nombre')
         
+        # Inicializamos vacíos por defecto
         lugar_queryset = Lugar.objects.none()
         proveedor_queryset = Proveedor.objects.none()
 
-        # Variable para la Operación (ID de la Empresa)
         operacion_id = None
 
-        if self.instance and self.instance.pk and self.instance.empresa:
-            # Caso 1: Editando una Solicitud existente
-            operacion_id = self.instance.empresa_id
-        
-        elif 'empresa' in self.data:
-            # Caso 2: El formulario se está enviando (POST)
+        # Lógica para mantener los datos si estamos editando (instance) o si hay error (data)
+        if self.is_bound and 'empresa' in self.data:
             try:
                 operacion_id = int(self.data.get('empresa'))
             except (ValueError, TypeError):
-                pass 
+                pass
+        elif self.instance and self.instance.pk and self.instance.empresa:
+            operacion_id = self.instance.empresa_id
 
         if operacion_id:
             try:
                 operacion = Empresa.objects.get(pk=operacion_id)
-                # Filtra los Lugares (Empresas)
-                lugar_queryset = Lugar.objects.filter(
-                    empresas=operacion, 
-                    tipo='ORIGEN'
-                ).order_by('nombre')
-                
-                # Filtra los Proveedores (basado en la Operación)
-                proveedor_queryset = Proveedor.objects.filter(
-                    empresa_id=operacion_id, 
-                    activo=True
-                ).order_by('razon_social')
-                
+                lugar_queryset = Lugar.objects.filter(empresas=operacion, tipo='ORIGEN').order_by('nombre')
+                proveedor_queryset = Proveedor.objects.filter(empresa_id=operacion_id, activo=True).order_by('razon_social')
             except Empresa.DoesNotExist:
                 pass
 
@@ -224,20 +209,27 @@ class DetalleSolicitudForm(forms.ModelForm):
         model = DetalleSolicitud
         fields = ['articulo', 'cantidad', 'precio_unitario']
         widgets = {
-            'articulo': forms.Select(attrs={'class': 'form-select articulo-select'}),
-            'cantidad': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '0.00'}),
-            'precio_unitario': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            # Clase 'select2-articulo' es la que usa tu JS para identificar el campo
+            'articulo': forms.Select(attrs={'class': 'form-select select2-articulo'}), 
+            'cantidad': forms.NumberInput(attrs={'class': 'form-control cantidad-input', 'placeholder': '0.00'}),
+            'precio_unitario': forms.NumberInput(attrs={'class': 'form-control precio-input', 'step': '0.01'}),
         }
 
     def __init__(self, *args, **kwargs):
         proveedor_id = kwargs.pop('proveedor_id', None)
         super().__init__(*args, **kwargs)
+        
+        # --- CORRECCIÓN IMPORTANTE ---
         if proveedor_id:
+            # Si hay proveedor (POST o Edición), filtramos estrictamente
             self.fields['articulo'].queryset = Articulo.objects.filter(
                 proveedores__id=proveedor_id, activo=True
             ).distinct()
         else:
-            self.fields['articulo'].queryset = Articulo.objects.none()
+            # Si NO hay proveedor (Carga inicial o Empty Form), permitimos TODOS los activos.
+            # Esto evita que Select2 vea el campo como "vacío/invalido" al renderizar.
+            # El JavaScript se encargará de limpiar visualmente las opciones incorrectas.
+            self.fields['articulo'].queryset = Articulo.objects.filter(activo=True)
 
 
 class OrdenCompraForm(forms.ModelForm):

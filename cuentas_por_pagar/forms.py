@@ -43,123 +43,63 @@ class FacturaForm(forms.ModelForm):
             pass
 
 class PagoForm(forms.ModelForm):
-    numero_plazo = forms.IntegerField(
-        required=False,
-        initial=1,
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'min': '1',
-            'placeholder': 'Número del plazo'
-        }),
-        help_text="Número del plazo (1 para primer plazo, 2 para segundo, etc.)"
-    )
-    
-    fecha_plazo_programado = forms.DateField(
-        required=False,
-        widget=forms.DateInput(attrs={
-            'class': 'form-control',
-            'type': 'date'
-        }),
-        help_text="Fecha programada para este plazo (opcional)"
-    )
-    
     class Meta:
         model = Pago
         fields = [
-            'factura', 'fecha_pago', 'monto_pagado', 'metodo_pago', 
-            'referencia', 'archivo_comprobante', 'numero_plazo',
-            'fecha_plazo_programado', 'notas'
+            'fecha_pago', 'monto_pagado', 'metodo_pago', 
+            'referencia', 'archivo_comprobante', 'notas'
+            # Quitamos numero_plazo del usuario, ya no es relevante para el cálculo, es solo informativo
         ]
-        # AQUÍ ES DONDE OCURRE LA MAGIA:
         widgets = {
-            'numero_plazo': forms.NumberInput(attrs={
-                'class': 'form-control', 
-                'placeholder': '1'  # <--- NECESARIO para Floating Label
-            }),
-            'monto_pagado': forms.NumberInput(attrs={
-                'class': 'form-control', 
-                'placeholder': '0.00', # <--- NECESARIO
-                'step': '0.01'
-            }),
-            'fecha_pago': forms.DateInput(attrs={
-                'class': 'form-control', 
-                'type': 'date',
-                'placeholder': 'yyyy-mm-dd' # <--- NECESARIO (aunque sea date)
-            }),
-            'metodo_pago': forms.Select(attrs={
-                'class': 'form-select', # <--- OJO: Para selects usa 'form-select' no 'form-control'
-                'placeholder': 'Seleccione'
-            }),
-            'referencia': forms.TextInput(attrs={
-                'class': 'form-control', 
-                'placeholder': 'Ej: Transferencia 12345' # <--- NECESARIO
-            }),
-            'notas': forms.Textarea(attrs={
-                'class': 'form-control', 
-                'placeholder': 'Comentarios adicionales',
-                'rows': 3
-            }),
-            'archivo_comprobante': forms.FileInput(attrs={
-                'class': 'form-control' # Los archivos no usan placeholder, eso está bien
-            }),
+            'monto_pagado': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': '0.00'}),
+            'fecha_pago': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'metodo_pago': forms.Select(attrs={'class': 'form-select'}),
+            'referencia': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Transferencia 123'}),
+            'notas': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'archivo_comprobante': forms.FileInput(attrs={'class': 'form-control'}),
         }
-    
+
     def __init__(self, *args, **kwargs):
+        self.factura = kwargs.pop('factura', None)
         super().__init__(*args, **kwargs)
-        # Hacer el campo factura no requerido si se pasa en el initial
-        if 'factura' in self.initial:
-            self.fields['factura'].required = False
-    
+        # Si estamos editando un pago existente, obtenemos la factura de la instancia
+        if self.instance.pk and self.instance.factura:
+            self.factura = self.instance.factura
+
     def clean_monto_pagado(self):
-        """Validación flexible del monto pagado (±10% del monto sugerido)"""
-        monto_pagado = self.cleaned_data.get('monto_pagado')
-        factura = self.cleaned_data.get('factura')
+        monto_nuevo = self.cleaned_data.get('monto_pagado')
         
-        # Si no hay factura o monto, no validar
-        if not factura or not monto_pagado:
-            return monto_pagado
+        if not monto_nuevo:
+            return 0
+
+        if not self.factura:
+            return monto_nuevo
+
+        # 1. Calcular cuánto se ha pagado en TOTAL en esta factura
+        pagos_existentes = self.factura.pagos.all()
         
-        # Solo validar para facturas a plazos
-        if not factura.es_pago_plazos:
-            return monto_pagado
-        
-        # Calcular márgenes
-        monto_minimo = float(factura.monto_minimo_permitido)
-        monto_maximo = float(factura.monto_maximo_permitido)
-        
-        # Validar que esté dentro del rango permitido
-        if monto_pagado < monto_minimo:
-            raise forms.ValidationError(
-                f"El monto pagado (${monto_pagado:.2f}) es menor al mínimo permitido (${monto_minimo:.2f}). "
-            )
-        
-        if monto_pagado > monto_maximo:
-            raise forms.ValidationError(
-                f"El monto pagado (${monto_pagado:.2f}) excede el máximo permitido (${monto_maximo:.2f}). "
-            )
-        
-        return monto_pagado
-    
-    def clean(self):
-        """Validación adicional para el número de plazo"""
-        cleaned_data = super().clean()
-        factura = cleaned_data.get('factura')
-        numero_plazo = cleaned_data.get('numero_plazo')
-        
-        if factura and numero_plazo:
-            # Validar que el número de plazo no esté ya pagado
-            if factura.pagos.filter(numero_plazo=numero_plazo).exists():
-                raise forms.ValidationError(
-                    f"El plazo #{numero_plazo} ya fue registrado para esta factura."
-                )
+        # Si estamos EDITANDO, excluimos el pago actual de la suma para no contarlo doble
+        if self.instance.pk:
+            pagos_existentes = pagos_existentes.exclude(pk=self.instance.pk)
             
-            # Validar que el número de plazo no exceda la cantidad programada
-            if factura.es_pago_plazos and numero_plazo > factura.cantidad_plazos:
-                raise forms.ValidationError(
-                    f"El plazo #{numero_plazo} excede el número total de plazos programados ({factura.cantidad_plazos})."
-                )
+        total_pagado_previamente = pagos_existentes.aggregate(total=Sum('monto_pagado'))['total'] or 0
+        total_pagado_previamente = float(total_pagado_previamente)
         
-        return cleaned_data
+        monto_factura = float(self.factura.monto)
+        monto_pendiente_real = monto_factura - total_pagado_previamente
+        
+        # 2. Validación: El nuevo monto no puede superar lo que falta por pagar
+        # Agregamos una tolerancia de 0.10 por redondeos decimales
+        if float(monto_nuevo) > (monto_pendiente_real + 0.10):
+            raise forms.ValidationError(
+                f"El monto (${monto_nuevo}) excede la deuda pendiente (${monto_pendiente_real:,.2f}). "
+                "No se puede pagar de más."
+            )
+            
+        if float(monto_nuevo) <= 0:
+             raise forms.ValidationError("El pago debe ser mayor a 0.")
+
+        return monto_nuevo
     
     
 class CXPManualForm(forms.ModelForm):

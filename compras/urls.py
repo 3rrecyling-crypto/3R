@@ -63,4 +63,5 @@ urlpatterns = [
     path('api/articulos_por_proveedor/<int:proveedor_id>/', views.get_articulos_por_proveedor, name='api_articulos_por_proveedor'),
     path('api/update-articulo-precio/', views.update_articulo_proveedor_precio, name='api_update_articulo_precio'),
     path('api/empresas-por-operacion/<int:operacion_id>/', views.get_empresas_por_operacion, name='api_empresas_por_operacion'),
+    path('reportes/excel-compras/', views.reporte_compras_excel, name='reporte_compras_excel'),
 ]

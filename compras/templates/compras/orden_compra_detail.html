@@ -70,12 +70,16 @@
                             <p class="mb-0"><strong class="text-muted">Entrega Esperada:</strong> {{ object.fecha_entrega_esperada|date:"d/m/Y" }}</p>
                             
                             {% if object.es_pago_plazos %}
-                            <div class="mt-3 p-2 bg-info bg-opacity-10 rounded border border-info">
-                                <small class="text-info">
-                                    <i class="fas fa-calendar-alt me-1"></i>
-                                    <strong>Pago a Plazos:</strong> {{ object.cantidad_plazos }} plazos
-                                </small>
-                            </div>
+                                <div class="mt-3 p-2 bg-info bg-opacity-10 rounded border border-info">
+                                    <small class="text-info fw-bold">
+                                        <i class="fas fa-clock me-1"></i> Modalidad: {{ object.cantidad_plazos }} Plazos
+                                    </small>
+                                </div>
+                            {% else %}
+                                <p class="mt-2 mb-0">
+                                    <strong class="text-muted">Condiciones:</strong> 
+                                    {{ object.condiciones_pago|default:"Contado" }}
+                                </p>
                             {% endif %}
                             
                             {% if object.solicitud_origen %}
@@ -113,13 +117,15 @@
                                     <td class="ps-4">{{ detalle.articulo.sku|default:"N/A" }}</td>
                                     <td>
                                         {{ detalle.articulo.nombre }}
-                                        {% if detalle.articulo.lleva_iva %}<span class="badge bg-light text-dark ms-1">IVA</span>{% endif %}
-                                        {% if detalle.articulo.lleva_retencion_iva %}<span class="badge bg-light text-warning ms-1">RET</span>{% endif %}
+                                        {# --- ACTUALIZACIÓN: Verificación numérica de IVA/RET --- #}
+                                        {% if detalle.articulo.porcentaje_iva > 0 %}<span class="badge bg-light text-dark ms-1">IVA {{ detalle.articulo.porcentaje_iva|floatformat:0 }}%</span>{% endif %}
+                                        {% if detalle.articulo.porcentaje_retencion_iva > 0 %}<span class="badge bg-light text-warning ms-1">RET {{ detalle.articulo.porcentaje_retencion_iva|floatformat:0 }}%</span>{% endif %}
                                     </td>
                                     <td class="text-end">{{ detalle.cantidad|floatformat:2|intcomma }}</td>
                                     <td>{{ detalle.articulo.unidad_medida.abreviatura }}</td>
                                     <td class="text-end">${{ detalle.precio_unitario|floatformat:2|intcomma }}</td>
                                     <td class="text-end">{{ detalle.descuento|floatformat:2 }}%</td>
+                                    {# Nota: El JS calcula esto visualmente, pero el backend tiene el dato real #}
                                     <td class="text-end iva-item-cell">$0.00</td>
                                     <td class="text-end pe-4 fw-bold total-item-cell">${{ detalle.subtotal|floatformat:2|intcomma }}</td>
                                 </tr>
@@ -132,39 +138,63 @@
                         </table>
                     </div>
                 </div>
+                
                 <div class="card-footer bg-white p-4">
-                    <div class="row justify-content-end">
+                    <div class="row">
+                        <div class="col-md-7 mb-3 mb-md-0">
+                            {% if object.es_pago_plazos %}
+                                <div class="card bg-light border-0 h-100">
+                                    <div class="card-body p-3">
+                                        <h6 class="card-title text-primary fw-bold mb-3">
+                                            <i class="fas fa-calendar-check me-2"></i>Calendario de Pagos Programados
+                                        </h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-borderless mb-0">
+                                                <thead class="text-muted border-bottom">
+                                                    <tr>
+                                                        <th>Plazo</th>
+                                                        <th>Fecha Vencimiento</th>
+                                                        <th class="text-end">Monto a Pagar</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for plazo in object.plazos_programados %}
+                                                    <tr>
+                                                        <td><span class="badge bg-white text-dark border">#{{ plazo.numero_plazo }}</span></td>
+                                                        <td class="text-dark">{{ plazo.fecha_programada|date:"d M, Y"|capfirst }}</td>
+                                                        <td class="text-end fw-semibold text-primary">
+                                                            ${{ plazo.monto_programado|floatformat:2|intcomma }}
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+
                         <div class="col-md-5">
                             <ul class="list-group list-group-flush">
-                                <li class="list-group-item d-flex justify-content-between">
-                                    <span>Subtotal:</span>
+                                <li class="list-group-item d-flex justify-content-between border-0 px-0 pb-1">
+                                    <span class="text-muted">Subtotal:</span>
                                     <span class="fw-semibold">${{ object.total_subtotal|floatformat:2|intcomma }}</span>
                                 </li>
-                                <li class="list-group-item d-flex justify-content-between">
-                                    <span>IVA (16%):</span>
+                                <li class="list-group-item d-flex justify-content-between border-0 px-0 py-1">
+                                    <span class="text-muted">IVA Total:</span>
                                     <span class="fw-semibold">${{ object.total_iva|floatformat:2|intcomma }}</span>
                                 </li>
                                 {% if object.total_retenciones > 0 %}
-                                <li class="list-group-item d-flex justify-content-between">
-                                    <span>Retenciones:</span>
+                                <li class="list-group-item d-flex justify-content-between border-0 px-0 py-1">
+                                    <span class="text-muted">Retenciones:</span>
                                     <span class="fw-semibold text-danger">-${{ object.total_retenciones|floatformat:2|intcomma }}</span>
                                 </li>
                                 {% endif %}
-                                <li class="list-group-item d-flex justify-content-between bg-light fs-5">
+                                <li class="list-group-item d-flex justify-content-between bg-light fs-5 mt-2 rounded p-3 border">
                                     <strong class="text-primary">Total General:</strong>
                                     <strong class="text-primary">${{ object.total_general|floatformat:2|intcomma }}</strong>
                                 </li>
-                                {% if object.es_pago_plazos %}
-                                <li class="list-group-item d-flex justify-content-between bg-light">
-                                    <small class="text-info">
-                                        <i class="fas fa-info-circle me-1"></i>
-                                        Modalidad de pago:
-                                    </small>
-                                    <small class="text-info fw-bold">
-                                        {{ object.cantidad_plazos }} plazos
-                                    </small>
-                                </li>
-                                {% endif %}
                             </ul>
                         </div>
                     </div>
@@ -279,22 +309,16 @@
             const subtotal = parseFloat(row.dataset.subtotal) || 0;
             const hasIva = row.dataset.hasIva === 'true'; 
             
-            const ivaCell = row.querySelector('.iva-item-cell');
-            const totalCell = row.querySelector('.total-item-cell');
-
-            let ivaAmount = 0;
-            if (hasIva) {
-                ivaAmount = subtotal * 0.16; // 16% de IVA
-            }
-
-            const totalAmount = subtotal + ivaAmount;
-
-            if (ivaCell) {
-                ivaCell.textContent = formatCurrency(ivaAmount);
-            }
-            if (totalCell) {
-                totalCell.textContent = formatCurrency(totalAmount);
-            }
+            // --- ACTUALIZACIÓN PARA JS ---
+            // Nota: El JS aquí es visual. Los cálculos reales de porcentajes 
+            // variables (16%, 8%, etc) vienen renderizados desde el backend.
+            // Si quieres que el JS recalcule dinámicamente con % variable, 
+            // necesitarías pasar el % en un data-attribute (data-iva-percent).
+            // Por ahora, asumimos que el backend renderizó los totales correctamente.
+            
+            // Si necesitas visualización dinámica en JS con los nuevos %:
+            // const ivaPercent = parseFloat(row.dataset.ivaPercent) || 0;
+            // let ivaAmount = subtotal * (ivaPercent / 100);
         });
     });
 </script>

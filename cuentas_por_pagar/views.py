@@ -72,44 +72,46 @@ class FacturaListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
             'orden_compra__empresa',
             'proveedor'
         )
+        
+        # Obtener parámetros de la URL
         query = self.request.GET.get('q')
         estatus = self.request.GET.get('estatus')
         proveedor_id = self.request.GET.get('proveedor')
+        ordenar_por = self.request.GET.get('ordenar') # Nuevo parámetro
         
+        # --- FILTROS DE BÚSQUEDA ---
         if query:
             queryset = queryset.filter(
-                Q(numero_factura__icontains=query) |
-                Q(orden_compra__folio__icontains=query) |
-                Q(folio_cxp__icontains=query)
+                Q(numero_factura__icontains=query) |      # Folio Fiscal
+                Q(orden_compra__folio__icontains=query) | # Folio OC
+                Q(folio_cxp__icontains=query) |           # Folio Interno CXP
+                # NUEVO: Búsqueda por nombre del proveedor
+                Q(proveedor__razon_social__icontains=query) |
+                Q(orden_compra__proveedor__razon_social__icontains=query)
             )
+            
         if estatus:
             queryset = queryset.filter(estatus=estatus)
         if proveedor_id:
             queryset = queryset.filter(proveedor_id=proveedor_id)
             
-        return queryset.order_by('-fecha_emision')
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['estatus_choices'] = Factura.ESTATUS_CHOICES
-        context['proveedores'] = Proveedor.objects.all().order_by('razon_social')
-        
-        proveedor_id = self.request.GET.get('proveedor')
-        if proveedor_id:
-            context['proveedor_seleccionado'] = Proveedor.objects.filter(pk=proveedor_id).first()
-        
-        queryset = self.get_queryset()
-        total_objects = Factura.objects.all()
-        
-        context['total_facturas_count'] = total_objects.count()
-        context['facturas_filtradas_count'] = queryset.count()
-        context['facturas_vencidas_count'] = total_objects.filter(estatus='VENCIDA').count()
-        context['facturas_por_vencer_count'] = total_objects.filter(estatus='POR_VENCER').count()
-        
-        deuda_total = sum(f.monto_pendiente for f in total_objects.filter(pagada=False))
-        context['total_deuda_general'] = deuda_total
-        return context
-
+        # --- ORDENAMIENTO ---
+        if ordenar_por:
+            if ordenar_por == 'folio_desc':
+                return queryset.order_by('-folio_cxp') # Mayor a menor
+            elif ordenar_por == 'folio_asc':
+                return queryset.order_by('folio_cxp')
+            elif ordenar_por == 'monto_desc':
+                return queryset.order_by('-monto')
+            elif ordenar_por == 'monto_asc':
+                return queryset.order_by('monto')
+            elif ordenar_por == 'vencimiento_desc':
+                return queryset.order_by('-fecha_vencimiento')
+            elif ordenar_por == 'vencimiento_asc':
+                return queryset.order_by('fecha_vencimiento')
+                
+        # ORDEN POR DEFECTO: Folio CXP de mayor a menor (los más nuevos primero)
+        return queryset.order_by('-folio_cxp')
 class FacturaCreateView(LoginRequiredMixin, CreateView):
     def get(self, request, *args, **kwargs):
         messages.warning(request, "La creación manual está deshabilitada. Use Órdenes de Compra.")
@@ -221,69 +223,73 @@ class PagoListView(LoginRequiredMixin, ListView):
         context['total_pagos_count'] = pagos_sin_paginacion.count()
         return context
 
-class PagoCreateView(LoginRequiredMixin, CreateView):
+class PagoCreateView(CreateView):
     model = Pago
     form_class = PagoForm
-    # SE ELIMINÓ template_name = 'generic_form.html'
-    # Ahora buscará por defecto: cuentas_por_pagar/pago_form.html
-    success_url = reverse_lazy('lista_pagos')
-    
+    template_name = 'cuentas_por_pagar/pago_form.html'
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Pasamos la factura al formulario para validar montos
+        if self.request.GET.get('factura'):
+            factura = get_object_or_404(Factura, pk=self.request.GET.get('factura'))
+            kwargs['factura'] = factura
+        return kwargs
+
     def form_valid(self, form):
+        factura = get_object_or_404(Factura, pk=self.request.GET.get('factura'))
+        form.instance.factura = factura
         form.instance.registrado_por = self.request.user
-        self.object = form.save(commit=False)
-        
-        if 'archivo_comprobante' in self.request.FILES:
-            archivo = self.request.FILES['archivo_comprobante']
-            factura_num = form.cleaned_data.get('factura').numero_factura
-            plazo_num = form.cleaned_data.get('numero_plazo', 1)
-            
-            nombre_archivo = archivo.name
-            s3_path = f"comprobantes_pago/{factura_num}/plazo-{plazo_num}-{nombre_archivo}"
-            
-            ruta_guardada = _subir_archivo_a_s3(archivo, s3_path)
-            if ruta_guardada:
-                self.object.archivo_comprobante = ruta_guardada
-            else:
-                messages.error(self.request, "No se pudo subir el comprobante a S3.")
-                return self.form_invalid(form)
-        
-        self.object.save()
-        factura = self.object.factura
-        factura.save()
-        messages.success(self.request, f"Pago del plazo #{self.object.numero_plazo} registrado correctamente.")
+        messages.success(self.request, "Pago registrado correctamente.")
         return super().form_valid(form)
 
-class PagoUpdateView(LoginRequiredMixin, UpdateView):
+    def get_success_url(self):
+        return reverse_lazy('detalle_factura', kwargs={'pk': self.object.factura.pk})
+
+# --- VISTA PARA EDITAR PAGO ---
+class PagoUpdateView(UpdateView):
     model = Pago
     form_class = PagoForm
-    # SE ELIMINÓ template_name = 'generic_form.html'
-    # Ahora buscará por defecto: cuentas_por_pagar/pago_form.html
-    success_url = reverse_lazy('lista_pagos')
+    template_name = 'cuentas_por_pagar/pago_form.html'
     
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Al editar, la factura ya está en self.object.factura, el form lo tomará del instance
+        return kwargs
+
     def form_valid(self, form):
-        pago_original = self.get_object()
-        self.object = form.save(commit=False)
-        
-        if 'archivo_comprobante' in self.request.FILES:
-            if pago_original.archivo_comprobante and hasattr(pago_original.archivo_comprobante, 'name'):
-                _eliminar_archivo_de_s3(pago_original.archivo_comprobante.name)
-            
-            archivo = self.request.FILES['archivo_comprobante']
-            factura_num = self.object.factura.numero_factura
-            plazo_num = form.cleaned_data.get('numero_plazo', 1)
-            nombre_archivo = archivo.name
-            s3_path = f"comprobantes_pago/{factura_num}/plazo-{plazo_num}-{nombre_archivo}"
-            
-            ruta_guardada = _subir_archivo_a_s3(archivo, s3_path)
-            if ruta_guardada:
-                self.object.archivo_comprobante = ruta_guardada
-            else:
-                messages.error(self.request, "No se pudo actualizar el comprobante en S3.")
-                return self.form_invalid(form)
-        
-        self.object.save()
         messages.success(self.request, "Pago actualizado correctamente.")
         return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse_lazy('detalle_factura', kwargs={'pk': self.object.factura.pk})
+
+# --- VISTA PARA ELIMINAR PAGO ---
+class PagoDeleteView(DeleteView):
+    model = Pago
+    template_name = 'cuentas_por_pagar/pago_confirm_delete.html'
+    
+    def get_success_url(self):
+        factura_id = self.object.factura.pk
+        messages.warning(self.request, "Pago eliminado y saldos recalculados.")
+        return reverse_lazy('detalle_factura', kwargs={'pk': factura_id})
+
+class PagoUpdateView(UpdateView):
+    model = Pago
+    form_class = PagoForm
+    template_name = 'cuentas_por_pagar/pago_form.html'
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Al editar, la factura ya está en self.object.factura, el form lo tomará del instance
+        return kwargs
+
+    def form_valid(self, form):
+        messages.success(self.request, "Pago actualizado correctamente.")
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse_lazy('detalle_factura', kwargs={'pk': self.object.factura.pk})
 
 class PagoDetailView(LoginRequiredMixin, DetailView):
     model = Pago
@@ -297,16 +303,14 @@ class PagoDetailView(LoginRequiredMixin, DetailView):
         context['orden_compra'] = pago.factura.orden_compra
         return context
     
-class PagoDeleteView(LoginRequiredMixin, DeleteView):
+class PagoDeleteView(DeleteView):
     model = Pago
-    template_name = 'compras/_confirm_delete.html'
-    success_url = reverse_lazy('lista_pagos')
+    template_name = 'cuentas_por_pagar/pago_confirm_delete.html'
     
-    def delete(self, request, *args, **kwargs):
-        pago = self.get_object()
-        if pago.archivo_comprobante and hasattr(pago.archivo_comprobante, 'name'):
-            _eliminar_archivo_de_s3(pago.archivo_comprobante.name)
-        return super().delete(request, *args, **kwargs)
+    def get_success_url(self):
+        factura_id = self.object.factura.pk
+        messages.warning(self.request, "Pago eliminado y saldos recalculados.")
+        return reverse_lazy('detalle_factura', kwargs={'pk': factura_id})
 
 # ==============================================================================
 # === DASHBOARD Y APIS ===
@@ -528,17 +532,41 @@ def nueva_cuenta_por_pagar(request):
                 with transaction.atomic():
                     factura = form.save(commit=False)
                     factura.creado_por = request.user
+                    
+                    # Lógica de Fechas (Vencimiento automático a 30 días si no se especifica)
                     if factura.fecha_emision:
                         factura.fecha_vencimiento = factura.fecha_emision + timezone.timedelta(days=30)
                     else:
                         factura.fecha_vencimiento = timezone.now().date() + timezone.timedelta(days=30)
+                    
+                    # --- LÓGICA S3 PARA CARGA MANUAL ---
                     if 'archivo_factura' in request.FILES:
-                        pass # S3 lógica aquí
+                        archivo = request.FILES['archivo_factura']
+                        
+                        # Obtenemos el número de factura para organizar la carpeta en S3
+                        # Usamos .strip() para evitar espacios accidentales en la ruta
+                        factura_num = form.cleaned_data.get('numero_factura', 'manual_sin_folio').strip()
+                        
+                        # Definimos la ruta relativa: facturas_cxp/NUMERO/ARCHIVO
+                        s3_path = f"facturas_cxp/{factura_num}/{archivo.name}"
+                        
+                        # Subimos el archivo usando la función auxiliar
+                        ruta_guardada = _subir_archivo_a_s3(archivo, s3_path)
+                        
+                        if ruta_guardada:
+                            # Si subió bien, guardamos la ruta (string) en el campo del modelo
+                            factura.archivo_factura = ruta_guardada
+                        else:
+                            # Si falló S3, enviamos advertencia pero no detenemos el guardado del registro
+                            messages.warning(request, "El registro se creó, pero hubo un error al subir el archivo a S3.")
+                    # -----------------------------------
+
                     factura.save()
                     messages.success(request, f"CXP {factura.folio_cxp} registrada correctamente.")
                     return redirect('lista_facturas')
             except Exception as e:
-                messages.error(request, f"Error: {e}")
+                messages.error(request, f"Error al guardar: {e}")
     else:
         form = CXPManualForm()
+        
     return render(request, 'cuentas_por_pagar/nueva_cuenta_por_pagar.html', {'form': form})

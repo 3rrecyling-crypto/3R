@@ -5,7 +5,6 @@
 
 {% block content %}
 <div class="container-fluid py-4">
-    <!-- Header Mejorado -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <div class="d-flex align-items-center mb-2">
@@ -15,39 +14,34 @@
             <p class="text-muted mb-0">Gestión de facturas y pagos pendientes</p>
         </div>
         <div class="d-flex gap-2">
-            <!-- Botón Filtros Avanzados -->
             <button class="btn btn-white border shadow-sm text-muted fw-medium" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosAvanzados">
                 <i class="fas fa-sliders-h me-2"></i>Filtros
             </button>
             
-            <!-- Botón Estadísticas -->
             <a href="{% url 'dashboard_cuentas_por_pagar' %}" class="btn btn-white border shadow-sm text-info fw-medium">
                 <i class="fas fa-chart-bar me-2"></i>Dashboard
             </a>
             
-            <!-- Botón Exportar -->
             <a href="{% url 'exportar_facturas_excel' %}" class="btn btn-white border shadow-sm text-success fw-medium">
                 <i class="fas fa-file-excel me-2"></i>Exportar
             </a>
             
-            <!-- Botón Nueva Factura -->
             <a href="{% url 'nueva_cuenta_por_pagar' %}" class="btn btn-primary shadow-sm fw-medium">
                 <i class="fas fa-plus me-2"></i>Nueva Factura
             </a>
         </div>
     </div>
 
-    <!-- Filtros Avanzados Colapsables -->
     <div class="collapse mb-4" id="filtrosAvanzados">
         <div class="card border-0 shadow-sm">
             <div class="card-body">
                 <form method="get" class="row g-3">
                     <div class="col-md-3">
-                        <label class="form-label small text-muted mb-1">Búsqueda</label>
+                        <label class="form-label small text-muted mb-1">Búsqueda General</label>
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-light border-end-0 text-muted"><i class="fas fa-search"></i></span>
                             <input type="text" name="q" class="form-control bg-light border-start-0" 
-                                   placeholder="Folio, proveedor, OC..." value="{{ request.GET.q }}">
+                                   placeholder="Buscar por Proveedor, Folio..." value="{{ request.GET.q }}">
                         </div>
                     </div>
                     
@@ -62,7 +56,7 @@
                     </div>
                     
                     <div class="col-md-2">
-                        <label class="form-label small text-muted mb-1">Proveedor</label>
+                        <label class="form-label small text-muted mb-1">Proveedor (Lista)</label>
                         <select name="proveedor" class="form-select form-select-sm">
                             <option value="">Todos</option>
                             {% for proveedor in proveedores %}
@@ -101,7 +95,6 @@
         </div>
     </div>
 
-    <!-- Tarjetas KPI Mejoradas -->
     <div class="row g-3 mb-4">
         <div class="col-xl-3 col-md-6">
             <div class="card border-0 shadow-sm h-100 overflow-hidden hover-lift">
@@ -196,7 +189,6 @@
         </div>
     </div>
 
-    <!-- Barra de Estado Filtros Activos -->
     {% if request.GET.q or request.GET.estatus or request.GET.proveedor %}
     <div class="alert alert-light border-0 shadow-sm mb-3 py-2">
         <div class="d-flex justify-content-between align-items-center">
@@ -220,7 +212,6 @@
     </div>
     {% endif %}
 
-    <!-- Tabla Principal Mejorada -->
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-white py-3 border-bottom border-light">
             <div class="d-flex justify-content-between align-items-center">
@@ -229,7 +220,6 @@
                     <small class="text-muted">{{ paginator.count|default:0 }} registros encontrados</small>
                 </div>
                 <div class="d-flex gap-2">
-                    <!-- Selector de Vista -->
                     <div class="btn-group btn-group-sm" role="group">
                         <button type="button" class="btn btn-outline-secondary active" id="btnVistaTabla">
                             <i class="fas fa-table"></i>
@@ -239,19 +229,18 @@
                         </button>
                     </div>
                     
-                    <!-- Ordenamiento -->
                     <select class="form-select form-select-sm w-auto" id="ordenarPor">
-                        <option value="fecha_vencimiento">Ordenar por: Vencimiento</option>
-                        <option value="-fecha_vencimiento">Vencimiento (Desc)</option>
-                        <option value="monto">Monto (Asc)</option>
-                        <option value="-monto">Monto (Desc)</option>
-                        <option value="numero_factura">Folio (Asc)</option>
+                        <option value="folio_desc">Ordenar por: Folio Interno (Reciente)</option>
+                        <option value="folio_asc">Folio Interno (Antiguo)</option>
+                        <option value="vencimiento_asc">Vencimiento (Próximo)</option>
+                        <option value="vencimiento_desc">Vencimiento (Lejano)</option>
+                        <option value="monto_desc">Monto (Mayor a menor)</option>
+                        <option value="monto_asc">Monto (Menor a mayor)</option>
                     </select>
                 </div>
             </div>
         </div>
         
-        <!-- Vista Tabla (Predeterminada) -->
         <div class="table-responsive" id="vistaTabla">
             <table class="table table-hover align-middle mb-0" id="facturasTable">
                 <thead class="bg-light text-muted text-uppercase small">
@@ -269,17 +258,15 @@
                     <tr class="position-relative {% if factura.esta_vencida %}table-danger-light{% elif factura.esta_por_vencer %}table-warning-light{% endif %}">
                         <td class="ps-4 py-3">
                             <div class="d-flex align-items-center">
-                                <!-- Avatar del Proveedor -->
                                 <div class="avatar-initial rounded-circle me-3 d-flex align-items-center justify-content-center 
                                             {% if factura.esta_vencida %}bg-danger text-white
                                             {% elif factura.esta_por_vencer %}bg-warning text-dark
                                             {% else %}bg-light-primary text-primary{% endif %}" 
                                      style="width: 40px; height: 40px; font-size: 0.9rem;">
-                                    {{ factura.orden_compra.proveedor.razon_social|slice:":2"|upper|default:"P" }}
+                                    {{ factura.orden_compra.proveedor.razon_social|slice:":2"|upper|default:factura.proveedor.razon_social|slice:":2"|upper|default:"P" }}
                                 </div>
                                 
                                 <div class="flex-grow-1" style="min-width: 0;">
-                                    <!-- Folio con Badge Interno -->
                                     <div class="d-flex align-items-center mb-1">
                                         <a href="{% url 'detalle_factura' factura.pk %}" class="text-dark fw-bold text-decoration-none stretched-link me-2">
                                             {{ factura.numero_factura }}
@@ -289,13 +276,11 @@
                                         </span>
                                     </div>
                                     
-                                    <!-- Nombre del Proveedor -->
                                     <div class="small text-muted text-truncate mb-1">
                                         <i class="fas fa-truck me-1"></i>
                                         {{ factura.orden_compra.proveedor.razon_social|default:factura.proveedor.razon_social }}
                                     </div>
                                     
-                                    <!-- Badges de Estado -->
                                     <div class="d-flex flex-wrap gap-1">
                                         {% if factura.es_pago_plazos %}
                                         <span class="badge bg-light text-info border border-info px-2 py-1" style="font-size: 0.7rem;">
@@ -321,7 +306,6 @@
 
                         <td>
                             <div class="d-flex flex-column">
-                                <!-- Fecha de Vencimiento -->
                                 <div class="mb-2">
                                     <span class="small text-dark d-block">
                                         <i class="far fa-calendar-alt text-muted me-1"></i>
@@ -333,7 +317,6 @@
                                     </span>
                                 </div>
                                 
-                                <!-- Indicador de Vencimiento -->
                                 {% if factura.dias_restantes_credito < 0 and not factura.pagada %}
                                 <div class="d-flex align-items-center mt-1">
                                     <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill d-flex align-items-center" style="font-size: 0.75em;">
@@ -348,7 +331,7 @@
                                         Vence en {{ factura.dias_restantes_credito }} días
                                     </span>
                                 </div>
-                                {% elif factura.dias_restantes_credito > 30 %}
+                                {% elif factura.dias_restantes_credito > 30 and not factura.pagada %}
                                 <div class="d-flex align-items-center mt-1">
                                     <span class="badge bg-success bg-opacity-10 text-success rounded-pill d-flex align-items-center" style="font-size: 0.75em;">
                                         <i class="fas fa-check-circle me-1"></i>
@@ -390,10 +373,8 @@
                         </td>
 
                         <td class="text-end">
-                            <!-- Monto Total -->
                             <div class="fw-bold text-dark mb-1">${{ factura.monto|floatformat:2|intcomma }}</div>
                             
-                            <!-- Progreso de Pago -->
                             {% if factura.monto_pendiente > 0 %}
                             <div class="progress mb-1" style="height: 4px;">
                                 <div class="progress-bar {% if factura.porcentaje_pagado == 100 %}bg-success
@@ -437,7 +418,6 @@
                             </span>
                             {% endif %}
                             
-                            <!-- Información Adicional -->
                             <div class="mt-1">
                                 <small class="text-muted">
                                     {% if factura.pagos.exists %}
@@ -478,15 +458,6 @@
                                     <li>
                                         <a class="dropdown-item" href="{% url 'crear_pago' %}?factura={{ factura.pk }}">
                                             <i class="fas fa-dollar-sign text-success me-2 w-20"></i>Registrar Pago
-                                        </a>
-                                    </li>
-                                    {% endif %}
-                                    
-                                    <!-- Acción Rápida según Estado -->
-                                    {% if factura.esta_vencida %}
-                                    <li>
-                                        <a class="dropdown-item text-danger" href="#">
-                                            <i class="fas fa-exclamation-triangle me-2 w-20"></i>Marcar Urgente
                                         </a>
                                     </li>
                                     {% endif %}
@@ -535,14 +506,12 @@
             </table>
         </div>
         
-        <!-- Vista Tarjetas (Oculto por defecto) -->
         <div class="d-none p-4" id="vistaTarjetas">
             <div class="row g-3">
                 {% for factura in facturas %}
                 <div class="col-xl-4 col-lg-6 col-md-12">
                     <div class="card border-0 shadow-sm h-100 hover-lift">
                         <div class="card-body">
-                            <!-- Header de la Tarjeta -->
                             <div class="d-flex justify-content-between align-items-start mb-3">
                                 <div>
                                     <span class="badge {% if factura.estatus == 'PAGADA' %}bg-success
@@ -565,13 +534,11 @@
                                 {% endif %}
                             </div>
                             
-                            <!-- Proveedor -->
                             <p class="small text-muted mb-3">
                                 <i class="fas fa-truck me-1"></i>
                                 {{ factura.orden_compra.proveedor.razon_social|default:factura.proveedor.razon_social|truncatechars:30 }}
                             </p>
                             
-                            <!-- Fechas -->
                             <div class="row g-2 mb-3">
                                 <div class="col-6">
                                     <small class="text-muted d-block">Emisión</small>
@@ -585,7 +552,6 @@
                                 </div>
                             </div>
                             
-                            <!-- Monto y Progreso -->
                             <div class="mb-3">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                     <span class="fw-bold fs-5">${{ factura.monto|floatformat:2|intcomma }}</span>
@@ -610,7 +576,6 @@
                                 {% endif %}
                             </div>
                             
-                            <!-- Footer con Botones -->
                             <div class="d-flex justify-content-between align-items-center pt-3 border-top">
                                 <div>
                                     {% if factura.es_pago_plazos %}
@@ -641,7 +606,6 @@
             </div>
         </div>
         
-        <!-- Paginación Mejorada -->
         {% if is_paginated %}
         <div class="card-footer bg-white border-top border-light py-3">
             <div class="d-flex justify-content-between align-items-center">
@@ -705,85 +669,25 @@
 
 {% block extra_css %}
 <style>
-    /* Mejoras generales */
-    .bg-gradient-primary {
-        background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
-    }
-    
-    /* Colores de fondo para badges */
+    .bg-gradient-primary { background: linear-gradient(135deg, #4e73df 0%, #224abe 100%); }
     .bg-light-primary { background-color: rgba(78, 115, 223, 0.1) !important; }
     .bg-light-warning { background-color: rgba(255, 193, 7, 0.1) !important; }
     .bg-light-danger { background-color: rgba(220, 53, 69, 0.1) !important; }
     .bg-light-success { background-color: rgba(40, 167, 69, 0.1) !important; }
-    
-    /* Avatar mejorado */
-    .avatar-initial {
-        font-family: var(--bs-font-sans-serif);
-        user-select: none;
-        font-weight: 600;
-    }
-    
-    .avatar-sm {
-        width: 48px;
-        height: 48px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    /* Efectos hover */
-    .hover-lift {
-        transition: all 0.2s ease;
-    }
-    .hover-lift:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
-    }
-    
-    /* Tabla mejorada */
-    .table-hover tbody tr {
-        transition: all 0.2s ease;
-        cursor: pointer;
-    }
-    .table-hover tbody tr:hover {
-        background-color: rgba(78, 115, 223, 0.03) !important;
-    }
-    
-    /* Estados especiales para filas */
-    .table-danger-light {
-        background-color: rgba(220, 53, 69, 0.03) !important;
-    }
-    .table-warning-light {
-        background-color: rgba(255, 193, 7, 0.03) !important;
-    }
-    
-    /* Progress bars */
-    .progress {
-        border-radius: 10px;
-        overflow: hidden;
-    }
-    .progress-bar {
-        border-radius: 10px;
-    }
-    
-    /* Dropdowns */
+    .avatar-initial { font-family: var(--bs-font-sans-serif); user-select: none; font-weight: 600; }
+    .avatar-sm { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; }
+    .hover-lift { transition: all 0.2s ease; }
+    .hover-lift:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important; }
+    .table-hover tbody tr { transition: all 0.2s ease; cursor: pointer; }
+    .table-hover tbody tr:hover { background-color: rgba(78, 115, 223, 0.03) !important; }
+    .table-danger-light { background-color: rgba(220, 53, 69, 0.03) !important; }
+    .table-warning-light { background-color: rgba(255, 193, 7, 0.03) !important; }
+    .progress { border-radius: 10px; overflow: hidden; }
+    .progress-bar { border-radius: 10px; }
     .no-arrow::after { display: none !important; }
     .w-20 { width: 20px; display: inline-block; text-align: center; }
-    
-    /* Badges personalizados */
-    .badge.border {
-        border-width: 1px !important;
-    }
-    
-    /* Responsive */
-    @media (max-width: 768px) {
-        .btn-group {
-            flex-wrap: wrap;
-        }
-        .table-responsive {
-            font-size: 0.9rem;
-        }
-    }
+    .badge.border { border-width: 1px !important; }
+    @media (max-width: 768px) { .btn-group { flex-wrap: wrap; } .table-responsive { font-size: 0.9rem; } }
 </style>
 {% endblock %}
 
@@ -796,49 +700,54 @@
         const vistaTabla = document.getElementById('vistaTabla');
         const vistaTarjetas = document.getElementById('vistaTarjetas');
         
-        btnVistaTabla.addEventListener('click', function() {
-            btnVistaTabla.classList.add('active');
-            btnVistaTarjetas.classList.remove('active');
-            vistaTabla.classList.remove('d-none');
-            vistaTarjetas.classList.add('d-none');
-        });
-        
-        btnVistaTarjetas.addEventListener('click', function() {
-            btnVistaTarjetas.classList.add('active');
-            btnVistaTabla.classList.remove('active');
-            vistaTarjetas.classList.remove('d-none');
-            vistaTabla.classList.add('d-none');
-        });
+        if (btnVistaTabla && btnVistaTarjetas) {
+            btnVistaTabla.addEventListener('click', function() {
+                btnVistaTabla.classList.add('active');
+                btnVistaTarjetas.classList.remove('active');
+                vistaTabla.classList.remove('d-none');
+                vistaTarjetas.classList.add('d-none');
+            });
+            
+            btnVistaTarjetas.addEventListener('click', function() {
+                btnVistaTarjetas.classList.add('active');
+                btnVistaTabla.classList.remove('active');
+                vistaTarjetas.classList.remove('d-none');
+                vistaTabla.classList.add('d-none');
+            });
+        }
         
         // Ordenamiento
         const ordenarPor = document.getElementById('ordenarPor');
-        ordenarPor.addEventListener('change', function() {
-            const url = new URL(window.location.href);
-            url.searchParams.set('ordenar', this.value);
-            window.location.href = url.toString();
-        });
-        
-        // Establecer valor actual del ordenamiento
-        const urlParams = new URLSearchParams(window.location.search);
-        const ordenarActual = urlParams.get('ordenar') || 'fecha_vencimiento';
-        ordenarPor.value = ordenarActual;
+        if (ordenarPor) {
+            ordenarPor.addEventListener('change', function() {
+                const url = new URL(window.location.href);
+                url.searchParams.set('ordenar', this.value);
+                window.location.href = url.toString();
+            });
+            
+            // Mantener seleccionado el valor actual
+            const urlParams = new URLSearchParams(window.location.search);
+            const ordenarActual = urlParams.get('ordenar') || 'folio_desc';
+            ordenarPor.value = ordenarActual;
+        }
         
         // Highlight de filas vencidas
         document.querySelectorAll('.table-danger-light').forEach(row => {
             row.addEventListener('click', function(e) {
                 if (!e.target.closest('.dropdown') && !e.target.closest('a')) {
-                    window.location.href = this.querySelector('a.stretched-link').href;
+                    const link = this.querySelector('a.stretched-link');
+                    if(link) window.location.href = link.href;
                 }
             });
         });
         
-        // Tooltips para elementos truncados
+        // Tooltips
         const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
         const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
             return new bootstrap.Tooltip(tooltipTriggerEl);
         });
         
-        // Auto-expandir filtros si hay búsqueda activa
+        // Auto-expandir filtros
         if (window.location.search.includes('q=') || 
             window.location.search.includes('estatus=') ||
             window.location.search.includes('proveedor=')) {
@@ -847,25 +756,6 @@
                 new bootstrap.Collapse(filtrosAvanzados, {toggle: true});
             }
         }
-        
-        // Contador de días para facturas vencidas
-        function actualizarContadoresDias() {
-            const ahora = new Date();
-            document.querySelectorAll('[data-fecha-vencimiento]').forEach(el => {
-                const fechaVencimiento = new Date(el.dataset.fechaVencimiento);
-                const diffDias = Math.floor((ahora - fechaVencimiento) / (1000 * 60 * 60 * 24));
-                
-                if (diffDias > 0) {
-                    const badge = el.querySelector('.badge');
-                    if (badge) {
-                        badge.innerHTML = `<i class="fas fa-exclamation-circle me-1"></i>Vencida hace ${diffDias} días`;
-                    }
-                }
-            });
-        }
-        
-        // Inicializar contadores
-        actualizarContadoresDias();
     });
 </script>
 {% endblock %}

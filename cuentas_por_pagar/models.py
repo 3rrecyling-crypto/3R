@@ -94,6 +94,7 @@ class Factura(models.Model):
         # 2. HERENCIA DE DATOS DE LA OC
         if self.orden_compra:
             self.proveedor = self.orden_compra.proveedor
+            # Solo si es nueva intentamos heredar plazos, si ya existe respetamos lo que tenga
             if self.pk is None and hasattr(self.orden_compra, 'cantidad_plazos'):
                 if self.orden_compra.cantidad_plazos:
                     self.cantidad_plazos = self.orden_compra.cantidad_plazos
@@ -102,8 +103,6 @@ class Factura(models.Model):
         if not self.cantidad_plazos or self.cantidad_plazos < 1:
             self.cantidad_plazos = 1
 
-        is_new = self.pk is None
-        
         # Guardamos primero para tener ID
         super().save(*args, **kwargs)
         
@@ -111,42 +110,43 @@ class Factura(models.Model):
         if self.orden_compra:
             self._sincronizar_con_compras()
             
-            # --- AUTO-REGISTRO DE PAGOS ---
-            # Si viene de OC y aún no tiene pagos, los creamos automáticamente
-            if not self.pagos.exists() and self.monto and self.monto > 0:
-                self._generar_pagos_automaticos_desde_oc()
+            # --- CORRECCIÓN AQUÍ: SE ELIMINA LA AUTO-GENERACIÓN DE PAGOS ---
+            # El código anterior creaba Pagos automáticamente, marcando la factura como pagada.
+            # Al comentarlo, la factura nace PENDIENTE y espera pagos manuales.
+            
+            # if not self.pagos.exists() and self.monto and self.monto > 0:
+            #    self._generar_pagos_automaticos_desde_oc()
+            
+            # ---------------------------------------------------------------
         
-        # 4. ACTUALIZAR ESTATUS (Importante después de generar pagos)
+        # 4. ACTUALIZAR ESTATUS
+        # Esto recalculará y verá que pagado es 0, poniendo el estatus en PENDIENTE
         self.actualizar_estatus_pago()
 
     def _generar_pagos_automaticos_desde_oc(self):
-        """Genera pagos automáticamente asumiendo validación por OC"""
+        """
+        (DEPRECADO/DESACTIVADO)
+        Genera pagos automáticamente asumiendo validación por OC.
+        Se mantiene el código por si se requiere reactivar en el futuro para casos de contado inmediato.
+        """
         try:
-            # Importación local para evitar dependencias circulares si Pago está abajo
-            # from .models import Pago 
-            
             monto_total = float(self.monto)
             cantidad = self.cantidad_plazos
             monto_por_plazo = monto_total / cantidad
-            
-            # Referencia por defecto
             ref = f"Auto-Generado OC {self.orden_compra.folio}"
             
             for i in range(1, cantidad + 1):
-                # Calcular fecha teórica (ej. hoy o diferida)
                 fecha_pago = timezone.now().date()
-                
                 Pago.objects.create(
                     factura=self,
                     numero_plazo=i,
                     monto_pagado=monto_por_plazo,
                     fecha_pago=fecha_pago,
-                    metodo_pago='TRANSFERENCIA', # Método por defecto
+                    metodo_pago='TRANSFERENCIA',
                     referencia=ref,
                     notas="Pago registrado automáticamente por sistema (Vinculación OC).",
                     registrado_por=self.creado_por
                 )
-            logger.info(f"Pagos automáticos generados para factura {self.folio_cxp}")
         except Exception as e:
             logger.error(f"Error generando pagos automáticos: {e}")
 
@@ -168,16 +168,19 @@ class Factura(models.Model):
                 else:
                     self.estatus = 'PENDIENTE'
         
+        # Usamos update_fields para evitar recursión infinita con save()
         super().save(update_fields=['pagada', 'estatus', 'dias_restantes_credito'])
     
     def _sincronizar_con_compras(self):
         try:
+            # Importación local para evitar error circular
             from compras.models import OrdenCompra
             if self.archivo_factura and self.orden_compra:
                 self.orden_compra.factura = self.archivo_factura
                 self.orden_compra.factura_subida = True
                 self.orden_compra.factura_subida_por = self.creado_por
                 self.orden_compra.fecha_factura_subida = timezone.now()
+                # Método opcional si existe en tu modelo OC
                 if hasattr(self.orden_compra, 'actualizar_estado_auditoria'):
                     self.orden_compra.actualizar_estado_auditoria()
                 self.orden_compra.save()
@@ -236,37 +239,58 @@ class Factura(models.Model):
     @property
     def plazos_programados(self):
         """
-        Retorna la estructura unificada de plazos.
-        Funciona para pago único (lista de 1 elemento) o múltiples plazos.
+        Calcula el estado de cada plazo basándose en el TOTAL acumulado pagado (Cascada).
+        No importa si hiciste 1 pago grande o 5 pequeños, el sistema llena las cubetas en orden.
         """
         plazos = []
-        # Aseguramos mínimo 1 plazo
         cantidad = self.cantidad_plazos if self.cantidad_plazos > 0 else 1
-        monto_por_plazo = float(self.monto) / cantidad
+        monto_total_factura = float(self.monto)
+        
+        # Cuánto debe valer cada plazo teóricamente
+        monto_teorico_por_plazo = monto_total_factura / cantidad
+        
+        # Dinero total disponible para repartir en los plazos
+        dinero_disponible = self.monto_pagado 
         
         for i in range(1, cantidad + 1):
-            # Fecha teórica (ej. cada 30 días)
+            # Fecha vencimiento teórica (ej: cada 30 días)
             fecha_teorica = self.fecha_emision + timedelta(days=30 * i) if self.fecha_emision else timezone.now().date()
             
-            # Buscar si ya existe el pago real
-            pago_real = self.pagos.filter(numero_plazo=i).first()
+            # --- CÁLCULO DE CASCADA ---
+            monto_necesario = monto_teorico_por_plazo
+            
+            if dinero_disponible >= (monto_necesario - 0.01): # Tolerancia de centavos
+                # Hay dinero suficiente para cubrir este plazo completo
+                cubierto = monto_necesario
+                dinero_disponible -= monto_necesario
+                estado = 'PAGADO'
+                saldo = 0
+            elif dinero_disponible > 0:
+                # Hay dinero, pero no alcanza para todo el plazo (Parcial)
+                cubierto = dinero_disponible
+                saldo = monto_necesario - dinero_disponible
+                dinero_disponible = 0 # Se acabó el dinero en este plazo
+                estado = 'PARCIAL'
+            else:
+                # No llegó dinero hasta aquí
+                cubierto = 0
+                saldo = monto_necesario
+                estado = 'PENDIENTE'
+
+            # Calcular estatus de tiempo
+            es_vencido = (estado != 'PAGADO' and fecha_teorica < timezone.now().date())
             
             plazos.append({
                 'numero_plazo': i,
                 'fecha_programada': fecha_teorica,
-                'monto_programado': monto_por_plazo,
-                'esta_pagado': pago_real is not None,
-                'pago': pago_real, # Objeto Pago o None
-                'esta_vencido': (not pago_real and fecha_teorica < timezone.now().date()),
-                'esta_por_vencer': (not pago_real and 0 <= (fecha_teorica - timezone.now().date()).days <= 3)
+                'monto_programado': monto_teorico_por_plazo,
+                'monto_cubierto': cubierto,   # Nuevo campo para el HTML
+                'saldo_pendiente': saldo,     # Nuevo campo para el HTML
+                'estado': estado,
+                'esta_vencido': es_vencido,
             })
+            
         return plazos
-
-    def __str__(self):
-        return f"{self.folio_cxp} | {self.proveedor} (${self.monto})"
-    
-    class Meta:
-        permissions = [("acceso_cxp", "Acceso al Módulo Cuentas por Pagar")]
 
 class Pago(models.Model):
     METODO_CHOICES = (
@@ -290,35 +314,6 @@ class Pago(models.Model):
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         # Actualizar la factura padre cada vez que se guarda un pago
-        self.factura.actualizar_estatus_pago()
-        
-    def __str__(self):
-        return f"Pago {self.monto_pagado} - {self.factura.folio_cxp}"
-
-    class Meta:
-        ordering = ['factura', 'numero_plazo']
-
-class Pago(models.Model):
-    METODO_CHOICES = (
-        ('TRANSFERENCIA', 'Transferencia'),
-        ('CHEQUE', 'Cheque'),
-        ('EFECTIVO', 'Efectivo'),
-        ('TARJETA', 'Tarjeta'),
-    )
-    factura = models.ForeignKey(Factura, on_delete=models.CASCADE, related_name='pagos')
-    fecha_pago = models.DateField()
-    monto_pagado = models.DecimalField(max_digits=12, decimal_places=2)
-    metodo_pago = models.CharField(max_length=20, choices=METODO_CHOICES)
-    referencia = models.CharField(max_length=100, blank=True)
-    notas = models.TextField(blank=True)
-    registrado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    creado_en = models.DateTimeField(auto_now_add=True)
-    archivo_comprobante = models.FileField(upload_to='comprobantes_pago/%Y/%m/', null=True, blank=True, verbose_name="Comprobante de Pago")
-    numero_plazo = models.PositiveIntegerField(default=1, verbose_name="Número de Plazo")
-    fecha_plazo_programado = models.DateField(null=True, blank=True)
-    
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
         self.factura.actualizar_estatus_pago()
         
     def __str__(self):

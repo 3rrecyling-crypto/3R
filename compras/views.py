@@ -7,6 +7,10 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.forms import inlineformset_factory
+from django.db.models import Count, Q
+import csv
+from django.contrib.auth.decorators import login_required, permission_required
+from django.http import HttpResponse
 from django.db import transaction
 from django.db.models import Q
 from django.contrib import messages
@@ -27,7 +31,8 @@ from .models import (
 # Formularios de esta app
 from .forms import (
     ProveedorForm, ArticuloForm, ArticuloProveedorFormSet, SolicitudCompraForm, 
-    DetalleSolicitudForm, OrdenCompraForm, DetalleOrdenCompraForm, CategoriaForm,OrdenCompraArchivosForm,SolicitudCompra,
+    DetalleSolicitudForm, OrdenCompraForm, DetalleOrdenCompraForm, CategoriaForm,
+    OrdenCompraArchivosForm
 )
 # Modelos de la app ternium
 from ternium.models import Empresa
@@ -43,21 +48,60 @@ from django.contrib.auth.mixins import PermissionRequiredMixin
 @login_required
 @permission_required('compras.acceso_compras', raise_exception=True)
 def dashboard_compras(request):
+    """
+    Dashboard principal con KPIs, Tabla de Acción Inmediata y Gráficos filtrados.
+    """
+    
+    # --- 1. KPIs (Indicadores Clave) ---
     solicitudes_pendientes = SolicitudCompra.objects.filter(estatus='PENDIENTE_APROBACION').count()
+    solicitudes_urgentes = SolicitudCompra.objects.filter(estatus='PENDIENTE_APROBACION', prioridad='URGENTE').count()
     ordenes_abiertas = OrdenCompra.objects.filter(estatus='APROBADA').count()
-    total_proveedores = Proveedor.objects.filter(activo=True).count()
-    # --- NUEVO: Conteo de artículos ---
-    total_articulos = Articulo.objects.filter(activo=True).count() 
+    total_articulos = Articulo.objects.filter(activo=True).count()
+    
+    # --- 2. TABLA DE ACCIÓN (Últimas 5 pendientes) ---
+    ultimas_solicitudes = SolicitudCompra.objects.filter(
+        estatus='PENDIENTE_APROBACION'
+    ).select_related('solicitante', 'empresa').order_by('-creado_en')[:5]
+
+    # --- 3. DATOS PARA GRÁFICO (Chart.js) ---
+    # EXCLUIMOS 'APROBADA' y 'AUDITADA' para que el gráfico muestre solo la "carga de trabajo" pendiente/problemas
+    # (Borradores, Canceladas, Listas para auditar, etc.)
+    ordenes_por_estatus = OrdenCompra.objects.exclude(
+        estatus__in=['AUDITADA', 'APROBADA', 'RECIBIDA_TOTAL', 'CERRADA'] 
+    ).values('estatus').annotate(total=Count('id'))
+    
+    labels_grafico = []
+    data_grafico = []
+    colores_grafico = []
+    
+    # Mapa de colores coherente
+    mapa_colores = {
+        'BORRADOR': '#6c757d',          # Gris (Secundario)
+        'LISTA_PARA_AUDITAR': '#ffc107', # Amarillo (Warning)
+        'CANCELADA': '#dc3545',         # Rojo (Danger)
+        'RECIBIDA_PARCIAL': '#17a2b8',  # Cian (Info)
+        'EN_AUDITORIA': '#fd7e14',      # Naranja
+    }
+
+    for item in ordenes_por_estatus:
+        # Convertimos la clave del estatus (ej: 'BORRADOR') a su texto legible
+        estatus_readable = dict(OrdenCompra.ESTATUS_CHOICES).get(item['estatus'], item['estatus'])
+        labels_grafico.append(estatus_readable)
+        data_grafico.append(item['total'])
+        colores_grafico.append(mapa_colores.get(item['estatus'], '#adb5bd')) # Gris default
 
     context = {
         'solicitudes_pendientes': solicitudes_pendientes,
+        'solicitudes_urgentes': solicitudes_urgentes,
         'ordenes_abiertas': ordenes_abiertas,
-        'total_proveedores': total_proveedores,
-        'total_articulos': total_articulos, # <--- Agregado al contexto
+        'total_articulos': total_articulos,
+        'ultimas_solicitudes': ultimas_solicitudes,
+        # Datos serializados para JS
+        'chart_labels': json.dumps(labels_grafico),
+        'chart_data': json.dumps(data_grafico),
+        'chart_colors': json.dumps(colores_grafico),
     }
     return render(request, 'compras/dashboard.html', context)
-
-# --- CRUD PROVEEDORES ---
 
 class ProveedorListView(LoginRequiredMixin, ListView):
     model = Proveedor
@@ -352,36 +396,39 @@ def get_proveedores_por_empresa(request, empresa_id):
 @login_required
 def get_articulos_por_proveedor(request, proveedor_id):
     """
-    Devuelve los artículos de un proveedor con su precio y todos los detalles
-    adicionales que el frontend necesita.
+    Devuelve los artículos de un proveedor incluyendo sus TASAS reales de impuestos.
     """
-    # --- INICIO DE LA CORRECCIÓN ---
-    # 1. Optimizamos la consulta para traer los datos relacionados en una sola petición a la BD.
-    articulos_prov = ArticuloProveedor.objects.filter(
-        proveedor_id=proveedor_id, 
-        articulo__activo=True
-    ).select_related('articulo', 'articulo__categoria', 'articulo__unidad_medida')
-    
-    # 2. Construimos la respuesta incluyendo los campos que faltaban.
-    data = []
-    for ap in articulos_prov:
-        articulo = ap.articulo
-        data.append({
-            'id': articulo.id,
-            'nombre': articulo.nombre,
-            'sku': articulo.sku,
-            'precio': ap.precio_unitario,
-            'lleva_iva': articulo.lleva_iva,
-            'lleva_retencion_iva': articulo.lleva_retencion_iva,
-            
-            # --- Campos añadidos que solucionan el problema ---
-            'unidad_medida': articulo.unidad_medida.abreviatura if articulo.unidad_medida else None,
-            'categoria': str(articulo.categoria) if articulo.categoria else None,
-            'tipo': articulo.get_tipo_display(), # Devuelve el texto legible ('Producto' o 'Servicio')
-        })
-    
-    return JsonResponse({'articulos': data})
-
+    try:
+        # Filtramos artículos activos y del proveedor seleccionado
+        articulos_prov = ArticuloProveedor.objects.filter(
+            proveedor_id=proveedor_id, 
+            articulo__activo=True
+        ).select_related('articulo', 'articulo__categoria', 'articulo__unidad_medida')
+        
+        data = []
+        for ap in articulos_prov:
+            articulo = ap.articulo
+            data.append({
+                'id': articulo.id,
+                'nombre': articulo.nombre,
+                'sku': articulo.sku,
+                'precio': ap.precio_unitario,
+                
+                # --- CAMBIO IMPORTANTE: Enviamos el valor numérico exacto ---
+                # Si el campo es None, enviamos 0.0
+                'iva_tasa': float(articulo.porcentaje_iva or 0), 
+                'ret_iva_tasa': float(articulo.porcentaje_retencion_iva or 0),
+                # ------------------------------------------------------------
+                
+                'unidad_medida': articulo.unidad_medida.abreviatura if articulo.unidad_medida else None,
+                'categoria': str(articulo.categoria) if articulo.categoria else None,
+                'tipo': articulo.get_tipo_display(),
+            })
+        
+        return JsonResponse({'articulos': data})
+    except Exception as e:
+        print(f"Error en API Articulos: {e}") 
+        return JsonResponse({'articulos': []})
 
 @login_required
 def crear_solicitud(request):
@@ -396,60 +443,64 @@ def crear_solicitud(request):
     if request.method == 'POST':
         form = SolicitudCompraForm(request.POST, request.FILES)
         
-        # --- INICIO DE LA CORRECCIÓN ---
-        # Obtenemos el ID del proveedor directamente del POST para pasarlo al formset
+        # Obtenemos el ID del proveedor de forma segura
         proveedor_id = request.POST.get('proveedor')
+        if not proveedor_id:
+            proveedor_id = None # Asegurar que sea None y no cadena vacía si falla
         
         formset = DetalleFormSet(
             request.POST, 
             request.FILES,
             prefix='detalles',
-            # ¡Clave! Pasamos el proveedor_id para que los formularios de detalle
-            # sepan qué queryset de artículos usar durante la validación.
             form_kwargs={'proveedor_id': proveedor_id} 
         )
-        # --- FIN DE LA CORRECCIÓN ---
         
-        if form.is_valid() and formset.is_valid() and formset.has_changed():
-            try:
-                with transaction.atomic():
-                    solicitud = form.save(commit=False)
-                    solicitud.solicitante = request.user
-                    solicitud.estatus = 'PENDIENTE_APROBACION'
-                    solicitud.save() # Guardamos la solicitud principal
-                    
-                    formset.instance = solicitud
-                    formset.save() # Guardamos los detalles
-                    
-                    messages.success(request, f'Solicitud {solicitud.folio} enviada para aprobación.')
-                    return redirect('lista_solicitudes')
-            except Exception as e:
-                messages.error(request, f"Error al crear la solicitud: {e}")
-        else:
-            # Lógica para mostrar errores de validación
-            if not form.is_valid():
-                messages.error(request, f"Error en datos generales: {form.errors.as_text()}")
-            if not formset.is_valid():
+        if form.is_valid():
+            # Validamos el formset. Aquí es donde DetalleSolicitudForm usará el 
+            # proveedor_id que pasamos arriba para asegurar que el artículo sea válido.
+            if formset.is_valid():
+                if not formset.has_changed():
+                     messages.error(request, "La solicitud debe tener al menos un artículo.")
+                else:
+                    try:
+                        with transaction.atomic():
+                            solicitud = form.save(commit=False)
+                            solicitud.solicitante = request.user
+                            solicitud.estatus = 'PENDIENTE_APROBACION'
+                            solicitud.save()
+                            
+                            formset.instance = solicitud
+                            formset.save()
+                            
+                            messages.success(request, f'Solicitud {solicitud.folio} enviada para aprobación.')
+                            return redirect('lista_solicitudes')
+                    except Exception as e:
+                        messages.error(request, f"Error al crear la solicitud: {e}")
+            else:
+                # Errores específicos de los artículos
                 for i, form_errors in enumerate(formset.errors):
-                    if form_errors:
-                        messages.error(request, f"Error en el artículo #{i+1}: {form_errors.as_text()}")
-            if not formset.has_changed():
-                messages.error(request, "La solicitud debe tener al menos un artículo.")
+                    for field, errors in form_errors.items():
+                        for error in errors:
+                            messages.error(request, f"Error en el artículo #{i+1} ({field}): {error}")
+        else:
+            messages.error(request, f"Error en datos generales: {form.errors.as_text()}")
 
-    else: # Petición GET
+    else: # GET
         form = SolicitudCompraForm()
-        # Al crear, no hay proveedor, por lo que el form_kwargs es None
+        # Inicializamos con None, lo que activará el "Articulo.objects.filter(activo=True)" en forms.py
+        # permitiendo que el widget se renderice correctamente para el JS.
         formset = DetalleFormSet(prefix='detalles', form_kwargs={'proveedor_id': None})
 
-    context = { 'form': form, 'formset': formset, 'titulo': 'Nueva Solicitud de Compra' }
+    context = { 
+        'form': form, 
+        'formset': formset, 
+        'titulo': 'Nueva Solicitud de Compra' 
+    }
     return render(request, 'compras/solicitud_form.html', context)
-
 @login_required
 def aprobar_solicitud(request, pk):
     if request.method == 'POST':
-        print("🔵 DEBUG: Entrando a aprobar_solicitud")
         solicitud = get_object_or_404(SolicitudCompra, pk=pk)
-        print(f"🔵 DEBUG: Solicitud {solicitud.folio} - Estatus: {solicitud.estatus}")
         
         if solicitud.estatus != 'PENDIENTE_APROBACION':
             messages.warning(request, "Esta solicitud no se puede aprobar en su estado actual.")
@@ -466,7 +517,6 @@ def aprobar_solicitud(request, pk):
                 solicitud.aprobado_por = request.user
                 solicitud.fecha_aprobacion = timezone.now()
                 solicitud.save()
-                print("🔵 DEBUG: Solicitud aprobada y guardada")
 
                 condiciones = f"{solicitud.proveedor.dias_credito} días de crédito" if solicitud.proveedor and solicitud.proveedor.dias_credito > 0 else "Contado"
 
@@ -480,8 +530,9 @@ def aprobar_solicitud(request, pk):
                     estatus='BORRADOR',
                     creado_por=request.user,
                     usuario_creacion=request.user,
+                    # Heredamos modalidad de pago por defecto (se puede cambiar al generar OC)
+                    modalidad_pago='UNA_EXHIBICION' 
                 )
-                print(f"🔵 DEBUG: OC creada - {orden.folio}")
 
                 # 3. Crea los detalles de la OC
                 for detalle_sol in solicitud.detalles.all():
@@ -492,55 +543,66 @@ def aprobar_solicitud(request, pk):
                         precio_unitario=detalle_sol.precio_unitario,
                         descuento=0
                     )
-                print("🔵 DEBUG: Detalles de OC creados")
                 
-                # --- NUEVO: CREAR FACTURA AUTOMÁTICA EN CXP ---
+                # --- MODIFICACIÓN: Lógica de CXP y Plazos ---
                 try:
                     from cuentas_por_pagar.models import Factura
-                    from datetime import datetime
+                    from decimal import Decimal
+                    from datetime import timedelta
                     
-                    print("🔵 DEBUG: Intentando importar modelos de CXP")
+                    # Verificamos si ya existen facturas vinculadas
+                    if not hasattr(orden, 'factura_cxp') and not orden.factura_cxp_set.exists() if hasattr(orden, 'factura_cxp_set') else True:
+                        
+                        # --- LÓGICA PARA PLAZOS ---
+                        if orden.modalidad_pago == 'A_PLAZOS' and orden.cantidad_plazos and orden.cantidad_plazos > 1:
+                            monto_por_plazo = orden.total_general / Decimal(orden.cantidad_plazos)
+                            
+                            for i in range(1, orden.cantidad_plazos + 1):
+                                # Nombre: CXP-OC-XXXXX-1, CXP-OC-XXXXX-2...
+                                numero_cxp = f"CXP-{orden.folio}-{i}"
+                                
+                                # Fecha: Cada plazo vence 30 días después del anterior (aproximado)
+                                fecha_vencimiento = timezone.now().date() + timedelta(days=30 * i)
+                                
+                                Factura.objects.create(
+                                    orden_compra=orden,
+                                    numero_factura=numero_cxp,
+                                    fecha_emision=timezone.now().date(),
+                                    fecha_vencimiento=fecha_vencimiento,
+                                    monto=monto_por_plazo,
+                                    creado_por=request.user,
+                                    descripcion=f"Plazo {i} de {orden.cantidad_plazos} - OC {orden.folio}" # Opcional si el modelo tiene descripción
+                                )
+                            messages.success(request, f"Solicitud aprobada. OC {orden.folio} generada con {orden.cantidad_plazos} plazos en CXP.")
+
+                        # --- LÓGICA PARA PAGO ÚNICO ---
+                        else:
+                            # Nombre: CXP-OC-XXXXX
+                            numero_cxp = f"CXP-{orden.folio}"
+                            
+                            # Fecha vencimiento según días de crédito del proveedor
+                            dias_credito = getattr(orden.proveedor, 'dias_credito', 0)
+                            fecha_vencimiento = timezone.now().date() + timedelta(days=dias_credito)
+                            
+                            Factura.objects.create(
+                                orden_compra=orden,
+                                numero_factura=numero_cxp,
+                                fecha_emision=timezone.now().date(),
+                                fecha_vencimiento=fecha_vencimiento,
+                                monto=orden.total_general,
+                                creado_por=request.user
+                            )
+                            messages.success(request, f"Solicitud aprobada. OC {orden.folio} y cuenta por pagar {numero_cxp} generadas.")
                     
-                    # Verificar si ya existe factura para evitar duplicados
-                    if not hasattr(orden, 'factura_cxp'):
-                        print("🔵 DEBUG: No existe factura, creando...")
-                        
-                        # Generar número de factura único
-                        numero_factura = f"FAC-{orden.folio}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                        print(f"🔵 DEBUG: Número factura generado: {numero_factura}")
-                        
-                        # Calcular fecha de vencimiento
-                        dias_credito = getattr(orden.proveedor, 'dias_credito', 30)
-                        fecha_vencimiento = timezone.now().date() + timezone.timedelta(days=dias_credito)
-                        print(f"🔵 DEBUG: Fecha vencimiento: {fecha_vencimiento}")
-                        
-                        # Crear la factura en CXP
-                        factura = Factura.objects.create(
-                            orden_compra=orden,
-                            numero_factura=numero_factura,
-                            fecha_emision=timezone.now().date(),
-                            fecha_vencimiento=fecha_vencimiento,
-                            monto=orden.total_general,
-                            creado_por=request.user
-                        )
-                        print(f"🔵 DEBUG: Factura creada exitosamente: {factura.numero_factura}")
-                        
-                        messages.success(request, f"Solicitud {solicitud.folio} aprobada. Se ha generado el borrador de la OC {orden.folio} y la factura {factura.numero_factura} en CXP.")
-                    else:
-                        print("🔵 DEBUG: Ya existe factura para esta OC")
-                        messages.success(request, f"Solicitud {solicitud.folio} aprobada. Se ha generado el borrador de la OC {orden.folio}.")
-                        
-                except ImportError as e:
-                    print(f"🔴 DEBUG ERROR ImportError: {e}")
-                    messages.success(request, f"Solicitud {solicitud.folio} aprobada. Se ha generado el borrador de la OC {orden.folio}. (No se pudo crear factura en CXP - ImportError)")
+                except ImportError:
+                    messages.success(request, f"Solicitud aprobada y OC {orden.folio} generada. (Módulo CXP no encontrado)")
                 except Exception as e:
-                    print(f"🔴 DEBUG ERROR General: {e}")
-                    messages.warning(request, f"Solicitud {solicitud.folio} aprobada. Se ha generado el borrador de la OC {orden.folio}. (Error al crear factura: {e})")
-                # --- FIN NUEVO ---
+                    print(f"Error al generar CXP: {e}")
+                    messages.warning(request, f"Solicitud aprobada y OC {orden.folio} generada, pero hubo un error creando la cuenta por pagar: {e}")
+                # --- FIN MODIFICACIÓN ---
         
         except Exception as e:
-            print(f"🔴 DEBUG ERROR Transacción: {e}")
-            messages.error(request, f"Ocurrió un error al aprobar la solicitud y generar la OC: {e}")
+            messages.error(request, f"Ocurrió un error al aprobar la solicitud: {e}")
 
         return redirect('detalle_solicitud', pk=pk)
     
@@ -567,27 +629,27 @@ class OrdenCompraListView(LoginRequiredMixin, ListView):
     template_name = 'compras/orden_compra_lista.html'
     context_object_name = 'ordenes'
     paginate_by = 15
-    ordering = ['-fecha_emision']
+    
+    # --- CAMBIO AQUÍ: Cambiamos '-fecha_emision' por '-id' ---
+    # '-id' ordena del ID más alto al más bajo (Folio más nuevo al más viejo)
+    ordering = ['-id'] 
+    # ---------------------------------------------------------
 
     def get_queryset(self):
         """
         Sobrescribe el método para añadir la lógica de filtrado
         basada en los parámetros GET de la URL.
         """
-        # --- INICIO MODIFICACIÓN ---
-        # Añadimos 'solicitud_origen__lugar' para poder filtrar por el lugar
-        # de la solicitud de origen.
         queryset = super().get_queryset().select_related(
             'empresa', 'proveedor', 'solicitud_origen', 'creado_por',
-            'solicitud_origen__lugar' # <-- AÑADIDO
+            'solicitud_origen__lugar' 
         )
-        # --- FIN MODIFICACIÓN ---
 
         # --- Obtiene parámetros del formulario de filtros ---
         folio = self.request.GET.get('folio', '').strip()
         proveedor_id = self.request.GET.get('proveedor')
         empresa_id = self.request.GET.get('empresa')
-        lugar_id = self.request.GET.get('lugar') # <-- AÑADIDO
+        lugar_id = self.request.GET.get('lugar') 
         estatus = self.request.GET.get('estatus')
         start_date = self.request.GET.get('start_date')
         end_date = self.request.GET.get('end_date')
@@ -599,14 +661,8 @@ class OrdenCompraListView(LoginRequiredMixin, ListView):
             queryset = queryset.filter(proveedor_id=proveedor_id)
         if empresa_id:
             queryset = queryset.filter(empresa_id=empresa_id)
-        
-        # --- FILTRO AÑADIDO ---
-        # Filtra por el 'lugar' de la solicitud de origen.
-        # Asume que las OCs manuales no se filtrarán por lugar (o puedes ajustar la lógica).
         if lugar_id:
             queryset = queryset.filter(solicitud_origen__lugar_id=lugar_id)
-        # --- FIN FILTRO AÑADIDO ---
-            
         if estatus:
             queryset = queryset.filter(estatus=estatus)
         if start_date:
@@ -614,28 +670,8 @@ class OrdenCompraListView(LoginRequiredMixin, ListView):
         if end_date:
             queryset = queryset.filter(fecha_emision__date__lte=end_date)
             
-        return queryset
-
-    def get_context_data(self, **kwargs):
-        """
-        Añade al contexto los datos necesarios para popular los
-        selects del formulario de filtros.
-        """
-        context = super().get_context_data(**kwargs)
-        
-        # --- Datos para los dropdowns del formulario de filtros ---
-        context['empresas'] = Empresa.objects.all().order_by('nombre')
-        context['proveedores'] = Proveedor.objects.filter(activo=True).order_by('razon_social')
-        context['estatus_choices'] = OrdenCompra.ESTATUS_CHOICES
-        
-        # --- LÍNEA AÑADIDA ---
-        context['lugares'] = Lugar.objects.filter(tipo='ORIGEN').order_by('nombre')
-        # --- FIN LÍNEA AÑADIDA ---
-
-        # --- Mantiene el estado del formulario ---
-        context['filtros_aplicados'] = self.request.GET
-        
-        return context
+        # Aseguramos que el ordenamiento se aplique incluso después de filtrar
+        return queryset.order_by('-id')
 
 class OrdenCompraDetailView(LoginRequiredMixin, DetailView):
     model = OrdenCompra
@@ -666,16 +702,23 @@ class OrdenCompraDetailView(LoginRequiredMixin, DetailView):
 
 @login_required
 def generar_orden_de_compra(request, pk):
+    # 1. Obtener objetos
     solicitud = get_object_or_404(SolicitudCompra, pk=pk)
     orden_existente = get_object_or_404(OrdenCompra, solicitud_origen=solicitud)
 
+    # 2. Validación
     if orden_existente.estatus != 'BORRADOR':
         messages.warning(request, f"La orden {orden_existente.folio} no es un borrador y no puede ser modificada aquí.")
         return redirect('detalle_orden_compra', pk=orden_existente.pk)
 
-    articulos_para_template = [detalle.articulo for detalle in orden_existente.detalles.select_related('articulo')]
-    
-    DetalleOCFormSet = inlineformset_factory(OrdenCompra, DetalleOrdenCompra, form=DetalleOrdenCompraForm, extra=0, can_delete=False)
+    # 3. FormSet
+    DetalleOCFormSet = inlineformset_factory(
+        OrdenCompra, 
+        DetalleOrdenCompra, 
+        form=DetalleOrdenCompraForm, 
+        extra=0, 
+        can_delete=False
+    )
 
     if request.method == 'POST':
         form = OrdenCompraForm(request.POST, instance=orden_existente)
@@ -684,52 +727,84 @@ def generar_orden_de_compra(request, pk):
         if form.is_valid() and formset.is_valid():
             with transaction.atomic():
                 oc = form.save(commit=False)
-                
-                # --- NUEVA LÓGICA: Sobrescribir condiciones si es a plazos ---
-                if oc.modalidad_pago == 'A_PLAZOS' and oc.cantidad_plazos:
-                    # Ignora los días de crédito y pone "# plazos"
-                    oc.condiciones_pago = f"{oc.cantidad_plazos} plazos"
-                # -------------------------------------------------------------
-
                 oc.estatus = 'APROBADA'
                 oc.save()
-                formset.save()
+                formset.save() # Guardar artículos para tener el total real
                 
-                # --- NUEVO: ACTUALIZAR FACTURA EN CXP SI EXISTE ---
+                # --- LÓGICA DE CONDICIONES (TEXTO) ---
+                if oc.modalidad_pago == 'A_PLAZOS' and oc.cantidad_plazos > 0:
+                    total_orden = oc.total_general
+                    monto_individual = total_orden / Decimal(oc.cantidad_plazos)
+                    oc.condiciones_pago = f"A {oc.cantidad_plazos} pagos de ${monto_individual:,.2f}"
+                    oc.save()
+
+                # --- INTEGRACIÓN CON CUENTAS POR PAGAR (CXP) ---
                 try:
                     from cuentas_por_pagar.models import Factura
-                    if hasattr(oc, 'factura_cxp'):
-                        factura = oc.factura_cxp
-                        factura.monto = oc.total_general
-                        # Opcional: Si cambian las condiciones, tal vez quieras actualizar fecha vencimiento aquí también
-                        factura.save()
-                        messages.success(request, f"Orden de Compra {oc.folio} ha sido finalizada y aprobada exitosamente. Factura {factura.numero_factura} actualizada en CXP.")
-                    else:
-                        messages.success(request, f"Orden de Compra {oc.folio} ha sido finalizada y aprobada exitosamente.")
+                    from datetime import timedelta
+                    
+                    # 1. Calcular Fecha de Vencimiento basada en Días de Crédito
+                    dias_credito = 0
+                    if oc.proveedor and oc.proveedor.dias_credito:
+                        dias_credito = oc.proveedor.dias_credito
+                    
+                    fecha_emision = timezone.now().date()
+                    fecha_vencimiento = fecha_emision + timedelta(days=dias_credito)
+                    
+                    # 2. Determinar cantidad de plazos para CXP
+                    num_plazos_cxp = 1
+                    if oc.modalidad_pago == 'A_PLAZOS' and oc.cantidad_plazos > 1:
+                        num_plazos_cxp = oc.cantidad_plazos
+
+                    # 3. Crear o Actualizar la Factura Única (Relación 1 a 1)
+                    # Usamos update_or_create para que si ya existe, se actualicen los datos
+                    # (ej: si cambiaste de Contado a Plazos, se actualiza la factura existente)
+                    Factura.objects.update_or_create(
+                        orden_compra=oc,
+                        defaults={
+                            'proveedor': oc.proveedor,
+                            # Usamos un folio temporal si no tiene uno fiscal real aún
+                            'numero_factura': f"REF-{oc.folio}", 
+                            'fecha_emision': fecha_emision,
+                            'fecha_vencimiento': fecha_vencimiento,
+                            'monto': oc.total_general,
+                            'cantidad_plazos': num_plazos_cxp, # Aquí se pasan los plazos reales
+                            'creado_por': request.user,
+                            'estatus': 'PENDIENTE',
+                            'pagada': False,
+                            'notas': f"Generada autom. desde OC {oc.folio}. Condiciones: {oc.condiciones_pago}"
+                        }
+                    )
+                        
+                except ImportError:
+                    print("Advertencia: El módulo cuentas_por_pagar no está disponible.")
                 except Exception as e:
-                    messages.success(request, f"Orden de Compra {oc.folio} ha sido finalizada y aprobada exitosamente. (No se pudo actualizar factura en CXP: {e})")
-                # --- FIN NUEVO ---
-                
-                return redirect('detalle_orden_compra', pk=oc.pk)
+                    print(f"Error al generar CXP: {e}")
+                # -----------------------------------------------
+
+            messages.success(request, f"Orden de Compra {oc.folio} aprobada y enviada a Cuentas por Pagar.")
+            return redirect('detalle_orden_compra', pk=oc.pk)
         else:
-            messages.error(request, "El formulario no es válido. Revisa los errores.")
-            
-    else: # Petición GET
+            messages.error(request, "Hay errores en el formulario.")
+    
+    else:
         form = OrdenCompraForm(instance=orden_existente)
         formset = DetalleOCFormSet(instance=orden_existente, prefix='detalles')
 
-    titulo = f"Terminar y Aprobar OC {orden_existente.folio} (Solicitud: {solicitud.folio})"
-    zipped_data = zip(formset.forms, articulos_para_template)
+    zipped_forms_and_articles = []
+    for formulario in formset:
+        articulo = formulario.instance.articulo
+        zipped_forms_and_articles.append((formulario, articulo))
 
     context = {
         'form': form,
         'formset': formset,
-        'zipped_forms_and_articles': zipped_data,
         'solicitud': solicitud,
-        'titulo': titulo,
+        'zipped_forms_and_articles': zipped_forms_and_articles,
+        'today_str': timezone.now().date().strftime('%Y-%m-%d'),
+        'titulo': "Generar Orden de Compra"
     }
     return render(request, 'compras/orden_compra_generar.html', context)
-
 @login_required
 def get_articulos_por_empresa(request, empresa_id):
     # Obtenemos el primer precio de proveedor asociado a cada artículo
@@ -1194,3 +1269,73 @@ def get_empresas_por_operacion(request, operacion_id):
         return JsonResponse({'empresas': []}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+@permission_required('compras.ver_reportes_compras', raise_exception=True)
+def reporte_compras_excel(request):
+    """
+    Genera CSV con cálculos seguros usando Decimal para evitar errores de tipo float.
+    """
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="reporte_compras_detallado.csv"'
+    response.write(u'\ufeff'.encode('utf8')) # BOM para Excel
+    
+    writer = csv.writer(response)
+    writer.writerow([
+        'Folio OC', 'Fecha Emisión', 'Estatus', 'Proveedor', 'RFC', 
+        'Solicitante', 'Artículo', 'SKU', 'Categoría', 'Cantidad', 'U.M.', 
+        'Precio Unit.', 'Desc. %', 'Subtotal Base', 'Tasa IVA %', 'Monto IVA', 
+        'Tasa Ret %', 'Monto Ret', 'Total Línea', 'Moneda'
+    ])
+    
+    ordenes = OrdenCompra.objects.filter(
+        estatus__in=['APROBADA', 'AUDITADA', 'RECIBIDA_PARCIAL', 'RECIBIDA_TOTAL', 'CERRADA']
+    ).select_related('proveedor', 'creado_por').prefetch_related('detalles__articulo__unidad_medida', 'detalles__articulo__categoria')
+    
+    for orden in ordenes:
+        for detalle in orden.detalles.all():
+            # 1. Convertir todo a Decimal seguro
+            cantidad = detalle.cantidad or Decimal('0')
+            precio = detalle.precio_unitario or Decimal('0')
+            descuento_val = detalle.descuento or Decimal('0')
+            
+            # 2. Cálculos Base
+            subtotal_bruto = cantidad * precio
+            monto_descuento = subtotal_bruto * (descuento_val / Decimal('100'))
+            subtotal_neto = subtotal_bruto - monto_descuento
+            
+            # 3. Impuestos (Usando Decimal para los porcentajes)
+            articulo = detalle.articulo
+            tasa_iva = articulo.porcentaje_iva or Decimal('0')
+            tasa_ret = articulo.porcentaje_retencion_iva or Decimal('0')
+            
+            monto_iva = subtotal_neto * (tasa_iva / Decimal('100'))
+            monto_ret = subtotal_neto * (tasa_ret / Decimal('100'))
+            
+            total_linea = subtotal_neto + monto_iva - monto_ret
+            
+            # 4. Escribir fila
+            writer.writerow([
+                orden.folio,
+                orden.fecha_emision.strftime('%d/%m/%Y'),
+                orden.get_estatus_display(),
+                orden.proveedor.razon_social,
+                orden.proveedor.rfc,
+                orden.creado_por.get_full_name() or orden.creado_por.username,
+                articulo.nombre,
+                articulo.sku or 'N/A',
+                articulo.categoria.nombre if articulo.categoria else 'General',
+                f"{cantidad:.2f}",
+                articulo.unidad_medida.abreviatura if articulo.unidad_medida else 'N/A',
+                f"{precio:.2f}",
+                f"{descuento_val:.2f}",
+                f"{subtotal_neto:.2f}",
+                f"{tasa_iva:.0f}",
+                f"{monto_iva:.2f}",
+                f"{tasa_ret:.0f}",
+                f"{monto_ret:.2f}",
+                f"{total_linea:.2f}",
+                orden.moneda
+            ])
+            
+    return response
