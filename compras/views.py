@@ -49,54 +49,61 @@ from django.contrib.auth.mixins import PermissionRequiredMixin
 @permission_required('compras.acceso_compras', raise_exception=True)
 def dashboard_compras(request):
     """
-    Dashboard principal con KPIs, Tabla de Acción Inmediata y Gráficos filtrados.
+    Dashboard principal mejorado con KPIs, tablas de resumen y gráficos.
     """
     
-    # --- 1. KPIs (Indicadores Clave) ---
-    solicitudes_pendientes = SolicitudCompra.objects.filter(estatus='PENDIENTE_APROBACION').count()
-    solicitudes_urgentes = SolicitudCompra.objects.filter(estatus='PENDIENTE_APROBACION', prioridad='URGENTE').count()
-    ordenes_abiertas = OrdenCompra.objects.filter(estatus='APROBADA').count()
-    total_articulos = Articulo.objects.filter(activo=True).count()
+    # --- 1. KPIs GLOBALES (Indicadores Clave) ---
+    # Usamos diccionarios para pasar el valor y también metadatos de color/icono si quisieramos
+    kpis = {
+        'pendientes': SolicitudCompra.objects.filter(estatus='PENDIENTE_APROBACION').count(),
+        'urgentes': SolicitudCompra.objects.filter(estatus='PENDIENTE_APROBACION', prioridad='URGENTE').count(),
+        'ordenes_activas': OrdenCompra.objects.exclude(estatus__in=['CANCELADA', 'CERRADA', 'BORRADOR']).count(),
+        'proveedores_activos': Proveedor.objects.filter(activo=True).count(),
+        'articulos_totales': Articulo.objects.filter(activo=True).count(),
+    }
     
-    # --- 2. TABLA DE ACCIÓN (Últimas 5 pendientes) ---
+    # --- 2. TABLAS DE RESUMEN ---
+    
+    # Últimas solicitudes pendientes de aprobación (Acción inmediata)
     ultimas_solicitudes = SolicitudCompra.objects.filter(
         estatus='PENDIENTE_APROBACION'
     ).select_related('solicitante', 'empresa').order_by('-creado_en')[:5]
 
+    # Últimas órdenes de compra generadas (Visibilidad de flujo)
+    ultimas_ordenes = OrdenCompra.objects.select_related(
+        'proveedor'
+    ).order_by('-fecha_emision')[:5]
+
     # --- 3. DATOS PARA GRÁFICO (Chart.js) ---
-    # EXCLUIMOS 'APROBADA' y 'AUDITADA' para que el gráfico muestre solo la "carga de trabajo" pendiente/problemas
-    # (Borradores, Canceladas, Listas para auditar, etc.)
+    # Estado de las Órdenes de Compra (excluyendo cerradas para ver carga actual)
     ordenes_por_estatus = OrdenCompra.objects.exclude(
-        estatus__in=['AUDITADA', 'APROBADA', 'RECIBIDA_TOTAL', 'CERRADA'] 
+        estatus__in=['CERRADA', 'RECIBIDA_TOTAL']
     ).values('estatus').annotate(total=Count('id'))
     
     labels_grafico = []
     data_grafico = []
     colores_grafico = []
     
-    # Mapa de colores coherente
     mapa_colores = {
-        'BORRADOR': '#6c757d',          # Gris (Secundario)
-        'LISTA_PARA_AUDITAR': '#ffc107', # Amarillo (Warning)
-        'CANCELADA': '#dc3545',         # Rojo (Danger)
-        'RECIBIDA_PARCIAL': '#17a2b8',  # Cian (Info)
+        'BORRADOR': '#6c757d',          # Gris
+        'APROBADA': '#0d6efd',          # Azul Primary
         'EN_AUDITORIA': '#fd7e14',      # Naranja
+        'LISTA_PARA_AUDITAR': '#ffc107',# Amarillo
+        'CANCELADA': '#dc3545',         # Rojo
+        'RECIBIDA_PARCIAL': '#20c997',  # Verde azulado
     }
 
     for item in ordenes_por_estatus:
-        # Convertimos la clave del estatus (ej: 'BORRADOR') a su texto legible
         estatus_readable = dict(OrdenCompra.ESTATUS_CHOICES).get(item['estatus'], item['estatus'])
         labels_grafico.append(estatus_readable)
         data_grafico.append(item['total'])
-        colores_grafico.append(mapa_colores.get(item['estatus'], '#adb5bd')) # Gris default
+        colores_grafico.append(mapa_colores.get(item['estatus'], '#adb5bd'))
 
     context = {
-        'solicitudes_pendientes': solicitudes_pendientes,
-        'solicitudes_urgentes': solicitudes_urgentes,
-        'ordenes_abiertas': ordenes_abiertas,
-        'total_articulos': total_articulos,
+        'kpis': kpis,
         'ultimas_solicitudes': ultimas_solicitudes,
-        # Datos serializados para JS
+        'ultimas_ordenes': ultimas_ordenes,
+        # Datos para JS
         'chart_labels': json.dumps(labels_grafico),
         'chart_data': json.dumps(data_grafico),
         'chart_colors': json.dumps(colores_grafico),

@@ -16,7 +16,12 @@ class Factura(models.Model):
     )
     
     # 1. Folio Interno Automático
-    folio_cxp = models.CharField(..., unique=False, null=True, blank=True) # Sin unique
+    folio_cxp = models.CharField(
+        max_length=20, 
+        unique=True,
+        editable=False, 
+        verbose_name="Folio Interno CXP"
+    )
 
     # 2. Folio Fiscal del Proveedor
     numero_factura = models.CharField(
