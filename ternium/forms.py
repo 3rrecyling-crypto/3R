@@ -3,12 +3,17 @@
 import os
 from django import forms
 from django.utils import timezone
+from django.forms import ClearableFileInput
 from django.contrib.auth.forms import AuthenticationForm
 from .models import (
     Empresa, Lugar, Remision, EntradaMaquila, LineaTransporte,
     Operador, Material, Unidad, Contenedor, DetalleRemision, Descarga,
     RegistroLogistico
 )
+
+
+class MultipleFileInput(ClearableFileInput):
+    allow_multiple_selected = True
 
 
 class OperadorForm(forms.ModelForm):
@@ -150,49 +155,65 @@ class LugarForm(forms.ModelForm):
 
 
 class RemisionForm(forms.ModelForm):
+    # Campo personalizado para subir múltiples archivos
+    # Usamos MultipleFileInput en lugar de ClearableFileInput directo
+    archivos_evidencia = forms.FileField(
+        required=False,
+        widget=MultipleFileInput(attrs={
+            'class': 'form-control',
+            'multiple': True,  # Permite seleccionar varios archivos
+            'accept': 'image/*,application/pdf'
+        }),
+        label="Evidencias (Fotos, PDF, Imágenes)"
+    )
+
     class Meta:
         model = Remision
-        exclude = ['status', 'auditado_por', 'auditado_en']
+        exclude = [
+            'status', 'auditado_por', 'auditado_en', 
+            'evidencia_carga', 'evidencia_descarga', 
+            'creado_en', 'actualizado_en'
+        ]
+        
         widgets = {
-            'empresa': forms.Select(attrs={'class': 'form-select'}),
+            'empresa': forms.Select(attrs={'class': 'form-select select2'}),
             'remision': forms.TextInput(attrs={'class': 'form-control'}),
             'fecha': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'linea_transporte': forms.Select(attrs={'class': 'form-select'}),
-            'operador': forms.Select(attrs={'class': 'form-select'}),
-            'unidad': forms.Select(attrs={'class': 'form-select'}),
-            'contenedor': forms.Select(attrs={'class': 'form-select'}),
-            'origen': forms.Select(attrs={'class': 'form-select'}),
-            'destino': forms.Select(attrs={'class': 'form-select'}),
-            'cliente': forms.Select(attrs={'class': 'form-select'}),
+            
+            'linea_transporte': forms.Select(attrs={'class': 'form-select select2'}),
+            'operador': forms.Select(attrs={'class': 'form-select select2'}),
+            'unidad': forms.Select(attrs={'class': 'form-select select2'}),
+            'contenedor': forms.Select(attrs={'class': 'form-select select2'}),
+            'origen': forms.Select(attrs={'class': 'form-select select2'}),
+            'destino': forms.Select(attrs={'class': 'form-select select2'}),
+            'cliente': forms.Select(attrs={'class': 'form-select select2'}),
+            
             'inicia_ld': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'termina_ld': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'folio_ld': forms.TextInput(attrs={'class': 'form-control'}),
             'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            
             'inicia_dlv': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'termina_dlv': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'folio_dlv': forms.TextInput(attrs={'class': 'form-control'}),
-            'evidencia_carga': forms.FileInput(attrs={'class': 'form-control'}),
-            'evidencia_descarga': forms.FileInput(attrs={'class': 'form-control'}),
+            
             'comentario': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
 
     def __init__(self, *args, **kwargs):
-        # 1. Extraemos el usuario y la empresa preseleccionada
         self.user = kwargs.pop('user', None)
         empresa = kwargs.pop('empresa', None)
         super().__init__(*args, **kwargs)
 
-        # --- CONFIGURACIÓN DE OBLIGATORIEDAD ---
-        
-        # A) Campos OBLIGATORIOS (Solo Origen y Destino)
+        # A) Campos OBLIGATORIOS
         self.fields['origen'].required = True
         self.fields['destino'].required = True
 
-        # B) Campos OPCIONALES (Todo lo demás)
+        # B) Campos OPCIONALES
         campos_opcionales = [
             'folio_ld', 'folio_dlv', 'linea_transporte', 'operador', 
             'unidad', 'contenedor', 'cliente', 'inicia_ld', 'termina_ld', 
-            'inicia_dlv', 'termina_dlv', 'evidencia_carga', 'evidencia_descarga',
+            'inicia_dlv', 'termina_dlv',
             'comentario', 'descripcion'
         ]
         
@@ -201,8 +222,6 @@ class RemisionForm(forms.ModelForm):
                 self.fields[campo].required = False
 
         # --- FILTROS DE SEGURIDAD Y CASCADA ---
-
-        # 2. FILTRO DE SEGURIDAD: Restringir el campo 'empresa' según el usuario
         if self.user and not self.user.is_superuser:
             if hasattr(self.user, 'ternium_profile'):
                 qs_autorizadas = self.user.ternium_profile.empresas_autorizadas.all()
@@ -210,7 +229,6 @@ class RemisionForm(forms.ModelForm):
             else:
                 self.fields['empresa'].queryset = Empresa.objects.none()
 
-        # 3. Lógica de filtrado de catálogos dependientes (Cascada)
         if empresa:
             if self.user and not self.user.is_superuser:
                 if not self.fields['empresa'].queryset.filter(pk=empresa.pk).exists():
@@ -237,9 +255,7 @@ class RemisionForm(forms.ModelForm):
     
     def clean(self):
         cleaned_data = super().clean()
-        # Se ha eliminado la validación estricta de evidencias para permitir guardar sin fotos/folios
         return cleaned_data
-
 
 class DetalleRemisionForm(forms.ModelForm):
     class Meta:

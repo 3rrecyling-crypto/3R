@@ -456,7 +456,7 @@ class Remision(models.Model):
     ]
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDIENTE', verbose_name="Estatus")
     
-    # Relaciones (Usa comillas 'Modelo' si el modelo está definido más abajo en el archivo)
+    # Relaciones
     empresa = models.ForeignKey('Empresa', on_delete=models.PROTECT, related_name="remisiones", verbose_name="Unidad de Negocio (Empresa)")
     remision = models.CharField(max_length=100, verbose_name="Remisión", unique=True)
     fecha = models.DateField(verbose_name="Fecha")
@@ -479,14 +479,13 @@ class Remision(models.Model):
     termina_dlv = models.DateTimeField(verbose_name="Termina Descarga", null=True, blank=True)
     folio_dlv = models.CharField(max_length=50, verbose_name="Folio Descarga", blank=True)
     
-    # Evidencias (Fotos) - YA NO SE USAN PARA CALCULAR ESTATUS
-    evidencia_carga = models.FileField(upload_to='remisiones/cargas/', blank=True, null=True)
-    evidencia_descarga = models.FileField(upload_to='remisiones/descargas/', blank=True, null=True)
+    # Evidencias (Fotos)
+    #evidencia_carga = models.FileField(upload_to='remisiones/cargas/', blank=True, null=True)
+    #evidencia_descarga = models.FileField(upload_to='remisiones/descargas/', blank=True, null=True)
 
     comentario = models.TextField(verbose_name="Comentario Adicional", blank=True)
     
     # Auditoría
-    # Corregido: Usamos 'User' importado arriba sin comillas y quitamos la referencia lazy errónea
     auditado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='remisiones_auditadas', verbose_name="Auditado por")
     auditado_en = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de Auditoría")
     
@@ -495,12 +494,17 @@ class Remision(models.Model):
 
     @property
     def total_peso_ld(self):
-        # Asegúrate de que tu modelo 'DetalleRemision' tenga related_name='detalles'
         return self.detalles.aggregate(total=Sum('peso_ld'))['total'] or 0
 
     @property
     def total_peso_dlv(self):
         return self.detalles.aggregate(total=Sum('peso_dlv'))['total'] or 0
+
+    # --- AQUÍ AGREGUÉ LA PROPIEDAD FALTANTE ---
+    @property
+    def diff(self):
+        return self.total_peso_ld - self.total_peso_dlv
+    # ------------------------------------------
 
     def save(self, *args, **kwargs):
         """
@@ -511,8 +515,6 @@ class Remision(models.Model):
             try:
                 old = Remision.objects.get(pk=self.pk)
                 if old.status == 'AUDITADO':
-                    # Si intentas guardar algo sobre una auditada, lanzamos error
-                    # (A menos que quieras permitir cambios menores, aquí se bloquea todo)
                     pass 
             except Remision.DoesNotExist:
                 pass
@@ -542,9 +544,7 @@ class Remision(models.Model):
                 # Validamos Descarga: Debe tener Fecha Inicio y Folio
                 descarga_ok = (self.inicia_dlv is not None) and tiene_texto(self.folio_dlv)
 
-                # NOTA: 'termina_ld' y 'termina_dlv' a veces no se llenan en Excel, 
-                # así que con que tenga 'inicia' y 'folio' lo damos por bueno.
-                
+                # Si tiene ambas partes completas -> TERMINADO
                 if carga_ok and descarga_ok:
                     self.status = 'TERMINADO'
                 else:
@@ -566,17 +566,14 @@ class Remision(models.Model):
         ordering = ['-fecha', '-creado_en']
         indexes = [models.Index(fields=['status']), models.Index(fields=['fecha'])]
         
-        # DEFINICIÓN DE PERMISOS PERSONALIZADOS
         permissions = [
             ("can_audit_remision", "Puede auditar remisiones"),
-            ("view_ternium_module", "Puede acceder al módulo Ternium"), # Equivale a Acceso_ternium
-            
-            # --- TUS NUEVOS PERMISOS ---
+            ("view_ternium_module", "Puede acceder al módulo Ternium"),
             ("acceso_ia", "Acceso a Inteligencia Artificial"),
             ("acceso_remisiones", "Acceso a Módulo Remisiones"),
             ("acceso_dashboard_patio", "Acceso a Dashboard Patios"),
             ("acceso_catalogos", "Acceso a Catálogos"),
-            ("acceso_reportes_kpi", "Acceso a Reportes y KPIs"), # Para el Dashboard de Análisis
+            ("acceso_reportes_kpi", "Acceso a Reportes y KPIs"),
         ]
         
 class Cliente(models.Model):
@@ -950,3 +947,10 @@ def save_user_profile(sender, instance, **kwargs):
         
         
 
+class EvidenciaRemision(models.Model):
+    remision = models.ForeignKey(Remision, on_delete=models.CASCADE, related_name='evidencias')
+    archivo = models.FileField(upload_to='remisiones/evidencias/')
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Evidencia de {self.remision}"

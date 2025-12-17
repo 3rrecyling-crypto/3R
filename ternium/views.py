@@ -5,6 +5,7 @@ import os
 import zipfile
 import datetime
 from django.db import IntegrityError # <--- AGREGAR ESTO AL INICIO DE views.py
+from django.forms import ClearableFileInput
 import decimal
 from django.db.models import Count, Sum, F, Avg, Q, FloatField, Case, When, Value
 from django.db.models.functions import TruncMonth, Coalesce # <-- AGREGAR ESTA LÍNEA

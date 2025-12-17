@@ -66,32 +66,84 @@
         border: 1px dashed #d1d5db;
         transition: all 0.3s ease;
     }
-    .image-preview {
-        width: 100%;
-        height: 150px;
-        background-color: #e9ecef;
+    .image-preview-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 10px;
+    }
+    .preview-item {
+        width: 100px;
+        height: 120px; /* Un poco más alto para el botón */
+        border: 1px solid #ddd;
         border-radius: 4px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        background: #fff;
+        position: relative;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+    .preview-item:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .preview-item img {
+        width: 100%;
+        height: 80px;
+        object-fit: cover;
+    }
+    .preview-item .file-icon-container {
+        width: 100%;
+        height: 80px;
         display: flex;
         align-items: center;
         justify-content: center;
-        overflow: hidden;
-        margin-top: 0.75rem;
+        background-color: #f8f9fa;
     }
-    .image-preview img {
-        max-width: 100%;
-        max-height: 100%;
-        object-fit: contain;
+    .preview-item .file-icon {
+        font-size: 2rem;
+        color: var(--secondary-color);
+    }
+    .preview-item small {
+        font-size: 0.6rem;
+        text-align: center;
+        width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding: 2px;
+        margin-top: auto;
     }
     .form-error {
         color: var(--danger-color);
         font-size: 0.8rem;
         margin-top: 0.25rem;
     }
-    /* Clase para marcar visualmente los obligatorios */
     .required-asterisk {
         color: var(--danger-color);
         margin-left: 3px;
         font-weight: bold;
+    }
+    /* Estilos para el Modal de Previsualización */
+    #filePreviewModal .modal-body {
+        padding: 0;
+        background-color: #333;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 400px;
+    }
+    #filePreviewModal .modal-content {
+        background-color: transparent;
+        border: none;
+    }
+    #filePreviewModal .btn-close {
+        background-color: white;
+        opacity: 0.8;
     }
 </style>
 {% endblock %}
@@ -138,6 +190,7 @@
                 <div class="col-md-4"><label for="{{ form.fecha.id_for_label }}" class="form-label">{{ form.fecha.label }}</label>{{ form.fecha }}<div class="form-error">{{ form.fecha.errors }}</div></div>
             </div></div>
         </div>
+
         <div class="card mb-4">
             <div class="card-header"><h5><i class="fas fa-truck me-2"></i>Transporte</h5></div>
             <div class="card-body"><div class="row g-3">
@@ -147,6 +200,7 @@
                 <div class="col-md-6"><label for="{{ form.contenedor.id_for_label }}" class="form-label">{{ form.contenedor.label }}</label>{{ form.contenedor }}<div class="form-error">{{ form.contenedor.errors }}</div></div>
             </div></div>
         </div>
+
         <div class="card mb-4">
             <div class="card-header"><h5><i class="fas fa-route me-2"></i>Ruta y Operación</h5></div>
             <div class="card-body"><div class="row g-3">
@@ -213,24 +267,46 @@
                     <div class="col-md-6"><label for="{{ form.folio_ld.id_for_label }}" class="form-label">{{ form.folio_ld.label }}</label>{{ form.folio_ld }}<div class="form-error">{{ form.folio_ld.errors }}</div></div>
                     <div class="col-md-6"><label for="{{ form.folio_dlv.id_for_label }}" class="form-label">{{ form.folio_dlv.label }}</label>{{ form.folio_dlv }}<div class="form-error">{{ form.folio_dlv.errors }}</div></div>
                     
-                    <div class="col-md-6">
-                        <div class="file-upload-card h-100">
-                            <label for="{{ form.evidencia_carga.id_for_label }}" class="form-label">{{ form.evidencia_carga.label }}</label>
-                            {{ form.evidencia_carga }}
-                            <div class="form-error">{{ form.evidencia_carga.errors }}</div>
-                            <div class="image-preview" id="preview_evidencia_carga" data-existing-url="{% if form.instance.evidencia_carga %}{{ form.instance.evidencia_carga.url }}{% endif %}"></div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="file-upload-card h-100">
-                            <label for="{{ form.evidencia_descarga.id_for_label }}" class="form-label">{{ form.evidencia_descarga.label }}</label>
-                            {{ form.evidencia_descarga }}
-                            <div class="form-error">{{ form.evidencia_descarga.errors }}</div>
-                            <div class="image-preview" id="preview_evidencia_descarga" data-existing-url="{% if form.instance.evidencia_descarga %}{{ form.instance.evidencia_descarga.url }}{% endif %}"></div>
+                    <div class="col-12 mt-4">
+                        <div class="file-upload-card">
+                            <label for="{{ form.archivos_evidencia.id_for_label }}" class="form-label fw-bold">
+                                <i class="fas fa-cloud-upload-alt me-2"></i>{{ form.archivos_evidencia.label }}
+                            </label>
+                            {{ form.archivos_evidencia }}
+                            <div class="form-text mt-2">Puede seleccionar varios archivos a la vez (Ctrl + Clic). Se aceptan imágenes y PDF.</div>
+                            
+                            <div id="new-files-preview" class="image-preview-container"></div>
                         </div>
                     </div>
 
-                    <div class="col-12"><label for="{{ form.comentario.id_for_label }}" class="form-label">{{ form.comentario.label }}</label>{{ form.comentario }}</div>
+                    {% if object and object.evidencias.all %}
+                    <div class="col-12 mt-3">
+                        <h6 class="border-bottom pb-2">Evidencias Guardadas:</h6>
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            {% for ev in object.evidencias.all %}
+                                {% if ev.archivo.url|lower|slice:"-3:" == "pdf" %}
+                                    <div class="preview-item" onclick="openPreviewModal('{{ ev.archivo.url }}', 'pdf', '{{ ev.archivo.name|escapejs }}')">
+                                        <div class="file-icon-container">
+                                            <i class="fas fa-file-pdf file-icon text-danger"></i>
+                                        </div>
+                                        <div class="mt-auto w-100 text-center bg-light p-1">
+                                            <small class="text-primary fw-bold">VER PDF</small>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <div class="preview-item" onclick="openPreviewModal('{{ ev.archivo.url }}', 'image', '{{ ev.archivo.name|escapejs }}')">
+                                        <img src="{{ ev.archivo.url }}" alt="Evidencia">
+                                        <div class="mt-auto w-100 text-center bg-light p-1">
+                                            <small class="text-primary fw-bold">VER FOTO</small>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="col-12 mt-3"><label for="{{ form.comentario.id_for_label }}" class="form-label">{{ form.comentario.label }}</label>{{ form.comentario }}</div>
                 </div>
             </div>
         </div>
@@ -241,12 +317,57 @@
         </div>
     </form>
 </div>
+
+<div class="modal fade" id="filePreviewModal" tabindex="-1" aria-labelledby="filePreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0 p-2">
+                <h6 class="modal-title text-white ms-2" id="filePreviewModalLabel">Visualizando Documento</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="previewModalBody">
+                </div>
+        </div>
+    </div>
+</div>
+
 {% endblock content %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
+// --- FUNCIÓN GLOBAL PARA ABRIR EL MODAL ---
+function openPreviewModal(url, type, name) {
+    const modalBody = $('#previewModalBody');
+    const modalTitle = $('#filePreviewModalLabel');
+    modalBody.empty(); // Limpiar contenido anterior
+    
+    if (name) modalTitle.text(name);
+
+    if (type === 'pdf') {
+        // Opción A: Usar <embed> o <iframe> para PDF
+        const iframe = $('<iframe>', {
+            src: url,
+            frameborder: 0,
+            style: 'width: 100%; height: 80vh;'
+        });
+        modalBody.append(iframe);
+    } else {
+        // Opción B: Imagen normal
+        const img = $('<img>', {
+            src: url,
+            class: 'img-fluid',
+            style: 'max-height: 85vh; max-width: 100%; object-fit: contain;'
+        });
+        modalBody.append(img);
+    }
+
+    // Mostrar el modal usando Bootstrap 5
+    var myModal = new bootstrap.Modal(document.getElementById('filePreviewModal'));
+    myModal.show();
+}
+
 $(document).ready(function() {
     
     // --- Variables y selectores ---
@@ -337,11 +458,8 @@ $(document).ready(function() {
     // --- LÓGICA DE SINCRONIZACIÓN DESTINO -> CLIENTE ---
     $('#id_destino').on('change', function() {
         const destinoId = $(this).val();
-        // Cuando cambia el destino, actualizamos TODOS los clientes del detalle
         if (destinoId) {
-            // Recorremos todos los selects de cliente en el formset
             $('#form-container .cliente-select').each(function() {
-                // Seteamos el valor y disparamos change para que Select2 se actualice
                 $(this).val(destinoId).trigger('change');
             });
         }
@@ -358,14 +476,12 @@ $(document).ready(function() {
         
         formContainer.append(newRow);
         
-        // Poblar selects con datos cacheados
         populateSelect(newRow.find('.material-select'), cachedCatalogData.materiales);
         populateSelect(newRow.find('.cliente-select'), cachedCatalogData.lugares);
         
-        // --- AUTO-RELLENADO DE CLIENTE EN NUEVA FILA ---
         const destinoActual = $('#id_destino').val();
         if (destinoActual) {
-            newRow.find('.cliente-select').val(destinoActual); // Pre-seleccionar
+            newRow.find('.cliente-select').val(destinoActual); 
         }
 
         initializeSelect2(newRow);
@@ -394,52 +510,62 @@ $(document).ready(function() {
         }
     });
     
-    // --- IMÁGENES ---
-    function handleImagePreview(inputElement, previewId) { 
-        const previewContainer = document.getElementById(previewId);
-        if (!previewContainer) return;
+    // --- LÓGICA DE PREVISUALIZACIÓN DE EVIDENCIAS NUEVAS ---
+    // AHORA LAS NUEVAS TAMBIÉN ABREN EL POPUP
+    $('#id_archivos_evidencia').on('change', function() {
+        const container = $('#new-files-preview');
+        container.empty();
+        
+        const files = this.files;
+        if (files.length === 0) return;
 
-        previewContainer.innerHTML = '';
-        const file = inputElement.files[0];
+        Array.from(files).forEach(file => {
+            // Creamos un wrapper que sea clickeable
+            const wrapper = $('<div class="preview-item"></div>');
+            let contentHtml = '';
+            let fileType = 'image'; // por defecto
 
-        if (file && file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = e => {
-                const img = document.createElement('img');
-                img.src = e.target.result;
-                previewContainer.appendChild(img);
-            };
-            reader.readAsDataURL(file);
-        } else if (file) {
-            previewContainer.innerHTML = '<div class="text-muted p-3"><i class="fas fa-file-alt fa-2x"></i><br><small>'+ file.name +'</small></div>';
-        } else {
-             previewContainer.innerHTML = '<div class="text-muted p-3"><i class="fas fa-file-alt fa-2x"></i></div>';
-        }
-    }
-
-    function initializePreviews() { 
-        document.querySelectorAll('.image-preview').forEach(preview => {
-            const existingUrl = preview.dataset.existingUrl; 
-            if (existingUrl) {
-                const fileName = existingUrl.split('/').pop().split('?')[0];
-                if (/\.(jpe?g|png|gif|webp)$/i.test(existingUrl)) {
-                    const img = document.createElement('img');
-                    img.src = existingUrl;
-                    preview.innerHTML = '';
-                    preview.appendChild(img);
-                } else {
-                    preview.innerHTML = '<div class="text-muted p-3"><i class="fas fa-file-alt fa-2x"></i><br><small>'+ fileName +'</small></div>';
+            if (file.type.startsWith('image/')) {
+                // Es imagen
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // Inyectamos la imagen y configuramos el click para abrir el modal
+                    wrapper.prepend(`<img src="${e.target.result}">`);
+                    
+                    // Al hacer click, pasamos el base64 al modal
+                    wrapper.on('click', function() {
+                        openPreviewModal(e.target.result, 'image', file.name);
+                    });
                 }
-            } else {
-                preview.innerHTML = '<div class="text-muted p-3"><i class="fas fa-file-alt fa-2x"></i></div>';
-            }
-        });
-    }
-    
-    $('#id_evidencia_carga').on('change', function() { handleImagePreview(this, 'preview_evidencia_carga'); }); 
-    $('#id_evidencia_descarga').on('change', function() { handleImagePreview(this, 'preview_evidencia_descarga'); }); 
+                reader.readAsDataURL(file);
+                
+                contentHtml = '<div class="mt-auto w-100 text-center bg-light p-1"><small class="text-primary fw-bold">VER FOTO</small></div>';
 
-    initializePreviews();
+            } else if (file.type === 'application/pdf') {
+                // Es PDF
+                fileType = 'pdf';
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // Al hacer click, pasamos el base64 al modal
+                     wrapper.on('click', function() {
+                        openPreviewModal(e.target.result, 'pdf', file.name);
+                    });
+                }
+                reader.readAsDataURL(file);
+
+                wrapper.prepend(`<div class="file-icon-container"><i class="fas fa-file-pdf file-icon text-danger"></i></div>`);
+                contentHtml = '<div class="mt-auto w-100 text-center bg-light p-1"><small class="text-primary fw-bold">VER PDF</small></div>';
+            
+            } else {
+                // Otros archivos
+                wrapper.prepend(`<div class="file-icon-container"><i class="fas fa-file-alt file-icon text-muted"></i></div>`);
+                contentHtml = `<div class="mt-auto w-100 text-center bg-light p-1"><small>${file.name}</small></div>`;
+            }
+            
+            wrapper.append(contentHtml);
+            container.append(wrapper);
+        });
+    });
 
     if (empresaSelect.val()) { 
         empresaSelect.trigger('change');
