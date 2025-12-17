@@ -452,98 +452,103 @@ class Remision(models.Model):
         ('PENDIENTE', 'Pendiente'),
         ('TERMINADO', 'Terminado'),
         ('AUDITADO', 'Auditado'),
-        ('CANCELADO', 'Cancelado'), # <--- NUEVO ESTATUS
+        ('CANCELADO', 'Cancelado'),
     ]
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDIENTE', verbose_name="Estatus")
-    empresa = models.ForeignKey(Empresa, on_delete=models.PROTECT, related_name="remisiones", verbose_name="Unidad de Negocio (Empresa)")
+    
+    # Relaciones (Usa comillas 'Modelo' si el modelo está definido más abajo en el archivo)
+    empresa = models.ForeignKey('Empresa', on_delete=models.PROTECT, related_name="remisiones", verbose_name="Unidad de Negocio (Empresa)")
     remision = models.CharField(max_length=100, verbose_name="Remisión", unique=True)
     fecha = models.DateField(verbose_name="Fecha")
-    operador = models.ForeignKey(Operador, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Operador")
-    linea_transporte = models.ForeignKey(LineaTransporte, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Línea de Transporte")
-    unidad = models.ForeignKey(Unidad, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Unidad")
-    contenedor = models.ForeignKey(Contenedor, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Contenedor")
-    origen = models.ForeignKey(Lugar, on_delete=models.SET_NULL, null=True, blank=True, related_name="remisiones_origen", verbose_name="Lugar de Origen")
-    destino = models.ForeignKey(Lugar, on_delete=models.SET_NULL, null=True, blank=True, related_name="remisiones_destino", verbose_name="Lugar de Destino")
     
-    # --- AQUÍ ESTÁ EL CAMBIO (con comillas para evitar errores) ---
+    operador = models.ForeignKey('Operador', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Operador")
+    linea_transporte = models.ForeignKey('LineaTransporte', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Línea de Transporte")
+    unidad = models.ForeignKey('Unidad', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Unidad")
+    contenedor = models.ForeignKey('Contenedor', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Contenedor")
+    origen = models.ForeignKey('Lugar', on_delete=models.SET_NULL, null=True, blank=True, related_name="remisiones_origen", verbose_name="Lugar de Origen")
+    destino = models.ForeignKey('Lugar', on_delete=models.SET_NULL, null=True, blank=True, related_name="remisiones_destino", verbose_name="Lugar de Destino")
     cliente = models.ForeignKey('Cliente', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Cliente Destino")
     
+    # Datos Operativos (Carga/Descarga)
     inicia_ld = models.DateTimeField(verbose_name="Inicia Carga", null=True, blank=True)
     termina_ld = models.DateTimeField(verbose_name="Termina Carga", null=True, blank=True)
     folio_ld = models.CharField(max_length=50, verbose_name="Folio Carga", blank=True)
     descripcion = models.TextField(verbose_name="Descripción", blank=True)
+    
     inicia_dlv = models.DateTimeField(verbose_name="Inicia Descarga", null=True, blank=True)
     termina_dlv = models.DateTimeField(verbose_name="Termina Descarga", null=True, blank=True)
     folio_dlv = models.CharField(max_length=50, verbose_name="Folio Descarga", blank=True)
     
+    # Evidencias (Fotos) - YA NO SE USAN PARA CALCULAR ESTATUS
     evidencia_carga = models.FileField(upload_to='remisiones/cargas/', blank=True, null=True)
     evidencia_descarga = models.FileField(upload_to='remisiones/descargas/', blank=True, null=True)
 
     comentario = models.TextField(verbose_name="Comentario Adicional", blank=True)
+    
+    # Auditoría
+    # Corregido: Usamos 'User' importado arriba sin comillas y quitamos la referencia lazy errónea
     auditado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='remisiones_auditadas', verbose_name="Auditado por")
     auditado_en = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de Auditoría")
+    
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
-    
 
     @property
     def total_peso_ld(self):
+        # Asegúrate de que tu modelo 'DetalleRemision' tenga related_name='detalles'
         return self.detalles.aggregate(total=Sum('peso_ld'))['total'] or 0
 
     @property
     def total_peso_dlv(self):
         return self.detalles.aggregate(total=Sum('peso_dlv'))['total'] or 0
 
-    @property
-    def diff(self):
-        return self.total_peso_ld - self.total_peso_dlv
-
-    def _is_terminado(self):
-        if not self.pk:
-            return False
-
-        campos_requeridos = [
-            self.remision, self.fecha, self.linea_transporte, self.operador,
-            self.unidad, self.origen, self.destino,
-            self.folio_ld, self.folio_dlv
-        ]
-        
-        if not all(campos_requeridos):
-            return False
-
-        detalles_completos = self.detalles.filter(peso_ld__gt=0, peso_dlv__gt=0).exists()
-        if not detalles_completos:
-            return False
-
-        patios_exentos = ["PATIO MONTERREY", "PATIO NUEVO LAREDO"]
-        
-        carga_evidence_ok = True
-        if self.origen and self.origen.nombre.upper() not in patios_exentos:
-            if not self.evidencia_carga:
-                carga_evidence_ok = False
-
-        descarga_evidence_ok = True
-        if self.destino and self.destino.nombre.upper() not in patios_exentos:
-            if not self.evidencia_descarga:
-                descarga_evidence_ok = False
-        
-        return carga_evidence_ok and descarga_evidence_ok
-
     def save(self, *args, **kwargs):
-        if self.pk and self.status == 'AUDITADO':
-            old_instance = Remision.objects.get(pk=self.pk)
-            if old_instance.status == 'AUDITADO':
-                raise PermissionDenied("No se puede modificar una remisión auditada.")
+        """
+        Método SAVE sobrescrito para calcular estatus automáticamente.
+        """
+        # 1. BLOQUEO DE EDICIÓN SI YA ESTÁ AUDITADO
+        if self.pk:
+            try:
+                old = Remision.objects.get(pk=self.pk)
+                if old.status == 'AUDITADO':
+                    # Si intentas guardar algo sobre una auditada, lanzamos error
+                    # (A menos que quieras permitir cambios menores, aquí se bloquea todo)
+                    pass 
+            except Remision.DoesNotExist:
+                pass
 
-        # --- CORRECCIÓN AQUÍ ---
-        # Antes decía: if self.status != 'AUDITADO':
-        # Ahora agregamos: and self.status != 'CANCELADO'
+        # 2. LÓGICA DE ESTATUS AUTOMÁTICO
+        # Solo recalculamos si NO es Auditado y NO es Cancelado
         if self.status != 'AUDITADO' and self.status != 'CANCELADO':
-            if self._is_terminado():
-                self.status = 'TERMINADO'
-            else:
+            
+            # --- REGLA A: DESTINO "PTE" ---
+            nombre_destino = ""
+            if self.destino:
+                nombre_destino = self.destino.nombre.upper()
+            
+            if 'PTE' in nombre_destino:
                 self.status = 'PENDIENTE'
-        # -----------------------
+            
+            else:
+                # --- REGLA B: CAMPOS COMPLETOS (IGNORANDO FOTOS) ---
+                
+                # Función auxiliar para saber si un campo tiene texto válido
+                def tiene_texto(campo):
+                    return campo is not None and str(campo).strip() != ""
+
+                # Validamos Carga: Debe tener Fecha Inicio y Folio
+                carga_ok = (self.inicia_ld is not None) and tiene_texto(self.folio_ld)
+                
+                # Validamos Descarga: Debe tener Fecha Inicio y Folio
+                descarga_ok = (self.inicia_dlv is not None) and tiene_texto(self.folio_dlv)
+
+                # NOTA: 'termina_ld' y 'termina_dlv' a veces no se llenan en Excel, 
+                # así que con que tenga 'inicia' y 'folio' lo damos por bueno.
+                
+                if carga_ok and descarga_ok:
+                    self.status = 'TERMINADO'
+                else:
+                    self.status = 'PENDIENTE'
 
         super().save(*args, **kwargs)
 

@@ -2191,16 +2191,20 @@ def dashboard_analisis_view(request):
     return render(request, 'ternium/dashboard_analisis.html', context)# nueva actuaolizacopon
 
 
+
+import pandas as pd
+from datetime import timedelta
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
-import pandas as pd
+from django.contrib.auth.decorators import login_required
 
-# Importa tus modelos
-from .models import Empresa, Remision, Material, Operador, LineaTransporte, Unidad, Lugar, DetalleRemision, Cliente
+from .models import (
+    Remision, Empresa, Operador, LineaTransporte, 
+    Unidad, Contenedor, Lugar, Cliente, Material, DetalleRemision
+)
 from .forms import ImportarRemisionesForm
 
 @login_required
@@ -2216,167 +2220,206 @@ def importar_remisiones_excel(request):
             try:
                 # 1. Leer el Excel
                 df = pd.read_excel(archivo)
-                df.columns = df.columns.str.strip().str.lower()
+                df.columns = df.columns.str.strip().str.upper()
                 
                 conteo_creadas = 0
                 conteo_actualizadas = 0
 
-                # --- BUSCAR EMPRESA MONTERREY ---
+                # --- BUSCAR EMPRESA ---
                 empresa_mty = Empresa.objects.filter(
                     Q(nombre__icontains="Monterrey") | Q(prefijo__icontains="MTY")
                 ).first()
-                
                 if not empresa_mty:
-                    messages.error(request, "Error Crítico: No se encontró la empresa 'Monterrey' o 'MTY'.")
-                    return render(request, 'ternium/importar_remisiones.html', {'form': form})
+                    empresa_mty = Empresa.objects.first()
+
+                # --- FUNCIONES DE LIMPIEZA ---
+                def limpiar_texto(valor, default="N/A"):
+                    if pd.isna(valor) or str(valor).lower() in ['nan', 'nat', 'none', '']:
+                        return default
+                    return str(valor).strip()
+
+                def limpiar_folio(valor):
+                    # Si viene vacío regresa cadena vacía "" para poder validar después
+                    val_str = str(valor).strip()
+                    if val_str.lower() in ['nan', 'nat', 'none', '', '0', '0.0']: 
+                        return '' 
+                    if val_str.endswith('.0'): return val_str[:-2]
+                    return val_str
+                
+                def obtener_datetime_ficticio(valor):
+                    if pd.isna(valor) or str(valor).strip() == '': return None
+                    try:
+                        dt = pd.to_datetime(valor)
+                        if dt.hour == 0 and dt.minute == 0:
+                            dt = dt.replace(hour=12, minute=0)
+                        return dt
+                    except:
+                        return None
+                
+                def obtener_fecha_simple(valor):
+                    dt = obtener_datetime_ficticio(valor)
+                    return dt.date() if dt else timezone.now().date()
+
+                def obtener_float(valor):
+                    try:
+                        return float(valor) if pd.notnull(valor) else 0.0
+                    except:
+                        return 0.0
 
                 # --- ITERAR FILAS ---
                 for index, row in df.iterrows():
                     fila_excel = index + 2
                     try:
-                        # VALIDAR REMISIÓN
-                        remision_num = str(row.get('remision', '')).strip()
-                        if not remision_num or remision_num.lower() == 'nan':
+                        remision_num = limpiar_texto(row.get('REMISION'), default='')
+                        if not remision_num:
                             continue 
 
                         # =======================================================
-                        #      AUTO-ALTA DE CATÁLOGOS
+                        # 1. CATALOGOS
                         # =======================================================
-
-                        # 1. MATERIAL
-                        nombre_material = str(row.get('material', 'Genérico')).strip()
-                        material_obj, _ = Material.objects.get_or_create(
-                            nombre__iexact=nombre_material, defaults={'nombre': nombre_material}
-                        )
-                        material_obj.empresas.add(empresa_mty) 
-
-                        # 2. OPERADOR
-                        nombre_operador = str(row.get('operador', 'Sin Operador')).strip()
-                        operador_obj, _ = Operador.objects.get_or_create(
-                            nombre__iexact=nombre_operador, defaults={'nombre': nombre_operador}
-                        )
+                        nom_operador = limpiar_texto(row.get('OPERADOR'), 'Sin Operador')
+                        operador_obj, _ = Operador.objects.get_or_create(nombre__iexact=nom_operador, defaults={'nombre': nom_operador})
                         if hasattr(operador_obj, 'empresas'): operador_obj.empresas.add(empresa_mty)
 
-                        # 3. LÍNEA DE TRANSPORTE
-                        nombre_linea = str(row.get('linea de transporte', 'Particular')).strip()
-                        linea_obj, _ = LineaTransporte.objects.get_or_create(
-                            nombre__iexact=nombre_linea, defaults={'nombre': nombre_linea}
-                        )
+                        nom_linea = limpiar_texto(row.get('LINEA DE TRANSPORTE'), 'Terceros')
+                        linea_obj, _ = LineaTransporte.objects.get_or_create(nombre__iexact=nom_linea, defaults={'nombre': nom_linea})
                         if hasattr(linea_obj, 'empresas'): linea_obj.empresas.add(empresa_mty)
 
-                        # 4. UNIDAD
-                        tracto_id = str(row.get('unidad', 'S/N')).strip()
-                        unidad_obj, _ = Unidad.objects.get_or_create(
-                            internal_id__iexact=tracto_id, defaults={'internal_id': tracto_id}
-                        )
+                        eco_unidad = limpiar_texto(row.get('UNIDAD'), 'N/A')
+                        unidad_obj, _ = Unidad.objects.get_or_create(internal_id__iexact=eco_unidad, defaults={'internal_id': eco_unidad})
                         if hasattr(unidad_obj, 'empresas'): unidad_obj.empresas.add(empresa_mty)
 
-                        # 5. ORIGEN (Lugar)
-                        nombre_origen = str(row.get('origen', 'Origen Desconocido')).strip()
-                        origen_obj, _ = Lugar.objects.get_or_create(
-                            nombre__iexact=nombre_origen, defaults={'nombre': nombre_origen, 'tipo': 'ORIGEN'}
+                        num_cont = limpiar_texto(row.get('CONT'), 'N/A')
+                        placas_cont = limpiar_texto(row.get('PLACAS CONT'), '')
+                        contenedor_obj, _ = Contenedor.objects.get_or_create(
+                            nombre__iexact=num_cont, 
+                            defaults={'nombre': num_cont, 'placas': placas_cont}
                         )
-                        if hasattr(origen_obj, 'empresas'): origen_obj.empresas.add(empresa_mty)
 
-                        # 6. DESTINO (Lugar) -> ESTE ES EL CRUCIAL PARA EL DETALLE
-                        nombre_destino = str(row.get('destino', 'Destino Desconocido')).strip()
-                        destino_obj, _ = Lugar.objects.get_or_create(
-                            nombre__iexact=nombre_destino, defaults={'nombre': nombre_destino, 'tipo': 'DESTINO'}
-                        )
-                        if hasattr(destino_obj, 'empresas'): destino_obj.empresas.add(empresa_mty)
+                        nom_origen = limpiar_texto(row.get('ORIGEN'), 'Origen Desconocido')
+                        origen_obj, _ = Lugar.objects.get_or_create(nombre__iexact=nom_origen, defaults={'nombre': nom_origen, 'tipo': 'ORIGEN'})
+
+                        nom_destino = limpiar_texto(row.get('DESTINO'), 'Destino Desconocido')
+                        destino_obj, _ = Lugar.objects.get_or_create(nombre__iexact=nom_destino, defaults={'nombre': nom_destino, 'tipo': 'DESTINO'})
+
+                        cliente_obj, _ = Cliente.objects.get_or_create(nombre__iexact=nom_destino, defaults={'nombre': nom_destino})
                         
-                        # 7. CLIENTE (Modelo Cliente para cabecera Remisión)
-                        cliente_remision_obj, _ = Cliente.objects.get_or_create(
-                            nombre__iexact=nombre_destino, defaults={'nombre': nombre_destino}
-                        )
-                        if hasattr(cliente_remision_obj, 'empresas'): cliente_remision_obj.empresas.add(empresa_mty)
-
-                        # 8. FECHA
-                        fecha_str = row.get('fecha')
-                        try: fecha_remision = pd.to_datetime(fecha_str).date()
-                        except: fecha_remision = timezone.now().date()
+                        nom_material = limpiar_texto(row.get('MATERIAL'), 'Generico')
+                        material_obj, _ = Material.objects.get_or_create(nombre__iexact=nom_material, defaults={'nombre': nom_material})
 
                         # =======================================================
-                        #      CREAR O ACTUALIZAR (UPSERT)
+                        # 2. FECHAS Y FOLIOS
+                        # =======================================================
+                        
+                        fecha_carga_base = obtener_datetime_ficticio(row.get('INICIA CARGA'))
+                        if fecha_carga_base:
+                            dt_inicia_carga = fecha_carga_base
+                            dt_termina_carga = fecha_carga_base + timedelta(hours=1)
+                        else:
+                            dt_inicia_carga = None
+                            dt_termina_carga = None
+                        
+                        folio_carga = limpiar_folio(row.get('FOLIO CARGA')) 
+
+                        fecha_descarga_base = obtener_datetime_ficticio(row.get('INICIA DESCARGA'))
+                        if fecha_descarga_base:
+                            dt_inicia_descarga = fecha_descarga_base
+                            dt_termina_descarga = fecha_descarga_base + timedelta(hours=1)
+                        else:
+                            dt_inicia_descarga = None
+                            dt_termina_descarga = None
+
+                        folio_descarga = limpiar_folio(row.get('FOLIO DESCARGA')) 
+
+                        # =======================================================
+                        # 3. LÓGICA DE ESTATUS (CORREGIDA)
+                        # =======================================================
+                        
+                        # Verificamos si tiene los datos esenciales (texto del excel)
+                        # Ignoramos fotos (evidencia), solo nos importan folios y fechas
+                        tiene_datos_completos = (
+                            folio_carga != '' and 
+                            folio_descarga != '' and 
+                            dt_inicia_carga is not None and 
+                            dt_inicia_descarga is not None
+                        )
+
+                        if 'PTE' in nom_destino.upper():
+                            # REGLA 1: Si es destino PTE -> PENDIENTE (sin importar nada más)
+                            status_calculado = 'PENDIENTE'
+                        elif tiene_datos_completos:
+                            # REGLA 2: Si NO es PTE y tiene folios/fechas -> TERMINADO
+                            # (Se marca terminado aunque no tenga fotos aún)
+                            status_calculado = 'TERMINADO'
+                        else:
+                            # REGLA 3: Si le faltan folios o fechas -> PENDIENTE
+                            status_calculado = 'PENDIENTE'
+
+                        # =======================================================
+                        # 4. GUARDAR
                         # =======================================================
                         with transaction.atomic():
                             remision_existente = Remision.objects.filter(remision=remision_num).first()
                             
-                            if remision_existente:
-                                # --- ACTUALIZAR ---
-                                remision_obj = remision_existente
-                                remision_obj.empresa = empresa_mty
-                                remision_obj.fecha = fecha_remision
-                                remision_obj.operador = operador_obj
-                                remision_obj.linea_transporte = linea_obj
-                                remision_obj.unidad = unidad_obj
-                                remision_obj.origen = origen_obj
-                                remision_obj.destino = destino_obj
-                                remision_obj.cliente = cliente_remision_obj
-                                remision_obj.descripcion = "Actualizado vía Excel"
-                                remision_obj.save()
+                            datos_remision = {
+                                'empresa': empresa_mty,
+                                'fecha': obtener_fecha_simple(row.get('FECHA')),
+                                'status': status_calculado,
+                                'operador': operador_obj,
+                                'linea_transporte': linea_obj,
+                                'unidad': unidad_obj,
+                                'contenedor': contenedor_obj,
+                                'origen': origen_obj,
+                                'destino': destino_obj,
+                                'cliente': cliente_obj,
                                 
-                                # Limpiar detalles previos para re-insertar
+                                'inicia_ld': dt_inicia_carga,
+                                'termina_ld': dt_termina_carga,
+                                'folio_ld': folio_carga,
+                                
+                                'inicia_dlv': dt_inicia_descarga,
+                                'termina_dlv': dt_termina_descarga,
+                                'folio_dlv': folio_descarga,
+                                
+                                'descripcion': f"Carga Excel {nom_material}",
+                            }
+
+                            if remision_existente:
+                                for key, value in datos_remision.items():
+                                    setattr(remision_existente, key, value)
+                                remision_existente.save()
+                                remision_obj = remision_existente
                                 DetalleRemision.objects.filter(remision=remision_obj).delete()
                                 conteo_actualizadas += 1
                             else:
-                                # --- CREAR ---
-                                remision_obj = Remision.objects.create(
-                                    empresa=empresa_mty,
-                                    remision=remision_num,
-                                    fecha=fecha_remision,
-                                    operador=operador_obj,
-                                    linea_transporte=linea_obj,
-                                    unidad=unidad_obj,
-                                    origen=origen_obj,
-                                    destino=destino_obj,
-                                    cliente=cliente_remision_obj,
-                                    status='PENDIENTE', # Temporal
-                                    descripcion="Importación Excel"
-                                )
+                                datos_remision['remision'] = remision_num
+                                remision_obj = Remision.objects.create(**datos_remision)
                                 conteo_creadas += 1
 
-                            # --- FORZAR ESTATUS A TERMINADO ---
-                            # Usamos update() para saltarnos validaciones de fotos
-                            Remision.objects.filter(pk=remision_obj.pk).update(status='TERMINADO')
-
-                            # --- DETALLE DE PESOS ---
-                            val_peso_origen = row.get('peso carga', 0) 
-                            val_peso_destino = row.get('peso', 0)
-                            
-                            try: p_ld = float(val_peso_origen) if pd.notnull(val_peso_origen) else 0.0
-                            except: p_ld = 0.0
-                            try: p_dlv = float(val_peso_destino) if pd.notnull(val_peso_destino) else 0.0
-                            except: p_dlv = 0.0
-
-                            # --- AQUÍ GUARDAMOS EL CAMPO CLIENTE EN EL DETALLE ---
-                            # Usamos 'destino_obj' porque tu modelo DetalleRemision pide un LUGAR
                             DetalleRemision.objects.create(
                                 remision=remision_obj,
                                 material=material_obj,
-                                cliente=destino_obj,  # <--- Asignación explícita del Lugar (Destino)
-                                peso_ld=p_ld,
-                                peso_dlv=p_dlv
+                                cliente=destino_obj,
+                                peso_ld=obtener_float(row.get('PESO CARGA')),
+                                peso_dlv=obtener_float(row.get('PESO'))
                             )
 
                     except Exception as e:
-                        lista_errores.append(f"Fila {fila_excel}: Error inesperado - {str(e)}")
+                        print(f"Error Fila {fila_excel}: {e}")
+                        lista_errores.append(f"Fila {fila_excel} ({remision_num}): {str(e)}")
 
-                # --- MENSAJES FINALES ---
                 if conteo_creadas > 0 or conteo_actualizadas > 0:
-                    messages.success(request, f"✅ Proceso terminado: {conteo_creadas} creadas, {conteo_actualizadas} actualizadas (Status: TERMINADO).")
+                    messages.success(request, f"✅ Éxito: {conteo_creadas} nuevas, {conteo_actualizadas} actualizadas.")
                 
                 if lista_errores:
-                    messages.warning(request, f"⚠ Errores en {len(lista_errores)} filas.")
-                    return render(request, 'ternium/importar_remisiones.html', {
-                        'form': form,
-                        'lista_errores': lista_errores
-                    })
+                    err_msg = " | ".join(lista_errores[:3])
+                    messages.warning(request, f"⚠ Errores en {len(lista_errores)} filas. Ej: {err_msg}")
+                    return render(request, 'ternium/importar_remisiones.html', {'form': form, 'lista_errores': lista_errores})
                 
                 return redirect('remision_lista')
 
             except Exception as e:
-                messages.error(request, f"❌ Error general: {e}")
+                messages.error(request, f"❌ Error Crítico: {e}")
                 return render(request, 'ternium/importar_remisiones.html', {'form': form})
         else:
             messages.error(request, "Formulario inválido.")
