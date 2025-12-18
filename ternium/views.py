@@ -534,28 +534,49 @@ class RemisionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
                 # Si no tiene perfil o empresas asignadas, no ve nada
                 queryset = queryset.none()
 
-        # 3. FILTROS DEL BUSCADOR (Misma lógica de siempre)
+        # 3. LÓGICA DE FILTROS (AQUÍ ESTÁ LA MAGIA)
         self.search_params = self.request.GET.copy()
         
-        filtros_activos = any(
-            k.startswith('q_') and v for k, v in self.request.GET.items()
-        )
-        
-        if not filtros_activos:
-            today = timezone.now().date()
-            month_ago = today - datetime.timedelta(days=30)
-            self.search_params['q_fecha_desde'] = month_ago.strftime('%Y-%m-%d')
-            self.search_params['q_fecha_hasta'] = today.strftime('%Y-%m-%d')
+        q_remision = self.request.GET.get('q_remision')
 
+        # --- CASO A: SI BUSCAN POR FOLIO (BÚSQUEDA GLOBAL) ---
+        if q_remision:
+            # Buscamos en TODA la base de datos, ignorando las fechas
+            queryset = queryset.filter(remision__icontains=q_remision)
+            
+            # (Opcional) Si quieres que ignore también los otros filtros al buscar exacto, 
+            # podrías retornar aquí. Pero mejor dejamos que los otros filtros (material, etc.)
+            # sigan funcionando si el usuario los seleccionó explícitamente.
+
+        # --- CASO B: SI NO HAY FOLIO (FILTROS NORMALES + FECHAS) ---
+        else:
+            filtros_activos = any(
+                k.startswith('q_') and v for k, v in self.request.GET.items()
+            )
+            
+            # Si no hay filtros, poner fechas default (últimos 30 días)
+            if not filtros_activos:
+                today = timezone.now().date()
+                month_ago = today - datetime.timedelta(days=30)
+                self.search_params['q_fecha_desde'] = month_ago.strftime('%Y-%m-%d')
+                self.search_params['q_fecha_hasta'] = today.strftime('%Y-%m-%d')
+            
+            # Aplicar filtros de fecha solo si no estamos buscando un folio específico
+            q_fecha_desde = self.search_params.get('q_fecha_desde')
+            q_fecha_hasta = self.search_params.get('q_fecha_hasta')
+            
+            if q_fecha_desde:
+                queryset = queryset.filter(fecha__gte=q_fecha_desde)
+            if q_fecha_hasta:
+                queryset = queryset.filter(fecha__lte=q_fecha_hasta)
+
+        # 4. APLICAR RESTO DE FILTROS (Siempre se aplican si están seleccionados)
         filters = {
-            'remision__icontains': self.search_params.get('q_remision'),
             'empresa__prefijo__icontains': self.search_params.get('q_prefijo'),
             'detalles__material_id': self.search_params.get('q_material'),
             'origen_id': self.search_params.get('q_origen'),
             'destino_id': self.search_params.get('q_destino'),
             'status': self.search_params.get('q_status'),
-            'fecha__gte': self.search_params.get('q_fecha_desde'),
-            'fecha__lte': self.search_params.get('q_fecha_hasta'),
         }
         
         for key, value in filters.items():
@@ -568,10 +589,11 @@ class RemisionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         return queryset
 
     def get_context_data(self, **kwargs):
+        # ESTE MÉTODO ES EL QUE LLENA LOS COMBOS (FILTROS VISUALES)
         context = super().get_context_data(**kwargs)
         context['search_params'] = self.search_params 
         
-        # Opcional: Filtrar también los prefijos del dropdown de búsqueda
+        # Llenar Prefijos (Empresas)
         if not self.request.user.is_superuser:
              perfil = getattr(self.request.user, 'ternium_profile', None)
              if perfil:
@@ -582,15 +604,24 @@ class RemisionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         else:
              context['prefijos'] = Empresa.objects.exclude(prefijo__isnull=True).exclude(prefijo='').values_list('prefijo', flat=True).distinct().order_by('prefijo')
              
+        # Llenar resto de catálogos
         context['materiales'] = Material.objects.all().order_by('nombre')
         context['origenes'] = Lugar.objects.filter(tipo__in=['ORIGEN', 'AMBOS']).order_by('nombre')
         context['destinos'] = Lugar.objects.filter(tipo__in=['DESTINO', 'AMBOS']).order_by('nombre')
         context['estatus_choices'] = Remision.STATUS_CHOICES
-        # Ajustamos esto para que no revele remisiones ajenas en el autocompletado si lo usas
+        
+        # Lista para autocompletado de remisiones
         if not self.request.user.is_superuser:
-             context['all_remision_numbers'] = Remision.objects.filter(empresa__in=self.request.user.ternium_profile.empresas_autorizadas.all()).values_list('remision', flat=True).distinct().order_by('remision')
+             # Solo ver remisiones de mis empresas
+             perfil = getattr(self.request.user, 'ternium_profile', None)
+             if perfil:
+                qs = Remision.objects.filter(empresa__in=perfil.empresas_autorizadas.all())
+             else:
+                qs = Remision.objects.none()
         else:
-             context['all_remision_numbers'] = Remision.objects.values_list('remision', flat=True).distinct().order_by('remision')
+             qs = Remision.objects.all()
+             
+        context['all_remision_numbers'] = qs.values_list('remision', flat=True).distinct().order_by('remision')
              
         return context
     
