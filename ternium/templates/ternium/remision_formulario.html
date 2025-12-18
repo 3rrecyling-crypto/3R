@@ -80,7 +80,8 @@
         margin-left: 3px;
         font-weight: bold;
     }
-    /* Estilo para el preview clickeable */
+    
+    /* Preview Styles */
     .preview-container {
         cursor: pointer;
         transition: transform 0.2s;
@@ -103,6 +104,15 @@
     }
     .preview-container:hover .preview-overlay {
         opacity: 1;
+    }
+    
+    /* --- CORRECCIÓN Z-INDEX MODAL (EXTREMA) --- */
+    /* Indices muy altos para superar cualquier Navbar o Sidebar fija */
+    .modal-backdrop {
+        z-index: 10050 !important;
+    }
+    .modal {
+        z-index: 10060 !important;
     }
 </style>
 {% endblock %}
@@ -244,10 +254,11 @@
                             </label>
                             
                             {{ form.evidencia_documento }}
-                            <div class="form-text mt-2 text-muted">Seleccione un archivo (PDF o Imagen).</div>
+                            
+                            <div class="form-text mt-2 text-muted">Seleccione un archivo (PDF o Imagen). Si ya existe uno, se mostrará arriba.</div>
                             
                             <div id="preview-container" class="mt-3 text-center" style="display:none;">
-                                <h6 class="text-primary mb-2">Vista Previa (Click para ampliar):</h6>
+                                <h6 class="text-primary mb-2">Vista Previa de archivo nuevo:</h6>
                                 <div class="preview-container d-inline-block rounded shadow-sm border p-1" onclick="openPreviewModalFromInput()">
                                     <div id="preview-content"></div>
                                     <div class="preview-overlay">
@@ -255,19 +266,6 @@
                                     </div>
                                 </div>
                             </div>
-                    
-                            {% if object.evidencia_documento %}
-                                <div class="alert alert-info mt-3 d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <i class="fas fa-check-circle me-2 text-success"></i>
-                                        <strong>Archivo Actual:</strong>
-                                        <a href="javascript:void(0)" onclick="openPreviewModal('{{ object.evidencia_documento.url }}', '{% if '.pdf' in object.evidencia_documento.url %}pdf{% else %}image{% endif %}')" class="text-decoration-underline ms-1 fw-bold">
-                                            Ver Documento
-                                        </a>
-                                    </div>
-                                    <span class="badge bg-primary">Guardado</span>
-                                </div>
-                            {% endif %}
                         </div>
                     </div>
 
@@ -304,14 +302,22 @@
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
+// --- SOLUCIÓN AL BLOQUEO DEL MODAL ---
+// Mueve el modal al body al cargar para evitar conflictos de apilamiento con navbar o cards
+document.addEventListener("DOMContentLoaded", function() {
+    var modalEl = document.getElementById('universalModal');
+    if(modalEl) {
+        document.body.appendChild(modalEl);
+    }
+});
+
 // Variable global para guardar el dataURI del input
 let currentPreviewData = null;
 let currentPreviewType = null;
 
-// Función para abrir el modal (Bloop up)
 function openPreviewModal(src, type) {
     const container = document.getElementById('modal-content-area');
-    container.innerHTML = ''; // Limpiar anterior
+    container.innerHTML = ''; 
     
     if (type === 'pdf') {
         const iframe = document.createElement('iframe');
@@ -342,13 +348,12 @@ function openPreviewModalFromInput() {
 $(document).ready(function() {
     
     const IS_EDITING = {{ is_editing|yesno:"true,false" }}; 
-    // ... (Variables de catálogos existentes) ...
     let cachedCatalogData = { materiales: [], lugares: [] };
     const formContainer = $('#form-container');
     const addButton = $('#add-form');
     const totalFormsInput = $('#id_detalles-TOTAL_FORMS');
-    const empresaSelect = $('#id_empresa'); // Este selector puede estar disabled ahora
-    const remisionInput = $('#id_remision_display'); 
+    const empresaSelect = $('#id_empresa'); 
+    const remisionInput = $('#id_remision_display'); // INPUT DE REMISIÓN
     const emptyFormTemplate = $('#empty-form-template').html();
 
     function initializeSelect2(context) {
@@ -359,7 +364,6 @@ $(document).ready(function() {
     }
     
     function populateSelect(selectElement, options) {
-        // ... (Tu lógica existente sin cambios) ...
         const currentVal = $(selectElement).val();
         $(selectElement).empty().append('<option value=""></option>');
         if (options) {
@@ -370,7 +374,7 @@ $(document).ready(function() {
 
     initializeSelect2(document);
 
-    // --- LÓGICA DE PREVISUALIZACIÓN DE ARCHIVO ---
+    // --- PREVISUALIZACIÓN DE ARCHIVO NUEVO ---
     $('#id_evidencia_documento').change(function(){
         const file = this.files[0];
         const previewContainer = $('#preview-container');
@@ -398,7 +402,6 @@ $(document).ready(function() {
                         <img src="${e.target.result}" style="max-height: 200px; display: block;" class="img-fluid rounded">
                     `);
                 } else {
-                    // Otros archivos
                     currentPreviewType = null;
                     contentDiv.html('<div class="p-3 text-muted">Vista previa no disponible</div>');
                 }
@@ -410,30 +413,22 @@ $(document).ready(function() {
         }
     });
 
-    // --- LÓGICA AL CAMBIAR EMPRESA ---
-    // Si estamos editando, el select está disabled, así que el evento 'change' no se disparará por usuario.
-    // Pero si no estamos editando, funciona normal.
+    // --- LÓGICA DE EMPRESAS Y CATALOGOS (CONSOLIDADOS) ---
     empresaSelect.on('change', function() { 
         const empresaId = $(this).val();
-        // Nota: Si está disabled, val() sigue funcionando si tiene opción seleccionada
+        
+        // Si no se selecciona empresa, se limpia y deshabilita lo necesario
         if (!empresaId) {
-             // ... Limpiar ...
              addButton.prop('disabled', true);
+             if (!IS_EDITING) remisionInput.val(''); 
              return;
         }
         
-        // ... (Resto de tu lógica AJAX para traer catálogos) ...
-        // Como es mucho código, lo resumo: Debes mantener tu lógica AJAX aquí.
-        // Solo asegúrate de que si IS_EDITING es true, quizás no quieras borrar 
-        // los selects de transporte/origen/destino que ya tienen datos.
-        // Pero tu lógica actual rellena de nuevo, lo cual está bien si el backend trae todo.
-        
+        // 1. Cargar Catálogos
         fetch(`/api/get-catalogos/${empresaId}/`) 
             .then(response => response.json())
             .then(data => {
-                // ... (Tu lógica de populateSelect existente) ...
                 cachedCatalogData.materiales = data.materiales || [];
-                // etc...
                 populateSelect($('#id_linea_transporte'), data.lineas_transporte);
                 populateSelect($('#id_unidad'), data.unidades);
                 populateSelect($('#id_contenedor'), data.contenedores);
@@ -442,45 +437,60 @@ $(document).ready(function() {
                 
                 formContainer.find('.detalle-form-row').each(function() {
                     populateSelect($(this).find('.material-select'), cachedCatalogData.materiales);
-                    // ...
                 });
             })
+            .catch(error => console.error("Error catálogos:", error))
             .finally(() => { addButton.prop('disabled', false); });
             
-            // Lógica de folio si no es editing
-            if (!IS_EDITING) {
-                 fetch(`/api/get-next-remision/${empresaId}/`)
-                 // ... tu lógica de folio ...
-            }
+        // 2. OBTENER FOLIO CONSECUTIVO (INTEGRACIÓN FUNCIONAL)
+        if (!IS_EDITING) {
+             remisionInput.val('Generando folio...');
+             
+             fetch(`/api/get-next-remision/${empresaId}/`)
+                 .then(response => {
+                     if (!response.ok) throw new Error('Error de red');
+                     return response.json();
+                 })
+                 .then(data => {
+                     // Verifica la respuesta de tu vista Django
+                     if (data.next_remision) {
+                         remisionInput.val(data.next_remision);
+                         remisionInput.prop('readonly', true);
+                     } else if (data.is_manual) {
+                         remisionInput.val('');
+                         remisionInput.prop('readonly', false);
+                         remisionInput.attr('placeholder', 'Folio manual');
+                     } else {
+                         remisionInput.val('');
+                     }
+                 })
+                 .catch(error => {
+                     console.error('Error obteniendo folio:', error);
+                     remisionInput.val('');
+                     remisionInput.prop('readonly', false);
+                 });
+        }
     });
 
-    // ... (Resto de listeners: destino->cliente, add-row, delete-row, calculo pesos) ...
-    // Estos no cambian, mantén tu código original aquí.
-    
     // Trigger inicial
     if (empresaSelect.val()) { 
-        // Si estamos editando, esto cargará los catálogos para que los selects tengan opciones
         empresaSelect.trigger('change');
     } else {
         addButton.prop('disabled', true);
     }
     
-    // Trigger para cálculos
+    // --- MANEJO DE FILAS DINÁMICAS ---
     addButton.on('click', function() { 
-        // ... Tu lógica de agregar fila ...
         const formIndex = parseInt(totalFormsInput.val());
         const newRowHtml = emptyFormTemplate.replace(/__prefix__/g, formIndex);
         const newRow = $(newRowHtml);
         formContainer.append(newRow);
         
-        // Importante: Llenar selects de la nueva fila
         populateSelect(newRow.find('.material-select'), cachedCatalogData.materiales);
-        // ...
         initializeSelect2(newRow);
         totalFormsInput.val(formIndex + 1);
     });
     
-    // ... Listeners de inputs y delete ...
     formContainer.on('click', '.btn-delete-row', function() { 
         $(this).closest('.detalle-form-row').find('input[type="checkbox"][name$="-DELETE"]').prop('checked', true).end().hide(); 
     });
@@ -503,7 +513,6 @@ $(document).ready(function() {
         }
     });
     
-    // Inicializar cálculos en filas existentes
     $('.detalle-form-row').each(function() {
         $(this).find('.peso-carga').trigger('input');
     });

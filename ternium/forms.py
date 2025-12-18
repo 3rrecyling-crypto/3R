@@ -4,12 +4,41 @@ import os
 from django import forms
 from django.utils import timezone
 from django.forms import ClearableFileInput
+from django.utils.safestring import mark_safe # Importante para el widget
 from django.contrib.auth.forms import AuthenticationForm
 from .models import (
     Empresa, Lugar, Remision, EntradaMaquila, LineaTransporte,
     Operador, Material, Unidad, Contenedor, DetalleRemision, Descarga,
     RegistroLogistico
 )
+
+
+class CustomImageWidget(forms.ClearableFileInput):
+    def render(self, name, value, attrs=None, renderer=None):
+        output = []
+        if value and hasattr(value, "url"):
+            # Verifica si es imagen para mostrar previsualización
+            ext = value.name.split('.')[-1].lower()
+            if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+                output.append(f'''
+                    <div class="mb-2 p-2 border rounded bg-light text-center">
+                        <p class="text-muted small mb-1">Imagen Actual:</p>
+                        <img src="{value.url}" style="max-height: 120px; max-width: 100%; border-radius: 4px;" class="img-thumbnail" />
+                        <br>
+                        <a href="{value.url}" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
+                            <i class="fas fa-search-plus"></i> Ver Completa
+                        </a>
+                    </div>
+                ''')
+            else:
+                # Si es PDF u otro archivo
+                output.append(f'''
+                    <div class="mb-2">
+                        <a href="{value.url}" target="_blank" class="btn btn-sm btn-info">Ver Documento Actual ({ext})</a>
+                    </div>
+                ''')
+        output.append(super().render(name, value, attrs, renderer))
+        return mark_safe(''.join(output))
 
 
 class MultipleFileInput(ClearableFileInput):
@@ -155,11 +184,11 @@ class LugarForm(forms.ModelForm):
 
 
 class RemisionForm(forms.ModelForm):
-    # Definimos el campo explícitamente para asegurar que se renderice
+    # --- 2. APLICAMOS EL WIDGET AQUI ---
     evidencia_documento = forms.FileField(
         required=False,
         label="Evidencia (PDF o Foto)",
-        widget=forms.FileInput(attrs={
+        widget=CustomImageWidget(attrs={ # Usamos el widget personalizado
             'class': 'form-control',
             'accept': 'image/*,application/pdf'
         })
@@ -220,7 +249,7 @@ class RemisionForm(forms.ModelForm):
             if campo in self.fields:
                 self.fields[campo].required = False
 
-        # --- FILTROS DE SEGURIDAD Y CASCADA ---
+        # --- FILTROS DE SEGURIDAD Y CASCADA (Tu lógica original se mantiene igual) ---
         if self.user and not self.user.is_superuser:
             if hasattr(self.user, 'ternium_profile'):
                 qs_autorizadas = self.user.ternium_profile.empresas_autorizadas.all()
@@ -547,3 +576,4 @@ class ImportarRemisionesForm(forms.Form):
             'accept': '.xlsx, .xls'
         })
     )
+    

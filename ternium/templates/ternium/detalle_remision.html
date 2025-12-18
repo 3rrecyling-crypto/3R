@@ -1,5 +1,29 @@
 {% extends 'ternium/base.html' %}
 {% load humanize %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    /* --- CORRECCIÓN CRÍTICA DE Z-INDEX --- */
+    /* Forzamos que el modal esté por encima de TODO, incluida la barra base */
+    .modal-backdrop {
+        z-index: 10050 !important;
+    }
+    .modal {
+        z-index: 10060 !important;
+    }
+    .group-hover:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    }
+    /* Estilo para simular botón en el formulario de auditar */
+    .btn-audit-submit {
+        border: none;
+        width: 100%;
+        text-align: left;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
@@ -14,7 +38,14 @@
         </div>
         <div class="d-flex align-items-center">
             <a href="{% url 'remision_lista' %}" class="btn btn-outline-secondary me-3">Volver</a>
-            <span class="badge bg-secondary">{{ remision.get_status_display }}</span>
+            
+            {% if remision.status == 'AUDITADO' %}
+                <span class="badge bg-primary fs-6"><i class="fas fa-lock me-1"></i> AUDITADO</span>
+            {% elif remision.status == 'TERMINADO' %}
+                <span class="badge bg-success fs-6">TERMINADO</span>
+            {% else %}
+                <span class="badge bg-warning text-dark fs-6">{{ remision.get_status_display }}</span>
+            {% endif %}
         </div>
     </div>
 
@@ -47,6 +78,35 @@
                     </table>
                 </div>
             </div>
+            
+            <div class="d-flex justify-content-end mt-4">
+                
+                {% if remision.status == 'AUDITADO' %}
+                    <div class="alert alert-info py-2 px-4 shadow-sm d-flex align-items-center">
+                        <i class="fas fa-lock fa-lg me-3"></i>
+                        <div>
+                            <strong>Registro Bloqueado</strong>
+                            <div class="small">Auditado por {{ remision.auditado_por }} el {{ remision.auditado_en|date:"d/m/Y H:i" }}</div>
+                        </div>
+                    </div>
+
+                {% else %}
+                    <a href="{% url 'editar_remision' remision.id %}" class="btn btn-primary btn-lg shadow-sm me-3">
+                        <i class="fas fa-edit me-2"></i> Editar
+                    </a>
+
+                    {% if remision.status == 'TERMINADO' %}
+                        <form action="{% url 'auditar_remision' remision.id %}" method="POST" onsubmit="return confirm('¿Confirmar Auditoría?\n\nAl auditar, esta remisión se bloqueará permanentemente y no podrá ser editada ni eliminada.');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-warning btn-lg shadow-sm fw-bold">
+                                <i class="fas fa-clipboard-check me-2"></i> AUDITAR
+                            </button>
+                        </form>
+                    {% endif %}
+
+                {% endif %}
+            </div>
+
         </div>
 
         <div class="col-lg-4">
@@ -124,8 +184,20 @@
   </div>
 </div>
 
+{% endblock content %}
+
+{% block extra_js %}
 <script>
-    // Misma función JS que en el formulario
+    // 1. SOLUCIÓN NUCLEAR AL BLOQUEO DE PANTALLA
+    // Mueve el modal al final del body para que no se vea afectado por estilos padres
+    document.addEventListener("DOMContentLoaded", function() {
+        var modalEl = document.getElementById('universalModal');
+        if(modalEl) {
+            document.body.appendChild(modalEl);
+        }
+    });
+
+    // 2. Función para abrir el modal
     function openPreviewModal(src, type) {
         const container = document.getElementById('modal-content-area');
         container.innerHTML = ''; 
@@ -150,5 +222,4 @@
         myModal.show();
     }
 </script>
-
 {% endblock %}
