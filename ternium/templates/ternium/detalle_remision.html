@@ -3,7 +3,6 @@
 
 {% block content %}
 <div class="container-fluid py-4">
-    
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h4 class="fw-bold mb-0 text-primary">
@@ -13,158 +12,39 @@
                 <i class="far fa-calendar-alt me-1"></i> {{ remision.fecha|date:"d \d\e F Y" }}
             </span>
         </div>
-        
         <div class="d-flex align-items-center">
-            <a href="{% url 'remision_lista' %}" class="btn btn-outline-secondary me-3">
-                <i class="fas fa-arrow-left me-2"></i>Volver
-            </a>
-
-            {% if remision.status == 'PENDIENTE' %}
-                <span class="badge bg-warning text-dark fs-6">Pendiente</span>
-            {% elif remision.status == 'TERMINADO' %}
-                <span class="badge bg-info text-dark fs-6">Terminado</span>
-            {% elif remision.status == 'AUDITADO' %}
-                <span class="badge bg-success fs-6"><i class="fas fa-check-circle me-1"></i>Auditado</span>
-            {% elif remision.status == 'CANCELADO' %}
-                <span class="badge bg-danger fs-6">Cancelado</span>
-            {% endif %}
+            <a href="{% url 'remision_lista' %}" class="btn btn-outline-secondary me-3">Volver</a>
+            <span class="badge bg-secondary">{{ remision.get_status_display }}</span>
         </div>
     </div>
 
     <div class="row g-4">
         <div class="col-lg-8">
-            
             <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-map-signs me-2 text-secondary"></i>Logística del Viaje</h6>
-                </div>
+                <div class="card-header bg-white py-3"><h6 class="mb-0 fw-bold">Logística</h6></div>
                 <div class="card-body">
-                    <div class="row g-3">
-                        
-                        <div class="col-md-4">
-                            <label class="small text-muted fw-bold">ORIGEN (SALIDA)</label>
-                            <div class="d-flex align-items-start mt-2">
-                                <div class="bg-info bg-opacity-10 p-2 rounded me-2 text-info">
-                                    <i class="fas fa-map-marker-alt"></i>
-                                </div>
-                                <div>
-                                    <span class="d-block fw-bold text-dark">{{ remision.origen.nombre|default:"No especificado" }}</span>
-                                    {% if remision.origen.direccion_completa %}
-                                        <small class="text-muted" style="font-size: 0.75rem; line-height: 1.2;">{{ remision.origen.direccion_completa }}</small>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="small text-muted fw-bold">DESTINO (LLEGADA)</label>
-                            <div class="d-flex align-items-start mt-2">
-                                <div class="bg-success bg-opacity-10 p-2 rounded me-2 text-success">
-                                    <i class="fas fa-flag-checkered"></i>
-                                </div>
-                                <div>
-                                    <span class="d-block fw-bold text-dark">{{ remision.destino.nombre|default:"No especificado" }}</span>
-                                    {% if remision.destino.direccion_completa %}
-                                        <small class="text-muted" style="font-size: 0.75rem; line-height: 1.2;">{{ remision.destino.direccion_completa }}</small>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="small text-muted fw-bold">CLIENTE COMERCIAL</label>
-                            <div class="d-flex align-items-center mt-2">
-                                <div class="bg-primary bg-opacity-10 p-2 rounded me-2 text-primary">
-                                    <i class="fas fa-user-tie"></i>
-                                </div>
-                                <div>
-                                    <span class="fw-bold text-dark">{{ remision.cliente.nombre|default:"Sin Cliente" }}</span>
-                                    <div class="small text-muted" style="font-size: 0.75rem;">Entidad a Facturar</div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="col-12 border-top my-3"></div>
-
-                        <div class="col-md-4">
-                            <label class="small text-muted fw-bold">UNIDAD / TRACTO</label>
-                            <p class="mb-0 fw-bold text-dark">{{ remision.unidad.internal_id|default:"-" }} <span class="text-muted small fw-normal">({{ remision.unidad.license_plate }})</span></p>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="small text-muted fw-bold">OPERADOR</label>
-                            <p class="mb-0 fw-bold text-dark">{{ remision.operador.nombre|default:"Sin asignar" }}</p>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="small text-muted fw-bold">LÍNEA TRANSPORTE</label>
-                            <p class="mb-0 fw-bold text-dark">{{ remision.linea_transporte.nombre|default:"Propio" }}</p>
-                        </div>
-                    </div>
+                     <div class="row">
+                         <div class="col-md-4"><strong>Origen:</strong> {{ remision.origen }}</div>
+                         <div class="col-md-4"><strong>Destino:</strong> {{ remision.destino }}</div>
+                         <div class="col-md-4"><strong>Cliente:</strong> {{ remision.cliente }}</div>
+                     </div>
                 </div>
             </div>
-
+            
             <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-balance-scale me-2 text-secondary"></i>Detalle de Carga</h6>
-                </div>
                 <div class="table-responsive">
                     <table class="table align-middle mb-0">
-                        <thead class="bg-light text-secondary small text-uppercase">
-                            <tr>
-                                <th class="ps-4">Material</th>
-                                <th class="text-center">Peso Carga (Ton)</th>
-                                <th class="text-center">Peso Descarga (Ton)</th>
-                                <th class="text-end pe-4">Estatus</th>
-                            </tr>
-                        </thead>
+                        <thead class="bg-light"><tr><th>Material</th><th>Carga</th><th>Descarga</th></tr></thead>
                         <tbody>
                             {% for detalle in remision.detalles.all %}
                             <tr>
-                                <td class="ps-4 fw-bold text-dark">{{ detalle.material.nombre }}</td>
-                                <td class="text-center text-muted">{{ detalle.peso_ld|floatformat:3 }}</td>
-                                <td class="text-center text-muted">{{ detalle.peso_dlv|floatformat:3 }}</td>
-                                <td class="text-end pe-4">
-                                    {% if detalle.peso_ld > detalle.peso_dlv %}
-                                        <span class="badge bg-danger bg-opacity-10 text-danger">Merma Detectada</span>
-                                    {% elif detalle.peso_dlv > detalle.peso_ld %}
-                                        <span class="badge bg-success bg-opacity-10 text-success">Ganancia</span>
-                                    {% else %}
-                                        <span class="badge bg-secondary bg-opacity-10 text-secondary">Exacto</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="4" class="text-center py-4 text-muted">Sin materiales registrados</td>
+                                <td>{{ detalle.material }}</td>
+                                <td>{{ detalle.peso_ld }}</td>
+                                <td>{{ detalle.peso_dlv }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
-                        <tfoot class="bg-light border-top">
-                            <tr>
-                                <td class="ps-4 fw-bold text-dark text-uppercase">Totales:</td>
-                                <td class="text-center fw-bold text-dark">{{ remision.total_peso_ld|floatformat:3 }}</td>
-                                <td class="text-center fw-bold text-dark">{{ remision.total_peso_dlv|floatformat:3 }}</td>
-                                <td class="text-end pe-4 fw-bold text-dark">{{ remision.diff|floatformat:3 }}</td>
-                            </tr>
-                        </tfoot>
                     </table>
-                </div>
-            </div>
-
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-comment-alt me-2 text-secondary"></i>Comentarios y Observaciones</h6>
-                </div>
-                <div class="card-body">
-                    {% if remision.comentario %}
-                        <div class="p-3 bg-light rounded border-start border-4 border-primary">
-                            <p class="mb-0 text-dark" style="white-space: pre-wrap;">{{ remision.comentario }}</p>
-                        </div>
-                    {% else %}
-                        <div class="text-center py-3 text-muted">
-                            <i class="far fa-comment-dots fa-2x mb-2 opacity-25"></i>
-                            <p class="small mb-0">No hay comentarios registrados en esta remisión.</p>
-                        </div>
-                    {% endif %}
                 </div>
             </div>
         </div>
@@ -173,80 +53,55 @@
             
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-camera me-2 text-secondary"></i>Evidencia Fotográfica</h6>
+                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-paperclip me-2 text-secondary"></i>Documentación</h6>
                 </div>
-                <div class="card-body">
+                <div class="card-body text-center">
                     
-                    <div class="mb-4">
-                        <label class="small fw-bold text-muted mb-2 d-block">EVIDENCIA DE CARGA</label>
-                        {% if remision.evidencia_carga %}
-                            <a href="#" 
-                               class="d-block position-relative group-hover"
-                               data-bs-toggle="modal" 
-                               data-bs-target="#imageModal"
-                               data-bs-img-src="{{ remision.evidencia_carga.url }}"
-                               data-bs-title="Evidencia de Carga">
-                                <img src="{{ remision.evidencia_carga.url }}" class="img-fluid rounded border shadow-sm w-100" style="max-height: 200px; object-fit: cover;" alt="Carga">
-                                <div class="position-absolute top-50 start-50 translate-middle badge bg-dark bg-opacity-75">
-                                    <i class="fas fa-search-plus me-1"></i> Ver Foto
+                    {% if remision.evidencia_documento %}
+                        <div class="mb-3">
+                            <label class="small fw-bold text-muted mb-2 d-block">ARCHIVO ADJUNTO</label>
+                            
+                            {% if '.pdf' in remision.evidencia_documento.url %}
+                                <div class="cursor-pointer group-hover p-4 border rounded bg-light" 
+                                     onclick="openPreviewModal('{{ remision.evidencia_documento.url }}', 'pdf')"
+                                     style="cursor: pointer; transition: all 0.2s;">
+                                    <i class="fas fa-file-pdf fa-5x text-danger mb-2"></i>
+                                    <p class="mb-0 fw-bold text-dark">Ver Documento PDF</p>
+                                    <small class="text-muted">Click para abrir</small>
                                 </div>
-                            </a>
-                        {% else %}
-                            <div class="bg-light rounded border border-dashed p-4 text-center text-muted">
-                                <i class="fas fa-image fa-2x mb-2 opacity-25"></i>
-                                <p class="small mb-0">Sin foto de carga</p>
-                            </div>
-                        {% endif %}
-                    </div>
-
-                    <div>
-                        <label class="small fw-bold text-muted mb-2 d-block">EVIDENCIA DE DESCARGA</label>
-                        {% if remision.evidencia_descarga %}
-                            <a href="#" 
-                               class="d-block position-relative group-hover"
-                               data-bs-toggle="modal" 
-                               data-bs-target="#imageModal"
-                               data-bs-img-src="{{ remision.evidencia_descarga.url }}"
-                               data-bs-title="Evidencia de Descarga">
-                                <img src="{{ remision.evidencia_descarga.url }}" class="img-fluid rounded border shadow-sm w-100" style="max-height: 200px; object-fit: cover;" alt="Descarga">
-                                <div class="position-absolute top-50 start-50 translate-middle badge bg-dark bg-opacity-75">
-                                    <i class="fas fa-search-plus me-1"></i> Ver Foto
+                            {% else %}
+                                <div class="cursor-pointer position-relative group-hover"
+                                     onclick="openPreviewModal('{{ remision.evidencia_documento.url }}', 'image')"
+                                     style="cursor: pointer;">
+                                    <img src="{{ remision.evidencia_documento.url }}" class="img-fluid rounded border shadow-sm w-100" style="max-height: 250px; object-fit: cover;" alt="Evidencia">
+                                    <div class="position-absolute top-50 start-50 translate-middle badge bg-dark bg-opacity-75">
+                                        <i class="fas fa-search-plus me-1"></i> Ampliar
+                                    </div>
                                 </div>
-                            </a>
-                        {% else %}
-                            <div class="bg-light rounded border border-dashed p-4 text-center text-muted">
-                                <i class="fas fa-image fa-2x mb-2 opacity-25"></i>
-                                <p class="small mb-0">Sin foto de descarga</p>
-                            </div>
-                        {% endif %}
-                    </div>
+                            {% endif %}
+                        </div>
+                        
+                        <a href="{{ remision.evidencia_documento.url }}" download class="btn btn-outline-primary btn-sm w-100 mt-2">
+                            <i class="fas fa-download me-2"></i>Descargar Archivo
+                        </a>
+                    {% else %}
+                        <div class="bg-light rounded border border-dashed p-4 text-center text-muted">
+                            <i class="fas fa-file-excel fa-2x mb-2 opacity-25"></i>
+                            <p class="small mb-0">Sin evidencia adjunta</p>
+                        </div>
+                    {% endif %}
 
                 </div>
             </div>
 
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-clock me-2 text-secondary"></i>Tiempos Registrados</h6>
+                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-clock me-2 text-secondary"></i>Tiempos</h6>
                 </div>
                 <div class="card-body">
                     <ul class="list-unstyled mb-0 small">
-                        <li class="mb-2 d-flex justify-content-between align-items-center">
-                            <span class="text-muted">Inicio Carga:</span>
-                            <span class="fw-bold font-monospace">{{ remision.inicia_ld|date:"d/m/Y H:i"|default:"--" }}</span>
-                        </li>
-                        <li class="mb-2 d-flex justify-content-between align-items-center">
-                            <span class="text-muted">Fin Carga:</span>
-                            <span class="fw-bold font-monospace">{{ remision.termina_ld|date:"d/m/Y H:i"|default:"--" }}</span>
-                        </li>
-                        <li class="border-top my-2"></li>
-                        <li class="mb-2 d-flex justify-content-between align-items-center">
-                            <span class="text-muted">Inicio Descarga:</span>
-                            <span class="fw-bold font-monospace">{{ remision.inicia_dlv|date:"d/m/Y H:i"|default:"--" }}</span>
-                        </li>
-                        <li class="d-flex justify-content-between align-items-center">
-                            <span class="text-muted">Fin Descarga:</span>
-                            <span class="fw-bold font-monospace">{{ remision.termina_dlv|date:"d/m/Y H:i"|default:"--" }}</span>
-                        </li>
+                        <li class="mb-2 d-flex justify-content-between"><span>Carga:</span> <strong>{{ remision.inicia_ld|default:"--" }}</strong></li>
+                        <li class="d-flex justify-content-between"><span>Descarga:</span> <strong>{{ remision.inicia_dlv|default:"--" }}</strong></li>
                     </ul>
                 </div>
             </div>
@@ -254,35 +109,46 @@
     </div>
 </div>
 
-<div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
+<div class="modal fade" id="universalModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
     <div class="modal-content border-0 shadow-lg">
-      <div class="modal-header border-0 pb-0">
-        <h5 class="modal-title fw-bold" id="imageModalLabel">Evidencia</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      <div class="modal-header bg-dark text-white py-2">
+        <h5 class="modal-title fs-6">Vista Previa</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body text-center p-4">
-        <img src="" id="modalImage" class="img-fluid rounded shadow-sm" alt="Evidencia en detalle">
+      <div class="modal-body p-0 bg-light" style="height: 85vh;">
+        <div id="modal-content-area" class="w-100 h-100 d-flex justify-content-center align-items-center">
+            </div>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        var imageModal = document.getElementById('imageModal');
-        imageModal.addEventListener('show.bs.modal', function (event) {
-            var button = event.relatedTarget;
-            var imgSrc = button.getAttribute('data-bs-img-src');
-            var title = button.getAttribute('data-bs-title');
-            
-            var modalTitle = imageModal.querySelector('.modal-title');
-            var modalImage = imageModal.querySelector('#modalImage');
-            
-            modalTitle.textContent = title;
-            modalImage.src = imgSrc;
-        });
-    });
+    // Misma función JS que en el formulario
+    function openPreviewModal(src, type) {
+        const container = document.getElementById('modal-content-area');
+        container.innerHTML = ''; 
+        
+        if (type === 'pdf') {
+            const iframe = document.createElement('iframe');
+            iframe.src = src;
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none';
+            container.appendChild(iframe);
+        } else {
+            const img = document.createElement('img');
+            img.src = src;
+            img.style.maxWidth = '100%';
+            img.style.maxHeight = '100%';
+            img.style.objectFit = 'contain';
+            container.appendChild(img);
+        }
+        
+        const myModal = new bootstrap.Modal(document.getElementById('universalModal'));
+        myModal.show();
+    }
 </script>
 
 {% endblock %}
