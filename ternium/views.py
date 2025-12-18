@@ -2698,7 +2698,6 @@ def cancelar_remision(request, pk):
     """
     remision = get_object_or_404(Remision, pk=pk)
     
-    # Validaciones de seguridad
     if remision.status == 'AUDITADO':
         messages.error(request, 'No se puede cancelar una remisión que ya fue auditada.')
         return redirect('remision_lista')
@@ -2709,28 +2708,21 @@ def cancelar_remision(request, pk):
 
     try:
         with transaction.atomic():
-            # 1. Revertir el inventario (Devolver el material al origen/destino)
-            # Esto es crucial para que los stocks cuadren.
             _update_inventory_from_remision(remision, revert=True)
-            
-            # 2. Cambiar estatus
             remision.status = 'CANCELADO'
-            
-            # 3. Opcional: Agregar nota automática en descripción
             usuario = request.user.username
             fecha = timezone.now().strftime("%d/%m/%Y %H:%M")
             remision.descripcion += f" [CANCELADA por {usuario} el {fecha}]"
-            
             remision.save()
             
-        messages.success(request, f'La remisión {remision.remision} ha sido CANCELADA y el inventario revertido.')
-        
+        messages.success(request, f'La remisión {remision.remision} ha sido CANCELADA.')
     except Exception as e:
         messages.error(request, f'Error al cancelar: {e}')
         
     return redirect('remision_lista')
 
-@xframe_options_exempt  # <--- AGREGA ESTA LÍNEA AQUÍ
+# --- ESTA ES LA PARTE QUE CAUSA EL ERROR ---
+@xframe_options_exempt  
 @login_required
 def detalle_remision(request, pk):
     remision = get_object_or_404(Remision, pk=pk)
