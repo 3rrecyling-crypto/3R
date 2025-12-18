@@ -5,7 +5,6 @@ import os
 import zipfile
 import datetime
 from django.db import IntegrityError # <--- AGREGAR ESTO AL INICIO DE views.py
-from django.forms import ClearableFileInput
 import decimal
 from django.db.models import Count, Sum, F, Avg, Q, FloatField, Case, When, Value
 from django.db.models.functions import TruncMonth, Coalesce # <-- AGREGAR ESTA LÍNEA
@@ -667,7 +666,6 @@ def crear_remision(request):
             except (Empresa.DoesNotExist, ValueError):
                 pass
         
-        # MODIFICADO: Pasamos user=request.user
         form = RemisionForm(request.POST, request.FILES, empresa=empresa_seleccionada, user=request.user)
         
         material_qs = Material.objects.filter(empresas=empresa_seleccionada) if empresa_seleccionada else Material.objects.none()
@@ -680,74 +678,59 @@ def crear_remision(request):
         )
 
         if form.is_valid() and formset.is_valid():
-            max_intentos = 5
-            guardado_exitoso = False
-            intento_actual = 0
-            
-            while intento_actual < max_intentos and not guardado_exitoso:
-                try:
-                    with transaction.atomic(): 
-                        remision = form.save(commit=False)
-                        
-                        # Validación extra de seguridad: Verificar si la empresa seleccionada es válida para el usuario
-                        if not request.user.is_superuser and remision.empresa:
-                            perfil = getattr(request.user, 'ternium_profile', None)
-                            if not perfil or not perfil.empresas_autorizadas.filter(pk=remision.empresa.pk).exists():
-                                raise PermissionDenied("No tienes permiso para crear remisiones en esta empresa.")
-
-                        if not empresa_seleccionada or not empresa_seleccionada.prefijo:
-                            if not remision.remision:
-                                raise ValidationError("La empresa no tiene prefijo y no se ingresó folio manual.")
-                        else:
-                            remision.remision = calcular_siguiente_folio(empresa_seleccionada.prefijo)
-
-                        remision.save() 
-                        formset.instance = remision
-                        formset.save()
-                        remision.save() # Guardado final
-                        
-                        _update_inventory_from_remision(remision, revert=False)
-                        
-                        guardado_exitoso = True
-                        messages.success(request, f'Remisión {remision.remision} creada exitosamente.')
-                        return redirect('remision_lista')
-                
-                except IntegrityError:
-                    intento_actual += 1
-                    if intento_actual >= max_intentos:
-                        messages.error(request, 'El sistema está recibiendo demasiadas solicitudes simultáneas. Por favor intente de nuevo.')
-                except PermissionDenied as e:
-                    messages.error(request, str(e))
-                    break
-                except Exception as e:
-                    messages.error(request, f'Ocurrió un error al guardar: {e}')
-                    break 
+            try:
+                with transaction.atomic(): 
+                    remision = form.save(commit=False)
                     
+                    # Seguridad y Folio
+                    if not request.user.is_superuser and remision.empresa:
+                        perfil = getattr(request.user, 'ternium_profile', None)
+                        if not perfil or not perfil.empresas_autorizadas.filter(pk=remision.empresa.pk).exists():
+                            raise PermissionDenied("No tienes permiso para esta empresa.")
+
+                    if empresa_seleccionada and empresa_seleccionada.prefijo:
+                        remision.remision = calcular_siguiente_folio(empresa_seleccionada.prefijo)
+                    
+                    remision.save() 
+                    formset.instance = remision
+                    formset.save()
+
+                    # === NUEVA LÓGICA: PROCESAR ARCHIVOS MÚLTIPLES ===
+                    archivos = request.FILES.getlist('archivos_evidencia')
+                    for f in archivos:
+                        # Generamos la ruta en S3: remisiones/FOLIO/nombre_archivo
+                        s3_path = f"remisiones/{remision.remision}/{f.name}"
+                        ruta_s3 = _subir_archivo_a_s3(f, s3_path)
+                        if ruta_s3:
+                            # Guardamos en el modelo de evidencias
+                            from .models import EvidenciaRemision
+                            EvidenciaRemision.objects.create(remision=remision, archivo=ruta_s3)
+
+                    _update_inventory_from_remision(remision, revert=False)
+                    messages.success(request, f'Remisión {remision.remision} creada exitosamente.')
+                    return redirect('remision_lista')
+                
+            except Exception as e:
+                messages.error(request, f'Error al guardar: {e}')
     else:
-        # MODIFICADO: Pasamos user=request.user
         form = RemisionForm(user=request.user)
         formset = DetalleFormSet(
             prefix='detalles', 
             form_kwargs={'material_queryset': Material.objects.none(), 'lugar_queryset': Lugar.objects.none()}
         )
 
-    context = {
-        'form': form, 
-        'formset': formset, 
-        'titulo': 'Nueva Remisión',
-        'is_editing': False
-    }
+    context = {'form': form, 'formset': formset, 'titulo': 'Nueva Remisión', 'is_editing': False}
     return render(request, 'ternium/remision_formulario.html', context)
 
-@login_required
+@@login_required
 def editar_remision(request, pk):
     remision_original = get_object_or_404(Remision, pk=pk)
     
-    # 1. SEGURIDAD: Verificar si el usuario tiene permiso sobre la empresa de esta remisión
+    # Seguridad
     if not request.user.is_superuser:
         perfil = getattr(request.user, 'ternium_profile', None)
         if not perfil or not perfil.empresas_autorizadas.filter(pk=remision_original.empresa.pk).exists():
-             messages.error(request, "No tienes permiso para acceder o editar remisiones de esta empresa.")
+             messages.error(request, "Acceso denegado.")
              return redirect('remision_lista')
 
     if remision_original.status == 'AUDITADO':
@@ -761,70 +744,51 @@ def editar_remision(request, pk):
     empresa_para_form = remision_original.empresa
 
     if request.method == 'POST':
-        # MODIFICADO: Pasamos user=request.user
         form = RemisionForm(request.POST, request.FILES, instance=remision_original, empresa=empresa_para_form, user=request.user)
         
-        material_qs = Material.objects.filter(empresas=empresa_para_form) if empresa_para_form else Material.objects.none()
-        lugar_qs = Lugar.objects.filter(empresas=empresa_para_form, tipo__in=['DESTINO', 'AMBOS']) if empresa_para_form else Lugar.objects.none()
+        material_qs = Material.objects.filter(empresas=empresa_para_form)
+        lugar_qs = Lugar.objects.filter(empresas=empresa_para_form, tipo__in=['DESTINO', 'AMBOS'])
 
         formset = DetalleFormSet(
-            request.POST, 
-            instance=remision_original, 
-            prefix='detalles', 
+            request.POST, instance=remision_original, prefix='detalles',
             form_kwargs={'material_queryset': material_qs, 'lugar_queryset': lugar_qs}
         )
         
         if form.is_valid() and formset.is_valid():
             try:
                 with transaction.atomic():
+                    # Revertir inventario para recalcular
                     _update_inventory_from_remision(remision_original, revert=True)
                     
-                    remision = form.save(commit=False)
-                    remision_num = remision_original.remision 
-
-                    if 'evidencia_carga' in request.FILES:
-                        _eliminar_archivo_de_s3(remision_original.evidencia_carga.name if remision_original.evidencia_carga else None)
-                        archivo = request.FILES['evidencia_carga']
-                        s3_path = f"remisiones/{remision_num}/carga_{archivo.name}"
-                        remision.evidencia_carga = _subir_archivo_a_s3(archivo, s3_path)
-                    
-                    if 'evidencia_descarga' in request.FILES:
-                        _eliminar_archivo_de_s3(remision_original.evidencia_descarga.name if remision_original.evidencia_descarga else None)
-                        archivo = request.FILES['evidencia_descarga']
-                        s3_path = f"remisiones/{remision_num}/descarga_{archivo.name}"
-                        remision.evidencia_descarga = _subir_archivo_a_s3(archivo, s3_path)
-
-                    remision.save()
-                    form.save_m2m()
+                    remision = form.save()
                     formset.save()
                     
+                    # === PROCESAR NUEVOS ARCHIVOS ===
+                    archivos = request.FILES.getlist('archivos_evidencia')
+                    for f in archivos:
+                        s3_path = f"remisiones/{remision.remision}/{f.name}"
+                        ruta_s3 = _subir_archivo_a_s3(f, s3_path)
+                        if ruta_s3:
+                            from .models import EvidenciaRemision
+                            EvidenciaRemision.objects.create(remision=remision, archivo=ruta_s3)
+
                     _update_inventory_from_remision(remision, revert=False)
-                    messages.success(request, 'Remisión actualizada y el inventario ha sido ajustado.')
+                    messages.success(request, 'Remisión actualizada correctamente.')
                     return redirect('detalle_remision', pk=remision.pk)
-            except ValidationError as e:
-                form.add_error(None, e)
-                messages.error(request, f'Error de validación: {e.message}')
+            except Exception as e:
+                messages.error(request, f'Error: {e}')
     else:
-        # MODIFICADO: Pasamos user=request.user
+        # Lógica GET igual...
         form = RemisionForm(instance=remision_original, empresa=empresa_para_form, user=request.user)
-        material_qs = Material.objects.filter(empresas=empresa_para_form) if empresa_para_form else Material.objects.none()
-        lugar_qs = Lugar.objects.filter(empresas=empresa_para_form, tipo__in=['DESTINO', 'AMBOS']) if empresa_para_form else Lugar.objects.none()
-        
+        material_qs = Material.objects.filter(empresas=empresa_para_form)
+        lugar_qs = Lugar.objects.filter(empresas=empresa_para_form, tipo__in=['DESTINO', 'AMBOS'])
         formset = DetalleFormSet(
-            instance=remision_original, 
-            prefix='detalles', 
+            instance=remision_original, prefix='detalles',
             form_kwargs={'material_queryset': material_qs, 'lugar_queryset': lugar_qs}
         )
 
-    context = {
-        'form': form,
-        'formset': formset,
-        'remision': remision_original,
-        'titulo': f'Editar Remisión {remision_original.remision}',
-        'is_editing': True 
-    }
+    context = {'form': form, 'formset': formset, 'remision': remision_original, 'is_editing': True}
     return render(request, 'ternium/remision_formulario.html', context)
-
     
 @login_required
 def detalle_remision(request, pk):
