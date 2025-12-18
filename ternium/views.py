@@ -691,20 +691,20 @@ def crear_remision(request):
                     if empresa_seleccionada and empresa_seleccionada.prefijo:
                         remision.remision = calcular_siguiente_folio(empresa_seleccionada.prefijo)
                     
+                    # === LÓGICA DE ARCHIVO ÚNICO A S3 ===
+                    if 'evidencia_documento' in request.FILES:
+                        archivo = request.FILES['evidencia_documento']
+                        # Definir ruta: remisiones/FOLIO/evidencia_NOMBRE
+                        s3_path = f"remisiones/{remision.remision}/evidencia_{archivo.name}"
+                        
+                        ruta_s3 = _subir_archivo_a_s3(archivo, s3_path)
+                        if ruta_s3:
+                            remision.evidencia_documento = ruta_s3
+                    # ====================================
+
                     remision.save() 
                     formset.instance = remision
                     formset.save()
-
-                    # === NUEVA LÓGICA: PROCESAR ARCHIVOS MÚLTIPLES ===
-                    archivos = request.FILES.getlist('archivos_evidencia')
-                    for f in archivos:
-                        # Generamos la ruta en S3: remisiones/FOLIO/nombre_archivo
-                        s3_path = f"remisiones/{remision.remision}/{f.name}"
-                        ruta_s3 = _subir_archivo_a_s3(f, s3_path)
-                        if ruta_s3:
-                            # Guardamos en el modelo de evidencias
-                            from .models import EvidenciaRemision
-                            EvidenciaRemision.objects.create(remision=remision, archivo=ruta_s3)
 
                     _update_inventory_from_remision(remision, revert=False)
                     messages.success(request, f'Remisión {remision.remision} creada exitosamente.')
@@ -757,28 +757,36 @@ def editar_remision(request, pk):
         if form.is_valid() and formset.is_valid():
             try:
                 with transaction.atomic():
-                    # Revertir inventario para recalcular
+                    # 1. Revertir inventario
                     _update_inventory_from_remision(remision_original, revert=True)
                     
-                    remision = form.save()
+                    remision = form.save(commit=False)
+                    
+                    # === LÓGICA DE REEMPLAZO DE ARCHIVO ÚNICO ===
+                    if 'evidencia_documento' in request.FILES:
+                        # a) Borrar archivo anterior de S3 si existe
+                        if remision_original.evidencia_documento and hasattr(remision_original.evidencia_documento, 'name'):
+                            _eliminar_archivo_de_s3(remision_original.evidencia_documento.name)
+                        
+                        # b) Subir nuevo archivo
+                        archivo = request.FILES['evidencia_documento']
+                        s3_path = f"remisiones/{remision.remision}/evidencia_{archivo.name}"
+                        ruta_s3 = _subir_archivo_a_s3(archivo, s3_path)
+                        
+                        if ruta_s3:
+                            remision.evidencia_documento = ruta_s3
+                    # ============================================
+
+                    remision.save()
                     formset.save()
                     
-                    # === PROCESAR NUEVOS ARCHIVOS ===
-                    archivos = request.FILES.getlist('archivos_evidencia')
-                    for f in archivos:
-                        s3_path = f"remisiones/{remision.remision}/{f.name}"
-                        ruta_s3 = _subir_archivo_a_s3(f, s3_path)
-                        if ruta_s3:
-                            from .models import EvidenciaRemision
-                            EvidenciaRemision.objects.create(remision=remision, archivo=ruta_s3)
-
+                    # 2. Actualizar inventario
                     _update_inventory_from_remision(remision, revert=False)
                     messages.success(request, 'Remisión actualizada correctamente.')
                     return redirect('detalle_remision', pk=remision.pk)
             except Exception as e:
                 messages.error(request, f'Error: {e}')
     else:
-        # Lógica GET igual...
         form = RemisionForm(instance=remision_original, empresa=empresa_para_form, user=request.user)
         material_qs = Material.objects.filter(empresas=empresa_para_form)
         lugar_qs = Lugar.objects.filter(empresas=empresa_para_form, tipo__in=['DESTINO', 'AMBOS'])
@@ -789,11 +797,6 @@ def editar_remision(request, pk):
 
     context = {'form': form, 'formset': formset, 'remision': remision_original, 'is_editing': True}
     return render(request, 'ternium/remision_formulario.html', context)
-    
-@login_required
-def detalle_remision(request, pk):
-    remision = get_object_or_404(Remision.objects.select_related('empresa', 'linea_transporte', 'operador', 'unidad', 'contenedor', 'origen', 'destino', 'auditado_por').prefetch_related('detalles__material'), pk=pk)
-    return render(request, 'ternium/remision_detalle.html', {'remision': remision})
 
 
 @login_required

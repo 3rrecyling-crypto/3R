@@ -155,24 +155,14 @@ class LugarForm(forms.ModelForm):
 
 
 class RemisionForm(forms.ModelForm):
-    # Campo personalizado para subir múltiples archivos
-    # Usamos MultipleFileInput en lugar de ClearableFileInput directo
-    archivos_evidencia = forms.FileField(
-        required=False,
-        widget=MultipleFileInput(attrs={
-            'class': 'form-control',
-            'multiple': True,  # Permite seleccionar varios archivos
-            'accept': 'image/*,application/pdf'
-        }),
-        label="Evidencias (Fotos, PDF, Imágenes)"
-    )
-
     class Meta:
         model = Remision
         exclude = [
             'status', 'auditado_por', 'auditado_en', 
-            'evidencia_carga', 'evidencia_descarga', 
-            'creado_en', 'actualizado_en'
+            'evidencia_carga', 'evidencia_descarga', # Campos obsoletos
+            'creado_en', 'actualizado_en',
+            # Excluimos archivos_evidencia si aún existe en el modelo para no causar conflicto
+            'archivos_evidencia' 
         ]
         
         widgets = {
@@ -198,6 +188,12 @@ class RemisionForm(forms.ModelForm):
             'folio_dlv': forms.TextInput(attrs={'class': 'form-control'}),
             
             'comentario': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+
+            # --- NUEVO WIDGET: Input simple para un solo archivo ---
+            'evidencia_documento': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': 'image/*,application/pdf'
+            }),
         }
 
     def __init__(self, *args, **kwargs):
@@ -205,16 +201,16 @@ class RemisionForm(forms.ModelForm):
         empresa = kwargs.pop('empresa', None)
         super().__init__(*args, **kwargs)
 
-        # A) Campos OBLIGATORIOS
+        # Campos Obligatorios
         self.fields['origen'].required = True
         self.fields['destino'].required = True
 
-        # B) Campos OPCIONALES
+        # Campos Opcionales
         campos_opcionales = [
             'folio_ld', 'folio_dlv', 'linea_transporte', 'operador', 
             'unidad', 'contenedor', 'cliente', 'inicia_ld', 'termina_ld', 
             'inicia_dlv', 'termina_dlv',
-            'comentario', 'descripcion'
+            'comentario', 'descripcion', 'evidencia_documento'
         ]
         
         for campo in campos_opcionales:
@@ -230,6 +226,7 @@ class RemisionForm(forms.ModelForm):
                 self.fields['empresa'].queryset = Empresa.objects.none()
 
         if empresa:
+            # Validar si el usuario tiene acceso a esa empresa (si viene pre-seleccionada)
             if self.user and not self.user.is_superuser:
                 if not self.fields['empresa'].queryset.filter(pk=empresa.pk).exists():
                     empresa = None
