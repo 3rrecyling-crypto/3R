@@ -722,7 +722,7 @@ def crear_remision(request):
     context = {'form': form, 'formset': formset, 'titulo': 'Nueva Remisión', 'is_editing': False}
     return render(request, 'ternium/remision_formulario.html', context)
 
-@@login_required
+@login_required
 def editar_remision(request, pk):
     remision_original = get_object_or_404(Remision, pk=pk)
     
