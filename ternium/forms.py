@@ -155,13 +155,22 @@ class LugarForm(forms.ModelForm):
 
 
 class RemisionForm(forms.ModelForm):
+    # Definimos el campo explícitamente para asegurar que se renderice
+    evidencia_documento = forms.FileField(
+        required=False,
+        label="Evidencia (PDF o Foto)",
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': 'image/*,application/pdf'
+        })
+    )
+
     class Meta:
         model = Remision
         exclude = [
             'status', 'auditado_por', 'auditado_en', 
-            'evidencia_carga', 'evidencia_descarga', # Campos obsoletos
+            'evidencia_carga', 'evidencia_descarga', 
             'creado_en', 'actualizado_en',
-            # Excluimos archivos_evidencia si aún existe en el modelo para no causar conflicto
             'archivos_evidencia' 
         ]
         
@@ -188,12 +197,6 @@ class RemisionForm(forms.ModelForm):
             'folio_dlv': forms.TextInput(attrs={'class': 'form-control'}),
             
             'comentario': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-
-            # --- NUEVO WIDGET: Input simple para un solo archivo ---
-            'evidencia_documento': forms.FileInput(attrs={
-                'class': 'form-control',
-                'accept': 'image/*,application/pdf'
-            }),
         }
 
     def __init__(self, *args, **kwargs):
@@ -226,7 +229,6 @@ class RemisionForm(forms.ModelForm):
                 self.fields['empresa'].queryset = Empresa.objects.none()
 
         if empresa:
-            # Validar si el usuario tiene acceso a esa empresa (si viene pre-seleccionada)
             if self.user and not self.user.is_superuser:
                 if not self.fields['empresa'].queryset.filter(pk=empresa.pk).exists():
                     empresa = None
@@ -249,10 +251,6 @@ class RemisionForm(forms.ModelForm):
         if self.instance and self.instance.pk and self.instance.status == 'AUDITADO':
             for field in self.fields:
                 self.fields[field].disabled = True
-    
-    def clean(self):
-        cleaned_data = super().clean()
-        return cleaned_data
 
 class DetalleRemisionForm(forms.ModelForm):
     class Meta:

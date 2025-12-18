@@ -691,7 +691,7 @@ def crear_remision(request):
                     if empresa_seleccionada and empresa_seleccionada.prefijo:
                         remision.remision = calcular_siguiente_folio(empresa_seleccionada.prefijo)
                     
-                    # === LÓGICA DE ARCHIVO ÚNICO A S3 ===
+                    # === GUARDAR ARCHIVO ÚNICO ===
                     if 'evidencia_documento' in request.FILES:
                         archivo = request.FILES['evidencia_documento']
                         # Definir ruta: remisiones/FOLIO/evidencia_NOMBRE
@@ -700,7 +700,7 @@ def crear_remision(request):
                         ruta_s3 = _subir_archivo_a_s3(archivo, s3_path)
                         if ruta_s3:
                             remision.evidencia_documento = ruta_s3
-                    # ====================================
+                    # =============================
 
                     remision.save() 
                     formset.instance = remision
@@ -762,7 +762,7 @@ def editar_remision(request, pk):
                     
                     remision = form.save(commit=False)
                     
-                    # === LÓGICA DE REEMPLAZO DE ARCHIVO ÚNICO ===
+                    # === ACTUALIZAR ARCHIVO ÚNICO ===
                     if 'evidencia_documento' in request.FILES:
                         # a) Borrar archivo anterior de S3 si existe
                         if remision_original.evidencia_documento and hasattr(remision_original.evidencia_documento, 'name'):
@@ -775,7 +775,7 @@ def editar_remision(request, pk):
                         
                         if ruta_s3:
                             remision.evidencia_documento = ruta_s3
-                    # ============================================
+                    # ================================
 
                     remision.save()
                     formset.save()
@@ -797,7 +797,6 @@ def editar_remision(request, pk):
 
     context = {'form': form, 'formset': formset, 'remision': remision_original, 'is_editing': True}
     return render(request, 'ternium/remision_formulario.html', context)
-
 
 @login_required
 @require_POST

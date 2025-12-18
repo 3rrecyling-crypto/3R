@@ -479,9 +479,15 @@ class Remision(models.Model):
     termina_dlv = models.DateTimeField(verbose_name="Termina Descarga", null=True, blank=True)
     folio_dlv = models.CharField(max_length=50, verbose_name="Folio Descarga", blank=True)
     
-    # Evidencias (Fotos)
-    #evidencia_carga = models.FileField(upload_to='remisiones/cargas/', blank=True, null=True)
-    #evidencia_descarga = models.FileField(upload_to='remisiones/descargas/', blank=True, null=True)
+    # --- CAMPO NUEVO PARA EL ARCHIVO ---
+    # Usamos FileField. Aunque subamos a S3 manual, esto ayuda al formulario a renderizar el input.
+    evidencia_documento = models.FileField(
+        upload_to='remisiones/evidencias/', # Django requiere un path por defecto
+        verbose_name="Evidencia (PDF o Foto)",
+        blank=True, 
+        null=True
+    )
+    # -----------------------------------
 
     comentario = models.TextField(verbose_name="Comentario Adicional", blank=True)
     
@@ -500,16 +506,11 @@ class Remision(models.Model):
     def total_peso_dlv(self):
         return self.detalles.aggregate(total=Sum('peso_dlv'))['total'] or 0
 
-    # --- AQUÍ AGREGUÉ LA PROPIEDAD FALTANTE ---
     @property
     def diff(self):
         return self.total_peso_ld - self.total_peso_dlv
-    # ------------------------------------------
 
     def save(self, *args, **kwargs):
-        """
-        Método SAVE sobrescrito para calcular estatus automáticamente.
-        """
         # 1. BLOQUEO DE EDICIÓN SI YA ESTÁ AUDITADO
         if self.pk:
             try:
@@ -520,31 +521,20 @@ class Remision(models.Model):
                 pass
 
         # 2. LÓGICA DE ESTATUS AUTOMÁTICO
-        # Solo recalculamos si NO es Auditado y NO es Cancelado
         if self.status != 'AUDITADO' and self.status != 'CANCELADO':
-            
-            # --- REGLA A: DESTINO "PTE" ---
             nombre_destino = ""
             if self.destino:
                 nombre_destino = self.destino.nombre.upper()
             
             if 'PTE' in nombre_destino:
                 self.status = 'PENDIENTE'
-            
             else:
-                # --- REGLA B: CAMPOS COMPLETOS (IGNORANDO FOTOS) ---
-                
-                # Función auxiliar para saber si un campo tiene texto válido
                 def tiene_texto(campo):
                     return campo is not None and str(campo).strip() != ""
 
-                # Validamos Carga: Debe tener Fecha Inicio y Folio
                 carga_ok = (self.inicia_ld is not None) and tiene_texto(self.folio_ld)
-                
-                # Validamos Descarga: Debe tener Fecha Inicio y Folio
                 descarga_ok = (self.inicia_dlv is not None) and tiene_texto(self.folio_dlv)
 
-                # Si tiene ambas partes completas -> TERMINADO
                 if carga_ok and descarga_ok:
                     self.status = 'TERMINADO'
                 else:
@@ -945,12 +935,4 @@ def save_user_profile(sender, instance, **kwargs):
     if hasattr(instance, 'ternium_profile'):
         instance.ternium_profile.save()
         
-        
-
-class EvidenciaRemision(models.Model):
-    remision = models.ForeignKey(Remision, on_delete=models.CASCADE, related_name='evidencias')
-    archivo = models.FileField(upload_to='remisiones/evidencias/')
-    creado_en = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Evidencia de {self.remision}"
+    
