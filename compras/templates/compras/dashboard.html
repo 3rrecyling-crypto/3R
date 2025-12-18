@@ -5,242 +5,406 @@
 {% block title %}Dashboard de Compras{% endblock %}
 
 {% block compras_content %}
+<style>
+    /* Estilos específicos para inyectar color y consistencia con base.html */
+    
+    /* Gradientes para KPIs */
+    .bg-gradient-primary-custom {
+        background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+    }
+    .bg-gradient-warning-custom {
+        background: linear-gradient(135deg, #fbbc05 0%, #f57c00 100%);
+    }
+    .bg-gradient-danger-custom {
+        background: linear-gradient(135deg, #ea4335 0%, #b71c1c 100%);
+    }
+    .bg-gradient-success-custom {
+        background: linear-gradient(135deg, #34a853 0%, #1b5e20 100%);
+    }
+    .bg-gradient-info-custom {
+        background: linear-gradient(135deg, #0dcaf0 0%, #0891b2 100%);
+    }
+
+    /* Tarjetas KPI */
+    .card-kpi {
+        border: none;
+        color: white;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        overflow: hidden;
+        position: relative;
+    }
+    .card-kpi:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.2) !important;
+    }
+    .card-kpi .icon-bg {
+        position: absolute;
+        right: -10px;
+        bottom: -10px;
+        font-size: 5rem;
+        opacity: 0.2;
+        transform: rotate(-15deg);
+    }
+
+    /* Accesos Directos */
+    .shortcut-card {
+        border: none;
+        transition: all 0.2s ease-in-out;
+        border-top: 4px solid transparent;
+    }
+    .shortcut-card:hover {
+        transform: translateY(-3px);
+        background-color: #fff;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    /* Colores de borde superior para shortcuts */
+    .border-top-blue { border-top-color: #1a73e8; }
+    .border-top-green { border-top-color: #34a853; }
+    .border-top-amber { border-top-color: #fbbc05; }
+    .border-top-purple { border-top-color: #6f42c1; }
+
+    /* Pestañas */
+    .nav-pills .nav-link.active {
+        background-color: #1a73e8; /* Tu primary-color */
+    }
+    .nav-pills .nav-link {
+        color: #5f6368;
+        font-weight: 500;
+    }
+    
+    /* Utilidades de texto */
+    .text-primary-custom { color: #1a73e8; }
+    .fs-7 { font-size: 0.9rem; }
+</style>
+
 <div class="container-fluid px-4 py-4">
     
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-5">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4">
         <div>
             <h2 class="fw-bold text-dark mb-1">
-                <i class="fas fa-chart-line me-2 text-primary"></i>Panel de Control
+                <i class="fas fa-chart-pie me-2 text-primary-custom"></i>Tablero de Control
             </h2>
-            <p class="text-muted mb-0">Visión general del estado de compras y operaciones.</p>
+            <p class="text-muted mb-0">Gestión estratégica de compras y suministros.</p>
         </div>
-        <div class="d-flex gap-2 mt-3 mt-md-0">
-            <a href="{% url 'reporte_compras_excel' %}" class="btn btn-success text-white shadow-sm">
-                <i class="fas fa-file-excel me-2"></i>Reporte Excel
-            </a>
-            <a href="{% url 'crear_solicitud' %}" class="btn btn-primary shadow-sm">
-                <i class="fas fa-plus me-2"></i>Nueva Solicitud
-            </a>
+        <div class="mt-3 mt-md-0">
+            <span class="badge bg-white text-dark border shadow-sm px-3 py-2 fs-7 rounded-pill">
+                <i class="far fa-clock me-2 text-primary-custom"></i>{% now "l, d F Y" %}
+            </span>
         </div>
     </div>
 
-    <div class="row g-4 mb-5">
+    <div class="row g-3 mb-4">
         <div class="col-xl-3 col-md-6">
-            <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning">
+            <div class="card card-kpi bg-gradient-warning-custom shadow h-100">
                 <div class="card-body">
-                    <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex justify-content-between align-items-center position-relative z-1">
                         <div>
-                            <p class="text-uppercase text-muted fw-bold mb-1 fs-7">Por Aprobar</p>
-                            <h3 class="fw-bold text-dark mb-0">{{ kpis.pendientes }}</h3>
+                            <h6 class="text-uppercase mb-1 opacity-75 fw-bold">Por Aprobar</h6>
+                            <h2 class="fw-bold mb-0 display-6">{{ kpis.pendientes }}</h2>
+                            <small class="opacity-75">Solicitudes nuevas</small>
                         </div>
-                        <div class="rounded-circle bg-warning bg-opacity-10 p-3 text-warning">
-                            <i class="fas fa-clock fa-2x"></i>
+                        <div class="p-2 bg-white bg-opacity-25 rounded-circle">
+                            <i class="fas fa-hourglass-half fa-2x"></i>
                         </div>
                     </div>
-                    <div class="mt-3">
-                        <small class="text-muted">Solicitudes esperando revisión</small>
-                    </div>
+                    <i class="fas fa-clipboard-check icon-bg"></i>
                 </div>
             </div>
         </div>
 
         <div class="col-xl-3 col-md-6">
-            <div class="card border-0 shadow-sm h-100 border-start border-4 border-danger">
+            <div class="card card-kpi bg-gradient-danger-custom shadow h-100">
                 <div class="card-body">
-                    <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex justify-content-between align-items-center position-relative z-1">
                         <div>
-                            <p class="text-uppercase text-danger fw-bold mb-1 fs-7">Atención Urgente</p>
-                            <h3 class="fw-bold text-dark mb-0">{{ kpis.urgentes }}</h3>
+                            <h6 class="text-uppercase mb-1 opacity-75 fw-bold">Prioridad Alta</h6>
+                            <h2 class="fw-bold mb-0 display-6">{{ kpis.urgentes }}</h2>
+                            <small class="opacity-75">Solicitudes Urgentes</small>
                         </div>
-                        <div class="rounded-circle bg-danger bg-opacity-10 p-3 text-danger">
-                            <i class="fas fa-exclamation-triangle fa-2x"></i>
+                        <div class="p-2 bg-white bg-opacity-25 rounded-circle">
+                            <i class="fas fa-fire fa-2x"></i>
                         </div>
                     </div>
-                    <div class="mt-3">
-                        <small class="text-danger fw-semibold">Prioridad Alta</small>
-                    </div>
+                    <i class="fas fa-exclamation-triangle icon-bg"></i>
                 </div>
             </div>
         </div>
 
         <div class="col-xl-3 col-md-6">
-            <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary">
+            <div class="card card-kpi bg-gradient-primary-custom shadow h-100">
                 <div class="card-body">
-                    <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex justify-content-between align-items-center position-relative z-1">
                         <div>
-                            <p class="text-uppercase text-primary fw-bold mb-1 fs-7">Órdenes Activas</p>
-                            <h3 class="fw-bold text-dark mb-0">{{ kpis.ordenes_activas }}</h3>
+                            <h6 class="text-uppercase mb-1 opacity-75 fw-bold">En Proceso</h6>
+                            <h2 class="fw-bold mb-0 display-6">{{ kpis.ordenes_activas }}</h2>
+                            <small class="opacity-75">Órdenes abiertas</small>
                         </div>
-                        <div class="rounded-circle bg-primary bg-opacity-10 p-3 text-primary">
+                        <div class="p-2 bg-white bg-opacity-25 rounded-circle">
                             <i class="fas fa-shipping-fast fa-2x"></i>
                         </div>
                     </div>
-                    <div class="mt-3">
-                        <small class="text-muted">En proceso o auditoría</small>
-                    </div>
+                    <i class="fas fa-file-invoice-dollar icon-bg"></i>
                 </div>
             </div>
         </div>
 
         <div class="col-xl-3 col-md-6">
-            <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
+            <div class="card card-kpi bg-gradient-success-custom shadow h-100">
                 <div class="card-body">
-                    <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex justify-content-between align-items-center position-relative z-1">
                         <div>
-                            <p class="text-uppercase text-success fw-bold mb-1 fs-7">Artículos Activos</p>
-                            <h3 class="fw-bold text-dark mb-0">{{ kpis.articulos_totales }}</h3>
+                            <h6 class="text-uppercase mb-1 opacity-75 fw-bold">Catálogo</h6>
+                            <h2 class="fw-bold mb-0 display-6">{{ kpis.articulos_totales }}</h2>
+                            <small class="opacity-75">Artículos activos</small>
                         </div>
-                        <div class="rounded-circle bg-success bg-opacity-10 p-3 text-success">
+                        <div class="p-2 bg-white bg-opacity-25 rounded-circle">
                             <i class="fas fa-boxes fa-2x"></i>
                         </div>
                     </div>
-                    <div class="mt-3">
-                        <small class="text-muted">Disponibles en catálogo</small>
-                    </div>
+                    <i class="fas fa-cubes icon-bg"></i>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <h5 class="fw-bold text-dark mb-3 ps-2 border-start border-4 border-primary">Accesos Rápidos</h5>
+        <div class="row g-3">
+            
+            <div class="col-6 col-md-3 col-xl-2">
+                <a href="{% url 'crear_solicitud' %}" class="card shortcut-card border-top-blue shadow-sm h-100 text-decoration-none">
+                    <div class="card-body text-center py-4">
+                        <div class="mb-3 text-primary-custom bg-light rounded-circle d-inline-block p-3">
+                            <i class="fas fa-plus fa-lg"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark mb-0">Nueva Solicitud</h6>
+                    </div>
+                </a>
+            </div>
+            <div class="col-6 col-md-3 col-xl-2">
+                <a href="{% url 'lista_solicitudes' %}" class="card shortcut-card border-top-blue shadow-sm h-100 text-decoration-none">
+                    <div class="card-body text-center py-4">
+                        <div class="mb-3 text-primary-custom bg-light rounded-circle d-inline-block p-3">
+                            <i class="fas fa-list-alt fa-lg"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark mb-0">Ver Solicitudes</h6>
+                    </div>
+                </a>
+            </div>
+            <div class="col-6 col-md-3 col-xl-2">
+                <a href="{% url 'lista_ordenes_compra' %}" class="card shortcut-card border-top-blue shadow-sm h-100 text-decoration-none">
+                    <div class="card-body text-center py-4">
+                        <div class="mb-3 text-info bg-light rounded-circle d-inline-block p-3">
+                            <i class="fas fa-file-signature fa-lg"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark mb-0">Órdenes Compra</h6>
+                    </div>
+                </a>
+            </div>
+
+            <div class="col-6 col-md-3 col-xl-2">
+                <a href="{% url 'lista_proveedores' %}" class="card shortcut-card border-top-green shadow-sm h-100 text-decoration-none">
+                    <div class="card-body text-center py-4">
+                        <div class="mb-3 text-success bg-light rounded-circle d-inline-block p-3">
+                            <i class="fas fa-truck fa-lg"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark mb-0">Proveedores</h6>
+                    </div>
+                </a>
+            </div>
+            <div class="col-6 col-md-3 col-xl-2">
+                <a href="{% url 'lista_articulos' %}" class="card shortcut-card border-top-amber shadow-sm h-100 text-decoration-none">
+                    <div class="card-body text-center py-4">
+                        <div class="mb-3 text-warning bg-light rounded-circle d-inline-block p-3">
+                            <i class="fas fa-box-open fa-lg"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark mb-0">Artículos</h6>
+                    </div>
+                </a>
+            </div>
+
+            <div class="col-6 col-md-3 col-xl-2">
+                <a href="{% url 'reporte_compras_excel' %}" class="card shortcut-card border-top-purple shadow-sm h-100 text-decoration-none">
+                    <div class="card-body text-center py-4">
+                        <div class="mb-3 text-white bg-success rounded-circle d-inline-block p-3 shadow-sm">
+                            <i class="fas fa-file-excel fa-lg"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark mb-0">Reporte Excel</h6>
+                    </div>
+                </a>
+            </div>
+        </div>
+        
+        <div class="d-flex gap-4 mt-3 ps-2 align-items-center">
+            <span class="text-muted small fw-bold text-uppercase">Creación Rápida:</span>
+            <a href="{% url 'crear_proveedor' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="fas fa-plus me-1"></i> Proveedor</a>
+            <a href="{% url 'crear_articulo' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="fas fa-plus me-1"></i> Artículo</a>
+            <a href="{% url 'crear_categoria' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i class="fas fa-tags me-1"></i> Categoría</a>
         </div>
     </div>
 
     <div class="row g-4">
-        
         <div class="col-lg-8">
-            
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-bold text-dark"><i class="fas fa-clipboard-list me-2 text-secondary"></i>Solicitudes Recientes</h5>
-                    <a href="{% url 'lista_solicitudes' %}" class="btn btn-sm btn-outline-primary rounded-pill">Ver todas</a>
+            <div class="card border-0 shadow h-100">
+                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="fw-bold text-dark mb-0"><i class="fas fa-history me-2 text-muted"></i>Actividad Reciente</h6>
+                    
+                    <ul class="nav nav-pills card-header-pills" id="dashboardTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active btn-sm rounded-pill px-3" id="solicitudes-tab" data-bs-toggle="tab" data-bs-target="#solicitudes" type="button" role="tab">Solicitudes</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link btn-sm rounded-pill px-3" id="ordenes-tab" data-bs-toggle="tab" data-bs-target="#ordenes" type="button" role="tab">Órdenes</button>
+                        </li>
+                    </ul>
                 </div>
+                
                 <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="bg-light text-muted small text-uppercase">
-                                <tr>
-                                    <th class="ps-4">Folio</th>
-                                    <th>Solicitante</th>
-                                    <th>Fecha</th>
-                                    <th>Prioridad</th>
-                                    <th class="text-end pe-4">Acción</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for sol in ultimas_solicitudes %}
-                                <tr>
-                                    <td class="ps-4 fw-semibold text-primary">#{{ sol.id }}</td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="avatar-circle bg-secondary text-white me-2">
-                                                {{ sol.solicitante.username|slice:":1"|upper }}
-                                            </div>
-                                            <div>
-                                                <div class="fw-bold fs-7">{{ sol.solicitante.get_full_name|default:sol.solicitante.username }}</div>
-                                                <div class="text-muted fs-8">{{ sol.empresa.nombre }}</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="text-muted fs-7">{{ sol.creado_en|date:"d/m/Y" }}</td>
-                                    <td>
-                                        {% if sol.prioridad == 'URGENTE' %}
-                                            <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3">Urgente</span>
-                                        {% else %}
-                                            <span class="badge bg-light text-dark border rounded-pill px-3">Normal</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-end pe-4">
-                                        <a href="{% url 'editar_solicitud' sol.id %}" class="btn btn-sm btn-light text-primary" title="Revisar">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="5" class="text-center py-4 text-muted">
-                                        <i class="fas fa-check-circle mb-2"></i><br>
-                                        No hay solicitudes pendientes de aprobación.
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <div class="tab-content" id="dashboardTabsContent">
+                        
+                        <div class="tab-pane fade show active" id="solicitudes" role="tabpanel">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="bg-light text-muted small text-uppercase">
+                                        <tr>
+                                            <th class="ps-4 py-3">Folio</th>
+                                            <th class="py-3">Solicitante</th>
+                                            <th class="py-3">Fecha</th>
+                                            <th class="py-3">Prioridad</th>
+                                            <th class="text-end pe-4 py-3">Acción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for sol in ultimas_solicitudes %}
+                                        <tr>
+                                            <td class="ps-4 fw-bold text-primary-custom">
+                                                <i class="fas fa-file-alt me-2 text-muted"></i>{{ sol.folio }}
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="rounded-circle bg-secondary text-white d-flex justify-content-center align-items-center me-2 shadow-sm" style="width:32px; height:32px; font-size:0.8rem;">
+                                                        {{ sol.solicitante.username|slice:":1"|upper }}
+                                                    </div>
+                                                    <div class="lh-1">
+                                                        <div class="fw-semibold text-dark">{{ sol.solicitante.username }}</div>
+                                                        <small class="text-muted" style="font-size: 0.75rem;">{{ sol.empresa.nombre|truncatechars:15 }}</small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="text-muted">{{ sol.creado_en|date:"d M" }}</td>
+                                            <td>
+                                                {% if sol.prioridad == 'URGENTE' %}
+                                                    <span class="badge bg-danger bg-opacity-75 rounded-pill"><i class="fas fa-bolt me-1"></i>Urgente</span>
+                                                {% else %}
+                                                    <span class="badge bg-light text-dark border rounded-pill">Normal</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-end pe-4">
+                                                <a href="{% url 'editar_solicitud' sol.id %}" class="btn btn-sm btn-outline-primary rounded-circle" title="Gestionar">
+                                                    <i class="fas fa-chevron-right"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="5" class="text-center py-5 text-muted">
+                                                <img src="https://cdn-icons-png.flaticon.com/512/7486/7486744.png" width="64" class="opacity-50 mb-3" alt="Empty">
+                                                <p class="mb-0">No hay solicitudes pendientes</p>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="ordenes" role="tabpanel">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="bg-light text-muted small text-uppercase">
+                                        <tr>
+                                            <th class="ps-4 py-3">Folio OC</th>
+                                            <th class="py-3">Proveedor</th>
+                                            <th class="py-3">Emisión</th>
+                                            <th class="py-3">Estatus</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for orden in ultimas_ordenes %}
+                                        <tr>
+                                            <td class="ps-4">
+                                                <a href="{% url 'detalle_orden_compra' orden.pk %}" class="fw-bold text-dark text-decoration-none">
+                                                    {{ orden.folio }}
+                                                </a>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <i class="fas fa-building text-muted me-2"></i>
+                                                    {{ orden.proveedor.razon_social|truncatechars:20 }}
+                                                </div>
+                                            </td>
+                                            <td class="text-muted">{{ orden.fecha_emision|date:"d M, Y" }}</td>
+                                            <td>
+                                                {% if orden.estatus == 'APROBADA' %}
+                                                    <span class="badge bg-primary">Aprobada</span>
+                                                {% elif orden.estatus == 'BORRADOR' %}
+                                                    <span class="badge bg-secondary">Borrador</span>
+                                                {% elif orden.estatus == 'CANCELADA' %}
+                                                    <span class="badge bg-danger">Cancelada</span>
+                                                {% elif orden.estatus == 'LISTA_PARA_AUDITAR' %}
+                                                    <span class="badge bg-warning text-dark">Por Auditar</span>
+                                                {% else %}
+                                                    <span class="badge bg-info text-dark">{{ orden.get_estatus_display }}</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="4" class="text-center py-5">Sin movimientos recientes.</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
-            </div>
-
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fw-bold text-dark"><i class="fas fa-file-invoice-dollar me-2 text-secondary"></i>Últimas Órdenes</h5>
-                    <a href="#" class="btn btn-sm btn-outline-primary rounded-pill">Ver historial</a>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="bg-light text-muted small text-uppercase">
-                                <tr>
-                                    <th class="ps-4">Folio OC</th>
-                                    <th>Proveedor</th>
-                                    <th>Fecha Emisión</th>
-                                    <th>Estatus</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for orden in ultimas_ordenes %}
-                                <tr>
-                                    <td class="ps-4 fw-bold text-dark">{{ orden.folio }}</td>
-                                    <td>{{ orden.proveedor.razon_social|truncatechars:25 }}</td>
-                                    <td class="text-muted fs-7">{{ orden.fecha_emision|date:"d M Y" }}</td>
-                                    <td>
-                                        <span class="badge rounded-pill 
-                                            {% if orden.estatus == 'APROBADA' %}bg-success
-                                            {% elif orden.estatus == 'BORRADOR' %}bg-secondary
-                                            {% elif orden.estatus == 'CANCELADA' %}bg-danger
-                                            {% else %}bg-info{% endif %}">
-                                            {{ orden.get_estatus_display }}
-                                        </span>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="4" class="text-center py-4 text-muted">No hay órdenes recientes.</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="card-footer bg-white border-0 py-2 text-center">
+                    <a href="{% url 'lista_solicitudes' %}" class="text-decoration-none text-primary-custom fs-7 fw-bold">
+                        Ver historial completo <i class="fas fa-arrow-right ms-1"></i>
+                    </a>
                 </div>
             </div>
-
         </div>
 
         <div class="col-lg-4">
-            
-            <div class="card border-0 shadow-sm mb-4">
+            <div class="card border-0 shadow mb-4 h-100" style="min-height: 300px;">
                 <div class="card-header bg-white border-0 py-3">
-                    <h6 class="mb-0 fw-bold text-dark">Carga de Trabajo (Órdenes)</h6>
+                    <h6 class="mb-0 fw-bold text-dark">Distribución de Estatus</h6>
                 </div>
-                <div class="card-body">
-                    <div style="height: 250px; position: relative;">
+                <div class="card-body d-flex flex-column align-items-center justify-content-center position-relative">
+                    <div style="width: 100%; height: 220px;">
                         <canvas id="ordenesChart"></canvas>
                     </div>
                     <div class="mt-3 text-center">
-                        <small class="text-muted">Distribución actual excluyendo cerradas</small>
+                        <span class="badge bg-light text-dark border">Total Activas: {{ kpis.ordenes_activas }}</span>
                     </div>
                 </div>
             </div>
-
-            <div class="card border-0 shadow-sm bg-primary text-white">
-                <div class="card-body p-4">
-                    <h5 class="fw-bold mb-3"><i class="fas fa-bolt me-2"></i>Acciones Rápidas</h5>
-                    <div class="d-grid gap-2">
-                        <a href="{% url 'crear_proveedor' %}" class="btn btn-light text-primary fw-medium text-start">
-                            <i class="fas fa-user-tie me-2"></i> Registrar Proveedor
-                        </a>
-                        <a href="{% url 'crear_articulo' %}" class="btn btn-light text-primary fw-medium text-start">
-                            <i class="fas fa-box-open me-2"></i> Nuevo Artículo
-                        </a>
-                    </div>
+        </div>
+        
+        <div class="col-12">
+             <div class="alert alert-info border-0 shadow-sm d-flex align-items-center mb-0" role="alert">
+                <i class="fas fa-info-circle fa-2x me-3 text-info"></i>
+                <div>
+                    <h6 class="alert-heading fw-bold mb-1">¿Cómo auditar una Orden?</h6>
+                    <p class="mb-0 fs-7">
+                        Para pasar una orden a estado "Auditada", primero debes ingresar al detalle de la OC y subir tanto la <strong>Factura (PDF/XML)</strong> como el <strong>Comprobante de Pago</strong>.
+                    </p>
                 </div>
             </div>
-
         </div>
     </div>
 </div>
@@ -248,10 +412,46 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Inicialización de Pestañas
+        var triggerTabList = [].slice.call(document.querySelectorAll('#dashboardTabs button'))
+        triggerTabList.forEach(function (triggerEl) {
+            var tabTrigger = new bootstrap.Tab(triggerEl)
+            triggerEl.addEventListener('click', function (event) {
+                event.preventDefault()
+                tabTrigger.show()
+            })
+        })
+
+        // Gráfico con colores personalizados que coinciden con los gradientes
         const ctx = document.getElementById('ordenesChart').getContext('2d');
         const labels = JSON.parse('{{ chart_labels|safe }}');
         const data = JSON.parse('{{ chart_data|safe }}');
-        const colors = JSON.parse('{{ chart_colors|safe }}');
+        
+        // Mapeo de colores más vibrantes para el Chart.js
+        // Aprobada (Azul), Borrador (Gris), Cancelada (Rojo), Lista Auditar (Amarillo)
+        const customColors = {
+            'BORRADOR': '#6c757d',
+            'APROBADA': '#1a73e8',  // Primary Blue
+            'LISTA_PARA_AUDITAR': '#fbbc05', // Warning Yellow
+            'AUDITADA': '#34a853', // Success Green
+            'CANCELADA': '#ea4335', // Danger Red
+            'DEFAULT': '#0dcaf0'
+        };
+
+        // Reconstruimos el array de colores basado en las etiquetas
+        // Nota: Si 'chart_colors' viene del backend, puedes usarlo, pero aquí lo forzamos para que combine con el diseño
+        let backgroundColors = [];
+        labels.forEach(label => {
+            // Buscamos la clave en el objeto customColors (asumiendo que el label coincide o usamos logica simple)
+            let color = customColors['DEFAULT'];
+            if (label.includes('Borrador')) color = customColors['BORRADOR'];
+            else if (label.includes('Aprobada')) color = customColors['APROBADA'];
+            else if (label.includes('Auditar')) color = customColors['LISTA_PARA_AUDITAR'];
+            else if (label.includes('Auditada')) color = customColors['AUDITADA'];
+            else if (label.includes('Cancelada')) color = customColors['CANCELADA'];
+            
+            backgroundColors.push(color);
+        });
 
         if (data && data.length > 0) {
             new Chart(ctx, {
@@ -260,9 +460,9 @@
                     labels: labels,
                     datasets: [{
                         data: data,
-                        backgroundColor: colors,
+                        backgroundColor: backgroundColors,
                         borderWidth: 0,
-                        hoverOffset: 4
+                        hoverOffset: 10
                     }]
                 },
                 options: {
@@ -270,38 +470,24 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            position: 'bottom',
+                            position: 'right',
                             labels: {
-                                boxWidth: 12,
-                                padding: 15,
-                                font: { size: 11 }
+                                usePointStyle: true,
+                                boxWidth: 10,
+                                font: { family: "'Roboto', sans-serif", size: 11 }
                             }
                         }
                     },
-                    cutout: '70%'
+                    cutout: '75%'
                 }
             });
         } else {
-            // Mensaje si no hay datos
             document.getElementById('ordenesChart').parentElement.innerHTML = 
                 '<div class="h-100 d-flex flex-column align-items-center justify-content-center text-muted">' +
                 '<i class="fas fa-chart-pie fa-3x mb-3 text-light"></i>' +
-                '<p>Sin datos activos</p>' +
+                '<p class="small">Sin datos suficientes</p>' +
                 '</div>';
         }
     });
 </script>
-
-<style>
-    .fs-7 { font-size: 0.85rem; }
-    .fs-8 { font-size: 0.75rem; }
-    .avatar-circle { 
-        width: 32px; height: 32px; 
-        border-radius: 50%; 
-        display: flex; align-items: center; justify-content: center; 
-        font-weight: bold; font-size: 0.8rem; 
-    }
-    .card { transition: transform 0.2s ease-in-out; }
-    .card:hover { transform: translateY(-2px); }
-</style>
 {% endblock %}

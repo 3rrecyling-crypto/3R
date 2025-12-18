@@ -577,3 +577,15 @@ class ImportarRemisionesForm(forms.Form):
         })
     )
     
+class ImportarEvidenciasZipForm(forms.Form):
+    """
+    Formulario para subir archivos masivos (FOTOS/PDF) en ZIP.
+    Los archivos deben llamarse igual que la remisión (ej: MTY-100.jpg).
+    """
+    archivo_zip = forms.FileField(
+        label="Seleccionar Archivo ZIP",
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': '.zip, application/zip, application/x-zip-compressed'
+        })
+    )

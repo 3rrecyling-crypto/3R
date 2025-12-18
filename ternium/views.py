@@ -14,6 +14,7 @@ from openpyxl.styles import Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from django.db.models import Q, Sum, F
 from django.http import HttpResponse, JsonResponse
+from .forms import ImportarEvidenciasZipForm # Asegúrate de importar esto arriba
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.contrib import messages
@@ -2392,8 +2393,22 @@ def importar_remisiones_excel(request):
             messages.error(request, "Formulario inválido.")
     else:
         form = ImportarRemisionesForm()
+        
+    if 'form_zip' not in locals():
+        form_zip = ImportarEvidenciasZipForm()
+        
+    context = {
+        'form': form, # El form de Excel que ya tenías
+        'form_zip': form_zip, # El nuevo form de ZIP
+        # ... otros datos de contexto si tienes ...
+    }
+    # Asegúrate de pasar 'lista_errores' si existe en tu lógica original
+    if 'lista_errores' in locals():
+        context['lista_errores'] = lista_errores
 
-    return render(request, 'ternium/importar_remisiones.html', {'form': form})
+    return render(request, 'ternium/importar_remisiones.html', context)
+
+
 # --- AGREGAR AL FINAL DE ternium/views.py ---
 
 
@@ -2884,3 +2899,84 @@ def export_catalogo_excel(request, model_name):
     response['Content-Disposition'] = f'attachment; filename="Catalogo_{model_name}_{datetime.date.today()}.xlsx"'
     wb.save(response)
     return response
+
+@login_required
+def importar_evidencias_masivas(request):
+    """
+    Procesa un archivo ZIP con evidencias (imágenes/PDFs).
+    Asocia cada archivo a una Remisión basándose en el nombre del archivo.
+    Ejemplo: 'MTY-500.jpg' se guarda en la remisión con folio 'MTY-500'.
+    """
+    if request.method == 'POST':
+        form = ImportarEvidenciasZipForm(request.POST, request.FILES)
+        if form.is_valid():
+            archivo_zip = request.FILES['archivo_zip']
+            
+            conteo_exitos = 0
+            conteo_errores = 0
+            errores_detalle = []
+
+            try:
+                # Abrimos el ZIP en memoria
+                with zipfile.ZipFile(archivo_zip, 'r') as zf:
+                    # Iteramos sobre cada archivo dentro del ZIP
+                    for filename in zf.namelist():
+                        # Ignorar carpetas o archivos ocultos de Mac (__MACOSX)
+                        if filename.endswith('/') or '__MACOSX' in filename or filename.startswith('.'):
+                            continue
+                        
+                        # Obtener nombre base (folio) y extensión
+                        # Ej: filename="MTY-1611.jpg" -> nombre_base="MTY-1611", ext=".jpg"
+                        nombre_base, extension = os.path.splitext(os.path.basename(filename))
+                        nombre_base = nombre_base.strip() # Limpiamos espacios
+                        
+                        # Buscar la remisión en la BD
+                        remision = Remision.objects.filter(remision__iexact=nombre_base).first()
+                        
+                        if remision:
+                            try:
+                                # Leer el archivo del ZIP a un buffer de memoria
+                                file_content = zf.read(filename)
+                                file_io = io.BytesIO(file_content)
+                                
+                                # Definir ruta S3 (mismo estándar que al crear individualmente)
+                                # remisiones/MTY-1611/evidencia_MTY-1611.jpg
+                                s3_path = f"remisiones/{remision.remision}/evidencia_{nombre_base}{extension}"
+                                
+                                # Usamos tu función auxiliar existente para subir a S3
+                                ruta_guardada = _subir_archivo_a_s3(file_io, s3_path)
+                                
+                                if ruta_guardada:
+                                    remision.evidencia_documento = ruta_guardada
+                                    remision.save()
+                                    conteo_exitos += 1
+                                else:
+                                    conteo_errores += 1
+                                    errores_detalle.append(f"{filename}: Error al subir a S3")
+                                    
+                            except Exception as e:
+                                conteo_errores += 1
+                                errores_detalle.append(f"{filename}: Error procesando archivo ({str(e)})")
+                        else:
+                            conteo_errores += 1
+                            errores_detalle.append(f"{filename}: No se encontró la remisión '{nombre_base}'")
+
+                # Mensajes finales
+                if conteo_exitos > 0:
+                    messages.success(request, f"✅ Se vincularon {conteo_exitos} evidencias exitosamente.")
+                
+                if conteo_errores > 0:
+                    messages.warning(request, f"⚠ Hubo {conteo_errores} archivos no procesados.")
+                    # Opcional: Mostrar los primeros 5 errores
+                    for err in errores_detalle[:5]:
+                        messages.warning(request, err)
+
+            except zipfile.BadZipFile:
+                messages.error(request, "El archivo subido no es un ZIP válido.")
+            except Exception as e:
+                messages.error(request, f"Error crítico procesando el ZIP: {e}")
+                
+            return redirect('importar_remisiones_excel') # Redirigimos a la misma página
+    
+    # Si intentan entrar por GET a esta URL específica, los mandamos al importador general
+    return redirect('importar_remisiones_excel')

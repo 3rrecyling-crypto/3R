@@ -3,107 +3,266 @@
 {% load static %}
 
 {% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+
 <style>
-    /* --- CORRECCIÓN CRÍTICA DE Z-INDEX --- */
-    /* Forzamos que el modal esté por encima de TODO, incluida la barra base */
-    .modal-backdrop {
-        z-index: 10050 !important;
+    /* --- CORRECCIÓN Z-INDEX (Mantenida de tu código) --- */
+    .modal-backdrop { z-index: 10500 !important; }
+    .modal { z-index: 10510 !important; }
+    .modal-dialog { z-index: 10520 !important; }
+
+    /* --- ESTILOS PERSONALIZADOS --- */
+    .card-border-top {
+        border-top: 3px solid #0d6efd;
     }
-    .modal {
-        z-index: 10060 !important;
+    
+    .card-border-secondary {
+        border-top: 3px solid #6c757d;
     }
-    .group-hover:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+
+    /* Efecto Hover en tarjetas y documentos */
+    .hover-lift {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-    /* Estilo para simular botón en el formulario de auditar */
-    .btn-audit-submit {
-        border: none;
-        width: 100%;
-        text-align: left;
+    .hover-lift:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.10)!important;
+    }
+
+    /* Fuente monoespaciada para números */
+    .font-mono {
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+
+    /* --- STEPPER / LÍNEA DE TIEMPO HORIZONTAL --- */
+    .steps {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        position: relative;
+    }
+    .steps::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: #e9ecef;
+        z-index: 1;
+        transform: translateY(-50%);
+    }
+    .step-item {
+        z-index: 2;
+        background: #fff;
+        padding: 0 10px;
+        text-align: center;
+    }
+    .step-circle {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background-color: #e9ecef;
+        color: #6c757d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 5px;
+        font-weight: bold;
+        font-size: 14px;
+        border: 2px solid #fff;
+    }
+    .step-item.active .step-circle {
+        background-color: #0d6efd;
+        color: #fff;
+        box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2);
+    }
+    .step-item.completed .step-circle {
+        background-color: #198754;
+        color: #fff;
+    }
+    .step-label {
+        font-size: 0.75rem;
+        color: #6c757d;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    /* --- LÍNEA DE TIEMPO VERTICAL (TIEMPOS) --- */
+    .timeline-vertical {
+        position: relative;
+        padding-left: 1.5rem;
+        border-left: 2px solid #e9ecef;
+        margin-left: 0.5rem;
+    }
+    .timeline-item {
+        position: relative;
+        margin-bottom: 1.5rem;
+    }
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -1.95rem;
+        top: 0.25rem;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #fff;
+        border: 2px solid #0d6efd;
+    }
+    .timeline-item.last::before {
+        border-color: #198754;
+        background: #198754;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+<div class="container-fluid py-4 bg-light">
+    
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
         <div>
-            <h4 class="fw-bold mb-0 text-primary">
-                <i class="fas fa-truck-loading me-2"></i>Remisión: {{ remision.remision }}
-            </h4>
-            <span class="text-muted small">
-                <i class="far fa-calendar-alt me-1"></i> {{ remision.fecha|date:"d \d\e F Y" }}
-            </span>
+            <h3 class="fw-bold text-dark mb-1">
+                Remisión #<span class="text-primary">{{ remision.remision }}</span>
+            </h3>
+            <div class="text-muted">
+                <i class="far fa-calendar-alt me-1"></i> {{ remision.fecha|date:"l d \d\e F, Y" }}
+            </div>
         </div>
-        <div class="d-flex align-items-center">
-            <a href="{% url 'remision_lista' %}" class="btn btn-outline-secondary me-3">Volver</a>
-            
+        <div class="mt-3 mt-md-0 d-flex gap-2">
+            <a href="{% url 'remision_lista' %}" class="btn btn-white border shadow-sm hover-lift">
+                <i class="fas fa-arrow-left me-1"></i> Volver
+            </a>
             {% if remision.status == 'AUDITADO' %}
-                <span class="badge bg-primary fs-6"><i class="fas fa-lock me-1"></i> AUDITADO</span>
-            {% elif remision.status == 'TERMINADO' %}
-                <span class="badge bg-success fs-6">TERMINADO</span>
-            {% else %}
-                <span class="badge bg-warning text-dark fs-6">{{ remision.get_status_display }}</span>
+                <span class="badge bg-primary d-flex align-items-center px-3"><i class="fas fa-lock me-2"></i> AUDITADO</span>
             {% endif %}
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4 px-4 py-3">
+        <div class="steps">
+            <div class="step-item completed">
+                <div class="step-circle"><i class="fas fa-check"></i></div>
+                <div class="step-label">Registro</div>
+            </div>
+            <div class="step-item {% if remision.status == 'TERMINADO' or remision.status == 'AUDITADO' %}completed{% else %}active{% endif %}">
+                <div class="step-circle">
+                    {% if remision.status == 'TERMINADO' or remision.status == 'AUDITADO' %}<i class="fas fa-check"></i>{% else %}2{% endif %}
+                </div>
+                <div class="step-label">Operación</div>
+            </div>
+            <div class="step-item {% if remision.status == 'AUDITADO' %}completed{% elif remision.status == 'TERMINADO' %}active{% endif %}">
+                <div class="step-circle">
+                    {% if remision.status == 'AUDITADO' %}<i class="fas fa-lock"></i>{% else %}3{% endif %}
+                </div>
+                <div class="step-label">Auditoría</div>
+            </div>
         </div>
     </div>
 
     <div class="row g-4">
         <div class="col-lg-8">
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header bg-white py-3"><h6 class="mb-0 fw-bold">Logística</h6></div>
-                <div class="card-body">
-                     <div class="row">
-                         <div class="col-md-4"><strong>Origen:</strong> {{ remision.origen }}</div>
-                         <div class="col-md-4"><strong>Destino:</strong> {{ remision.destino }}</div>
-                         <div class="col-md-4"><strong>Cliente:</strong> {{ remision.cliente }}</div>
-                     </div>
+            
+            <div class="card shadow-sm border-0 mb-4 card-border-top hover-lift">
+                <div class="card-body p-4">
+                    <h6 class="text-uppercase text-muted fw-bold mb-3 small tracking-wide">Detalles Logísticos</h6>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="p-3 bg-light rounded-3 h-100">
+                                <label class="small text-muted d-block mb-1">Origen</label>
+                                <strong class="text-dark d-flex align-items-center">
+                                    <i class="fas fa-warehouse text-primary me-2"></i> {{ remision.origen }}
+                                </strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 bg-light rounded-3 h-100">
+                                <label class="small text-muted d-block mb-1">Destino</label>
+                                <strong class="text-dark d-flex align-items-center">
+                                    <i class="fas fa-map-marker-alt text-danger me-2"></i> {{ remision.destino }}
+                                </strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 bg-light rounded-3 h-100">
+                                <label class="small text-muted d-block mb-1">Cliente</label>
+                                <strong class="text-dark d-flex align-items-center">
+                                    <i class="fas fa-user-tie text-secondary me-2"></i> {{ remision.cliente }}
+                                </strong>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            
-            <div class="card shadow-sm border-0 mb-4">
+
+            <div class="card shadow-sm border-0 mb-4 hover-lift">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h6 class="mb-0 fw-bold"><i class="fas fa-cubes me-2 text-secondary"></i>Materiales y Pesos</h6>
+                </div>
                 <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead class="bg-light"><tr><th>Material</th><th>Carga</th><th>Descarga</th></tr></thead>
+                    <table class="table align-middle mb-0 table-hover">
+                        <thead class="bg-light text-muted small text-uppercase">
+                            <tr>
+                                <th class="ps-4">Material</th>
+                                <th class="text-end">Carga (Kg)</th>
+                                <th class="text-end pe-4">Descarga (Kg)</th>
+                            </tr>
+                        </thead>
                         <tbody>
                             {% for detalle in remision.detalles.all %}
                             <tr>
-                                <td>{{ detalle.material }}</td>
-                                <td>{{ detalle.peso_ld }}</td>
-                                <td>{{ detalle.peso_dlv }}</td>
+                                <td class="ps-4 fw-medium">{{ detalle.material }}</td>
+                                <td class="text-end font-mono">{{ detalle.peso_ld|intcomma }}</td>
+                                <td class="text-end pe-4 font-mono">{{ detalle.peso_dlv|intcomma }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center py-4 text-muted">No hay materiales registrados</td>
                             </tr>
                             {% endfor %}
                         </tbody>
+                        {% if remision.detalles.exists %}
+                        <tfoot class="bg-light fw-bold">
+                            <tr>
+                                <td class="ps-4">Totales</td>
+                                <td class="text-end font-mono text-primary">
+                                    --
+                                </td>
+                                <td class="text-end pe-4 font-mono text-success">--</td>
+                            </tr>
+                        </tfoot>
+                        {% endif %}
                     </table>
                 </div>
             </div>
-            
+
             <div class="d-flex justify-content-end mt-4">
-                
                 {% if remision.status == 'AUDITADO' %}
-                    <div class="alert alert-info py-2 px-4 shadow-sm d-flex align-items-center">
-                        <i class="fas fa-lock fa-lg me-3"></i>
+                    <div class="alert alert-primary bg-opacity-10 border-primary w-100 d-flex align-items-center shadow-sm">
+                        <div class="fs-1 text-primary me-4"><i class="fas fa-shield-alt"></i></div>
                         <div>
-                            <strong>Registro Bloqueado</strong>
-                            <div class="small">Auditado por {{ remision.auditado_por }} el {{ remision.auditado_en|date:"d/m/Y H:i" }}</div>
+                            <h5 class="alert-heading fw-bold mb-1">Registro Auditado y Bloqueado</h5>
+                            <p class="mb-0 small text-muted">
+                                Validado por <strong>{{ remision.auditado_por|default:"Sistema" }}</strong> el {{ remision.auditado_en|date:"d/m/Y H:i" }}.
+                                No se permiten más ediciones.
+                            </p>
                         </div>
                     </div>
-
                 {% else %}
-                    <a href="{% url 'editar_remision' remision.id %}" class="btn btn-primary btn-lg shadow-sm me-3">
-                        <i class="fas fa-edit me-2"></i> Editar
+                    
+                    <a href="{% url 'editar_remision' remision.id %}" class="btn btn-outline-primary btn-lg px-4 me-3 shadow-sm hover-lift">
+                        <i class="fas fa-edit me-2"></i> Editar Datos
                     </a>
 
                     {% if remision.status == 'TERMINADO' %}
-                        <form action="{% url 'auditar_remision' remision.id %}" method="POST" onsubmit="return confirm('¿Confirmar Auditoría?\n\nAl auditar, esta remisión se bloqueará permanentemente y no podrá ser editada ni eliminada.');">
+                        <form id="form-audit" action="{% url 'auditar_remision' remision.id %}" method="POST">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-warning btn-lg shadow-sm fw-bold">
-                                <i class="fas fa-clipboard-check me-2"></i> AUDITAR
+                            <button type="button" id="btn-audit" class="btn btn-warning btn-lg px-4 shadow-sm fw-bold hover-lift text-dark">
+                                <i class="fas fa-clipboard-check me-2"></i> AUDITAR REMISIÓN
                             </button>
                         </form>
                     {% endif %}
-
                 {% endif %}
             </div>
 
@@ -111,72 +270,95 @@
 
         <div class="col-lg-4">
             
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-paperclip me-2 text-secondary"></i>Documentación</h6>
+            <div class="card shadow-sm border-0 mb-4 card-border-secondary hover-lift">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold text-dark">Evidencia Digital</h6>
+                    <span class="badge bg-light text-dark border">Adjunto</span>
                 </div>
-                <div class="card-body text-center">
-                    
+                <div class="card-body text-center p-4">
                     {% if remision.evidencia_documento %}
-                        <div class="mb-3">
-                            <label class="small fw-bold text-muted mb-2 d-block">ARCHIVO ADJUNTO</label>
-                            
-                            {% if '.pdf' in remision.evidencia_documento.url %}
-                                <div class="cursor-pointer group-hover p-4 border rounded bg-light" 
-                                     onclick="openPreviewModal('{{ remision.evidencia_documento.url }}', 'pdf')"
-                                     style="cursor: pointer; transition: all 0.2s;">
-                                    <i class="fas fa-file-pdf fa-5x text-danger mb-2"></i>
-                                    <p class="mb-0 fw-bold text-dark">Ver Documento PDF</p>
-                                    <small class="text-muted">Click para abrir</small>
+                        {% if '.pdf' in remision.evidencia_documento.url %}
+                            <div class="card p-3 border-0 bg-light mb-3 cursor-pointer hover-lift" 
+                                 onclick="openPreviewModal('{{ remision.evidencia_documento.url }}', 'pdf')">
+                                <i class="fas fa-file-pdf fa-4x text-danger mb-3"></i>
+                                <h6 class="fw-bold text-dark">Documento PDF</h6>
+                                <small class="text-primary">Click para previsualizar</small>
+                            </div>
+                        {% else %}
+                            <div class="position-relative hover-lift mb-3" 
+                                 onclick="openPreviewModal('{{ remision.evidencia_documento.url }}', 'image')"
+                                 style="cursor: pointer;">
+                                <img src="{{ remision.evidencia_documento.url }}" class="img-fluid rounded shadow-sm border w-100" style="height: 200px; object-fit: cover;" alt="Evidencia">
+                                <div class="position-absolute top-50 start-50 translate-middle">
+                                    <span class="badge bg-dark bg-opacity-75 rounded-pill px-3 py-2">
+                                        <i class="fas fa-search-plus"></i> Ver
+                                    </span>
                                 </div>
-                            {% else %}
-                                <div class="cursor-pointer position-relative group-hover"
-                                     onclick="openPreviewModal('{{ remision.evidencia_documento.url }}', 'image')"
-                                     style="cursor: pointer;">
-                                    <img src="{{ remision.evidencia_documento.url }}" class="img-fluid rounded border shadow-sm w-100" style="max-height: 250px; object-fit: cover;" alt="Evidencia">
-                                    <div class="position-absolute top-50 start-50 translate-middle badge bg-dark bg-opacity-75">
-                                        <i class="fas fa-search-plus me-1"></i> Ampliar
-                                    </div>
-                                </div>
-                            {% endif %}
-                        </div>
-                        
-                        <a href="{{ remision.evidencia_documento.url }}" download class="btn btn-outline-primary btn-sm w-100 mt-2">
-                            <i class="fas fa-download me-2"></i>Descargar Archivo
+                            </div>
+                        {% endif %}
+                        <a href="{{ remision.evidencia_documento.url }}" download class="btn btn-sm btn-outline-secondary w-100">
+                            <i class="fas fa-download me-2"></i>Descargar Original
                         </a>
                     {% else %}
-                        <div class="bg-light rounded border border-dashed p-4 text-center text-muted">
-                            <i class="fas fa-file-excel fa-2x mb-2 opacity-25"></i>
-                            <p class="small mb-0">Sin evidencia adjunta</p>
+                        <div class="py-5 text-muted border border-dashed rounded bg-light">
+                            <i class="fas fa-cloud-upload-alt fa-3x mb-3 opacity-25"></i>
+                            <p class="mb-0 small fw-bold">No se ha cargado evidencia</p>
                         </div>
                     {% endif %}
-
                 </div>
             </div>
 
-            <div class="card shadow-sm border-0">
+            <div class="card shadow-sm border-0 hover-lift">
                 <div class="card-header bg-white py-3">
-                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-clock me-2 text-secondary"></i>Tiempos</h6>
+                    <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-history me-2 text-secondary"></i>Cronología</h6>
                 </div>
                 <div class="card-body">
-                    <ul class="list-unstyled mb-0 small">
-                        <li class="mb-2 d-flex justify-content-between"><span>Carga:</span> <strong>{{ remision.inicia_ld|default:"--" }}</strong></li>
-                        <li class="d-flex justify-content-between"><span>Descarga:</span> <strong>{{ remision.inicia_dlv|default:"--" }}</strong></li>
-                    </ul>
+                    <div class="timeline-vertical">
+                        <div class="timeline-item">
+                            <label class="text-muted small fw-bold d-block">HORA DE CARGA</label>
+                            {% if remision.inicia_ld %}
+                                <span class="text-dark fw-bold font-mono">{{ remision.inicia_ld|date:"H:i" }}</span>
+                                <div class="small text-muted">{{ remision.inicia_ld|date:"d/m/Y" }}</div>
+                            {% else %}
+                                <span class="badge bg-secondary">Pendiente</span>
+                            {% endif %}
+                        </div>
+                        <div class="timeline-item last">
+                            <label class="text-muted small fw-bold d-block">HORA DE DESCARGA</label>
+                            {% if remision.inicia_dlv %}
+                                <span class="text-success fw-bold font-mono">{{ remision.inicia_dlv|date:"H:i" }}</span>
+                                <div class="small text-muted">{{ remision.inicia_dlv|date:"d/m/Y" }}</div>
+                            {% else %}
+                                <span class="badge bg-secondary">Pendiente</span>
+                            {% endif %}
+                        </div>
+                        {% if remision.tiempo_total %}
+                        <div class="mt-3 pt-3 border-top">
+                             <div class="d-flex justify-content-between align-items-center">
+                                 <span class="small fw-bold text-muted">TIEMPO TOTAL</span>
+                                 <span class="badge bg-dark font-mono">{{ remision.tiempo_total }}</span>
+                             </div>
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
+
         </div>
     </div>
 </div>
 
 <div class="modal fade" id="universalModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-centered">
-    <div class="modal-content border-0 shadow-lg">
-      <div class="modal-header bg-dark text-white py-2">
-        <h5 class="modal-title fs-6">Vista Previa</h5>
+    <div class="modal-content border-0 shadow-lg overflow-hidden">
+      <div class="modal-header bg-dark text-white py-2 border-0">
+        <h5 class="modal-title fs-6"><i class="fas fa-eye me-2"></i>Vista Previa</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body p-0 bg-light" style="height: 85vh;">
+      <div class="modal-body p-0 bg-light position-relative" style="height: 85vh;">
+        <div id="modal-spinner" class="position-absolute top-50 start-50 translate-middle text-muted" style="display:none;">
+            <div class="spinner-border" role="status"></div>
+        </div>
         <div id="modal-content-area" class="w-100 h-100 d-flex justify-content-center align-items-center">
             </div>
       </div>
@@ -187,36 +369,69 @@
 {% endblock content %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
-    // 1. SOLUCIÓN NUCLEAR AL BLOQUEO DE PANTALLA
-    // Mueve el modal al final del body para que no se vea afectado por estilos padres
     document.addEventListener("DOMContentLoaded", function() {
+        // 1. SOLUCIÓN AL BLOQUEO DE PANTALLA
         var modalEl = document.getElementById('universalModal');
-        if(modalEl) {
-            document.body.appendChild(modalEl);
+        if(modalEl) { document.body.appendChild(modalEl); }
+
+        // 2. MANEJO DE SWEETALERT PARA AUDITAR
+        const btnAudit = document.getElementById('btn-audit');
+        if(btnAudit){
+            btnAudit.addEventListener('click', function(e) {
+                e.preventDefault(); // Detener envío normal
+                
+                Swal.fire({
+                    title: '¿Confirmar Auditoría?',
+                    text: "Al auditar, esta remisión se bloqueará permanentemente. No podrás editar ni eliminar este registro después.",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ffc107', // Amarillo warning
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Sí, Auditar y Bloquear',
+                    cancelButtonText: 'Cancelar',
+                    color: '#333',
+                    background: '#fff'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        document.getElementById('form-audit').submit();
+                    }
+                })
+            });
         }
     });
 
-    // 2. Función para abrir el modal
+    // 3. FUNCIÓN MODAL MEJORADA
     function openPreviewModal(src, type) {
         const container = document.getElementById('modal-content-area');
-        container.innerHTML = ''; 
+        const spinner = document.getElementById('modal-spinner');
         
+        container.innerHTML = ''; 
+        spinner.style.display = 'block'; // Mostrar spinner cargando
+        
+        let element;
+
         if (type === 'pdf') {
-            const iframe = document.createElement('iframe');
-            iframe.src = src;
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.style.border = 'none';
-            container.appendChild(iframe);
+            element = document.createElement('iframe');
+            element.src = src;
+            element.style.width = '100%';
+            element.style.height = '100%';
+            element.style.border = 'none';
         } else {
-            const img = document.createElement('img');
-            img.src = src;
-            img.style.maxWidth = '100%';
-            img.style.maxHeight = '100%';
-            img.style.objectFit = 'contain';
-            container.appendChild(img);
+            element = document.createElement('img');
+            element.src = src;
+            element.style.maxWidth = '100%';
+            element.style.maxHeight = '100%';
+            element.style.objectFit = 'contain';
         }
+
+        element.onload = function() {
+            spinner.style.display = 'none'; // Ocultar spinner al cargar
+        };
+
+        container.appendChild(element);
         
         const myModal = new bootstrap.Modal(document.getElementById('universalModal'));
         myModal.show();
