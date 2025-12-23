@@ -1,0 +1,262 @@
+{% extends 'ternium/base.html' %}
+
+{% block content %}
+<style>
+    /* Aseguramos que el fondo gris quede detrás del modal */
+    .modal-backdrop { z-index: 1040 !important; }
+    .modal { z-index: 1050 !important; }
+    .modal-content { z-index: 1100 !important; }
+</style>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-dark"><i class="fas fa-layer-group me-2 text-primary"></i>Catálogo de Conceptos</h2>
+            <p class="text-muted small mb-0">Gestiona las categorías y subcategorías para clasificar tus movimientos.</p>
+        </div>
+        <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaCategoria">
+            <i class="fas fa-folder-plus me-2"></i>Nueva Categoría
+        </button>
+    </div>
+
+    <div class="accordion shadow-sm" id="accordionCategorias">
+        {% for cat in categorias %}
+        <div class="accordion-item border-0 mb-2 rounded overflow-hidden shadow-sm">
+            <h2 class="accordion-header position-relative" id="heading{{ cat.id }}">
+                <button class="accordion-button {% if not forloop.first %}collapsed{% endif %} fw-bold bg-white text-dark" 
+                        type="button" 
+                        data-bs-toggle="collapse" 
+                        data-bs-target="#collapse{{ cat.id }}">
+                    <i class="fas fa-folder me-2 text-warning"></i> {{ cat.nombre }}
+                    <span class="badge bg-light text-secondary ms-2 border">{{ cat.subcategorias.count }} items</span>
+                </button>
+                
+                <div class="position-absolute end-0 top-50 translate-middle-y me-5 pe-3 d-flex gap-2" style="z-index: 5;">
+                    <button class="btn btn-sm btn-outline-secondary border-0" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#modalEditarCategoria" 
+                            data-id="{{ cat.id }}" 
+                            data-nombre="{{ cat.nombre }}"
+                            title="Editar Categoría">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger border-0" 
+                            onclick="confirmarEliminar('{% url 'bancos_eliminar_categoria' cat.id %}', 'la categoría {{ cat.nombre }}')"
+                            title="Eliminar Categoría">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </h2>
+
+            <div id="collapse{{ cat.id }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#accordionCategorias">
+                <div class="accordion-body bg-light p-0">
+                    <ul class="list-group list-group-flush">
+                        {% for sub in cat.subcategorias.all %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center ps-5 bg-transparent border-bottom-0">
+                            <span class="text-secondary">
+                                <i class="fas fa-level-up-alt fa-rotate-90 me-2 small opacity-50"></i> {{ sub.nombre }}
+                            </span>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-link text-muted p-0 me-3" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#modalEditarSub" 
+                                        data-id="{{ sub.id }}" 
+                                        data-nombre="{{ sub.nombre }}"
+                                        data-cat="{{ cat.id }}"
+                                        title="Editar Subcategoría">
+                                    <i class="fas fa-pencil-alt small"></i>
+                                </button>
+                                <button class="btn btn-sm btn-link text-danger p-0" 
+                                        onclick="confirmarEliminar('{% url 'bancos_eliminar_subcategoria' sub.id %}', 'la subcategoría {{ sub.nombre }}')"
+                                        title="Eliminar Subcategoría">
+                                    <i class="fas fa-times small"></i>
+                                </button>
+                            </div>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item ps-5 text-muted fst-italic small bg-transparent">
+                            Sin subcategorías registradas.
+                        </li>
+                        {% endfor %}
+                        
+                        <li class="list-group-item ps-5 bg-white border-top">
+                            <button class="btn btn-sm btn-outline-primary rounded-pill" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#modalNuevaSub"
+                                    data-cat-id="{{ cat.id }}"
+                                    data-cat-nombre="{{ cat.nombre }}">
+                                <i class="fas fa-plus me-1"></i> Agregar Subcategoría a <strong>{{ cat.nombre }}</strong>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-5 text-muted">
+            <i class="fas fa-folder-open fa-3x mb-3 opacity-50"></i>
+            <h4>No hay categorías</h4>
+            <p>Comienza creando una nueva categoría.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="modal fade" id="modalNuevaCategoria" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="post" action="{% url 'bancos_crear_categoria' %}" class="modal-content">
+            {% csrf_token %}
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Nueva Categoría</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label fw-bold">Nombre</label>
+                {{ cat_form.nombre }}
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-primary">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="modalEditarCategoria" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="post" action="" id="formEditarCat" class="modal-content">
+            {% csrf_token %}
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title">Editar Categoría</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label fw-bold">Nombre</label>
+                <input type="text" name="nombre" id="inputNombreCat" class="form-control" required>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-dark">Actualizar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="modalNuevaSub" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="post" action="{% url 'bancos_crear_subcategoria' %}" class="modal-content">
+            {% csrf_token %}
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">Nueva Subcategoría</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label small text-muted">Pertenece a:</label>
+                    <input type="text" id="displayCatNombre" class="form-control-plaintext fw-bold" readonly>
+                    <input type="hidden" name="categoria" id="inputCatIdHidden">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Nombre Subcategoría</label>
+                    {{ sub_form.nombre }}
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-info text-white">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="modalEditarSub" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="post" action="" id="formEditarSub" class="modal-content">
+            {% csrf_token %}
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title">Editar Subcategoría</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Categoría Padre</label>
+                    {{ sub_form.categoria }} 
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Nombre</label>
+                    <input type="text" name="nombre" id="inputNombreSub" class="form-control" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-secondary">Actualizar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        
+        // --- MOVER MODALES AL FINAL DEL BODY ---
+        const modales = [
+            'modalNuevaCategoria', 
+            'modalEditarCategoria', 
+            'modalNuevaSub', 
+            'modalEditarSub'
+        ];
+        
+        modales.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) document.body.appendChild(el);
+        });
+        // ---------------------------------------------------------
+
+        // Modal Editar Categoría
+        var modalEditarCat = document.getElementById('modalEditarCategoria');
+        modalEditarCat.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            var id = button.getAttribute('data-id');
+            var nombre = button.getAttribute('data-nombre');
+            
+            // Actualizar action del form con la ruta de BANCOS
+            var form = document.getElementById('formEditarCat');
+            form.action = "/bancos/categorias/editar/" + id + "/"; 
+            
+            document.getElementById('inputNombreCat').value = nombre;
+        });
+
+        // Modal Nueva Subcategoría (Prellenar padre)
+        var modalNuevaSub = document.getElementById('modalNuevaSub');
+        modalNuevaSub.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            var catId = button.getAttribute('data-cat-id');
+            var catNombre = button.getAttribute('data-cat-nombre');
+            
+            document.getElementById('inputCatIdHidden').value = catId;
+            document.getElementById('displayCatNombre').value = catNombre;
+        });
+
+        // Modal Editar Subcategoría
+        var modalEditarSub = document.getElementById('modalEditarSub');
+        modalEditarSub.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            var id = button.getAttribute('data-id');
+            var nombre = button.getAttribute('data-nombre');
+            var catId = button.getAttribute('data-cat'); // ID del padre actual
+            
+            var form = document.getElementById('formEditarSub');
+            // Actualizar action del form con la ruta de BANCOS
+            form.action = "/bancos/subcategorias/editar/" + id + "/";
+
+            document.getElementById('inputNombreSub').value = nombre;
+            // Seleccionar la categoría correcta en el dropdown
+            var select = form.querySelector('select[name="categoria"]');
+            if(select) select.value = catId;
+        });
+    });
+
+    function confirmarEliminar(url, nombre) {
+        if(confirm("¿Estás seguro de eliminar " + nombre + "? Esta acción no se puede deshacer.")) {
+            window.location.href = url;
+        }
+    }
+</script>
+
+{% endblock %}

@@ -23,4 +23,16 @@ urlpatterns = [
     path('transferencias/cancelar/<int:pk>/', views.cancelar_transferencia, name='cancelar_transferencia'),
     path('transferencia/', views.crear_transferencia, name='crear_transferencia'),
     path('ajax/obtener-tc/', views.ajax_obtener_tc, name='ajax_obtener_tc'),
+    path('importar-movimientos/', views.importar_movimientos, name='importar_movimientos'),
+
+    
+    path('categorias/', views.gestion_categorias_view, name='bancos_categorias_lista'), # <--- NOMBRE ÚNICO
+    
+    path('categorias/crear/', views.crear_categoria, name='bancos_crear_categoria'),
+    path('categorias/editar/<int:pk>/', views.editar_categoria, name='bancos_editar_categoria'),
+    path('categorias/eliminar/<int:pk>/', views.eliminar_categoria, name='bancos_eliminar_categoria'),
+    
+    path('subcategorias/crear/', views.crear_subcategoria, name='bancos_crear_subcategoria'),
+    path('subcategorias/editar/<int:pk>/', views.editar_subcategoria, name='bancos_editar_subcategoria'),
+    path('subcategorias/eliminar/<int:pk>/', views.eliminar_subcategoria, name='bancos_eliminar_subcategoria'),
 ]

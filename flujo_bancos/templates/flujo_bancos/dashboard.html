@@ -33,11 +33,11 @@
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
     }
 
-    /* --- CAMBIO: KPI CARDS MÁS COMPACTAS --- */
+    /* KPI CARDS */
     .kpi-card {
         background: white;
         border-radius: 12px;
-        padding: 1rem 1.25rem; /* Reducido de 1.5rem */
+        padding: 1rem 1.25rem;
         margin-bottom: 1rem;
         box-shadow: var(--card-shadow);
         transition: var(--transition-base);
@@ -61,9 +61,9 @@
     .kpi-card.dolares { border-left-color: #9b59b6; }
 
     .kpi-value {
-        font-size: 1.6rem; /* Reducido de 2rem */
+        font-size: 1.6rem;
         font-weight: 700;
-        margin: 0.25rem 0; /* Margen reducido */
+        margin: 0.25rem 0;
         color: var(--dark-color);
     }
 
@@ -72,7 +72,7 @@
     .kpi-value.neutral { color: var(--info-color); }
 
     .kpi-label {
-        font-size: 0.8rem; /* Reducido levemente */
+        font-size: 0.8rem;
         text-transform: uppercase;
         letter-spacing: 1px;
         color: var(--gray-color);
@@ -80,9 +80,9 @@
     }
 
     .kpi-icon {
-        font-size: 2rem; /* Reducido de 2.5rem */
+        font-size: 2rem;
         opacity: 0.8;
-        margin-bottom: 0.5rem; /* Margen reducido */
+        margin-bottom: 0.5rem;
     }
 
     .kpi-icon.ingresos { color: var(--secondary-color); }
@@ -97,12 +97,12 @@
         display: flex;
         align-items: center;
         gap: 0.75rem;
-        margin-bottom: 0.5rem; /* Margen reducido */
+        margin-bottom: 0.5rem;
     }
 
     .kpi-icon-image {
-        width: 40px; /* Reducido de 48px */
-        height: 40px; /* Reducido de 48px */
+        width: 40px;
+        height: 40px;
         border-radius: 10px;
         overflow: hidden;
         display: flex;
@@ -111,26 +111,18 @@
         box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
     }
 
-    .kpi-icon-image.ingresos { 
-        background: linear-gradient(135deg, #34a853, #2e7d32); 
-    }
-    .kpi-icon-image.egresos { 
-        background: linear-gradient(135deg, #ea4335, #c62828); 
-    }
-    .kpi-icon-image.dolares { 
-        background: linear-gradient(135deg, #9b59b6, #8e44ad); 
-    }
-    .kpi-icon-image.tipo-cambio { 
-        background: linear-gradient(135deg, #f39c12, #e67e22); 
-    }
+    .kpi-icon-image.ingresos { background: linear-gradient(135deg, #34a853, #2e7d32); }
+    .kpi-icon-image.egresos { background: linear-gradient(135deg, #ea4335, #c62828); }
+    .kpi-icon-image.dolares { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+    .kpi-icon-image.tipo-cambio { background: linear-gradient(135deg, #f39c12, #e67e22); }
 
     .kpi-icon-image img {
-        width: 20px; /* Reducido */
+        width: 20px;
         height: 20px;
         filter: brightness(0) invert(1);
     }
-    /* -------------------------------------- */
 
+    /* Account Cards */
     .account-card {
         background: white;
         border-radius: 10px;
@@ -175,23 +167,7 @@
     .account-currency.mxn { background: #e3f2fd; color: #1565c0; }
     .account-currency.usd { background: #fff3e0; color: #ef6c00; }
 
-    .progress-container {
-        background: #f5f5f5;
-        border-radius: 10px;
-        height: 10px;
-        margin: 1rem 0;
-        overflow: hidden;
-    }
-
-    .progress-bar {
-        height: 100%;
-        border-radius: 10px;
-        transition: width 1s ease-in-out;
-    }
-
-    .progress-bar.ingresos { background: linear-gradient(90deg, var(--secondary-color), #4cd964); }
-    .progress-bar.egresos { background: linear-gradient(90deg, var(--warning-color), #ff6b6b); }
-
+    /* Quick Actions */
     .quick-actions {
         background: white;
         border-radius: 12px;
@@ -229,7 +205,9 @@
     .action-btn.success { background: linear-gradient(135deg, var(--secondary-color), #2e7d32); }
     .action-btn.info { background: linear-gradient(135deg, var(--info-color), #0d47a1); }
     .action-btn.warning { background: linear-gradient(135deg, var(--accent-color), #f57c00); }
+    .action-btn.purple { background: linear-gradient(135deg, #6c5ce7, #a29bfe); }
 
+    /* Filters */
     .filter-buttons {
         display: flex;
         gap: 0.5rem;
@@ -252,6 +230,7 @@
         color: white;
     }
 
+    /* Stats & Transactions */
     .stat-card {
         background: white;
         border-radius: 10px;
@@ -305,27 +284,12 @@
     .transaction-icon.ingreso { background: #e8f5e9; color: var(--secondary-color); }
     .transaction-icon.egreso { background: #ffebee; color: var(--warning-color); }
 
-    .transaction-details {
-        flex: 1;
-    }
-
-    .transaction-concept {
-        font-weight: 600;
-        margin-bottom: 0.25rem;
-    }
-
-    .transaction-amount {
-        font-weight: 700;
-        font-size: 1.1rem;
-    }
-
+    .transaction-details { flex: 1; }
+    .transaction-concept { font-weight: 600; margin-bottom: 0.25rem; }
+    .transaction-amount { font-weight: 700; font-size: 1.1rem; }
     .transaction-amount.ingreso { color: var(--secondary-color); }
     .transaction-amount.egreso { color: var(--warning-color); }
-
-    .transaction-date {
-        font-size: 0.85rem;
-        color: var(--gray-color);
-    }
+    .transaction-date { font-size: 0.85rem; color: var(--gray-color); }
 
     .currency-summary {
         background: white;
@@ -345,41 +309,25 @@
 
     .currency-item:last-child { border-bottom: none; }
 
-    .currency-label {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .currency-flag {
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        overflow: hidden;
-    }
-
+    .currency-label { display: flex; align-items: center; gap: 0.5rem; }
+    .currency-flag { width: 24px; height: 24px; border-radius: 50%; overflow: hidden; }
     .currency-flag.mxn { background: #006847; }
     .currency-flag.usd { background: #3c3b6e; }
+    .currency-value { font-weight: 700; font-size: 1.2rem; }
 
-    .currency-value {
-        font-weight: 700;
-        font-size: 1.2rem;
-    }
-
-    /* Responsive adjustments */
+    /* Responsive */
     @media (max-width: 768px) {
         .kpi-value { font-size: 1.5rem; }
         .account-balance { font-size: 1.2rem; }
         .filter-buttons { justify-content: center; }
-        .kpi-icon-image {
-            width: 36px;
-            height: 36px;
-        }
-        .kpi-icon-image img {
-            width: 18px;
-            height: 18px;
-        }
+        .kpi-icon-image { width: 36px; height: 36px; }
+        .kpi-icon-image img { width: 18px; height: 18px; }
     }
+
+    /* Modal Fix */
+    .modal-backdrop { z-index: 1040 !important; }
+    .modal-content { z-index: 1100 !important; }
+    .modal { z-index: 1050 !important; }
 </style>
 {% endblock %}
 
@@ -388,7 +336,7 @@
     <div class="dashboard-header">
         <div class="container">
             <div class="row align-items-center">
-                <div class="col-md-8">
+                <div class="col-md-7">
                     <h1 class="mb-2"><i class="fas fa-chart-line me-2"></i>Panel de Control Financiero</h1>
                     <p class="mb-0">
                         <i class="fas fa-calendar-alt me-1"></i>
@@ -398,8 +346,16 @@
                         {% endif %}
                     </p>
                 </div>
-                <div class="col-md-4 text-end">
+                <div class="col-md-5 text-end">
                     <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#importarModal">
+                            <i class="fas fa-file-upload me-1"></i> Importar TXT
+                        </button>
+
+                        <a href="{% url 'bancos_categorias_lista' %}" class="btn btn-outline-light">
+                            <i class="fas fa-tags me-1"></i> Categorías
+                        </a>
+
                         <a href="{% url 'crear_movimiento' %}" class="btn btn-light">
                             <i class="fas fa-plus-circle me-1"></i> Nuevo Movimiento
                         </a>
@@ -638,7 +594,7 @@
                                                     ≈ ${{ cuenta.saldo_convertido_temp|stringformat:".2f"|intcomma }} MXN
                                                 </div>
                                                 {% endif %}
-                                                </div>
+                                            </div>
                                             <span class="account-currency {% if cuenta.moneda == 'MXN' %}mxn{% else %}usd{% endif %}">
                                                 {{ cuenta.moneda }}
                                             </span>
@@ -710,22 +666,32 @@
             <div class="col-lg-4">
                 <div class="quick-actions">
                     <h5 class="mb-3"><i class="fas fa-bolt me-2"></i>Acciones Rápidas</h5>
+                    
                     <a href="{% url 'crear_movimiento' %}" class="action-btn success">
                         <i class="fas fa-plus-circle me-2"></i>Nuevo Movimiento
                     </a>
+                    
                     <a href="{% url 'lista_movimientos' %}" class="action-btn success">
-                        <i class="fas fas fa-book-open me-2"></i>Todos los Movimientos
+                        <i class="fas fa-book-open me-2"></i>Todos los Movimientos
                     </a>
+                    
+                    <a href="{% url 'bancos_categorias_lista' %}" class="action-btn purple">
+                        <i class="fas fa-tags me-2"></i>Gestionar Categorías
+                    </a>
+                    
                     <a href="{% url 'crear_transferencia' %}" class="action-btn primary">
                         <i class="fas fa-exchange-alt me-2"></i>Transferencia
                     </a>
+                    
                     <a href="{% url 'exportar_movimientos_excel' %}?filtro={{ filtro_actual }}&fecha_inicio={{ fecha_inicio|date:'Y-m-d' }}&fecha_fin={{ fecha_fin|date:'Y-m-d' }}" 
                        class="action-btn info">
                         <i class="fas fa-file-excel me-2"></i>Reporte del Período
                     </a>
+                    
                     <a href="{% url 'lista_transferencias' %}" class="action-btn warning">
                         <i class="fas fa-list-check me-2"></i>Ver Transferencias
                     </a>
+                    
                     <a href="{% url 'exportar_transferencias_excel' %}" class="action-btn" style="background: linear-gradient(135deg, #6c5ce7, #a29bfe);">
                         <i class="fas fa-download me-2"></i>Exportar Transferencias
                     </a>
@@ -836,39 +802,85 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="importarModal" tabindex="-1" aria-labelledby="importarModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="importarModalLabel">
+            <i class="fas fa-file-invoice"></i> Importar Movimientos TXT
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      
+      <form method="post" action="{% url 'importar_movimientos' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-body">
+            
+            <div class="alert alert-info py-2 mb-3">
+                <small><i class="fas fa-info-circle"></i> Sube el archivo .txt.<br>Formato: <b>Fecha | Concepto | Cargo | Abono</b></small>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Cuenta de Destino</label>
+                <select name="cuenta_destino" class="form-select" required>
+                    <option value="">Seleccione una cuenta...</option>
+                    {% for c in cuentas %}
+                    <option value="{{ c.id }}">{{ c.nombre }} ({{ c.moneda }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="id_archivo_txt" class="form-label fw-bold">Archivo (.txt)</label>
+                <input type="file" 
+                       name="archivo_txt" 
+                       class="form-control" 
+                       accept=".txt" 
+                       id="id_archivo_txt" 
+                       required>
+            </div>
+
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-cloud-upload-alt"></i> Procesar
+            </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // Auto-refresh cada 5 minutos para actualizar saldos
+    // Auto-refresh cada 5 minutos
     setTimeout(function() {
         window.location.reload();
-    }, 300000); // 5 minutos
+    }, 300000); 
 
-    // Agregar parámetros de filtro a los enlaces de exportación
     document.addEventListener('DOMContentLoaded', function() {
+        // --- MOVER MODAL AL BODY ---
+        var modalElement = document.getElementById('importarModal');
+        if(modalElement){
+            document.body.appendChild(modalElement);
+        }
+
         const exportLinks = document.querySelectorAll('a[href*="exportar_movimientos_excel"]');
         const filtroActual = '{{ filtro_actual }}';
         const fechaInicio = '{{ fecha_inicio|date:"Y-m-d" }}';
         const fechaFin = '{{ fecha_fin|date:"Y-m-d" }}';
         
         exportLinks.forEach(link => {
-            if (!link.href.includes('?')) {
-                link.href += '?';
-            }
-            // Agregar parámetros si no están presentes
-            if (!link.href.includes('filtro=')) {
-                link.href += `&filtro=${filtroActual}`;
-            }
-            if (!link.href.includes('fecha_inicio=')) {
-                link.href += `&fecha_inicio=${fechaInicio}`;
-            }
-            if (!link.href.includes('fecha_fin=')) {
-                link.href += `&fecha_fin=${fechaFin}`;
-            }
+            if (!link.href.includes('?')) link.href += '?';
+            if (!link.href.includes('filtro=')) link.href += `&filtro=${filtroActual}`;
+            if (!link.href.includes('fecha_inicio=')) link.href += `&fecha_inicio=${fechaInicio}`;
+            if (!link.href.includes('fecha_fin=')) link.href += `&fecha_fin=${fechaFin}`;
         });
 
-        // Efecto de animación en las tarjetas
+        // Animación tarjetas
         const kpiCards = document.querySelectorAll('.kpi-card');
         kpiCards.forEach((card, index) => {
             setTimeout(() => {
@@ -877,7 +889,6 @@
             }, index * 100);
         });
 
-        // Inicialmente ocultar tarjetas para animación
         kpiCards.forEach(card => {
             card.style.opacity = '0';
             card.style.transform = 'translateY(20px)';
@@ -885,7 +896,7 @@
         });
     });
 
-    // Mostrar/ocultar detalles de cuenta
+    // Expandir tarjetas de cuenta
     document.querySelectorAll('.account-card').forEach(card => {
         card.addEventListener('click', function(e) {
             if (!e.target.closest('a')) {
