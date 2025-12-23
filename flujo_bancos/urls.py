@@ -35,4 +35,5 @@ urlpatterns = [
     path('subcategorias/crear/', views.crear_subcategoria, name='bancos_crear_subcategoria'),
     path('subcategorias/editar/<int:pk>/', views.editar_subcategoria, name='bancos_editar_subcategoria'),
     path('subcategorias/eliminar/<int:pk>/', views.eliminar_subcategoria, name='bancos_eliminar_subcategoria'),
+    path('movimientos/eliminar/<int:pk>/', views.eliminar_movimiento, name='eliminar_movimiento'),
 ]

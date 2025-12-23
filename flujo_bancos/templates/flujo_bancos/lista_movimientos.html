@@ -325,11 +325,19 @@
                                     <a href="{% url 'editar_movimiento' mov.id %}" class="btn btn-icon btn-outline-primary" title="Editar">
                                         <i class="fas fa-pen"></i>
                                     </a>
+                                    
                                     <a href="{% url 'auditar_movimiento' mov.id %}" 
                                        class="btn btn-icon btn-outline-success" 
                                        title="Auditar y Bloquear"
                                        onclick="return confirm('¿Confirmas que este movimiento es correcto? Se bloqueará para futuras ediciones.')">
                                         <i class="fas fa-check-double"></i>
+                                    </a>
+
+                                    <a href="{% url 'eliminar_movimiento' mov.id %}" 
+                                       class="btn btn-icon btn-outline-danger" 
+                                       title="Eliminar Movimiento"
+                                       onclick="return confirm('⚠️ ¿Estás seguro de ELIMINAR este movimiento? Esta acción no se puede deshacer.')">
+                                        <i class="fas fa-trash"></i>
                                     </a>
                                 {% endif %}
                             </div>

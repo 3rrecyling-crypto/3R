@@ -937,3 +937,24 @@ def eliminar_subcategoria(request, pk):
     sub.delete()
     messages.success(request, "Subcategoría eliminada.")
     return redirect('bancos_categorias_lista')
+
+
+def eliminar_movimiento(request, pk):
+    mov = get_object_or_404(Movimiento, pk=pk)
+
+    # 1. Seguridad: No borrar si ya está auditado
+    if mov.auditado:
+        messages.error(request, "No es posible eliminar un movimiento que ya ha sido auditado.")
+        return redirect('lista_movimientos')
+
+    # 2. Limpieza S3: Borrar archivo adjunto si existe
+    if mov.comprobante:
+        try:
+            _eliminar_archivo_de_s3(str(mov.comprobante))
+        except Exception as e:
+            print(f"Advertencia: No se pudo borrar archivo S3: {e}")
+
+    # 3. Borrar registro
+    mov.delete()
+    messages.success(request, "El movimiento ha sido eliminado correctamente.")
+    return redirect('lista_movimientos')
