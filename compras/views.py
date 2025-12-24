@@ -1417,23 +1417,43 @@ def twilio_webhook(request):
 @login_required
 def solicitud_pdf_view(request, pk):
     """
-    Genera el PDF de la Solicitud para enviarlo por WhatsApp.
+    Genera el PDF de la Solicitud reutilizando el template de Orden de Compra.
+    Mapeamos los campos para que coincidan.
     """
     solicitud = get_object_or_404(SolicitudCompra, pk=pk)
-    # Usamos el mismo template o uno nuevo (ej. solicitud_pdf_template.html)
     template_path = 'compras/orden_compra_pdf_template.html' 
     
+    # --- MAPEAMOS LOS CAMPOS PARA QUE EL TEMPLATE NO FALLE ---
+    # 1. El template busca 'creado_por', así que se lo asignamos manual
+    solicitud.creado_por = solicitud.solicitante
+    
+    # 2. El template busca 'fecha_emision', usamos 'creado_en'
+    solicitud.fecha_emision = solicitud.creado_en
+
+    # 3. El template busca 'moneda', ponemos una por defecto o vacía
+    solicitud.moneda = "MXN" 
+    
+    # 4. El template busca 'condiciones_pago', usamos el dato del proveedor o texto
+    if solicitud.proveedor and solicitud.proveedor.dias_credito:
+        solicitud.condiciones_pago = f"{solicitud.proveedor.dias_credito} días crédito"
+    else:
+        solicitud.condiciones_pago = "Contado / N/A"
+
     # Calculamos totales para el contexto
     total = sum([(d.cantidad or 0) * (d.precio_unitario or 0) for d in solicitud.detalles.all()])
     
+    # Truco para convertir el número a letras (reutilizando lógica si la tienes en el template)
+    # Si tu template usa 'total_en_letra', agrégalo aquí también usando num2words como en la otra vista.
+    
     context = {
-        'orden': solicitud, # Usamos 'orden' para reutilizar tu template existente
+        'orden': solicitud, # Pasamos la solicitud disfrazada de 'orden'
         'empresa': solicitud.empresa,
         'total_general': total,
-        'titulo_documento': "SOLICITUD DE COMPRA" # Para cambiar el título en el PDF
+        'titulo_documento': "SOLICITUD DE COMPRA" # Esto cambiará el título si tu HTML usa esta variable
     }
 
     response = HttpResponse(content_type='application/pdf')
+    # Cambia 'attachment' por 'inline' si quieres verlo en el navegador
     response['Content-Disposition'] = f'inline; filename="SC_{solicitud.folio}.pdf"' 
 
     template = get_template(template_path)
