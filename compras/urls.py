@@ -65,4 +65,5 @@ urlpatterns = [
     path('api/empresas-por-operacion/<int:operacion_id>/', views.get_empresas_por_operacion, name='api_empresas_por_operacion'),
     path('reportes/excel-compras/', views.reporte_compras_excel, name='reporte_compras_excel'),
     path('webhooks/whatsapp/', views.twilio_webhook, name='twilio_webhook'),
+    path('solicitudes/<int:pk>/pdf/', views.solicitud_pdf_view, name='solicitud_pdf'),
 ]

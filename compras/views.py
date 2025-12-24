@@ -1412,3 +1412,34 @@ def twilio_webhook(request):
         return HttpResponse(str(response))
     
     return HttpResponseForbidden()
+
+
+@login_required
+def solicitud_pdf_view(request, pk):
+    """
+    Genera el PDF de la Solicitud para enviarlo por WhatsApp.
+    """
+    solicitud = get_object_or_404(SolicitudCompra, pk=pk)
+    # Usamos el mismo template o uno nuevo (ej. solicitud_pdf_template.html)
+    template_path = 'compras/orden_compra_pdf_template.html' 
+    
+    # Calculamos totales para el contexto
+    total = sum([(d.cantidad or 0) * (d.precio_unitario or 0) for d in solicitud.detalles.all()])
+    
+    context = {
+        'orden': solicitud, # Usamos 'orden' para reutilizar tu template existente
+        'empresa': solicitud.empresa,
+        'total_general': total,
+        'titulo_documento': "SOLICITUD DE COMPRA" # Para cambiar el título en el PDF
+    }
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="SC_{solicitud.folio}.pdf"' 
+
+    template = get_template(template_path)
+    html = template.render(context)
+    pisa_status = pisa.CreatePDF(html, dest=response)
+    
+    if pisa_status.err:
+       return HttpResponse('Error generando PDF')
+    return response
