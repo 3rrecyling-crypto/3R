@@ -12,12 +12,6 @@ class Cuenta(models.Model):
     
     @property
     def saldo_actual(self):
-        ingresos = self.movimientos.aggregate(total=Sum('abono'))['total'] or 0
-        egresos = self.movimientos.aggregate(total=Sum('cargo'))['total'] or 0
-        return self.saldo_inicial + ingresos - egresos
-
-    @property
-    def saldo_actual(self):
         # Calculamos el saldo al vuelo usando Abono (ingreso) y Cargo (egreso)
         ingresos = self.movimientos.aggregate(total=Sum('abono'))['total'] or 0
         egresos = self.movimientos.aggregate(total=Sum('cargo'))['total'] or 0

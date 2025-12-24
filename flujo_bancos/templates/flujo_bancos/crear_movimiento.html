@@ -35,6 +35,20 @@
         .modal-backdrop { z-index: 1040 !important; }
         .modal-content { z-index: 1100 !important; }
         .modal { z-index: 1050 !important; }
+        
+        /* Estilos para las tarjetas de saldo */
+        .card-saldo-antes {
+            background-color: #f8f9fa;
+            border-left: 4px solid #6c757d;
+        }
+        .card-saldo-despues {
+            background-color: #e8f5e9;
+            border-left: 4px solid #198754; /* Verde éxito */
+        }
+        .card-saldo-despues.negativo {
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545; /* Rojo peligro */
+        }
     </style>
 {% endblock %}
 
@@ -44,23 +58,27 @@
         <div class="col-md-3 mb-4">
             <div class="card shadow border-0 sticky-card">
                 <div class="card-header bg-dark text-white text-center py-3">
-                    <h5 class="mb-0 fw-bold"><i class="fas fa-wallet me-2"></i>Estado de Cuenta</h5>
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-wallet me-2"></i>Resumen de Saldo</h5>
                 </div>
                 <div class="card-body">
-                    <div class="mb-4 text-center">
-                        <small class="text-muted text-uppercase fw-bold">Saldo Disponible</small>
-                        <h3 id="display-saldo-actual" 
-                            class="fw-bold text-dark mt-1 saldo-editable"
-                            title="Clic para corregir saldo inicial"
+                    
+                    <div class="p-3 mb-3 rounded card-saldo-antes">
+                        <small class="text-muted text-uppercase fw-bold d-block mb-1" style="font-size: 0.7rem;">
+                            Saldo Antes de Realizar la Operación
+                        </small>
+                        <h4 id="display-saldo-antes" 
+                            class="fw-bold text-secondary mb-0 saldo-editable"
+                            title="Clic para corregir saldo base"
                             onclick="abrirModalSaldo()">
                             $0.00
-                        </h3>
-                        <div id="saldo-loader" class="loading-text d-none">Consultando banco...</div>
+                        </h4>
+                        <div id="saldo-loader" class="loading-text d-none">Consultando...</div>
                     </div>
-                    <hr>
-                    
-                    <h6 class="text-primary fw-bold mb-3"><i class="fas fa-calculator me-2"></i>Desglose Proyectado</h6>
-                    <ul class="list-group list-group-flush small">
+
+                    <h6 class="text-primary fw-bold mb-3 mt-4">
+                        <i class="fas fa-calculator me-2"></i>Desglose
+                    </h6>
+                    <ul class="list-group list-group-flush small mb-3">
                         <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-transparent">
                             Monto Base
                             <span id="resumen-subtotal" class="fw-bold text-dark">$0.00</span>
@@ -75,10 +93,15 @@
                         </li>
                     </ul>
 
-                    <div class="alert alert-light border-primary border-dashed mt-3 text-center py-3">
-                        <small class="text-muted fw-bold">SALDO FINAL ESTIMADO</small>
-                        <h4 id="display-saldo-final" class="fw-bold mt-2 mb-0">$0.00</h4>
+                    <div id="card-saldo-final" class="p-3 rounded card-saldo-despues">
+                        <small class="text-muted text-uppercase fw-bold d-block mb-1" style="font-size: 0.7rem;">
+                            Saldo Después de Realizar la Operación
+                        </small>
+                        <h3 id="display-saldo-despues" class="fw-bold text-success mb-0">
+                            $0.00
+                        </h3>
                     </div>
+
                 </div>
             </div>
         </div>
@@ -86,7 +109,10 @@
         <div class="col-md-9">
             <div class="card shadow-lg border-0">
                 <div class="card-header bg-primary text-white py-3 d-flex justify-content-between align-items-center">
-                    <h4 class="mb-0 fw-bold"><i class="fas fa-plus-circle me-2"></i>Nuevo Movimiento Bancario</h4>
+                    <h4 class="mb-0 fw-bold">
+                        <i class="fas {% if movimiento %}fa-edit{% else %}fa-plus-circle{% endif %} me-2"></i>
+                        {% if movimiento %}Editar Movimiento{% else %}Nuevo Movimiento Bancario{% endif %}
+                    </h4>
                     <span id="icono-operacion" class="badge bg-white text-primary fs-6 p-2 shadow-sm">Operación</span>
                 </div>
                 
@@ -195,13 +221,19 @@
                                 <div class="bg-white p-2 border rounded shadow-sm">
                                     {{ form.comprobante }}
                                 </div>
+                                {% if movimiento.comprobante %}
+                                    <div class="mt-1 small">
+                                        <a href="{{ movimiento.comprobante.url }}" target="_blank">Ver actual</a>
+                                    </div>
+                                {% endif %}
                             </div>
                         </div>
 
                         <div class="d-flex justify-content-end gap-3 pt-3 border-top">
                             <a href="{% url 'lista_movimientos' %}" class="btn btn-light border px-4">Cancelar</a>
                             <button type="submit" class="btn btn-success px-5 fw-bold shadow">
-                                <i class="fas fa-cloud-upload-alt me-2"></i>Finalizar y Guardar
+                                <i class="fas fa-cloud-upload-alt me-2"></i>
+                                {% if movimiento %}Actualizar Movimiento{% else %}Finalizar y Guardar{% endif %}
                             </button>
                         </div>
                     </form>
@@ -245,8 +277,28 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
+    // --- VARIABLES DE ESTADO ---
     let currentCuentaId = null;
-    let currentSaldoInicial = 0;
+    let currentSaldoInicial = 0; // Para el modal de edición
+    let saldoBaseCuenta = 0;     // ESTE ES EL "SALDO ANTES"
+
+    // --- DATOS INYECTADOS DESDE DJANGO (Para edición histórica correcta) ---
+    {% if movimiento %}
+        const esEdicion = true;
+        // Recuperamos los valores crudos de la BD para ingeniería inversa
+        const saldoFinalGuardado = parseFloat("{{ movimiento.saldo_banco|default:0 }}");
+        const abonoGuardado = parseFloat("{{ movimiento.abono|default:0 }}");
+        const cargoGuardado = parseFloat("{{ movimiento.cargo|default:0 }}");
+        
+        // CÁLCULO DEL "SALDO ANTES" HISTÓRICO:
+        // SaldoAntes = SaldoFinal - Abono + Cargo
+        saldoBaseCuenta = saldoFinalGuardado - abonoGuardado + cargoGuardado;
+    {% else %}
+        const esEdicion = false;
+        // Si es nuevo, saldoBaseCuenta se llenará con AJAX fetchSaldo()
+    {% endif %}
+
+    const fmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
 
     function abrirTerceroPopup(url) {
         const w = 600; const h = 700;
@@ -261,13 +313,12 @@
             return;
         }
         document.getElementById('inputSaldo').value = currentSaldoInicial;
-        document.getElementById('formSaldo').action = "/bancos/cuenta/saldo/" + currentCuentaId + "/"; 
+        document.getElementById('formSaldo').action = "/bancos/cuenta/editar/" + currentCuentaId + "/"; 
         var myModal = new bootstrap.Modal(document.getElementById('modalSaldo'));
         myModal.show();
     }
 
     $(document).ready(function() {
-        // Mover modales al body
         var modals = document.querySelectorAll('.modal');
         modals.forEach(modal => document.body.appendChild(modal));
 
@@ -281,22 +332,24 @@
 
         const divTercero = document.getElementById('div_tercero');
         const divDestino = document.getElementById('div_cuenta_destino');
+        
         const inputSubtotal = document.getElementById('id_monto_total');
         const inputIva = document.getElementById('id_iva');
         const inputRetIva = document.getElementById('id_ret_iva');
         const inputRetIsr = document.getElementById('id_ret_isr');
         const seccionImpuestos = document.getElementById('seccion-impuestos-contenedor');
-        const displaySaldoActual = document.getElementById('display-saldo-actual');
-        const displaySaldoFinal = document.getElementById('display-saldo-final');
+        
+        // ELEMENTOS DE VISUALIZACIÓN
+        const displaySaldoAntes = document.getElementById('display-saldo-antes');
+        const displaySaldoDespues = document.getElementById('display-saldo-despues');
+        const cardSaldoDespues = document.getElementById('card-saldo-final');
+        
         const resumenSubtotal = document.getElementById('resumen-subtotal');
         const resumenIva = document.getElementById('resumen-iva');
         const resumenRet = document.getElementById('resumen-ret');
         const iconoOperacion = document.getElementById('icono-operacion');
         const labelTercero = document.getElementById('label-tercero');
         const loader = document.getElementById('saldo-loader');
-
-        let saldoBaseCuenta = 0;
-        const fmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
 
         function checkOperacion() {
             const data = $operacionSelect.select2('data')[0];
@@ -315,57 +368,88 @@
         }
 
         function actualizarCalculos() {
+            // Obtenemos valores del formulario
             const subtotal = parseFloat(inputSubtotal.value) || 0;
             let iva = parseFloat(inputIva.value) || 0;
             const retIva = parseFloat(inputRetIva.value) || 0;
             const retIsr = parseFloat(inputRetIsr.value) || 0;
             const tipo = $tipoSelect.val();
             
-            let totalNeto = 0;
-            let saldoFinal = saldoBaseCuenta;
+            let totalOperacion = 0;
+            let saldoFinal = saldoBaseCuenta; // Empezamos desde el saldo "ANTES"
 
+            // Lógica de Ingreso/Egreso
             if (tipo === 'ingreso') {
                 seccionImpuestos.style.opacity = '0.5';
                 seccionImpuestos.style.pointerEvents = 'none';
                 iva = 0; 
                 inputIva.value = 0;
-                totalNeto = subtotal;
-                saldoFinal += totalNeto;
+                
+                totalOperacion = subtotal; // Ingreso suele ser directo sin impuestos desglosados aquí
+                saldoFinal += totalOperacion;
+
                 iconoOperacion.innerHTML = '<i class="fas fa-arrow-circle-up me-1"></i>INGRESO';
                 iconoOperacion.className = "badge bg-white text-success fs-6 p-2 shadow-sm border border-success";
                 labelTercero.innerHTML = '<i class="fas fa-user-tie me-1"></i>Recibido de (Cliente)';
             } else {
                 seccionImpuestos.style.opacity = '1';
                 seccionImpuestos.style.pointerEvents = 'auto';
-                totalNeto = subtotal + iva - (retIva + retIsr);
-                saldoFinal -= totalNeto;
+                
+                totalOperacion = subtotal + iva - (retIva + retIsr);
+                saldoFinal -= totalOperacion;
+
                 iconoOperacion.innerHTML = '<i class="fas fa-arrow-circle-down me-1"></i>EGRESO';
                 iconoOperacion.className = "badge bg-white text-danger fs-6 p-2 shadow-sm border border-danger";
                 labelTercero.innerHTML = '<i class="fas fa-truck-loading me-1"></i>Pagado a (Proveedor)';
             }
 
-            displaySaldoActual.textContent = fmt.format(saldoBaseCuenta);
+            // --- ACTUALIZAR PANTALLA ---
+            
+            // 1. Mostrar Saldo ANTES
+            displaySaldoAntes.textContent = fmt.format(saldoBaseCuenta);
+
+            // 2. Mostrar Desgloses
             resumenSubtotal.textContent = fmt.format(subtotal);
             resumenIva.textContent = fmt.format(iva);
             resumenRet.textContent = fmt.format(retIva + retIsr);
-            displaySaldoFinal.textContent = fmt.format(saldoFinal);
 
+            // 3. Mostrar Saldo DESPUÉS
+            displaySaldoDespues.textContent = fmt.format(saldoFinal);
+
+            // Estilos condicionales para el saldo final
             if (saldoFinal < 0) {
-                displaySaldoFinal.className = "fw-bold mt-2 mb-0 text-danger";
+                displaySaldoDespues.classList.remove('text-success');
+                displaySaldoDespues.classList.add('text-danger');
+                cardSaldoDespues.classList.add('negativo');
+                cardSaldoDespues.classList.remove('card-saldo-despues'); // Quitamos borde verde
             } else {
-                displaySaldoFinal.className = "fw-bold mt-2 mb-0 text-success";
+                displaySaldoDespues.classList.remove('text-danger');
+                displaySaldoDespues.classList.add('text-success');
+                cardSaldoDespues.classList.remove('negativo');
+                cardSaldoDespues.classList.add('card-saldo-despues'); // Ponemos borde verde
             }
         }
 
         function fetchSaldo() {
+            // Si estamos editando y NO hemos cambiado la cuenta, NO sobreescribimos el saldo histórico
+            // con el saldo actual del banco.
             const cuentaId = $cuentaSelect.val();
             currentCuentaId = cuentaId;
+
+            // Si es edición y es la misma cuenta original, usamos el cálculo histórico ya hecho arriba
+            if (esEdicion && cuentaId == "{{ form.cuenta.value|default:'' }}") {
+                actualizarCalculos();
+                return;
+            }
+
+            // Si cambiamos de cuenta o es nuevo, traemos el saldo ACTUAL fresco
             if (!cuentaId) {
                 saldoBaseCuenta = 0;
                 currentSaldoInicial = 0;
                 actualizarCalculos();
                 return;
             }
+
             loader.classList.remove('d-none');
             $.getJSON("{% url 'ajax_saldo_cuenta' %}", { cuenta_id: cuentaId }, function(data) {
                 saldoBaseCuenta = parseFloat(data.saldo) || 0;
@@ -390,6 +474,7 @@
             });
         });
 
+        // Eventos
         $cuentaSelect.select2({ theme: 'bootstrap-5', width: '100%' }).on('change', fetchSaldo);
         $operacionSelect.select2({ theme: 'bootstrap-5', width: '100%' }).on('change', checkOperacion);
         $terceroSelect.select2({ theme: 'bootstrap-5', width: '100%' });
@@ -402,7 +487,11 @@
             el.addEventListener('input', actualizarCalculos);
         });
 
-        if ($cuentaSelect.val()) fetchSaldo();
+        // Inicialización
+        if ($cuentaSelect.val()) {
+            // Si es nuevo, fetchSaldo traerá el dato. Si es edición, fetchSaldo respetará el histórico.
+            fetchSaldo(); 
+        }
         checkOperacion();
         actualizarCalculos();
     });

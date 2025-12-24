@@ -3,8 +3,10 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Sum, Q
 from django.utils import timezone
+import re 
 from django.conf import settings
 from decimal import Decimal
+from django.core.paginator import Paginator # <--- IMPORTANTE: AGREGAR AL INICIO
 from datetime import datetime, timedelta
 import csv
 import io
@@ -213,7 +215,7 @@ def importar_movimientos(request):
             cuenta = form.cleaned_data['cuenta_destino']
             archivo = request.FILES['archivo_txt']
             
-            # 1. Leer archivo
+            # 1. Leer archivo intentando utf-8, luego latin-1
             try:
                 decoded_file = archivo.read().decode('utf-8')
             except UnicodeDecodeError:
@@ -223,97 +225,114 @@ def importar_movimientos(request):
             lineas = decoded_file.splitlines()
             contador_exito = 0
             errores = []
+            
+            # Variables para capturar el saldo más reciente
+            saldo_final_txt = None
+            fecha_cierre_txt = None
 
             for i, linea in enumerate(lineas, start=1):
-                if not linea.strip(): continue 
+                # Omitir líneas vacías o encabezados
+                if not linea.strip() or "Concepto" in linea or "Saldo" in linea:
+                    continue
                 
-                # Ignorar encabezados
-                if "Concepto" in linea and ("Fecha" in linea or "Día" in linea):
-                    continue
+                # --- CORRECCIÓN 1: Definir 'datos' separando por tabulación ---
+                datos = linea.split('\t')
 
-                # 2. Detectar separador
-                if '\t' in linea:
-                    datos = linea.split('\t')
-                elif '|' in linea:
-                    datos = linea.split('|')
-                else:
-                    errores.append(f"Línea {i}: Separador no detectado.")
-                    continue
-
+                # Validar que la línea tenga al menos 4 columnas para evitar errores de índice
                 if len(datos) < 4:
-                    errores.append(f"Línea {i}: Faltan columnas.")
                     continue
 
-                # 3. Extraer datos
-                fecha_str = datos[0].strip()
+                # --- CORRECCIÓN 2: Definir las variables extrayéndolas de 'datos' ---
+                fecha_str = datos[0].strip()   # <--- Aquí definimos fecha_str
                 concepto = datos[1].strip()
                 cargo_str = datos[2].strip()
                 abono_str = datos[3].strip()
                 
-                # 4. LIMPIEZA DE NÚMEROS (USANDO DECIMAL)
-                try:
-                    # CORRECCIÓN AQUÍ: Usamos Decimal en lugar de float
-                    cargo = Decimal(cargo_str.replace(',', '') or 0)
-                    abono = Decimal(abono_str.replace(',', '') or 0)
-                except Exception:
-                    errores.append(f"Línea {i}: Monto inválido.")
-                    continue
+                # El saldo suele venir en la columna 4 (índice 4)
+                saldo_str = "0"
+                if len(datos) >= 5: 
+                    saldo_str = datos[4].strip()
 
-                # 5. Parseo de Fecha
+                # Limpieza y conversión de números
+                def limpiar_numero(valor):
+                    if not valor: return Decimal(0)
+                    # Quitamos comas y espacios
+                    limpio = valor.replace(',', '').strip()
+                    return Decimal(limpio) if limpio else Decimal(0)
+
+                try:
+                    cargo = limpiar_numero(cargo_str)
+                    abono = limpiar_numero(abono_str)
+                    saldo_linea = limpiar_numero(saldo_str)
+                except:
+                    continue # Si fallan los números, saltamos la línea
+
+                # Parseo de Fecha
                 fecha = None
-                formatos_fecha = ['%d-%m-%Y', '%d/%m/%Y', '%Y-%m-%d', '%Y/%m/%d']
-                
-                for fmt in formatos_fecha:
+                for fmt in ['%d-%m-%Y', '%d/%m/%Y', '%Y-%m-%d']:
                     try:
                         fecha = datetime.strptime(fecha_str, fmt).date()
                         break
-                    except ValueError:
-                        continue
+                    except ValueError: continue
                 
-                if not fecha:
-                    errores.append(f"Línea {i}: Fecha inválida ({fecha_str})")
-                    continue
+                if not fecha: continue
 
-                # 6. Guardar
+                # --- LÓGICA DE SALDO (Capturar el primero que aparece = más reciente) ---
+                if saldo_final_txt is None:
+                    saldo_final_txt = saldo_linea
+                    fecha_cierre_txt = fecha
+                
+                # Guardar movimiento en BD
                 try:
-                    Movimiento.objects.create(
-                        cuenta=cuenta,
-                        fecha=fecha,
-                        concepto=concepto,
-                        cargo=cargo,
-                        abono=abono,
-                        subcategoria=None, 
-                        estatus='PENDIENTE'
-                    )
-                    contador_exito += 1
+                    existe = Movimiento.objects.filter(
+                        cuenta=cuenta, 
+                        fecha=fecha, 
+                        concepto=concepto, 
+                        cargo=cargo, 
+                        abono=abono
+                    ).exists()
+                    
+                    if not existe:
+                        Movimiento.objects.create(
+                            cuenta=cuenta,
+                            fecha=fecha,
+                            concepto=concepto,
+                            cargo=cargo,
+                            abono=abono,
+                            saldo_banco=saldo_linea,
+                            comentarios='Importado TXT',
+                            auditado=False
+                        )
+                        contador_exito += 1
                 except Exception as e:
-                    errores.append(f"Línea {i}: Error DB ({str(e)})")
+                    errores.append(f"Línea {i}: Error al guardar.")
+
+            # --- AJUSTE DE SALDO DE LA CUENTA ---
+            if saldo_final_txt is not None:
+                # Calculamos totales actuales en BD
+                agregados = Movimiento.objects.filter(cuenta=cuenta).aggregate(
+                    total_abono=Sum('abono'), 
+                    total_cargo=Sum('cargo')
+                )
+                suma_abonos = agregados['total_abono'] or 0
+                suma_cargos = agregados['total_cargo'] or 0
+                
+                # Fórmula inversa para hallar el saldo inicial correcto
+                nuevo_inicial = saldo_final_txt - suma_abonos + suma_cargos
+                
+                cuenta.saldo_inicial = nuevo_inicial
+                cuenta.save()
+                
+                messages.success(request, f"✅ Saldo ajustado al Banco: ${saldo_final_txt:,.2f}")
 
             if contador_exito > 0:
-                messages.success(request, f"✅ Éxito: Se cargaron {contador_exito} movimientos.")
+                messages.success(request, f"Se importaron {contador_exito} movimientos correctamente.")
+            elif not errores:
+                messages.warning(request, "No se encontraron movimientos nuevos.")
             
-            if errores:
-                msg = f"⚠️ Hubo problemas con {len(errores)} líneas. (Ej: {errores[0]})"
-                messages.warning(request, msg)
-
             return redirect('lista_movimientos')
     
     return redirect('dashboard_bancos')
-
-# ---------------------------------------------------------
-# LISTAR TRANSFERENCIAS
-# ---------------------------------------------------------
-def lista_transferencias(request):
-    transferencias = Movimiento.objects.filter(
-        cargo__gt=0
-    ).filter(
-        Q(concepto__icontains='(Envío a') | 
-        Q(concepto__icontains='Transferencia')
-    ).select_related('cuenta').order_by('-fecha')
-
-    return render(request, 'flujo_bancos/lista_transferencias.html', {
-        'transferencias': transferencias
-    })
 
 # ---------------------------------------------------------
 # CANCELAR TRANSFERENCIA
@@ -353,29 +372,35 @@ def lista_movimientos(request):
     fecha_inicio = request.GET.get('fecha_inicio', '')
     fecha_fin = request.GET.get('fecha_fin', '')
     estatus_filtro = request.GET.get('estatus', '')
-    
-    # --- NUEVO: Obtener el filtro de auditado ---
     auditado_filtro = request.GET.get('auditado', '') 
 
-    movimientos = Movimiento.objects.all().select_related('cuenta', 'subcategoria', 'categoria')
+    # Consulta base
+    qs = Movimiento.objects.all().select_related('cuenta', 'subcategoria', 'categoria')
 
+    # Filtros
     if q:
-        movimientos = movimientos.filter(Q(concepto__icontains=q) | Q(cuenta__nombre__icontains=q))
+        qs = qs.filter(Q(concepto__icontains=q) | Q(cuenta__nombre__icontains=q) | Q(tercero__icontains=q))
     if fecha_inicio:
-        movimientos = movimientos.filter(fecha__gte=fecha_inicio)
+        qs = qs.filter(fecha__gte=fecha_inicio)
     if fecha_fin:
-        movimientos = movimientos.filter(fecha__lte=fecha_fin)
+        qs = qs.filter(fecha__lte=fecha_fin)
     if estatus_filtro:
-        movimientos = movimientos.filter(estatus=estatus_filtro)
-    
-    # --- NUEVO: Aplicar el filtro de auditado ---
+        qs = qs.filter(estatus=estatus_filtro)
     if auditado_filtro == '1':
-        movimientos = movimientos.filter(auditado=True)
+        qs = qs.filter(auditado=True)
     elif auditado_filtro == '0':
-        movimientos = movimientos.filter(auditado=False)
+        qs = qs.filter(auditado=False)
+
+    # Ordenamiento por defecto
+    qs = qs.order_by('-fecha', '-id')
+
+    # --- PAGINACIÓN (27 FILAS) ---
+    paginator = Paginator(qs, 27) 
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
 
     context = {
-        'movimientos': movimientos,
+        'movimientos': page_obj, # Ahora pasamos la página, no el queryset completo
         'importar_form': ImportarTxtForm(),
         'estatus_filtro': estatus_filtro
     }
@@ -958,3 +983,22 @@ def eliminar_movimiento(request, pk):
     mov.delete()
     messages.success(request, "El movimiento ha sido eliminado correctamente.")
     return redirect('lista_movimientos')
+
+def lista_transferencias(request):
+    # Filtramos movimientos que parezcan transferencias (salidas con concepto de Envío)
+    transferencias = Movimiento.objects.filter(
+        cargo__gt=0
+    ).filter(
+        Q(concepto__icontains='(Envío a') | Q(concepto__icontains='Transferencia')
+    ).select_related('cuenta').order_by('-fecha', '-id')
+
+    # Paginación (opcional, igual que en movimientos)
+    paginator = Paginator(transferencias, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'transferencias': page_obj,
+    }
+    # Asegúrate de tener este template o usa 'lista_movimientos.html' temporalmente
+    return render(request, 'flujo_bancos/lista_transferencias.html', context)

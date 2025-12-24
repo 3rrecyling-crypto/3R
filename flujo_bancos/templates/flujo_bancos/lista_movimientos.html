@@ -135,6 +135,19 @@
     .excel-dropdown .dropdown-menu { border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
     .excel-dropdown .dropdown-item { padding: 0.75rem 1.25rem; border-radius: 6px; margin: 2px; }
     .excel-dropdown .dropdown-item:hover { background: rgba(26, 115, 232, 0.08); }
+    
+    /* Estilos Paginación */
+    .pagination .page-link {
+        color: #0d6efd;
+        border-radius: 5px;
+        margin: 0 2px;
+        border: 1px solid #dee2e6;
+    }
+    .pagination .page-item.active .page-link {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+        color: white;
+    }
 </style>
 {% endblock %}
 
@@ -248,7 +261,7 @@
                         <td class="ps-3 text-nowrap fw-bold">{{ mov.fecha|date:"d/m/Y" }}</td>
                         
                         <td style="min-width: 200px;">
-                            <div class="fw-bold text-dark mb-1">{{ mov.concepto|truncatechars:40 }}</div>
+                            <div class="fw-bold text-dark mb-1">{{ mov.concepto|truncatechars:80 }}</div>
                             <div class="text-small-muted"><i class="fas fa-university me-1"></i>{{ mov.cuenta.nombre }}</div>
                         </td>
 
@@ -336,7 +349,7 @@
                                     <a href="{% url 'eliminar_movimiento' mov.id %}" 
                                        class="btn btn-icon btn-outline-danger" 
                                        title="Eliminar Movimiento"
-                                       onclick="return confirm('⚠️ ¿Estás seguro de ELIMINAR este movimiento? Esta acción no se puede deshacer.')">
+                                       onclick="return confirm(⚠️ ¿Estás seguro de ELIMINAR este movimiento? Esta acción no se puede deshacer.')">
                                         <i class="fas fa-trash"></i>
                                     </a>
                                 {% endif %}
@@ -356,7 +369,49 @@
                 </tbody>
             </table>
         </div>
-    </div>
+
+        {% if movimientos.has_other_pages %}
+        <div class="card-footer bg-white border-top-0 py-3">
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center mb-0">
+                    
+                    {% if movimientos.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ movimientos.previous_page_number }}&q={{ request.GET.q }}&fecha_inicio={{ request.GET.fecha_inicio }}&fecha_fin={{ request.GET.fecha_fin }}&estatus={{ request.GET.estatus }}&auditado={{ request.GET.auditado }}">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-left"></i></span></li>
+                    {% endif %}
+
+                    {% for i in movimientos.paginator.page_range %}
+                        {% if i == movimientos.number %}
+                            <li class="page-item active"><span class="page-link">{{ i }}</span></li>
+                        {% elif i > movimientos.number|add:'-3' and i < movimientos.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ i }}&q={{ request.GET.q }}&fecha_inicio={{ request.GET.fecha_inicio }}&fecha_fin={{ request.GET.fecha_fin }}&estatus={{ request.GET.estatus }}&auditado={{ request.GET.auditado }}">{{ i }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if movimientos.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ movimientos.next_page_number }}&q={{ request.GET.q }}&fecha_inicio={{ request.GET.fecha_inicio }}&fecha_fin={{ request.GET.fecha_fin }}&estatus={{ request.GET.estatus }}&auditado={{ request.GET.auditado }}">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-right"></i></span></li>
+                    {% endif %}
+                </ul>
+                <div class="text-center mt-2 text-muted small">
+                    Mostrando {{ movimientos.start_index }} - {{ movimientos.end_index }} de {{ movimientos.paginator.count }} registros
+                </div>
+            </nav>
+        </div>
+        {% endif %}
+        </div>
 </div>
 
 <div class="modal fade" id="importarModal" tabindex="-1" aria-hidden="true">
