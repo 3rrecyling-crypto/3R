@@ -8,6 +8,8 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.forms import inlineformset_factory
 from django.db.models import Count, Q
+import threading # Para enviar el mensaje en segundo plano y no trabar la página
+from .utils import enviar_whatsapp_solicitud
 import csv
 from django.contrib.auth.decorators import login_required, permission_required
 from django.http import HttpResponse
@@ -450,10 +452,9 @@ def crear_solicitud(request):
     if request.method == 'POST':
         form = SolicitudCompraForm(request.POST, request.FILES)
         
-        # Obtenemos el ID del proveedor de forma segura
         proveedor_id = request.POST.get('proveedor')
         if not proveedor_id:
-            proveedor_id = None # Asegurar que sea None y no cadena vacía si falla
+            proveedor_id = None 
         
         formset = DetalleFormSet(
             request.POST, 
@@ -463,8 +464,6 @@ def crear_solicitud(request):
         )
         
         if form.is_valid():
-            # Validamos el formset. Aquí es donde DetalleSolicitudForm usará el 
-            # proveedor_id que pasamos arriba para asegurar que el artículo sea válido.
             if formset.is_valid():
                 if not formset.has_changed():
                      messages.error(request, "La solicitud debe tener al menos un artículo.")
@@ -479,6 +478,15 @@ def crear_solicitud(request):
                             formset.instance = solicitud
                             formset.save()
                             
+                            # --- INTEGRACIÓN WHATSAPP ---
+                            # Usamos un hilo (thread) para que el usuario no espere a que Twilio responda
+                            try:
+                                thread = threading.Thread(target=enviar_whatsapp_solicitud, args=(solicitud,))
+                                thread.start()
+                            except Exception as e:
+                                print(f"No se pudo iniciar el hilo de WhatsApp: {e}")
+                            # ----------------------------
+
                             messages.success(request, f'Solicitud {solicitud.folio} enviada para aprobación.')
                             return redirect('lista_solicitudes')
                     except Exception as e:
@@ -494,8 +502,6 @@ def crear_solicitud(request):
 
     else: # GET
         form = SolicitudCompraForm()
-        # Inicializamos con None, lo que activará el "Articulo.objects.filter(activo=True)" en forms.py
-        # permitiendo que el widget se renderice correctamente para el JS.
         formset = DetalleFormSet(prefix='detalles', form_kwargs={'proveedor_id': None})
 
     context = { 

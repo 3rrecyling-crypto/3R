@@ -183,3 +183,13 @@ DEFAULT_FROM_EMAIL = 'Soporte 3R Recycling <3rrecycling@gmail.com>'
 SESSION_COOKIE_AGE = 1209600  # 2 semanas por defecto (en segundos)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True # Por defecto se cierra al salir, el checkbox cambiará esto
 BANXICO_API_TOKEN = os.environ.get('BANXICO_API_TOKEN')
+
+
+# settings.py
+
+# Credenciales de Twilio
+TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
+TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
+TWILIO_WHATSAPP_FROM = 'whatsapp:+14155238886'           # Número Sandbox o tu número verificado
+TWILIO_WHATSAPP_TO_APPROVER = 'whatsapp:+5218123465830'  # El número del jefe/aprobador
+TWILIO_CONTENT_SID = os.getenv('TWILIO_CONTENT_SID')
