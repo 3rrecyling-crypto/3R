@@ -209,11 +209,92 @@ class SolicitudCompra(models.Model):
     motivo = models.TextField()
     prioridad = models.CharField(max_length=20, choices=PRIORIDAD_CHOICES, default='PROGRAMADO')
     estatus = models.CharField(max_length=25, choices=ESTATUS_CHOICES, default='BORRADOR')
-    proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True, blank=True, help_text="Proveedor seleccionado para esta solicitud (opcional)")
+    proveedor = models.ForeignKey('Proveedor', on_delete=models.SET_NULL, null=True, blank=True, help_text="Proveedor seleccionado para esta solicitud (opcional)")
     cotizacion = models.FileField(upload_to='cotizaciones/%Y/%m/', null=True, blank=True, verbose_name="Archivo de Cotización")
     aprobado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="solicitudes_aprobadas")
     fecha_aprobacion = models.DateTimeField(null=True, blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
+
+    def ejecutar_aprobacion(self, usuario_responsable):
+        """
+        Lógica centralizada para aprobar la solicitud y generar la Orden de Compra.
+        Retorna: (Exito: bool, Mensaje: str)
+        """
+        # Usamos apps.get_model para evitar errores de "Importación Circular"
+        OrdenCompra = apps.get_model('compras', 'OrdenCompra')
+        DetalleOrdenCompra = apps.get_model('compras', 'DetalleOrdenCompra')
+        # Si usas el módulo de cuentas por pagar:
+        try:
+            Factura = apps.get_model('cuentas_por_pagar', 'Factura')
+            usar_cxp = True
+        except LookupError:
+            usar_cxp = False
+
+        # Validaciones previas
+        if self.estatus != 'PENDIENTE_APROBACION':
+            return False, f"La solicitud está en estatus '{self.get_estatus_display()}' y no se puede aprobar."
+
+        if hasattr(self, 'orden_de_compra'):
+            return False, f"Ya existe una Orden de Compra ({self.orden_de_compra.folio}) para esta solicitud."
+
+        # 1. Aprobar la solicitud
+        self.estatus = 'APROBADA'
+        self.aprobado_por = usuario_responsable
+        self.fecha_aprobacion = timezone.now()
+        self.save()
+
+        # 2. Determinar condiciones de pago
+        condiciones = "Contado"
+        if self.proveedor and self.proveedor.dias_credito > 0:
+            condiciones = f"{self.proveedor.dias_credito} días de crédito"
+
+        # 3. Crear la Orden de Compra (OC)
+        orden = OrdenCompra.objects.create(
+            solicitud_origen=self,
+            empresa=self.empresa,
+            proveedor=self.proveedor,
+            fecha_entrega_esperada=timezone.now().date() + timezone.timedelta(days=7),
+            condiciones_pago=condiciones,
+            estatus='BORRADOR', # Nace como borrador para revisión final o directo aprobada según tu flujo
+            creado_por=usuario_responsable,
+            usuario_creacion=usuario_responsable,
+            modalidad_pago='UNA_EXHIBICION'
+        )
+
+        # 4. Copiar los detalles de la Solicitud a la OC
+        for detalle_sol in self.detalles.all():
+            DetalleOrdenCompra.objects.create(
+                orden_compra=orden,
+                articulo=detalle_sol.articulo,
+                cantidad=detalle_sol.cantidad,
+                precio_unitario=detalle_sol.precio_unitario,
+                descuento=0
+            )
+
+        mensaje_extra = ""
+        
+        # 5. (Opcional) Generar Cuenta por Pagar (CXP) automáticamente
+        if usar_cxp:
+            try:
+                from datetime import timedelta
+                numero_cxp = f"CXP-{orden.folio}"
+                dias_credito = getattr(orden.proveedor, 'dias_credito', 0)
+                fecha_vencimiento = timezone.now().date() + timedelta(days=dias_credito)
+                
+                Factura.objects.create(
+                    orden_compra=orden,
+                    numero_factura=numero_cxp,
+                    fecha_emision=timezone.now().date(),
+                    fecha_vencimiento=fecha_vencimiento,
+                    monto=orden.total_general, # Asegúrate que 'total_general' funcione en el modelo OC
+                    creado_por=usuario_responsable,
+                    descripcion=f"Generada desde WhatsApp/Web por {usuario_responsable}"
+                )
+                mensaje_extra = " y Cuenta por Pagar"
+            except Exception as e:
+                print(f"Error generando CXP automática: {e}")
+
+        return True, f"Solicitud Aprobada. Se generó la OC {orden.folio}{mensaje_extra}."
 
     def save(self, *args, **kwargs):
         if not self.folio:

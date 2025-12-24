@@ -45,6 +45,11 @@ from ternium.models import Empresa, Origen # Asegúrate que Origen esté importa
 from django.contrib.auth.decorators import permission_required, login_required
 from django.contrib.auth.mixins import PermissionRequiredMixin
 
+from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse
+from django.contrib.auth.models import User
+from twilio.twiml.messaging_response import MessagingResponse
+from .models import SolicitudCompra
 # --- DASHBOARD ---
 
 @login_required
@@ -1352,3 +1357,58 @@ def reporte_compras_excel(request):
             ])
             
     return response
+
+
+@csrf_exempt # Twilio no tiene token CSRF, así que lo desactivamos para esta vista
+def twilio_webhook(request):
+    """
+    Recibe mensajes de WhatsApp.
+    Espera mensajes como: "APROBAR SC-1-00050"
+    """
+    if request.method == 'POST':
+        # Obtener datos de Twilio
+        incoming_msg = request.POST.get('Body', '').strip().upper()
+        from_number = request.POST.get('From', '')
+
+        response = MessagingResponse()
+        msg = response.message()
+
+        # Lógica simple: Buscar la palabra clave APROBAR
+        if incoming_msg.startswith('APROBAR'):
+            try:
+                # Intentar extraer el folio. Ej: "APROBAR SC-1-00123" -> "SC-1-00123"
+                partes = incoming_msg.split()
+                if len(partes) < 2:
+                    msg.body("⚠️ Error: Debes enviar el folio. Ejemplo: APROBAR SC-1-00050")
+                    return HttpResponse(str(response))
+
+                folio = partes[1]
+                
+                # Buscar la solicitud
+                solicitud = SolicitudCompra.objects.get(folio=folio)
+                
+                # Obtener un usuario "Bot" o el Admin principal para asignar la acción
+                # (Ya que WhatsApp no nos dice quién es el usuario de Django, asumimos un admin)
+                usuario_bot = User.objects.filter(is_superuser=True).first()
+
+                # Ejecutar la lógica que movimos al modelo en el Paso 1
+                exito, mensaje_resultado = solicitud.ejecutar_aprobacion(usuario_bot)
+
+                if exito:
+                    msg.body(f"✅ Éxito: {mensaje_resultado}")
+                else:
+                    msg.body(f"❌ No se pudo aprobar: {mensaje_resultado}")
+
+            except SolicitudCompra.DoesNotExist:
+                msg.body(f"🔍 No encontré ninguna solicitud con el folio {folio}")
+            except Exception as e:
+                msg.body(f"Error interno: {str(e)}")
+        
+        elif incoming_msg == 'HOLA':
+             msg.body("Hola, soy el bot de Compras. Responde 'APROBAR [FOLIO]' para autorizar.")
+        else:
+             msg.body("No entendí el comando. Intenta: APROBAR SC-X-XXXXX")
+
+        return HttpResponse(str(response))
+    
+    return HttpResponseForbidden()
