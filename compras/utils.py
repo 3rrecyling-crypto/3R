@@ -7,22 +7,23 @@ import json
 
 def enviar_whatsapp_solicitud(solicitud):
     """
-    Envía una notificación de WhatsApp usando Twilio Content API.
+    Versión simplificada para que funcione con la plantilla de Citas.
     """
     try:
         client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
 
-        # Mapeamos las variables de tu plantilla {{1}} y {{2}}
-        # Ejemplo: {{1}} = Folio, {{2}} = Solicitante
+        # La plantilla de Citas es estricta. 
+        # Variable 1: Ponemos el Folio
+        # Variable 2: Ponemos un texto corto (NO PONER TODO EL DETALLE AQUÍ O FALLARÁ)
         variables = {
             "1": solicitud.folio,
-            "2": f"{solicitud.solicitante.first_name} {solicitud.solicitante.last_name}"
+            "2": f"{solicitud.solicitante.first_name} - Revisa la web para aprobar."
         }
 
         message = client.messages.create(
             from_=settings.TWILIO_WHATSAPP_FROM,
-            to=settings.TWILIO_WHATSAPP_TO_APPROVER, # Número del aprobador
-            content_sid=settings.TWILIO_CONTENT_SID, # Tu plantilla HX...
+            to=settings.TWILIO_WHATSAPP_TO_APPROVER,
+            content_sid=settings.TWILIO_CONTENT_SID,
             content_variables=json.dumps(variables)
         )
         
@@ -33,7 +34,7 @@ def enviar_whatsapp_solicitud(solicitud):
         return False
     
     
-def enviar_whatsapp_solicitud(solicitud, dominio_web="https://threer-recycling.onrender.com"):
+def enviar_whatsapp_solicitud(solicitud, dominio_web="https://3recycling.com.mx"):
     """
     Envía un mensaje detallado.
     dominio_web: Se usa para crear el link al archivo.
