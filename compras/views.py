@@ -1359,55 +1359,79 @@ def reporte_compras_excel(request):
     return response
 
 
-@csrf_exempt # Twilio no tiene token CSRF, así que lo desactivamos para esta vista
+@csrf_exempt
 def twilio_webhook(request):
     """
     Recibe mensajes de WhatsApp.
-    Espera mensajes como: "APROBAR SC-1-00050"
+    Maneja:
+    1. Botones "SI" / "NO" (Actúan sobre la última solicitud pendiente)
+    2. Comandos explícitos "APROBAR SC-..." (Para aprobar una específica antigua)
     """
     if request.method == 'POST':
-        # Obtener datos de Twilio
         incoming_msg = request.POST.get('Body', '').strip().upper()
-        from_number = request.POST.get('From', '')
-
+        
         response = MessagingResponse()
         msg = response.message()
+        
+        # Obtenemos el usuario Bot o Admin para firmar la acción
+        usuario_bot = User.objects.filter(is_superuser=True).first()
 
-        # Lógica simple: Buscar la palabra clave APROBAR
-        if incoming_msg.startswith('APROBAR'):
+        # --- CASO 1: BOTÓN "SI" ---
+        if incoming_msg == 'SI':
+            # Buscamos la solicitud pendiente MÁS RECIENTE
+            ultima_solicitud = SolicitudCompra.objects.filter(
+                estatus='PENDIENTE_APROBACION'
+            ).order_by('creado_en').last()
+
+            if ultima_solicitud:
+                exito, texto = ultima_solicitud.ejecutar_aprobacion(usuario_bot)
+                if exito:
+                    msg.body(f"✅ Confirmado: Solicitud {ultima_solicitud.folio} APROBADA.\nOC generada.")
+                else:
+                    msg.body(f"⚠️ No se pudo aprobar {ultima_solicitud.folio}: {texto}")
+            else:
+                msg.body("👍 Todo al día. No encontré solicitudes pendientes de aprobación recientes.")
+
+        # --- CASO 2: BOTÓN "NO" ---
+        elif incoming_msg == 'NO':
+            # Buscamos la solicitud pendiente MÁS RECIENTE
+            ultima_solicitud = SolicitudCompra.objects.filter(
+                estatus='PENDIENTE_APROBACION'
+            ).order_by('creado_en').last()
+
+            if ultima_solicitud:
+                ultima_solicitud.estatus = 'RECHAZADA'
+                ultima_solicitud.save()
+                msg.body(f"🚫 Enterado: Solicitud {ultima_solicitud.folio} ha sido RECHAZADA.")
+            else:
+                msg.body("No hay solicitudes pendientes para rechazar.")
+
+        # --- CASO 3: COMANDO EXPLÍCITO (APROBAR SC-...) ---
+        elif incoming_msg.startswith('APROBAR'):
             try:
-                # Intentar extraer el folio. Ej: "APROBAR SC-1-00123" -> "SC-1-00123"
                 partes = incoming_msg.split()
                 if len(partes) < 2:
-                    msg.body("⚠️ Error: Debes enviar el folio. Ejemplo: APROBAR SC-1-00050")
-                    return HttpResponse(str(response))
-
-                folio = partes[1]
-                
-                # Buscar la solicitud
-                solicitud = SolicitudCompra.objects.get(folio=folio)
-                
-                # Obtener un usuario "Bot" o el Admin principal para asignar la acción
-                # (Ya que WhatsApp no nos dice quién es el usuario de Django, asumimos un admin)
-                usuario_bot = User.objects.filter(is_superuser=True).first()
-
-                # Ejecutar la lógica que movimos al modelo en el Paso 1
-                exito, mensaje_resultado = solicitud.ejecutar_aprobacion(usuario_bot)
-
-                if exito:
-                    msg.body(f"✅ Éxito: {mensaje_resultado}")
+                    msg.body("⚠️ Error: Faltó el folio. Ejemplo: APROBAR SC-1-00050")
                 else:
-                    msg.body(f"❌ No se pudo aprobar: {mensaje_resultado}")
-
+                    folio = partes[1]
+                    solicitud = SolicitudCompra.objects.get(folio=folio)
+                    exito, texto = solicitud.ejecutar_aprobacion(usuario_bot)
+                    if exito:
+                        msg.body(f"✅ {texto}")
+                    else:
+                        msg.body(f"❌ {texto}")
             except SolicitudCompra.DoesNotExist:
-                msg.body(f"🔍 No encontré ninguna solicitud con el folio {folio}")
+                msg.body(f"🔍 No encontré el folio {folio}.")
             except Exception as e:
-                msg.body(f"Error interno: {str(e)}")
-        
-        elif incoming_msg == 'HOLA':
-             msg.body("Hola, soy el bot de Compras. Responde 'APROBAR [FOLIO]' para autorizar.")
+                msg.body(f"Error: {str(e)}")
+
+        # --- CASO 4: CUALQUIER OTRA COSA ---
         else:
-             msg.body("No entendí el comando. Intenta: APROBAR SC-X-XXXXX")
+             msg.body(
+                 "🤖 Soy el Bot de Compras.\n"
+                 "- Usa los botones SI/NO para lo más reciente.\n"
+                 "- Escribe 'APROBAR [FOLIO]' para una específica."
+             )
 
         return HttpResponse(str(response))
     
