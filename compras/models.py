@@ -319,12 +319,12 @@ class DetalleSolicitud(models.Model):
 
 
 class OrdenCompra(models.Model):
+    # --- 1. ESTATUS SIMPLIFICADOS ---
     ESTATUS_CHOICES = (
-        ('BORRADOR', 'Borrador'),
-        ('APROBADA', 'Aprobada'),
-        ('LISTA_PARA_AUDITAR', 'Lista para Auditar'),
-        ('CANCELADA', 'Cancelada'),
-        ('AUDITADA', 'Auditada'),
+        ('PENDIENTE', 'Pendiente'),   # Antes Borrador. Fase de edición.
+        ('APROBADA', 'Aprobada'),     # Ya emitida. Esperando docs o auditoría.
+        ('AUDITADA', 'Auditada'),     # Finalizada/Cerrada correctamente.
+        ('CANCELADA', 'Cancelada'),   # Anulada.
     )
     
     MONEDA_CHOICES = (
@@ -332,22 +332,32 @@ class OrdenCompra(models.Model):
         ('USD', 'USD - Dólares Americanos'),
     )
 
-    folio = models.CharField(max_length=20, unique=True, editable=False)
-    solicitud_origen = models.OneToOneField(SolicitudCompra, on_delete=models.SET_NULL, null=True, blank=True, related_name="orden_de_compra")
-    empresa = models.ForeignKey(Empresa, on_delete=models.PROTECT)
-    proveedor = models.ForeignKey(Proveedor, on_delete=models.PROTECT)
-    fecha_emision = models.DateField(auto_now_add=True)
-    fecha_entrega_esperada = models.DateField()
-    moneda = models.CharField(max_length=3, choices=MONEDA_CHOICES, default='MXN')
-    tipo_cambio = models.DecimalField(max_digits=10, decimal_places=4, default=1.0)
-    condiciones_pago = models.CharField(max_length=255)
-    estatus = models.CharField(max_length=20, choices=ESTATUS_CHOICES, default='BORRADOR')
-    creado_por = models.ForeignKey(User, on_delete=models.PROTECT)
-    creado_en = models.DateTimeField(auto_now_add=True)
     MODALIDAD_PAGO_CHOICES = (
         ('UNA_EXHIBICION', 'A una sola exhibición'),
         ('A_PLAZOS', 'A plazos'),
     )
+
+    # --- 2. CAMPOS GENERALES ---
+    folio = models.CharField(max_length=20, unique=True, editable=False)
+    solicitud_origen = models.OneToOneField('SolicitudCompra', on_delete=models.SET_NULL, null=True, blank=True, related_name="orden_de_compra")
+    empresa = models.ForeignKey('ternium.Empresa', on_delete=models.PROTECT)
+    proveedor = models.ForeignKey('Proveedor', on_delete=models.PROTECT)
+    
+    fecha_emision = models.DateField(auto_now_add=True)
+    fecha_entrega_esperada = models.DateField()
+    
+    moneda = models.CharField(max_length=3, choices=MONEDA_CHOICES, default='MXN')
+    tipo_cambio = models.DecimalField(max_digits=10, decimal_places=4, default=1.0)
+    
+    condiciones_pago = models.CharField(max_length=255)
+    
+    # Estatus por defecto ahora es PENDIENTE
+    estatus = models.CharField(max_length=20, choices=ESTATUS_CHOICES, default='PENDIENTE')
+    
+    creado_por = models.ForeignKey(User, on_delete=models.PROTECT)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    
+    # --- 3. CAMPOS DE PAGO ---
     modalidad_pago = models.CharField(
         max_length=20, 
         choices=MODALIDAD_PAGO_CHOICES, 
@@ -361,12 +371,14 @@ class OrdenCompra(models.Model):
         help_text="Solo aplica si la modalidad es 'A plazos'"
     )
     
-    # Campos de checklist para auditoría
+    # --- 4. CAMPOS DE AUDITORÍA Y DOCUMENTOS ---
     factura_subida = models.BooleanField(default=False, verbose_name="Factura subida")
     comprobante_pago_subido = models.BooleanField(default=False, verbose_name="Comprobante de pago subido")
-    lista_para_auditar = models.BooleanField(default=False, verbose_name="Lista para auditar")
     
-    # Campos para tracking de quién subió los documentos
+    # Este campo es interno, ayuda a filtrar visualmente pero NO es un estatus de DB
+    lista_para_auditoria = models.BooleanField(default=False, editable=False, help_text="Indicador interno: True si tiene ambos documentos.")
+    
+    # Tracking de documentos
     factura_subida_por = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, 
         related_name='facturas_subidas'
@@ -378,14 +390,11 @@ class OrdenCompra(models.Model):
     fecha_factura_subida = models.DateTimeField(null=True, blank=True)
     fecha_comprobante_subido = models.DateTimeField(null=True, blank=True)
     
-    # Campos para la administración de documentos
+    # Archivos
     factura = models.FileField(upload_to='ordenes_compra/facturas/%Y/%m/', null=True, blank=True, verbose_name="Factura (PDF/XML)")
     comprobante_pago = models.FileField(upload_to='ordenes_compra/pagos/%Y/%m/', null=True, blank=True, verbose_name="Comprobante de Pago")
     archivo_opcional = models.FileField(upload_to='ordenes_compra/opcionales/%Y/%m/', null=True, blank=True, verbose_name="Archivo Opcional")
 
-    # Campo de auditoría
-    lista_para_auditoria = models.BooleanField(default=False, editable=False, help_text="Se marca automáticamente cuando se suben la factura y el comprobante de pago.")
-    
     usuario_creacion = models.ForeignKey(
         User, 
         on_delete=models.SET_NULL, 
@@ -403,23 +412,25 @@ class OrdenCompra(models.Model):
         verbose_name='Usuario Aprobador'
     )
 
+    # --- 5. MÉTODOS ---
+
     def actualizar_estado_auditoria(self):
-        """Actualiza el estado de lista_para_auditar basado en los documentos subidos"""
-        self.lista_para_auditar = self.factura_subida and self.comprobante_pago_subido
-        
-        if self.lista_para_auditar and self.estatus == 'APROBADA':
-            self.estatus = 'LISTA_PARA_AUDITAR'
-        elif not self.lista_para_auditar and self.estatus == 'LISTA_PARA_AUDITAR':
-            self.estatus = 'APROBADA'
-            
+        """
+        Verifica si los documentos están completos.
+        Actualiza el flag 'lista_para_auditoria' pero NO cambia el estatus principal.
+        Se mantiene en APROBADA hasta intervención humana.
+        """
+        self.lista_para_auditoria = bool(self.factura and self.comprobante_pago)
         self.save()
 
     def save(self, *args, **kwargs):
+        # Generación de Folio
         if not self.folio:
             last_id = OrdenCompra.objects.all().order_by('id').last()
             next_id = (last_id.id + 1) if last_id else 1
             self.folio = f"OC-{self.empresa.id}-{next_id:05d}"
         
+        # Actualización automática del flag de auditoría al guardar
         if self.factura and self.comprobante_pago:
             self.lista_para_auditoria = True
         else:
@@ -430,9 +441,8 @@ class OrdenCompra(models.Model):
     def __str__(self):
         return f"Orden de Compra {self.folio} - {self.proveedor.razon_social}"
 
-    # --- PROPIEDADES PARA PAGOS A PLAZOS ---
-    
-    
+    # --- 6. PROPIEDADES (CÁLCULOS) ---
+
     @property
     def es_pago_plazos(self):
         return self.modalidad_pago == 'A_PLAZOS'
@@ -458,12 +468,15 @@ class OrdenCompra(models.Model):
     
     @property
     def plazos_pagados(self):
-        """Obtiene los plazos que ya tienen pagos registrados"""
+        """Obtiene los plazos que ya tienen pagos registrados (si existe módulo CXP)"""
         if hasattr(self, 'factura_cxp') and self.factura_cxp:
             return self.factura_cxp.pagos.all().order_by('numero_plazo')
-        # Usar referencia string para evitar importación circular
-        Pago = apps.get_model('cuentas_por_pagar', 'Pago')
-        return Pago.objects.none()
+        # Referencia dinámica para evitar importación circular
+        try:
+            Pago = apps.get_model('cuentas_por_pagar', 'Pago')
+            return Pago.objects.none()
+        except LookupError:
+            return []
     
     @property
     def plazos_pendientes(self):
@@ -471,7 +484,12 @@ class OrdenCompra(models.Model):
         if not self.es_pago_plazos:
             return []
         
-        plazos_pagados_ids = self.plazos_pagados.values_list('numero_plazo', flat=True)
+        plazos_pagados_ids = []
+        # Pequeña validación por si plazos_pagados devuelve lista vacía o QuerySet
+        pagados = self.plazos_pagados
+        if hasattr(pagados, 'values_list'):
+            plazos_pagados_ids = pagados.values_list('numero_plazo', flat=True)
+
         plazos_pendientes = []
         
         for plazo in self.plazos_programados:
@@ -480,7 +498,6 @@ class OrdenCompra(models.Model):
         
         return plazos_pendientes
 
-    # --- PROPIEDADES PARA CÁLCULOS FINANCIEROS ---
     @property
     def moneda_simbolo(self):
         if self.moneda == 'USD':
@@ -503,13 +520,13 @@ class OrdenCompra(models.Model):
 
     @property
     def total_subtotal(self):
+        # Subtotal después de descuentos
         return sum(detalle.subtotal for detalle in self.detalles.all())
 
     @property
     def total_iva(self):
         total = Decimal('0')
         for detalle in self.detalles.all():
-            # Cálculo basado en el porcentaje del artículo
             if detalle.articulo and detalle.articulo.porcentaje_iva > 0:
                 tasa = detalle.articulo.porcentaje_iva / Decimal('100')
                 total += detalle.subtotal * tasa
@@ -519,7 +536,6 @@ class OrdenCompra(models.Model):
     def total_retenciones(self):
         total = Decimal('0')
         for detalle in self.detalles.all():
-            # Cálculo basado en el porcentaje del artículo
             if detalle.articulo and detalle.articulo.porcentaje_retencion_iva > 0:
                 tasa = detalle.articulo.porcentaje_retencion_iva / Decimal('100')
                 total += detalle.subtotal * tasa
@@ -530,7 +546,6 @@ class OrdenCompra(models.Model):
         return self.total_subtotal + self.total_iva - self.total_retenciones
     
     class Meta:
-        # ... (otras configuraciones meta si tienes) ...
         permissions = [
             ("acceso_compras", "Acceso al Módulo de Compras"),
             ("aprobar_solicitudes", "Puede aprobar solicitudes de compra"),

@@ -6,76 +6,36 @@
 
 {% block compras_content %}
 <style>
-    /* Estilos específicos para inyectar color y consistencia con base.html */
+    /* Estilos específicos Dashboard */
+    .bg-gradient-primary-custom { background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%); }
+    .bg-gradient-warning-custom { background: linear-gradient(135deg, #fbbc05 0%, #f57c00 100%); }
+    .bg-gradient-danger-custom { background: linear-gradient(135deg, #ea4335 0%, #b71c1c 100%); }
+    .bg-gradient-success-custom { background: linear-gradient(135deg, #34a853 0%, #1b5e20 100%); }
     
-    /* Gradientes para KPIs */
-    .bg-gradient-primary-custom {
-        background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
-    }
-    .bg-gradient-warning-custom {
-        background: linear-gradient(135deg, #fbbc05 0%, #f57c00 100%);
-    }
-    .bg-gradient-danger-custom {
-        background: linear-gradient(135deg, #ea4335 0%, #b71c1c 100%);
-    }
-    .bg-gradient-success-custom {
-        background: linear-gradient(135deg, #34a853 0%, #1b5e20 100%);
-    }
-    .bg-gradient-info-custom {
-        background: linear-gradient(135deg, #0dcaf0 0%, #0891b2 100%);
-    }
-
-    /* Tarjetas KPI */
     .card-kpi {
-        border: none;
-        color: white;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        overflow: hidden;
-        position: relative;
+        border: none; color: white; transition: transform 0.3s ease; overflow: hidden; position: relative;
     }
-    .card-kpi:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.2) !important;
-    }
+    .card-kpi:hover { transform: translateY(-5px); }
     .card-kpi .icon-bg {
-        position: absolute;
-        right: -10px;
-        bottom: -10px;
-        font-size: 5rem;
-        opacity: 0.2;
-        transform: rotate(-15deg);
+        position: absolute; right: -10px; bottom: -10px; font-size: 5rem; opacity: 0.2; transform: rotate(-15deg);
     }
-
-    /* Accesos Directos */
     .shortcut-card {
-        border: none;
-        transition: all 0.2s ease-in-out;
-        border-top: 4px solid transparent;
+        border: none; transition: all 0.2s ease-in-out; border-top: 4px solid transparent;
     }
     .shortcut-card:hover {
-        transform: translateY(-3px);
-        background-color: #fff;
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+        transform: translateY(-3px); background-color: #fff; box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
     }
-    
-    /* Colores de borde superior para shortcuts */
     .border-top-blue { border-top-color: #1a73e8; }
     .border-top-green { border-top-color: #34a853; }
     .border-top-amber { border-top-color: #fbbc05; }
     .border-top-purple { border-top-color: #6f42c1; }
-
-    /* Pestañas */
-    .nav-pills .nav-link.active {
-        background-color: #1a73e8; /* Tu primary-color */
-    }
-    .nav-pills .nav-link {
-        color: #5f6368;
-        font-weight: 500;
-    }
-    
-    /* Utilidades de texto */
+    .nav-pills .nav-link.active { background-color: #1a73e8; }
+    .nav-pills .nav-link { color: #5f6368; font-weight: 500; }
     .text-primary-custom { color: #1a73e8; }
     .fs-7 { font-size: 0.9rem; }
+    
+    /* Alerta WhatsApp */
+    .alert-whatsapp { background-color: #dcf8c6; border-color: #25d366; color: #075e54; }
 </style>
 
 <div class="container-fluid px-4 py-4">
@@ -83,7 +43,7 @@
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4">
         <div>
             <h2 class="fw-bold text-dark mb-1">
-                <i class="fas fa-chart-pie me-2 text-primary-custom"></i>Tablero de Control
+                <i class="fas fa-chart-bar me-2 text-primary-custom"></i>Tablero de Control
             </h2>
             <p class="text-muted mb-0">Gestión estratégica de compras y suministros.</p>
         </div>
@@ -92,6 +52,14 @@
                 <i class="far fa-clock me-2 text-primary-custom"></i>{% now "l, d F Y" %}
             </span>
         </div>
+    </div>
+
+    <div class="alert alert-whatsapp border-0 shadow-sm d-flex align-items-center mb-4 alert-dismissible fade show" role="alert">
+        <i class="fab fa-whatsapp fa-2x me-3" style="color: #25d366;"></i>
+        <div>
+            <strong>¡Novedad!</strong> Ahora puedes recibir alertas y aprobar Solicitudes de Compra (S.C.) directamente desde <strong>WhatsApp</strong>.
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 
     <div class="row g-3 mb-4">
@@ -171,7 +139,6 @@
     <div class="mb-4">
         <h5 class="fw-bold text-dark mb-3 ps-2 border-start border-4 border-primary">Accesos Rápidos</h5>
         <div class="row g-3">
-            
             <div class="col-6 col-md-3 col-xl-2">
                 <a href="{% url 'crear_solicitud' %}" class="card shortcut-card border-top-blue shadow-sm h-100 text-decoration-none">
                     <div class="card-body text-center py-4">
@@ -202,7 +169,6 @@
                     </div>
                 </a>
             </div>
-
             <div class="col-6 col-md-3 col-xl-2">
                 <a href="{% url 'lista_proveedores' %}" class="card shortcut-card border-top-green shadow-sm h-100 text-decoration-none">
                     <div class="card-body text-center py-4">
@@ -223,7 +189,6 @@
                     </div>
                 </a>
             </div>
-
             <div class="col-6 col-md-3 col-xl-2">
                 <a href="{% url 'reporte_compras_excel' %}" class="card shortcut-card border-top-purple shadow-sm h-100 text-decoration-none">
                     <div class="card-body text-center py-4">
@@ -248,14 +213,16 @@
         <div class="col-lg-8">
             <div class="card border-0 shadow h-100">
                 <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
-                    <h6 class="fw-bold text-dark mb-0"><i class="fas fa-history me-2 text-muted"></i>Actividad Reciente</h6>
+                    <h6 class="fw-bold text-dark mb-0">
+                        <i class="fas fa-tasks me-2 text-muted"></i>Actividad Pendiente
+                    </h6>
                     
                     <ul class="nav nav-pills card-header-pills" id="dashboardTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link active btn-sm rounded-pill px-3" id="solicitudes-tab" data-bs-toggle="tab" data-bs-target="#solicitudes" type="button" role="tab">Solicitudes</button>
+                            <button class="nav-link active btn-sm rounded-pill px-3" id="solicitudes-tab" data-bs-toggle="tab" data-bs-target="#solicitudes" type="button" role="tab">Solicitudes Pendientes</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link btn-sm rounded-pill px-3" id="ordenes-tab" data-bs-toggle="tab" data-bs-target="#ordenes" type="button" role="tab">Órdenes</button>
+                            <button class="nav-link btn-sm rounded-pill px-3" id="ordenes-tab" data-bs-toggle="tab" data-bs-target="#ordenes" type="button" role="tab">Por Auditar / Docs</button>
                         </li>
                     </ul>
                 </div>
@@ -271,16 +238,15 @@
                                             <th class="ps-4 py-3">Folio</th>
                                             <th class="py-3">Solicitante</th>
                                             <th class="py-3">Fecha</th>
+                                            <th class="py-3">Estatus</th>
                                             <th class="py-3">Prioridad</th>
-                                            <th class="text-end pe-4 py-3">Acción</th>
+                                            <th class="text-end pe-4 py-3">Ver</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for sol in ultimas_solicitudes %}
                                         <tr>
-                                            <td class="ps-4 fw-bold text-primary-custom">
-                                                <i class="fas fa-file-alt me-2 text-muted"></i>{{ sol.folio }}
-                                            </td>
+                                            <td class="ps-4 fw-bold text-primary-custom">{{ sol.folio }}</td>
                                             <td>
                                                 <div class="d-flex align-items-center">
                                                     <div class="rounded-circle bg-secondary text-white d-flex justify-content-center align-items-center me-2 shadow-sm" style="width:32px; height:32px; font-size:0.8rem;">
@@ -293,6 +259,7 @@
                                                 </div>
                                             </td>
                                             <td class="text-muted">{{ sol.creado_en|date:"d M" }}</td>
+                                            <td><span class="badge bg-warning text-dark border">{{ sol.get_estatus_display }}</span></td>
                                             <td>
                                                 {% if sol.prioridad == 'URGENTE' %}
                                                     <span class="badge bg-danger bg-opacity-75 rounded-pill"><i class="fas fa-bolt me-1"></i>Urgente</span>
@@ -301,18 +268,13 @@
                                                 {% endif %}
                                             </td>
                                             <td class="text-end pe-4">
-                                                <a href="{% url 'editar_solicitud' sol.id %}" class="btn btn-sm btn-outline-primary rounded-circle" title="Gestionar">
-                                                    <i class="fas fa-chevron-right"></i>
+                                                <a href="{% url 'detalle_solicitud' sol.id %}" class="btn btn-sm btn-outline-primary rounded-circle" title="Ver Detalle">
+                                                    <i class="fas fa-eye"></i>
                                                 </a>
                                             </td>
                                         </tr>
                                         {% empty %}
-                                        <tr>
-                                            <td colspan="5" class="text-center py-5 text-muted">
-                                                <img src="https://cdn-icons-png.flaticon.com/512/7486/7486744.png" width="64" class="opacity-50 mb-3" alt="Empty">
-                                                <p class="mb-0">No hay solicitudes pendientes</p>
-                                            </td>
-                                        </tr>
+                                        <tr><td colspan="6" class="text-center py-5 text-muted">No hay solicitudes pendientes</td></tr>
                                         {% endfor %}
                                     </tbody>
                                 </table>
@@ -328,53 +290,56 @@
                                             <th class="py-3">Proveedor</th>
                                             <th class="py-3">Emisión</th>
                                             <th class="py-3">Estatus</th>
+                                            <th class="text-end pe-4 py-3">Ver</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for orden in ultimas_ordenes %}
                                         <tr>
-                                            <td class="ps-4">
-                                                <a href="{% url 'detalle_orden_compra' orden.pk %}" class="fw-bold text-dark text-decoration-none">
-                                                    {{ orden.folio }}
-                                                </a>
-                                            </td>
+                                            <td class="ps-4 fw-bold text-dark">{{ orden.folio }}</td>
                                             <td>
                                                 <div class="d-flex align-items-center">
-                                                    <i class="fas fa-building text-muted me-2"></i>
-                                                    {{ orden.proveedor.razon_social|truncatechars:20 }}
+                                                    <i class="fas fa-building text-muted me-2"></i> {{ orden.proveedor.razon_social|truncatechars:20 }}
                                                 </div>
                                             </td>
                                             <td class="text-muted">{{ orden.fecha_emision|date:"d M, Y" }}</td>
                                             <td>
-                                                {% if orden.estatus == 'APROBADA' %}
-                                                    <span class="badge bg-primary">Aprobada</span>
-                                                {% elif orden.estatus == 'BORRADOR' %}
-                                                    <span class="badge bg-secondary">Borrador</span>
-                                                {% elif orden.estatus == 'CANCELADA' %}
-                                                    <span class="badge bg-danger">Cancelada</span>
+                                                {% if orden.estatus == 'PENDIENTE' %}
+                                                     <span class="badge bg-secondary text-white fw-bold"><i class="fas fa-pencil-alt me-1"></i> Pendiente</span>
+                                                
+                                                {% elif orden.estatus == 'APROBADA' %}
+                                                    <span class="badge bg-warning text-dark border border-warning"><i class="fas fa-upload me-1"></i> Listas para auditar</span>
+                                                
                                                 {% elif orden.estatus == 'LISTA_PARA_AUDITAR' %}
-                                                    <span class="badge bg-warning text-dark">Por Auditar</span>
+                                                    <span class="badge bg-warning text-dark border border-warning"><i class="fas fa-user-check me-1"></i> Listas para auditar</span>
+                                                
                                                 {% else %}
-                                                    <span class="badge bg-info text-dark">{{ orden.get_estatus_display }}</span>
+                                                    <span class="badge bg-light text-dark border">{{ orden.get_estatus_display }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-end pe-4">
+                                                {% if orden.estatus == 'PENDIENTE' %}
+                                                    <a href="{% url 'terminar_orden_compra' orden.pk %}" class="btn btn-sm btn-warning rounded-pill" title="Definir Plazos y Aprobar">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                {% else %}
+                                                    <a href="{% url 'detalle_orden_compra' orden.pk %}" class="btn btn-sm btn-outline-primary rounded-circle" title="Ver Detalle">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
                                                 {% endif %}
                                             </td>
                                         </tr>
                                         {% empty %}
-                                        <tr>
-                                            <td colspan="4" class="text-center py-5">Sin movimientos recientes.</td>
-                                        </tr>
+                                        <tr><td colspan="5" class="text-center py-5 text-muted">¡Todo al día! No hay órdenes pendientes de acción.</td></tr>
                                         {% endfor %}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
-
                     </div>
                 </div>
                 <div class="card-footer bg-white border-0 py-2 text-center">
-                    <a href="{% url 'lista_solicitudes' %}" class="text-decoration-none text-primary-custom fs-7 fw-bold">
-                        Ver historial completo <i class="fas fa-arrow-right ms-1"></i>
-                    </a>
+                    <a href="{% url 'lista_solicitudes' %}" class="text-decoration-none text-primary-custom fs-7 fw-bold">Ver historial completo <i class="fas fa-arrow-right ms-1"></i></a>
                 </div>
             </div>
         </div>
@@ -382,10 +347,10 @@
         <div class="col-lg-4">
             <div class="card border-0 shadow mb-4 h-100" style="min-height: 300px;">
                 <div class="card-header bg-white border-0 py-3">
-                    <h6 class="mb-0 fw-bold text-dark">Distribución de Estatus</h6>
+                    <h6 class="mb-0 fw-bold text-dark">Estatus de Órdenes</h6>
                 </div>
-                <div class="card-body d-flex flex-column align-items-center justify-content-center position-relative">
-                    <div style="width: 100%; height: 220px;">
+                <div class="card-body p-3">
+                    <div style="width: 100%; height: 250px;">
                         <canvas id="ordenesChart"></canvas>
                     </div>
                     <div class="mt-3 text-center">
@@ -410,6 +375,8 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Inicialización de Pestañas
@@ -422,69 +389,82 @@
             })
         })
 
-        // Gráfico con colores personalizados que coinciden con los gradientes
+        // --- CONFIGURACIÓN DEL GRÁFICO DE BARRAS ---
         const ctx = document.getElementById('ordenesChart').getContext('2d');
         const labels = JSON.parse('{{ chart_labels|safe }}');
         const data = JSON.parse('{{ chart_data|safe }}');
         
-        // Mapeo de colores más vibrantes para el Chart.js
-        // Aprobada (Azul), Borrador (Gris), Cancelada (Rojo), Lista Auditar (Amarillo)
+        // Mapeo de colores actualizado
         const customColors = {
-            'BORRADOR': '#6c757d',
-            'APROBADA': '#1a73e8',  // Primary Blue
-            'LISTA_PARA_AUDITAR': '#fbbc05', // Warning Yellow
-            'AUDITADA': '#34a853', // Success Green
-            'CANCELADA': '#ea4335', // Danger Red
+            'PENDIENTE': '#6c757d',
+            'APROBADA': '#ffc107', // Amarillo para "Listas para auditar"
+            'LISTA_PARA_AUDITAR': '#ffc107',
+            'AUDITADA': '#198754',
+            'CANCELADA': '#dc3545',
             'DEFAULT': '#0dcaf0'
         };
 
-        // Reconstruimos el array de colores basado en las etiquetas
-        // Nota: Si 'chart_colors' viene del backend, puedes usarlo, pero aquí lo forzamos para que combine con el diseño
         let backgroundColors = [];
         labels.forEach(label => {
-            // Buscamos la clave en el objeto customColors (asumiendo que el label coincide o usamos logica simple)
             let color = customColors['DEFAULT'];
-            if (label.includes('Borrador')) color = customColors['BORRADOR'];
+            if (label.includes('Pendiente')) color = customColors['PENDIENTE'];
             else if (label.includes('Aprobada')) color = customColors['APROBADA'];
             else if (label.includes('Auditar')) color = customColors['LISTA_PARA_AUDITAR'];
             else if (label.includes('Auditada')) color = customColors['AUDITADA'];
             else if (label.includes('Cancelada')) color = customColors['CANCELADA'];
-            
             backgroundColors.push(color);
         });
 
+        // Registrar el plugin
+        Chart.register(ChartDataLabels);
+
         if (data && data.length > 0) {
             new Chart(ctx, {
-                type: 'doughnut',
+                type: 'bar',
                 data: {
                     labels: labels,
                     datasets: [{
+                        label: 'Cantidad',
                         data: data,
                         backgroundColor: backgroundColors,
-                        borderWidth: 0,
-                        hoverOffset: 10
+                        borderRadius: 4, 
+                        borderWidth: 1
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'right',
-                            labels: {
-                                usePointStyle: true,
-                                boxWidth: 10,
-                                font: { family: "'Roboto', sans-serif", size: 11 }
-                            }
+                    layout: {
+                        padding: {
+                            top: 25 
                         }
                     },
-                    cutout: '75%'
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { precision: 0 },
+                            grid: { drawBorder: false, display: true }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        datalabels: {
+                            anchor: 'end',
+                            align: 'top', 
+                            color: '#000',
+                            font: { weight: 'bold', size: 14 },
+                            formatter: function(value) { return value > 0 ? value : ''; }
+                        }
+                    }
                 }
             });
         } else {
             document.getElementById('ordenesChart').parentElement.innerHTML = 
                 '<div class="h-100 d-flex flex-column align-items-center justify-content-center text-muted">' +
-                '<i class="fas fa-chart-pie fa-3x mb-3 text-light"></i>' +
+                '<i class="fas fa-chart-bar fa-3x mb-3 text-light"></i>' +
                 '<p class="small">Sin datos suficientes</p>' +
                 '</div>';
         }

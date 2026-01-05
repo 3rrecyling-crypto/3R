@@ -67,6 +67,7 @@ class FacturaListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     paginate_by = 10
     
     def get_queryset(self):
+        # Optimizamos la consulta trayendo datos relacionados para evitar N+1 queries
         queryset = super().get_queryset().select_related(
             'orden_compra__proveedor', 
             'orden_compra__empresa',
@@ -77,41 +78,97 @@ class FacturaListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         query = self.request.GET.get('q')
         estatus = self.request.GET.get('estatus')
         proveedor_id = self.request.GET.get('proveedor')
-        ordenar_por = self.request.GET.get('ordenar') # Nuevo parámetro
+        fecha_desde = self.request.GET.get('fecha_desde')
+        fecha_hasta = self.request.GET.get('fecha_hasta')
+        ordenar_por = self.request.GET.get('ordenar')
         
         # --- FILTROS DE BÚSQUEDA ---
         if query:
             queryset = queryset.filter(
-                Q(numero_factura__icontains=query) |      # Folio Fiscal
-                Q(orden_compra__folio__icontains=query) | # Folio OC
-                Q(folio_cxp__icontains=query) |           # Folio Interno CXP
-                # NUEVO: Búsqueda por nombre del proveedor
+                Q(numero_factura__icontains=query) |      
+                Q(orden_compra__folio__icontains=query) | 
+                Q(folio_cxp__icontains=query) |           
                 Q(proveedor__razon_social__icontains=query) |
                 Q(orden_compra__proveedor__razon_social__icontains=query)
             )
             
         if estatus:
             queryset = queryset.filter(estatus=estatus)
+            
         if proveedor_id:
-            queryset = queryset.filter(proveedor_id=proveedor_id)
+            # Filtra tanto si es proveedor directo o vía OC
+            queryset = queryset.filter(
+                Q(proveedor_id=proveedor_id) | 
+                Q(orden_compra__proveedor_id=proveedor_id)
+            )
+
+        if fecha_desde:
+            queryset = queryset.filter(fecha_emision__gte=fecha_desde)
+        
+        if fecha_hasta:
+            queryset = queryset.filter(fecha_emision__lte=fecha_hasta)
             
         # --- ORDENAMIENTO ---
-        if ordenar_por:
-            if ordenar_por == 'folio_desc':
-                return queryset.order_by('-folio_cxp') # Mayor a menor
-            elif ordenar_por == 'folio_asc':
-                return queryset.order_by('folio_cxp')
-            elif ordenar_por == 'monto_desc':
-                return queryset.order_by('-monto')
-            elif ordenar_por == 'monto_asc':
-                return queryset.order_by('monto')
-            elif ordenar_por == 'vencimiento_desc':
-                return queryset.order_by('-fecha_vencimiento')
-            elif ordenar_por == 'vencimiento_asc':
-                return queryset.order_by('fecha_vencimiento')
-                
-        # ORDEN POR DEFECTO: Folio CXP de mayor a menor (los más nuevos primero)
-        return queryset.order_by('-folio_cxp')
+        if ordenar_por == 'folio_desc':
+            queryset = queryset.order_by('-folio_cxp')
+        elif ordenar_por == 'folio_asc':
+            queryset = queryset.order_by('folio_cxp')
+        elif ordenar_por == 'monto_desc':
+            queryset = queryset.order_by('-monto')
+        elif ordenar_por == 'monto_asc':
+            queryset = queryset.order_by('monto')
+        elif ordenar_por == 'vencimiento_desc':
+            queryset = queryset.order_by('-fecha_vencimiento')
+        elif ordenar_por == 'vencimiento_asc':
+            queryset = queryset.order_by('fecha_vencimiento')
+        else:
+            # Orden por defecto
+            queryset = queryset.order_by('-folio_cxp')
+            
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # 1. Datos para los Filtros (Select de Proveedores y Estatus)
+        context['proveedores'] = Proveedor.objects.all().order_by('razon_social')
+        context['estatus_choices'] = Factura.ESTATUS_CHOICES
+        
+        # Si hay un proveedor seleccionado, lo enviamos al template para mostrar su nombre
+        proveedor_id = self.request.GET.get('proveedor')
+        if proveedor_id:
+            try:
+                context['proveedor_seleccionado'] = Proveedor.objects.get(pk=proveedor_id)
+            except Proveedor.DoesNotExist:
+                pass
+
+        # 2. Cálculos para las Tarjetas (Metrics)
+        # Usamos todos los objetos de la DB para las métricas globales, no solo los de la página actual
+        all_facturas = Factura.objects.all()
+        facturas_filtradas = self.get_queryset() # Respetamos los filtros actuales para el conteo de lista
+        
+        context['total_facturas_count'] = all_facturas.count()
+        context['facturas_filtradas_count'] = facturas_filtradas.count()
+        
+        # Contadores de alertas
+        context['facturas_por_vencer_count'] = all_facturas.filter(estatus='POR_VENCER').count()
+        context['facturas_vencidas_count'] = all_facturas.filter(estatus='VENCIDA').count()
+        
+        # Cálculo de Deuda Total (Suma de montos pendientes de todas las facturas no pagadas)
+        # Nota: Como monto_pendiente es una propiedad, iteramos. Si son miles de registros, esto se debe optimizar.
+        facturas_pendientes = all_facturas.filter(pagada=False)
+        total_deuda = sum(f.monto_pendiente for f in facturas_pendientes)
+        context['total_deuda_general'] = total_deuda
+        
+        # Cálculo de porcentaje global pagado (para la barra de progreso en la tarjeta de deuda)
+        total_historico = all_facturas.aggregate(total=Sum('monto'))['total'] or 0
+        if total_historico > 0:
+            pagado_historico = float(total_historico) - total_deuda
+            context['porcentaje_deuda_pagada'] = round((pagado_historico / float(total_historico)) * 100)
+        else:
+            context['porcentaje_deuda_pagada'] = 0
+            
+        return context
 class FacturaCreateView(LoginRequiredMixin, CreateView):
     def get(self, request, *args, **kwargs):
         messages.warning(request, "La creación manual está deshabilitada. Use Órdenes de Compra.")
@@ -359,7 +416,9 @@ def dashboard_cuentas_por_pagar(request):
     # Cálculos seguros de OCs
     try:
         from compras.models import OrdenCompra
-        ocs_listas_auditoria = OrdenCompra.objects.filter(lista_para_auditar=True).count()
+        # --- CORRECCIÓN AQUÍ: Se cambió 'lista_para_auditar' por 'lista_para_auditoria' ---
+        ocs_listas_auditoria = OrdenCompra.objects.filter(lista_para_auditoria=True).count()
+        # ----------------------------------------------------------------------------------
         total_ocs_activas = OrdenCompra.objects.filter(estatus__in=['APROBADA', 'LISTA_PARA_AUDITAR']).count()
         ocs_en_proceso = OrdenCompra.objects.filter(estatus='APROBADA').count()
         ocs_auditadas = OrdenCompra.objects.filter(estatus='AUDITADA').count()
@@ -391,7 +450,6 @@ def dashboard_cuentas_por_pagar(request):
         'porcentaje_pagos_sincronizados': porcentaje_pagos_sincronizados,
     }
     return render(request, 'cuentas_por_pagar/dashboard.html', context)
-
 @login_required
 def api_estadisticas_proveedor(request):
     facturas_pendientes = Factura.objects.filter(pagada=False).select_related('orden_compra__proveedor')
@@ -434,15 +492,41 @@ def exportar_facturas_excel(request):
     wb = Workbook()
     ws = wb.active
     ws.title = "Facturas Cuentas por Pagar"
-    ws.append(['Número Factura', 'Proveedor', 'Monto', 'Pendiente', 'Estatus', 'Fecha Vencimiento'])
-    for f in Factura.objects.select_related('orden_compra__proveedor'):
-        ws.append([f.numero_factura, f.orden_compra.proveedor.razon_social, f.monto, f.monto_pendiente, f.get_estatus_display(), f.fecha_vencimiento])
+    
+    # Encabezados
+    ws.append([
+        'Folio Interno', 
+        'Número Factura', 
+        'Proveedor', 
+        'Monto Total', 
+        'Monto Pendiente', 
+        'Estatus', 
+        'Fecha Emisión',
+        'Fecha Vencimiento'
+    ])
+    
+    # Optimizamos la consulta para traer datos de orden_compra y proveedor si existen
+    facturas = Factura.objects.select_related('orden_compra__proveedor', 'proveedor').all()
+    
+    for f in facturas:
+        # Usamos la propiedad segura 'nombre_proveedor' del modelo
+        proveedor_nombre = f.nombre_proveedor
+            
+        ws.append([
+            f.folio_cxp,
+            f.numero_factura, 
+            proveedor_nombre, 
+            f.monto, 
+            f.monto_pendiente, 
+            f.get_estatus_display(), 
+            f.fecha_emision,
+            f.fecha_vencimiento
+        ])
     
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = 'attachment; filename=facturas_cuentas_por_pagar.xlsx'
     wb.save(response)
     return response
-
 @login_required
 def gestionar_plazos_factura(request, pk):
     factura = get_object_or_404(Factura, pk=pk)

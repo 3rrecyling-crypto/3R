@@ -378,8 +378,8 @@
                             {% if factura.monto_pendiente > 0 %}
                             <div class="progress mb-1" style="height: 4px;">
                                 <div class="progress-bar {% if factura.porcentaje_pagado == 100 %}bg-success
-                                                         {% elif factura.porcentaje_pagado > 50 %}bg-warning
-                                                         {% else %}bg-danger{% endif %}" 
+                                                          {% elif factura.porcentaje_pagado > 50 %}bg-warning
+                                                          {% else %}bg-danger{% endif %}" 
                                      role="progressbar" 
                                      style="width: {{ factura.porcentaje_pagado }}%;">
                                 </div>
@@ -521,31 +521,31 @@
                                         {{ factura.get_estatus_display }}
                                     </span>
                                     <h6 class="mb-1">
-                                        <a href="{% url 'detalle_factura' factura.pk %}" class="text-dark text-decoration-none">
+                                        <a href="{% url 'detalle_factura' factura.pk %}" class="text-dark text-decoration-none fw-bold">
                                             {{ factura.numero_factura }}
                                         </a>
                                     </h6>
                                     <small class="text-muted">{{ factura.folio_cxp }}</small>
                                 </div>
                                 {% if factura.archivo_factura %}
-                                <span class="badge bg-light-success text-success border border-success">
+                                <a href="{{ factura.archivo_factura.url }}" target="_blank" class="badge bg-light-success text-success border border-success" title="Ver PDF">
                                     <i class="fas fa-paperclip"></i>
-                                </span>
+                                </a>
                                 {% endif %}
                             </div>
                             
-                            <p class="small text-muted mb-3">
+                            <p class="small text-muted mb-3 text-truncate">
                                 <i class="fas fa-truck me-1"></i>
-                                {{ factura.orden_compra.proveedor.razon_social|default:factura.proveedor.razon_social|truncatechars:30 }}
+                                <strong>{{ factura.orden_compra.proveedor.razon_social|default:factura.proveedor.razon_social }}</strong>
                             </p>
                             
-                            <div class="row g-2 mb-3">
+                            <div class="row g-2 mb-3 bg-light p-2 rounded">
                                 <div class="col-6">
-                                    <small class="text-muted d-block">Emisión</small>
-                                    <span class="fw-semibold">{{ factura.fecha_emision|date:"d/m/Y" }}</span>
+                                    <small class="text-muted d-block" style="font-size: 0.75rem;">Emisión</small>
+                                    <span class="fw-semibold text-dark">{{ factura.fecha_emision|date:"d/m/Y" }}</span>
                                 </div>
                                 <div class="col-6">
-                                    <small class="text-muted d-block">Vence</small>
+                                    <small class="text-muted d-block" style="font-size: 0.75rem;">Vencimiento</small>
                                     <span class="fw-semibold {% if factura.esta_vencida %}text-danger{% endif %}">
                                         {{ factura.fecha_vencimiento|date:"d/m/Y" }}
                                     </span>
@@ -554,15 +554,15 @@
                             
                             <div class="mb-3">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="fw-bold fs-5">${{ factura.monto|floatformat:2|intcomma }}</span>
+                                    <span class="fw-bold fs-5 text-dark">${{ factura.monto|floatformat:2|intcomma }}</span>
                                     {% if factura.monto_pendiente > 0 %}
-                                    <span class="text-danger small">Pend: ${{ factura.monto_pendiente|floatformat:2|intcomma }}</span>
+                                    <span class="text-danger small fw-bold">Pend: ${{ factura.monto_pendiente|floatformat:2|intcomma }}</span>
                                     {% else %}
                                     <span class="text-success small"><i class="fas fa-check-circle"></i> Pagado</span>
                                     {% endif %}
                                 </div>
                                 {% if factura.monto_pendiente > 0 %}
-                                <div class="progress" style="height: 5px;">
+                                <div class="progress" style="height: 6px;">
                                     <div class="progress-bar {% if factura.porcentaje_pagado == 100 %}bg-success
                                                              {% elif factura.porcentaje_pagado > 50 %}bg-warning
                                                              {% else %}bg-danger{% endif %}" 
@@ -570,8 +570,12 @@
                                     </div>
                                 </div>
                                 <div class="d-flex justify-content-between mt-1">
-                                    <small class="text-muted">{{ factura.porcentaje_pagado|floatformat:0 }}% pagado</small>
-                                    <small class="text-muted">{{ factura.dias_restantes_credito }} días rest.</small>
+                                    <small class="text-muted" style="font-size: 0.75rem;">{{ factura.porcentaje_pagado|floatformat:0 }}% pagado</small>
+                                    {% if factura.dias_restantes_credito < 0 %}
+                                    <small class="text-danger fw-bold" style="font-size: 0.75rem;">Vencida hace {{ factura.dias_restantes_credito|stringformat:"d"|slice:"1:" }} días</small>
+                                    {% else %}
+                                    <small class="text-muted" style="font-size: 0.75rem;">{{ factura.dias_restantes_credito }} días rest.</small>
+                                    {% endif %}
                                 </div>
                                 {% endif %}
                             </div>
@@ -579,21 +583,21 @@
                             <div class="d-flex justify-content-between align-items-center pt-3 border-top">
                                 <div>
                                     {% if factura.es_pago_plazos %}
-                                    <span class="badge bg-light text-info border border-info">
-                                        {{ factura.cantidad_plazos }} plazos
+                                    <span class="badge bg-light text-info border border-info" title="Factura a plazos">
+                                        <i class="fas fa-layer-group me-1"></i>{{ factura.cantidad_plazos }}
                                     </span>
                                     {% endif %}
                                 </div>
                                 <div class="btn-group btn-group-sm">
-                                    <a href="{% url 'detalle_factura' factura.pk %}" class="btn btn-outline-primary">
+                                    <a href="{% url 'detalle_factura' factura.pk %}" class="btn btn-outline-primary" title="Ver Detalle">
                                         <i class="fas fa-eye"></i>
                                     </a>
                                     {% if factura.es_pago_plazos %}
-                                    <a href="{% url 'gestionar_plazos_factura' factura.pk %}" class="btn btn-outline-info">
+                                    <a href="{% url 'gestionar_plazos_factura' factura.pk %}" class="btn btn-outline-info" title="Gestionar Plazos">
                                         <i class="fas fa-layer-group"></i>
                                     </a>
                                     {% else %}
-                                    <a href="{% url 'crear_pago' %}?factura={{ factura.pk }}" class="btn btn-outline-success">
+                                    <a href="{% url 'crear_pago' %}?factura={{ factura.pk }}" class="btn btn-outline-success" title="Registrar Pago">
                                         <i class="fas fa-dollar-sign"></i>
                                     </a>
                                     {% endif %}
@@ -601,6 +605,11 @@
                             </div>
                         </div>
                     </div>
+                </div>
+                {% empty %}
+                 <div class="col-12 text-center py-5">
+                    <img src="https://cdn-icons-png.flaticon.com/512/7486/7486747.png" alt="Empty" style="width: 80px; opacity: 0.5;">
+                    <h5 class="text-muted mt-3">No hay datos para mostrar en tarjetas</h5>
                 </div>
                 {% endfor %}
             </div>

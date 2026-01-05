@@ -4,274 +4,422 @@
 {% block title %}Dashboard - Cuentas por Pagar{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center">
-            <h1>Dashboard - Cuentas por Pagar</h1>
-            <div>
-                <a href="{% url 'exportar_facturas_excel' %}" class="btn btn-outline-info me-2">
-                    <i class="fas fa-file-excel me-2"></i>Exportar Excel
-                </a>
-                <a href="{% url 'lista_facturas' %}" class="btn btn-primary">
-                    <i class="fas fa-list me-2"></i>Ver Todas las Facturas
-                </a>
-            </div>
+<div class="container-fluid px-4">
+    <!-- Header con Breadcrumb -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">Dashboard</h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="#">Inicio</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Cuentas por Pagar</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="d-flex">
+            <a href="{% url 'exportar_facturas_excel' %}" class="btn btn-light border shadow-sm me-2">
+                <i class="fas fa-file-excel text-success me-2"></i>Exportar Excel
+            </a>
+            <a href="{% url 'lista_facturas' %}" class="btn btn-primary shadow-sm">
+                <i class="fas fa-list me-2"></i>Ver Facturas
+            </a>
         </div>
     </div>
-</div>
 
-<div class="row mb-4">
-    <div class="col-xl-2 col-md-4 mb-3">
-        <div class="card text-white bg-primary h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h4 class="card-title">{{ total_facturas }}</h4>
-                        <p class="card-text">Total Facturas</p>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-file-invoice fa-2x"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-xl-2 col-md-4 mb-3">
-        <div class="card text-white bg-warning h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h4 class="card-title">{{ facturas_pendientes_count }}</h4>
-                        <p class="card-text">Pendientes</p>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-clock fa-2x"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-xl-2 col-md-4 mb-3">
-        <div class="card text-white bg-danger h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h4 class="card-title">{{ facturas_vencidas_count }}</h4>
-                        <p class="card-text">Vencidas</p>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-exclamation-triangle fa-2x"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-xl-2 col-md-4 mb-3">
-        <div class="card text-white bg-orange h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h4 class="card-title">{{ facturas_por_vencer_count }}</h4>
-                        <p class="card-text">Por Vencer</p>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-hourglass-half fa-2x"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-xl-2 col-md-4 mb-3">
-        <div class="card text-white bg-success h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h4 class="card-title">${{ total_deuda_general|floatformat:2|intcomma }}</h4>
-                        <p class="card-text">Deuda Total</p>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-money-bill-wave fa-2x"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-xl-2 col-md-4 mb-3">
-        <div class="card text-white bg-info h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h4 class="card-title">{{ estadisticas|length }}</h4>
-                        <p class="card-text">Proveedores</p>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-building fa-2x"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Deuda por Proveedor</h5>
-            </div>
-            <div class="card-body">
-                <canvas id="deudasChart" height="250"></canvas>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Distribución de Facturas</h5>
-            </div>
-            <div class="card-body">
-                <canvas id="distribucionChart" height="250"></canvas>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Facturas por Proveedor</h5>
-            </div>
-            <div class="card-body">
-                <canvas id="facturasProveedorChart" height="200"></canvas>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Estatus por Proveedor</h5>
-            </div>
-            <div class="card-body">
-                <canvas id="estatusProveedorChart" height="200"></canvas>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Detalle por Proveedor</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover table-sm">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Proveedor</th>
-                                <th class="text-end">Deuda Total</th>
-                                <th class="text-center">Total Facturas</th>
-                                <th class="text-center">Por Vencer</th>
-                                <th class="text-center">Vencidas</th>
-                                <th class="text-center">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for stat in estadisticas %}
-                            <tr>
-                                <td>
-                                    <strong>{{ stat.proveedor }}</strong>
-                                </td>
-                                <td class="text-end">
-                                    <span class="fw-bold text-primary">${{ stat.total_deuda|floatformat:2|intcomma }}</span>
-                                </td>
-                                <td class="text-center">
-                                    <span class="badge bg-primary">{{ stat.cantidad_facturas }}</span>
-                                </td>
-                                <td class="text-center">
-                                    {% if stat.facturas_por_vencer > 0 %}
-                                    <span class="badge bg-warning">{{ stat.facturas_por_vencer }}</span>
-                                    {% else %}
-                                    <span class="badge bg-secondary">0</span>
-                                    {% endif %}
-                                </td>
-                                <td class="text-center">
-                                    {% if stat.facturas_vencidas > 0 %}
-                                    <span class="badge bg-danger">{{ stat.facturas_vencidas }}</span>
-                                    {% else %}
-                                    <span class="badge bg-secondary">0</span>
-                                    {% endif %}
-                                </td>
-                                <td class="text-center">
-                                    <a href="{% url 'lista_facturas' %}?q={{ stat.proveedor|urlencode }}" 
-                                       class="btn btn-sm btn-outline-primary" 
-                                       title="Ver facturas de este proveedor">
-                                        <i class="fas fa-search"></i>
-                                    </a>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="6" class="text-center py-4">
-                                    <i class="fas fa-check-circle text-success fa-2x mb-2"></i>
-                                    <p class="mb-0">No hay deudas pendientes</p>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Alertas Recientes</h5>
-            </div>
-            <div class="card-body">
-                {% if alertas_recientes %}
-                <div class="list-group list-group-flush">
-                    {% for alerta in alertas_recientes %}
-                    <div class="list-group-item px-0">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">{{ alerta.numero_factura }}</h6>
-                            <small class="text-muted">{{ alerta.ultima_alerta_enviada|timesince }}</small>
+    <!-- Cards de Resumen -->
+    <div class="row mb-4">
+        <!-- Total Facturas -->
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Total Facturas</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_facturas }}</div>
                         </div>
-                        <p class="mb-1 small">{{ alerta.proveedor.razon_social|default:"Sin Proveedor" }}</p>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="badge {% if alerta.estatus == 'VENCIDA' %}bg-danger{% else %}bg-warning{% endif %}">
-                                {{ alerta.get_estatus_display }}
-                            </span>
-                            <small>${{ alerta.monto_pendiente|floatformat:2|intcomma }}</small>
+                        <div class="col-auto">
+                            <i class="fas fa-file-invoice fa-2x text-gray-300"></i>
                         </div>
                     </div>
-                    {% endfor %}
                 </div>
-                {% else %}
-                <div class="text-center py-3">
-                    <i class="fas fa-bell-slash text-muted fa-2x mb-2"></i>
-                    <p class="text-muted mb-0">No hay alertas recientes</p>
-                </div>
-                {% endif %}
             </div>
         </div>
 
-        <div class="card mt-4">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Acciones Rápidas</h5>
+        <!-- Pendientes -->
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Pendientes</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ facturas_pendientes_count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    <a href="{% url 'nueva_cuenta_por_pagar' %}" class="btn btn-success">
-                        <i class="fas fa-plus-circle me-2"></i>Nueva Cuenta por Pagar
-                    </a>
-                    <a href="{% url 'lista_facturas' %}" class="btn btn-outline-primary">
-                        <i class="fas fa-file-invoice me-2"></i>Gestionar Facturas
-                    </a>
+        </div>
+
+        <!-- Vencidas -->
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="card border-left-danger shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                Vencidas</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ facturas_vencidas_count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Por Vencer -->
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="card border-left-orange shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-orange text-uppercase mb-1">
+                                Por Vencer</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ facturas_por_vencer_count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-hourglass-half fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Deuda Total -->
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Deuda Total</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">${{ total_deuda_general|floatformat:2|intcomma }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-money-bill-wave fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Proveedores -->
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Proveedores</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ estadisticas|length }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-building fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficas Principales -->
+    <div class="row mb-4">
+        <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Deuda por Proveedor</h6>
+                    <div class="dropdown no-arrow">
+                        <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" 
+                           data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="dropdownMenuLink">
+                            <li><a class="dropdown-item" href="{% url 'lista_facturas' %}">Ver Detalles</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="deudasChart" height="250"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Distribución de Facturas</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-pie pt-4 pb-2">
+                        <canvas id="distribucionChart" height="250"></canvas>
+                    </div>
+                    <div class="mt-4 text-center small">
+                        <span class="me-3">
+                            <i class="fas fa-circle text-success"></i> Pagadas
+                        </span>
+                        <span class="me-3">
+                            <i class="fas fa-circle text-warning"></i> Pendientes
+                        </span>
+                        <span class="me-3">
+                            <i class="fas fa-circle text-orange"></i> Por Vencer
+                        </span>
+                        <span>
+                            <i class="fas fa-circle text-danger"></i> Vencidas
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficas Secundarias -->
+    <div class="row mb-4">
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Facturas por Proveedor</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-bar">
+                        <canvas id="facturasProveedorChart" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Estatus por Proveedor</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="estatusProveedorChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla Detallada y Sidebar -->
+    <div class="row">
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Detalle por Proveedor</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="dataTable" width="100%" cellspacing="0">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Proveedor</th>
+                                    <th class="text-end">Deuda Total</th>
+                                    <th class="text-center">Total Facturas</th>
+                                    <th class="text-center">Por Vencer</th>
+                                    <th class="text-center">Vencidas</th>
+                                    <th class="text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stat in estadisticas %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm me-3">
+                                                <div class="avatar-title bg-light text-primary rounded">
+                                                    <i class="fas fa-building"></i>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <strong>{{ stat.proveedor }}</strong>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="fw-bold text-dark">${{ stat.total_deuda|floatformat:2|intcomma }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-primary rounded-pill">{{ stat.cantidad_facturas }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if stat.facturas_por_vencer > 0 %}
+                                        <span class="badge bg-warning rounded-pill">{{ stat.facturas_por_vencer }}</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary rounded-pill">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if stat.facturas_vencidas > 0 %}
+                                        <span class="badge bg-danger rounded-pill">{{ stat.facturas_vencidas }}</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary rounded-pill">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'lista_facturas' %}?q={{ stat.proveedor|urlencode }}" 
+                                               class="btn btn-sm btn-outline-primary" 
+                                               title="Ver facturas">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <button type="button" class="btn btn-sm btn-outline-info" 
+                                                    title="Más opciones">
+                                                <i class="fas fa-ellipsis-h"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-5">
+                                        <div class="empty-state">
+                                            <i class="fas fa-check-circle text-success fa-3x mb-3"></i>
+                                            <h5 class="text-muted">No hay deudas pendientes</h5>
+                                            <p class="text-muted mb-4">Excelente gestión de las cuentas por pagar</p>
+                                            <a href="{% url 'nueva_cuenta_por_pagar' %}" class="btn btn-primary">
+                                                <i class="fas fa-plus me-2"></i>Agregar Nueva Factura
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            {% if estadisticas %}
+                            <tfoot>
+                                <tr class="table-light">
+                                    <th class="text-end">Total:</th>
+                                    <th class="text-end">${{ total_deuda_general|floatformat:2|intcomma }}</th>
+                                    <th class="text-center">{{ total_facturas }}</th>
+                                    <th class="text-center">{{ facturas_por_vencer_count }}</th>
+                                    <th class="text-center">{{ facturas_vencidas_count }}</th>
+                                    <th></th>
+                                </tr>
+                            </tfoot>
+                            {% endif %}
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Alertas -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-danger">
+                        <i class="fas fa-bell me-2"></i>Alertas Recientes
+                    </h6>
+                    <span class="badge bg-danger">{{ alertas_recientes|length }}</span>
+                </div>
+                <div class="card-body">
+                    {% if alertas_recientes %}
+                    <div class="timeline">
+                        {% for alerta in alertas_recientes %}
+                        <div class="timeline-item {% if forloop.first %}active{% endif %}">
+                            <div class="timeline-marker {% if alerta.estatus == 'VENCIDA' %}bg-danger{% else %}bg-warning{% endif %}"></div>
+                            <div class="timeline-content">
+                                <h6 class="mb-1">{{ alerta.numero_factura }}</h6>
+                                <p class="text-muted small mb-1">
+                                    {{ alerta.proveedor.razon_social|default:"Sin Proveedor" }}
+                                </p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="badge {% if alerta.estatus == 'VENCIDA' %}bg-danger{% else %}bg-warning{% endif %}">
+                                        {{ alerta.get_estatus_display }}
+                                    </span>
+                                    <small class="text-dark fw-bold">${{ alerta.monto_pendiente|floatformat:2|intcomma }}</small>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="far fa-clock me-1"></i>{{ alerta.ultima_alerta_enviada|timesince }} atrás
+                                </small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <div class="py-3">
+                            <i class="fas fa-bell-slash text-muted fa-3x mb-3"></i>
+                            <h5 class="text-muted">Sin alertas recientes</h5>
+                            <p class="text-muted small mb-0">Todo está al día</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Acciones Rápidas -->
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-bolt me-2"></i>Acciones Rápidas
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-3">
+                        <a href="{% url 'nueva_cuenta_por_pagar' %}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-plus-circle me-2"></i>Nueva Cuenta por Pagar
+                        </a>
+                        <a href="{% url 'lista_facturas' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-file-invoice me-2"></i>Gestionar Facturas
+                        </a>
+                        <a href="{% url 'exportar_facturas_excel' %}" class="btn btn-success">
+                            <i class="fas fa-file-excel me-2"></i>Exportar Reporte
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estadísticas Rápidas -->
+            <div class="card shadow mt-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-chart-bar me-2"></i>Estadísticas
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6 mb-3">
+                            <div class="stat-card">
+                                <div class="stat-value text-primary">{{ facturas_con_archivo }}</div>
+                                <div class="stat-label">Facturas con Archivo</div>
+                                <div class="progress mt-2" style="height: 4px;">
+                                    <div class="progress-bar bg-primary" role="progressbar" 
+                                         style="width: {{ porcentaje_facturas_sincronizadas }}%" 
+                                         aria-valuenow="{{ porcentaje_facturas_sincronizadas }}" 
+                                         aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="stat-card">
+                                <div class="stat-value text-success">{{ pagos_con_comprobante }}</div>
+                                <div class="stat-label">Pagos con Comprobante</div>
+                                <div class="progress mt-2" style="height: 4px;">
+                                    <div class="progress-bar bg-success" role="progressbar" 
+                                         style="width: {{ porcentaje_pagos_sincronizados }}%" 
+                                         aria-valuenow="{{ porcentaje_pagos_sincronizados }}" 
+                                         aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -281,45 +429,203 @@
 
 {% block extra_css %}
 <style>
-    .bg-orange {
-        background-color: #fd7e14 !important;
-    }
-    
-    .card {
-        transition: transform 0.2s ease-in-out;
-    }
-    
-    .card:hover {
-        transform: translateY(-2px);
-    }
-    
-    .table th {
-        border-top: none;
-        font-weight: 600;
-    }
-    
-    .list-group-item {
-        border-left: none;
-        border-right: none;
-    }
-    
-    .list-group-item:first-child {
-        border-top: none;
+    :root {
+        --primary: #4e73df;
+        --success: #1cc88a;
+        --info: #36b9cc;
+        --warning: #f6c23e;
+        --danger: #e74a3b;
+        --secondary: #858796;
+        --light: #f8f9fc;
+        --dark: #5a5c69;
+        --orange: #fd7e14;
     }
 
-    .chart-data-label {
-        font-weight: bold;
-        font-size: 12px;
-        text-shadow: 1px 1px 2px white;
+    .card {
+        border: none;
+        border-radius: 10px;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+    }
+
+    .card-header {
+        border-bottom: 1px solid #e3e6f0;
+        background-color: #fff;
+        padding: 1rem 1.25rem;
+    }
+
+    .border-left-primary {
+        border-left: 4px solid var(--primary) !important;
+    }
+
+    .border-left-success {
+        border-left: 4px solid var(--success) !important;
+    }
+
+    .border-left-info {
+        border-left: 4px solid var(--info) !important;
+    }
+
+    .border-left-warning {
+        border-left: 4px solid var(--warning) !important;
+    }
+
+    .border-left-danger {
+        border-left: 4px solid var(--danger) !important;
+    }
+
+    .border-left-orange {
+        border-left: 4px solid var(--orange) !important;
+    }
+
+    .avatar-sm {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .avatar-title {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .timeline {
+        position: relative;
+        padding-left: 20px;
+    }
+
+    .timeline-item {
+        position: relative;
+        padding-bottom: 20px;
+        border-left: 2px solid #e3e6f0;
+        padding-left: 20px;
+    }
+
+    .timeline-item:last-child {
+        padding-bottom: 0;
+    }
+
+    .timeline-marker {
+        position: absolute;
+        left: -7px;
+        top: 0;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 3px rgba(0,0,0,0.1);
+    }
+
+    .timeline-content {
+        padding-left: 0;
+    }
+
+    .empty-state {
+        padding: 2rem;
+    }
+
+    .empty-state i {
+        opacity: 0.8;
+    }
+
+    .stat-card {
+        padding: 10px;
+    }
+
+    .stat-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .stat-label {
+        font-size: 0.85rem;
+        color: var(--secondary);
+        margin-top: 0.25rem;
+    }
+
+    .progress {
+        border-radius: 10px;
+        background-color: #eaecf4;
+    }
+
+    .progress-bar {
+        border-radius: 10px;
+    }
+
+    .table th {
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+        color: var(--dark);
+        border-top: none;
+        background-color: var(--light);
+    }
+
+    .table tfoot th {
+        background-color: #f8f9fc;
+        border-top: 2px solid #e3e6f0;
+    }
+
+    .badge.rounded-pill {
+        min-width: 2rem;
+        padding: 0.25rem 0.5rem;
+    }
+
+    .btn-group .btn {
+        border-radius: 6px;
+    }
+
+    .chart-area, .chart-bar, .chart-pie {
+        position: relative;
+    }
+
+    .text-orange {
+        color: var(--orange) !important;
+    }
+
+    .bg-orange {
+        background-color: var(--orange) !important;
+    }
+
+    .breadcrumb {
+        background: transparent;
+        padding: 0;
+        margin-bottom: 0.5rem;
+    }
+
+    .breadcrumb-item a {
+        color: var(--primary);
+        text-decoration: none;
+    }
+
+    .breadcrumb-item.active {
+        color: var(--dark);
+    }
+
+    .dropdown-menu {
+        border: none;
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
     }
 </style>
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Funciones auxiliares
     function obtenerDatosDeTabla() {
         const proveedores = [];
         const deudas = [];
@@ -327,7 +633,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const facturasPorVencer = [];
         const facturasVencidas = [];
         
-        document.querySelectorAll('table tbody tr').forEach(row => {
+        document.querySelectorAll('#dataTable tbody tr').forEach(row => {
             const cells = row.querySelectorAll('td');
             if (cells.length >= 5) {
                 proveedores.push(cells[0].querySelector('strong').textContent.trim());
@@ -360,6 +666,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Configuración de colores
+    const colors = {
+        primary: '#4e73df',
+        success: '#1cc88a',
+        info: '#36b9cc',
+        warning: '#f6c23e',
+        danger: '#e74a3b',
+        orange: '#fd7e14',
+        light: '#f8f9fc',
+        dark: '#5a5c69'
+    };
+
     const datos = obtenerDatosDeTabla();
     
     if (datos.labels.length > 0) {
@@ -369,19 +687,27 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     crearGraficaDistribucion();
 
+    // Gráfico de Deudas por Proveedor
     function crearGraficaDeudas(data) {
         const ctx = document.getElementById('deudasChart').getContext('2d');
-        const chart = new Chart(ctx, {
+        
+        // Crear gradiente
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(78, 115, 223, 0.8)');
+        gradient.addColorStop(1, 'rgba(78, 115, 223, 0.1)');
+        
+        new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.labels,
+                labels: data.labels.slice(0, 8), // Mostrar solo los primeros 8
                 datasets: [{
-                    label: 'Deuda ($)',
-                    data: data.deudas,
-                    backgroundColor: 'rgba(26, 115, 232, 0.8)',
-                    borderColor: 'rgba(26, 115, 232, 1)',
+                    label: 'Deuda Total',
+                    data: data.deudas.slice(0, 8),
+                    backgroundColor: gradient,
+                    borderColor: colors.primary,
                     borderWidth: 1,
-                    borderRadius: 5,
+                    borderRadius: 8,
+                    borderSkipped: false,
                 }]
             },
             options: {
@@ -390,6 +716,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                        titleFont: { size: 12 },
+                        bodyFont: { size: 14 },
                         callbacks: {
                             label: function(context) {
                                 return `Deuda: ${formatoMoneda(context.parsed.y)}`;
@@ -400,194 +729,135 @@ document.addEventListener('DOMContentLoaded', function() {
                 scales: {
                     y: {
                         beginAtZero: true,
+                        grid: { drawBorder: false },
                         ticks: {
                             callback: function(value) {
                                 return formatoMoneda(value);
-                            }
+                            },
+                            color: colors.dark
                         }
                     },
                     x: {
+                        grid: { display: false },
                         ticks: {
                             maxRotation: 45,
-                            minRotation: 45
+                            minRotation: 45,
+                            color: colors.dark
                         }
                     }
                 }
             }
         });
-
-        chart.canvas.parentNode.style.position = 'relative';
-        const labelsContainer = document.createElement('div');
-        labelsContainer.style.position = 'absolute';
-        labelsContainer.style.top = '0';
-        labelsContainer.style.left = '0';
-        labelsContainer.style.width = '100%';
-        labelsContainer.style.height = '100%';
-        labelsContainer.style.pointerEvents = 'none';
-        chart.canvas.parentNode.appendChild(labelsContainer);
-
-        chart.update();
-        setTimeout(() => {
-            const meta = chart.getDatasetMeta(0);
-            data.deudas.forEach((value, index) => {
-                const bar = meta.data[index];
-                if (bar) {
-                    const label = document.createElement('div');
-                    label.className = 'chart-data-label';
-                    label.style.position = 'absolute';
-                    label.style.left = bar.x + 'px';
-                    label.style.top = (bar.y - 20) + 'px';
-                    label.style.transform = 'translateX(-50%)';
-                    label.style.textAlign = 'center';
-                    label.style.fontWeight = 'bold';
-                    label.style.fontSize = '12px';
-                    label.style.color = '#000';
-                    label.style.textShadow = '1px 1px 2px white';
-                    label.textContent = formatoMoneda(value);
-                    labelsContainer.appendChild(label);
-                }
-            });
-        }, 100);
     }
 
+    // Gráfico de Distribución (Doughnut)
     function crearGraficaDistribucion() {
         const ctx = document.getElementById('distribucionChart').getContext('2d');
+        
         const totalPendientes = {{ facturas_pendientes_count }};
         const totalPorVencer = {{ facturas_por_vencer_count }};
         const totalVencidas = {{ facturas_vencidas_count }};
         const totalPagadas = {{ total_facturas }} - totalPendientes - totalPorVencer - totalVencidas;
-        const data = [totalPagadas, totalPendientes, totalPorVencer, totalVencidas];
-        const total = data.reduce((a, b) => a + b, 0);
         
-        const chart = new Chart(ctx, {
+        new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: ['Pagadas', 'Pendientes', 'Por Vencer', 'Vencidas'],
                 datasets: [{
-                    data: data,
+                    data: [totalPagadas, totalPendientes, totalPorVencer, totalVencidas],
                     backgroundColor: [
-                        'rgba(40, 167, 69, 0.8)',
-                        'rgba(255, 193, 7, 0.8)',
-                        'rgba(253, 126, 20, 0.8)',
-                        'rgba(220, 53, 69, 0.8)'
+                        colors.success,
+                        colors.warning,
+                        colors.orange,
+                        colors.danger
                     ],
-                    borderWidth: 2
+                    borderWidth: 2,
+                    borderColor: '#fff',
+                    hoverOffset: 15
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                cutout: '70%',
                 plugins: {
-                    legend: { position: 'bottom' }
+                    legend: { 
+                        display: false,
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((context.parsed / total) * 100);
+                                return `${context.label}: ${context.parsed} (${percentage}%)`;
+                            }
+                        }
+                    }
                 }
             }
         });
-
-        chart.canvas.parentNode.style.position = 'relative';
-        const labelsContainer = document.createElement('div');
-        labelsContainer.style.position = 'absolute';
-        labelsContainer.style.top = '0';
-        labelsContainer.style.left = '0';
-        labelsContainer.style.width = '100%';
-        labelsContainer.style.height = '100%';
-        labelsContainer.style.pointerEvents = 'none';
-        labelsContainer.style.display = 'flex';
-        labelsContainer.style.alignItems = 'center';
-        labelsContainer.style.justifyContent = 'center';
-        chart.canvas.parentNode.appendChild(labelsContainer);
-
-        chart.update();
-        setTimeout(() => {
-            const centerLabel = document.createElement('div');
-            centerLabel.className = 'chart-data-label';
-            centerLabel.style.textAlign = 'center';
-            centerLabel.style.fontWeight = 'bold';
-            centerLabel.style.fontSize = '16px';
-            centerLabel.style.color = '#000';
-            centerLabel.style.textShadow = '1px 1px 2px white';
-            centerLabel.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
-            centerLabel.style.padding = '8px';
-            centerLabel.style.borderRadius = '4px';
-            
-            let labelText = '';
-            data.forEach((value, index) => {
-                if (value > 0) {
-                    const percentage = Math.round((value / total) * 100);
-                    labelText += `${chart.data.labels[index]}: ${value} (${percentage}%)\n`;
-                }
-            });
-            centerLabel.textContent = labelText.trim();
-            labelsContainer.appendChild(centerLabel);
-        }, 100);
     }
 
+    // Gráfico de Facturas por Proveedor
     function crearGraficaFacturasProveedor(data) {
         const ctx = document.getElementById('facturasProveedorChart').getContext('2d');
-        const chart = new Chart(ctx, {
+        
+        // Mostrar solo los primeros 6 proveedores para mejor visualización
+        const labels = data.labels.slice(0, 6);
+        const values = data.facturas_totales.slice(0, 6);
+        
+        new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: data.labels,
+                labels: labels,
                 datasets: [{
                     label: 'Total Facturas',
-                    data: data.facturas_totales,
-                    backgroundColor: 'rgba(108, 117, 125, 0.8)',
-                    borderColor: 'rgba(108, 117, 125, 1)',
+                    data: values,
+                    backgroundColor: colors.info,
+                    borderColor: colors.info,
                     borderWidth: 1,
-                    borderRadius: 3,
+                    borderRadius: 6,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `Facturas: ${context.parsed.y}`;
+                            }
+                        }
+                    }
+                },
                 scales: {
-                    y: { beginAtZero: true, ticks: { precision: 0 } },
-                    x: { ticks: { maxRotation: 45, minRotation: 45 } }
+                    y: { 
+                        beginAtZero: true, 
+                        ticks: { precision: 0 },
+                        grid: { drawBorder: false }
+                    },
+                    x: { 
+                        grid: { display: false },
+                        ticks: { maxRotation: 45, minRotation: 45 }
+                    }
                 }
             }
         });
-
-        chart.canvas.parentNode.style.position = 'relative';
-        const labelsContainer = document.createElement('div');
-        labelsContainer.style.position = 'absolute';
-        labelsContainer.style.top = '0';
-        labelsContainer.style.left = '0';
-        labelsContainer.style.width = '100%';
-        labelsContainer.style.height = '100%';
-        labelsContainer.style.pointerEvents = 'none';
-        chart.canvas.parentNode.appendChild(labelsContainer);
-
-        chart.update();
-        setTimeout(() => {
-            const meta = chart.getDatasetMeta(0);
-            data.facturas_totales.forEach((value, index) => {
-                const bar = meta.data[index];
-                if (bar) {
-                    const label = document.createElement('div');
-                    label.className = 'chart-data-label';
-                    label.style.position = 'absolute';
-                    label.style.left = bar.x + 'px';
-                    label.style.top = (bar.y - 20) + 'px';
-                    label.style.transform = 'translateX(-50%)';
-                    label.style.textAlign = 'center';
-                    label.style.fontWeight = 'bold';
-                    label.style.fontSize = '12px';
-                    label.style.color = '#000';
-                    label.style.textShadow = '1px 1px 2px white';
-                    label.textContent = value;
-                    labelsContainer.appendChild(label);
-                }
-            });
-        }, 100);
     }
 
+    // Gráfico de Estatus por Proveedor (Stacked)
     function crearGraficaEstatusProveedor(data) {
         const ctx = document.getElementById('estatusProveedorChart').getContext('2d');
+        
+        // Tomar los 5 principales proveedores por deuda
         const topProveedores = data.labels.slice(0, 5);
         const topPorVencer = data.facturas_por_vencer.slice(0, 5);
         const topVencidas = data.facturas_vencidas.slice(0, 5);
         
-        const chart = new Chart(ctx, {
+        new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: topProveedores,
@@ -595,15 +865,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     {
                         label: 'Por Vencer',
                         data: topPorVencer,
-                        backgroundColor: 'rgba(253, 126, 20, 0.8)',
-                        borderColor: 'rgba(253, 126, 20, 1)',
+                        backgroundColor: colors.orange,
+                        borderColor: colors.orange,
                         borderWidth: 1,
                     },
                     {
                         label: 'Vencidas',
                         data: topVencidas,
-                        backgroundColor: 'rgba(220, 53, 69, 0.8)',
-                        borderColor: 'rgba(220, 53, 69, 1)',
+                        backgroundColor: colors.danger,
+                        borderColor: colors.danger,
                         borderWidth: 1,
                     }
                 ]
@@ -611,67 +881,29 @@ document.addEventListener('DOMContentLoaded', function() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { position: 'top' } },
+                plugins: { 
+                    legend: { 
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20
+                        }
+                    }
+                },
                 scales: {
-                    x: { stacked: true, ticks: { maxRotation: 45, minRotation: 45 } },
-                    y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
+                    x: { 
+                        stacked: true, 
+                        grid: { display: false }
+                    },
+                    y: { 
+                        stacked: true, 
+                        beginAtZero: true, 
+                        ticks: { precision: 0 },
+                        grid: { drawBorder: false }
+                    }
                 }
             }
         });
-
-        chart.canvas.parentNode.style.position = 'relative';
-        const labelsContainer = document.createElement('div');
-        labelsContainer.style.position = 'absolute';
-        labelsContainer.style.top = '0';
-        labelsContainer.style.left = '0';
-        labelsContainer.style.width = '100%';
-        labelsContainer.style.height = '100%';
-        labelsContainer.style.pointerEvents = 'none';
-        chart.canvas.parentNode.appendChild(labelsContainer);
-
-        chart.update();
-        setTimeout(() => {
-            const meta0 = chart.getDatasetMeta(0);
-            const meta1 = chart.getDatasetMeta(1);
-            
-            topPorVencer.forEach((value, index) => {
-                const bar = meta0.data[index];
-                if (bar && value > 0) {
-                    const label = document.createElement('div');
-                    label.className = 'chart-data-label';
-                    label.style.position = 'absolute';
-                    label.style.left = bar.x + 'px';
-                    label.style.top = (bar.y - 10) + 'px';
-                    label.style.transform = 'translateX(-50%)';
-                    label.style.textAlign = 'center';
-                    label.style.fontWeight = 'bold';
-                    label.style.fontSize = '10px';
-                    label.style.color = '#fff';
-                    label.style.textShadow = '1px 1px 2px #000';
-                    label.textContent = value;
-                    labelsContainer.appendChild(label);
-                }
-            });
-
-            topVencidas.forEach((value, index) => {
-                const bar = meta1.data[index];
-                if (bar && value > 0) {
-                    const label = document.createElement('div');
-                    label.className = 'chart-data-label';
-                    label.style.position = 'absolute';
-                    label.style.left = bar.x + 'px';
-                    label.style.top = (bar.y - 10) + 'px';
-                    label.style.transform = 'translateX(-50%)';
-                    label.style.textAlign = 'center';
-                    label.style.fontWeight = 'bold';
-                    label.style.fontSize = '10px';
-                    label.style.color = '#fff';
-                    label.style.textShadow = '1px 1px 2px #000';
-                    label.textContent = value;
-                    labelsContainer.appendChild(label);
-                }
-            });
-        }, 100);
     }
 });
 </script>

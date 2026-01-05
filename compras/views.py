@@ -8,6 +8,8 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.forms import inlineformset_factory
 from django.db.models import Count, Q
+import uuid 
+from django.db import IntegrityError
 import threading # Para enviar el mensaje en segundo plano y no trabar la página
 from .utils import enviar_whatsapp_solicitud
 import csv
@@ -44,7 +46,7 @@ from xhtml2pdf import pisa
 from ternium.models import Empresa, Origen # Asegúrate que Origen esté importado
 from django.contrib.auth.decorators import permission_required, login_required
 from django.contrib.auth.mixins import PermissionRequiredMixin
-
+from django.apps import apps
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from django.contrib.auth.models import User
@@ -56,66 +58,86 @@ from .models import SolicitudCompra
 @permission_required('compras.acceso_compras', raise_exception=True)
 def dashboard_compras(request):
     """
-    Dashboard principal mejorado con KPIs, tablas de resumen y gráficos.
+    Dashboard principal.
+    RESTRICCIÓN: Si no es admin (superuser), redirige a mis solicitudes.
     """
-    
-    # --- 1. KPIs GLOBALES (Indicadores Clave) ---
-    # Usamos diccionarios para pasar el valor y también metadatos de color/icono si quisieramos
+    # --- CAMBIO DE SEGURIDAD ---
+    if not request.user.is_superuser:
+        return redirect('lista_solicitudes')
+    # ---------------------------
+
     kpis = {
         'pendientes': SolicitudCompra.objects.filter(estatus='PENDIENTE_APROBACION').count(),
         'urgentes': SolicitudCompra.objects.filter(estatus='PENDIENTE_APROBACION', prioridad='URGENTE').count(),
-        'ordenes_activas': OrdenCompra.objects.exclude(estatus__in=['CANCELADA', 'CERRADA', 'BORRADOR']).count(),
-        'proveedores_activos': Proveedor.objects.filter(activo=True).count(),
+        'ordenes_activas': OrdenCompra.objects.filter(estatus__in=['PENDIENTE', 'APROBADA']).count(),
         'articulos_totales': Articulo.objects.filter(activo=True).count(),
     }
     
-    # --- 2. TABLAS DE RESUMEN ---
-    
-    # Últimas solicitudes pendientes de aprobación (Acción inmediata)
     ultimas_solicitudes = SolicitudCompra.objects.filter(
         estatus='PENDIENTE_APROBACION'
     ).select_related('solicitante', 'empresa').order_by('-creado_en')[:5]
 
-    # Últimas órdenes de compra generadas (Visibilidad de flujo)
-    ultimas_ordenes = OrdenCompra.objects.select_related(
-        'proveedor'
-    ).order_by('-fecha_emision')[:5]
+    ultimas_ordenes = OrdenCompra.objects.filter(
+        estatus__in=['PENDIENTE', 'APROBADA']
+    ).select_related('proveedor').order_by('-id')[:10]
 
-    # --- 3. DATOS PARA GRÁFICO (Chart.js) ---
-    # Estado de las Órdenes de Compra (excluyendo cerradas para ver carga actual)
     ordenes_por_estatus = OrdenCompra.objects.exclude(
-        estatus__in=['CERRADA', 'RECIBIDA_TOTAL']
+        estatus__in=['CANCELADA']
     ).values('estatus').annotate(total=Count('id'))
     
     labels_grafico = []
     data_grafico = []
-    colores_grafico = []
     
-    mapa_colores = {
-        'BORRADOR': '#6c757d',          # Gris
-        'APROBADA': '#0d6efd',          # Azul Primary
-        'EN_AUDITORIA': '#fd7e14',      # Naranja
-        'LISTA_PARA_AUDITAR': '#ffc107',# Amarillo
-        'CANCELADA': '#dc3545',         # Rojo
-        'RECIBIDA_PARCIAL': '#20c997',  # Verde azulado
-    }
-
     for item in ordenes_por_estatus:
         estatus_readable = dict(OrdenCompra.ESTATUS_CHOICES).get(item['estatus'], item['estatus'])
         labels_grafico.append(estatus_readable)
         data_grafico.append(item['total'])
-        colores_grafico.append(mapa_colores.get(item['estatus'], '#adb5bd'))
 
     context = {
         'kpis': kpis,
         'ultimas_solicitudes': ultimas_solicitudes,
         'ultimas_ordenes': ultimas_ordenes,
-        # Datos para JS
         'chart_labels': json.dumps(labels_grafico),
         'chart_data': json.dumps(data_grafico),
-        'chart_colors': json.dumps(colores_grafico),
     }
     return render(request, 'compras/dashboard.html', context)
+# ... (Otras vistas, asegúrate de cambiar 'BORRADOR' por 'PENDIENTE' en aprobar_solicitud y generar_oc) ...
+
+# --- WEBHOOK WHATSAPP ACTUALIZADO ---
+@csrf_exempt
+def twilio_webhook(request):
+    if request.method == 'POST':
+        incoming_msg = request.POST.get('Body', '').strip().upper()
+        response = MessagingResponse()
+        msg = response.message()
+        usuario_bot = User.objects.filter(is_superuser=True).first()
+
+        if incoming_msg == 'SI':
+            ultima_solicitud = SolicitudCompra.objects.filter(estatus='PENDIENTE_APROBACION').order_by('creado_en').last()
+            if ultima_solicitud:
+                exito, texto = ultima_solicitud.ejecutar_aprobacion(usuario_bot)
+                if exito:
+                    # Obtenemos la OC recién creada
+                    oc = ultima_solicitud.orden_de_compra
+                    msg.body(f"✅ *Solicitud {ultima_solicitud.folio} APROBADA*\n\n📄 Se generó la *OC {oc.folio}* en estatus *PENDIENTE*.\n\n⚠️ Ingresa al sistema para completar detalles y emitirla al proveedor.")
+                else:
+                    msg.body(f"⚠️ Error: {texto}")
+            else:
+                msg.body("👍 No hay solicitudes pendientes recientes.")
+
+        elif incoming_msg == 'NO':
+            ultima_solicitud = SolicitudCompra.objects.filter(estatus='PENDIENTE_APROBACION').order_by('creado_en').last()
+            if ultima_solicitud:
+                ultima_solicitud.estatus = 'RECHAZADA'
+                ultima_solicitud.save()
+                msg.body(f"🚫 Solicitud {ultima_solicitud.folio} RECHAZADA.")
+            else:
+                msg.body("No hay solicitudes pendientes.")
+
+        # ... (Resto del código igual)
+
+        return HttpResponse(str(response))
+    return HttpResponseForbidden()
 
 class ProveedorListView(LoginRequiredMixin, ListView):
     model = Proveedor
@@ -327,48 +349,32 @@ class SolicitudCompraListView(LoginRequiredMixin, PermissionRequiredMixin, ListV
     ordering = ['-creado_en']
 
     def get_queryset(self):
-        """
-        Sobrescribimos este método para añadir la lógica de filtrado
-        basada en los parámetros GET de la URL.
-        """
-        # --- INICIO MODIFICACIÓN ---
-        # Añadimos 'lugar' al select_related para optimizar
         queryset = super().get_queryset().select_related(
             'empresa', 'lugar', 'solicitante', 'aprobado_por'
         )
-        # --- FIN MODIFICACIÓN ---
         
-        # Obtener parámetros del formulario de filtros
+        # --- CAMBIO DE SEGURIDAD: Filtrar por usuario si no es admin ---
+        if not self.request.user.is_superuser:
+            queryset = queryset.filter(solicitante=self.request.user)
+        # -------------------------------------------------------------
+
         folio = self.request.GET.get('folio')
         empresa_id = self.request.GET.get('empresa')
-        lugar_id = self.request.GET.get('lugar') # <-- AÑADIDO
+        lugar_id = self.request.GET.get('lugar')
         solicitante_id = self.request.GET.get('solicitante')
         estatus = self.request.GET.get('estatus')
         prioridad = self.request.GET.get('prioridad')
         start_date = self.request.GET.get('start_date')
         end_date = self.request.GET.get('end_date')
 
-        # Aplicar filtros al queryset si los parámetros existen
-        if folio:
-            queryset = queryset.filter(folio__icontains=folio)
-        if empresa_id:
-            queryset = queryset.filter(empresa_id=empresa_id)
-        
-        # --- FILTRO AÑADIDO ---
-        if lugar_id:
-            queryset = queryset.filter(lugar_id=lugar_id)
-        # --- FIN FILTRO AÑADIDO ---
-            
-        if solicitante_id:
-            queryset = queryset.filter(solicitante_id=solicitante_id)
-        if estatus:
-            queryset = queryset.filter(estatus=estatus)
-        if prioridad:
-            queryset = queryset.filter(prioridad=prioridad)
-        if start_date:
-            queryset = queryset.filter(creado_en__date__gte=start_date)
-        if end_date:
-            queryset = queryset.filter(creado_en__date__lte=end_date)
+        if folio: queryset = queryset.filter(folio__icontains=folio)
+        if empresa_id: queryset = queryset.filter(empresa_id=empresa_id)
+        if lugar_id: queryset = queryset.filter(lugar_id=lugar_id)
+        if solicitante_id: queryset = queryset.filter(solicitante_id=solicitante_id)
+        if estatus: queryset = queryset.filter(estatus=estatus)
+        if prioridad: queryset = queryset.filter(prioridad=prioridad)
+        if start_date: queryset = queryset.filter(creado_en__date__gte=start_date)
+        if end_date: queryset = queryset.filter(creado_en__date__lte=end_date)
             
         return queryset
 
@@ -400,6 +406,16 @@ class SolicitudCompraDetailView(LoginRequiredMixin, DetailView):
     model = SolicitudCompra
     template_name = 'compras/solicitud_detalle.html'
     context_object_name = 'solicitud'
+
+    # --- CAMBIO DE SEGURIDAD ---
+    def get_queryset(self):
+        """
+        Asegura que un usuario normal solo pueda ver sus propios detalles.
+        """
+        qs = super().get_queryset()
+        if not self.request.user.is_superuser:
+            qs = qs.filter(solicitante=self.request.user)
+        return qs
     
 @login_required
 def get_proveedores_por_empresa(request, empresa_id):
@@ -520,17 +536,19 @@ def aprobar_solicitud(request, pk):
     if request.method == 'POST':
         solicitud = get_object_or_404(SolicitudCompra, pk=pk)
         
+        # Validación de estatus
         if solicitud.estatus != 'PENDIENTE_APROBACION':
             messages.warning(request, "Esta solicitud no se puede aprobar en su estado actual.")
             return redirect('detalle_solicitud', pk=pk)
 
-        if hasattr(solicitud, 'orden_de_compra'):
-            messages.warning(request, f"Ya existe una orden de compra ({solicitud.orden_de_compra.folio}) para esta solicitud.")
+        # Verificar si ya tiene OC
+        if OrdenCompra.objects.filter(solicitud_origen=solicitud).exists():
+            messages.warning(request, f"Ya existe una orden de compra para esta solicitud.")
             return redirect('detalle_solicitud', pk=pk)
 
         try:
             with transaction.atomic():
-                # 1. Aprueba la solicitud
+                # 1. Aprobar la Solicitud
                 solicitud.estatus = 'APROBADA'
                 solicitud.aprobado_por = request.user
                 solicitud.fecha_aprobacion = timezone.now()
@@ -538,21 +556,20 @@ def aprobar_solicitud(request, pk):
 
                 condiciones = f"{solicitud.proveedor.dias_credito} días de crédito" if solicitud.proveedor and solicitud.proveedor.dias_credito > 0 else "Contado"
 
-                # 2. Crea la Orden de Compra en estado BORRADOR
+                # 2. Crear Orden de Compra en estatus PENDIENTE
                 orden = OrdenCompra.objects.create(
                     solicitud_origen=solicitud,
                     empresa=solicitud.empresa,
                     proveedor=solicitud.proveedor,
                     fecha_entrega_esperada=timezone.now().date() + timezone.timedelta(days=7),
                     condiciones_pago=condiciones,
-                    estatus='BORRADOR',
+                    estatus='PENDIENTE',  # <--- Nace como PENDIENTE
                     creado_por=request.user,
                     usuario_creacion=request.user,
-                    # Heredamos modalidad de pago por defecto (se puede cambiar al generar OC)
                     modalidad_pago='UNA_EXHIBICION' 
                 )
 
-                # 3. Crea los detalles de la OC
+                # 3. Copiar detalles
                 for detalle_sol in solicitud.detalles.all():
                     DetalleOrdenCompra.objects.create(
                         orden_compra=orden,
@@ -562,69 +579,35 @@ def aprobar_solicitud(request, pk):
                         descuento=0
                     )
                 
-                # --- MODIFICACIÓN: Lógica de CXP y Plazos ---
-                try:
-                    from cuentas_por_pagar.models import Factura
-                    from decimal import Decimal
-                    from datetime import timedelta
-                    
-                    # Verificamos si ya existen facturas vinculadas
-                    if not hasattr(orden, 'factura_cxp') and not orden.factura_cxp_set.exists() if hasattr(orden, 'factura_cxp_set') else True:
-                        
-                        # --- LÓGICA PARA PLAZOS ---
-                        if orden.modalidad_pago == 'A_PLAZOS' and orden.cantidad_plazos and orden.cantidad_plazos > 1:
-                            monto_por_plazo = orden.total_general / Decimal(orden.cantidad_plazos)
-                            
-                            for i in range(1, orden.cantidad_plazos + 1):
-                                # Nombre: CXP-OC-XXXXX-1, CXP-OC-XXXXX-2...
-                                numero_cxp = f"CXP-{orden.folio}-{i}"
-                                
-                                # Fecha: Cada plazo vence 30 días después del anterior (aproximado)
-                                fecha_vencimiento = timezone.now().date() + timedelta(days=30 * i)
-                                
-                                Factura.objects.create(
-                                    orden_compra=orden,
-                                    numero_factura=numero_cxp,
-                                    fecha_emision=timezone.now().date(),
-                                    fecha_vencimiento=fecha_vencimiento,
-                                    monto=monto_por_plazo,
-                                    creado_por=request.user,
-                                    descripcion=f"Plazo {i} de {orden.cantidad_plazos} - OC {orden.folio}" # Opcional si el modelo tiene descripción
-                                )
-                            messages.success(request, f"Solicitud aprobada. OC {orden.folio} generada con {orden.cantidad_plazos} plazos en CXP.")
+                messages.success(request, f"Solicitud aprobada. Se generó la OC {orden.folio} en estatus PENDIENTE. Ve a 'Terminar' para definir plazos.")
 
-                        # --- LÓGICA PARA PAGO ÚNICO ---
-                        else:
-                            # Nombre: CXP-OC-XXXXX
-                            numero_cxp = f"CXP-{orden.folio}"
-                            
-                            # Fecha vencimiento según días de crédito del proveedor
-                            dias_credito = getattr(orden.proveedor, 'dias_credito', 0)
-                            fecha_vencimiento = timezone.now().date() + timedelta(days=dias_credito)
-                            
-                            Factura.objects.create(
-                                orden_compra=orden,
-                                numero_factura=numero_cxp,
-                                fecha_emision=timezone.now().date(),
-                                fecha_vencimiento=fecha_vencimiento,
-                                monto=orden.total_general,
-                                creado_por=request.user
-                            )
-                            messages.success(request, f"Solicitud aprobada. OC {orden.folio} y cuenta por pagar {numero_cxp} generadas.")
-                    
-                except ImportError:
-                    messages.success(request, f"Solicitud aprobada y OC {orden.folio} generada. (Módulo CXP no encontrado)")
-                except Exception as e:
-                    print(f"Error al generar CXP: {e}")
-                    messages.warning(request, f"Solicitud aprobada y OC {orden.folio} generada, pero hubo un error creando la cuenta por pagar: {e}")
-                # --- FIN MODIFICACIÓN ---
-        
         except Exception as e:
             messages.error(request, f"Ocurrió un error al aprobar la solicitud: {e}")
 
         return redirect('detalle_solicitud', pk=pk)
     
     return HttpResponseForbidden()
+
+@login_required
+@require_POST
+def cancelar_orden_compra(request, pk):
+    orden = get_object_or_404(OrdenCompra, pk=pk)
+    
+    # Validar que no esté ya finalizada o cancelada
+    if orden.estatus in ['AUDITADA', 'CANCELADA', 'CERRADA']:
+        messages.error(request, f"No se puede cancelar la orden {orden.folio} porque está en estatus {orden.get_estatus_display()}.")
+        return redirect('detalle_orden_compra', pk=pk)
+
+    # Permitir cancelar PENDIENTE y APROBADA
+    try:
+        with transaction.atomic():
+            orden.estatus = 'CANCELADA'
+            orden.save()
+            messages.success(request, f"La Orden de Compra {orden.folio} ha sido CANCELADA correctamente.")
+    except Exception as e:
+        messages.error(request, f"Error al cancelar la orden: {e}")
+        
+    return redirect('detalle_orden_compra', pk=pk)
 
 @login_required
 def rechazar_solicitud(request, pk):
@@ -720,16 +703,15 @@ class OrdenCompraDetailView(LoginRequiredMixin, DetailView):
 
 @login_required
 def generar_orden_de_compra(request, pk):
-    # 1. Obtener objetos
+    # Obtenemos la solicitud y la orden
     solicitud = get_object_or_404(SolicitudCompra, pk=pk)
     orden_existente = get_object_or_404(OrdenCompra, solicitud_origen=solicitud)
 
-    # 2. Validación
-    if orden_existente.estatus != 'BORRADOR':
-        messages.warning(request, f"La orden {orden_existente.folio} no es un borrador y no puede ser modificada aquí.")
+    # Validación de Estatus
+    if orden_existente.estatus != 'PENDIENTE':
+        messages.warning(request, f"La orden {orden_existente.folio} ya fue procesada o no está pendiente.")
         return redirect('detalle_orden_compra', pk=orden_existente.pk)
 
-    # 3. FormSet
     DetalleOCFormSet = inlineformset_factory(
         OrdenCompra, 
         DetalleOrdenCompra, 
@@ -744,63 +726,85 @@ def generar_orden_de_compra(request, pk):
 
         if form.is_valid() and formset.is_valid():
             with transaction.atomic():
+                # 1. Guardar datos y cambiar estatus a APROBADA
                 oc = form.save(commit=False)
-                oc.estatus = 'APROBADA'
+                oc.estatus = 'APROBADA' 
                 oc.save()
-                formset.save() # Guardar artículos para tener el total real
-                
-                # --- LÓGICA DE CONDICIONES (TEXTO) ---
-                if oc.modalidad_pago == 'A_PLAZOS' and oc.cantidad_plazos > 0:
+                formset.save() 
+
+                # Actualizar texto de condiciones si es a plazos
+                if oc.modalidad_pago == 'A_PLAZOS' and oc.cantidad_plazos and oc.cantidad_plazos > 0:
                     total_orden = oc.total_general
                     monto_individual = total_orden / Decimal(oc.cantidad_plazos)
                     oc.condiciones_pago = f"A {oc.cantidad_plazos} pagos de ${monto_individual:,.2f}"
                     oc.save()
 
-                # --- INTEGRACIÓN CON CUENTAS POR PAGAR (CXP) ---
+                # 2. GENERAR CUENTAS POR PAGAR (CXP)
                 try:
-                    from cuentas_por_pagar.models import Factura
+                    Factura = apps.get_model('cuentas_por_pagar', 'Factura')
                     from datetime import timedelta
                     
-                    # 1. Calcular Fecha de Vencimiento basada en Días de Crédito
-                    dias_credito = 0
-                    if oc.proveedor and oc.proveedor.dias_credito:
-                        dias_credito = oc.proveedor.dias_credito
-                    
                     fecha_emision = timezone.now().date()
-                    fecha_vencimiento = fecha_emision + timedelta(days=dias_credito)
                     
-                    # 2. Determinar cantidad de plazos para CXP
-                    num_plazos_cxp = 1
-                    if oc.modalidad_pago == 'A_PLAZOS' and oc.cantidad_plazos > 1:
-                        num_plazos_cxp = oc.cantidad_plazos
-
-                    # 3. Crear o Actualizar la Factura Única (Relación 1 a 1)
-                    # Usamos update_or_create para que si ya existe, se actualicen los datos
-                    # (ej: si cambiaste de Contado a Plazos, se actualiza la factura existente)
-                    Factura.objects.update_or_create(
-                        orden_compra=oc,
-                        defaults={
-                            'proveedor': oc.proveedor,
-                            # Usamos un folio temporal si no tiene uno fiscal real aún
-                            'numero_factura': f"REF-{oc.folio}", 
-                            'fecha_emision': fecha_emision,
-                            'fecha_vencimiento': fecha_vencimiento,
-                            'monto': oc.total_general,
-                            'cantidad_plazos': num_plazos_cxp, # Aquí se pasan los plazos reales
-                            'creado_por': request.user,
-                            'estatus': 'PENDIENTE',
-                            'pagada': False,
-                            'notas': f"Generada autom. desde OC {oc.folio}. Condiciones: {oc.condiciones_pago}"
-                        }
-                    )
+                    # CASO A: PAGO A PLAZOS
+                    if oc.modalidad_pago == 'A_PLAZOS' and oc.cantidad_plazos and oc.cantidad_plazos > 1:
+                        monto_por_plazo = oc.total_general / Decimal(oc.cantidad_plazos)
                         
-                except ImportError:
-                    print("Advertencia: El módulo cuentas_por_pagar no está disponible.")
-                except Exception as e:
-                    print(f"Error al generar CXP: {e}")
-                # -----------------------------------------------
+                        for i in range(1, oc.cantidad_plazos + 1):
+                            # Generamos el Folio Único para CXP
+                            folio_cxp_unico = f"CXP-{oc.folio}-{i}"
+                            
+                            fecha_vencimiento = fecha_emision + timedelta(days=30 * i)
+                            
+                            Factura.objects.update_or_create(
+                                orden_compra=oc,
+                                folio_cxp=folio_cxp_unico, # CORRECCIÓN: Usamos folio_cxp como identificador único
+                                defaults={
+                                    'proveedor': oc.proveedor,
+                                    'numero_factura': f"PLAZO {i} - {oc.folio}", # Referencia legible
+                                    'fecha_emision': fecha_emision,
+                                    'fecha_vencimiento': fecha_vencimiento,
+                                    'monto': monto_por_plazo,
+                                    'creado_por': request.user,
+                                    'estatus': 'PENDIENTE',
+                                    'pagada': False,
+                                    'notas': f"Plazo {i}/{oc.cantidad_plazos} de OC {oc.folio}"
+                                }
+                            )
+                            
+                    # CASO B: PAGO ÚNICO
+                    else:
+                        dias_credito = oc.proveedor.dias_credito if oc.proveedor else 0
+                        fecha_vencimiento = fecha_emision + timedelta(days=dias_credito)
+                        
+                        # Generamos el Folio Único para CXP
+                        folio_cxp_unico = f"CXP-{oc.folio}"
+                        
+                        Factura.objects.update_or_create(
+                            orden_compra=oc,
+                            # CORRECCIÓN IMPORTANTE: Usamos folio_cxp en el filtro o defaults para asegurar unicidad
+                            defaults={
+                                'folio_cxp': folio_cxp_unico,  # <--- AQUÍ ESTABA EL ERROR (FALTABA ESTE CAMPO)
+                                'proveedor': oc.proveedor,
+                                'numero_factura': f"REF-{oc.folio}", # Usamos una referencia temporal
+                                'fecha_emision': fecha_emision,
+                                'fecha_vencimiento': fecha_vencimiento,
+                                'monto': oc.total_general,
+                                'creado_por': request.user,
+                                'estatus': 'PENDIENTE',
+                                'pagada': False,
+                                'notas': f"Generada desde OC {oc.folio}"
+                            }
+                        )
 
-            messages.success(request, f"Orden de Compra {oc.folio} aprobada y enviada a Cuentas por Pagar.")
+                except LookupError:
+                    print("Advertencia: El módulo 'cuentas_por_pagar' no está instalado.")
+                except Exception as e:
+                    # Capturamos el error para no detener el flujo, pero lo mostramos
+                    print(f"Error generando CXP: {e}")
+                    messages.warning(request, f"Orden aprobada, pero hubo un error generando la CXP: {e}")
+
+            messages.success(request, f"Orden de Compra {oc.folio} APROBADA y enviada a Cuentas por Pagar.")
             return redirect('detalle_orden_compra', pk=oc.pk)
         else:
             messages.error(request, "Hay errores en el formulario.")
@@ -820,10 +824,9 @@ def generar_orden_de_compra(request, pk):
         'solicitud': solicitud,
         'zipped_forms_and_articles': zipped_forms_and_articles,
         'today_str': timezone.now().date().strftime('%Y-%m-%d'),
-        'titulo': "Generar Orden de Compra"
+        'titulo': "Definir Plazos y Aprobar OC"
     }
     return render(request, 'compras/orden_compra_generar.html', context)
-@login_required
 def get_articulos_por_empresa(request, empresa_id):
     # Obtenemos el primer precio de proveedor asociado a cada artículo
     primer_proveedor_precio = ArticuloProveedor.objects.filter(
@@ -856,12 +859,16 @@ def get_proveedores_por_articulo(request, articulo_id):
 def editar_solicitud(request, pk):
     solicitud = get_object_or_404(SolicitudCompra, pk=pk)
 
-    # --- INICIO DE LA MODIFICACIÓN ---
-    # REGLA: No se puede editar una solicitud que ya ha sido procesada.
+    # --- CAMBIO DE SEGURIDAD: Verificar propiedad ---
+    if not request.user.is_superuser and solicitud.solicitante != request.user:
+        # Si no es admin y la solicitud no es suya, error 404 o prohibido
+        from django.http import Http404
+        raise Http404("No tienes permiso para ver o editar esta solicitud.")
+    # -----------------------------------------------
+
     if solicitud.estatus in ['APROBADA', 'RECHAZADA', 'CERRADA']:
         messages.error(request, f"La solicitud {solicitud.folio} no se puede editar porque su estatus es '{solicitud.get_estatus_display()}'.")
         return redirect('detalle_solicitud', pk=solicitud.pk)
-    # --- FIN DE LA MODIFICACIÓN ---
 
     DetalleFormSet = inlineformset_factory(
         SolicitudCompra, 
@@ -885,7 +892,6 @@ def editar_solicitud(request, pk):
         if form.is_valid() and formset.is_valid():
             with transaction.atomic():
                 solicitud_actualizada = form.save(commit=False)
-                # Al editar, siempre vuelve a pendiente de aprobación
                 solicitud_actualizada.estatus = 'PENDIENTE_APROBACION' 
                 solicitud_actualizada.save()
                 
@@ -893,9 +899,6 @@ def editar_solicitud(request, pk):
             
             messages.success(request, f'La solicitud {solicitud.folio} fue actualizada correctamente.')
             return redirect('detalle_solicitud', pk=solicitud.pk)
-        else:
-            # ... (manejo de errores del formulario)
-            pass
     else:
         form = SolicitudCompraForm(instance=solicitud)
         formset = DetalleFormSet(instance=solicitud, prefix='detalles', form_kwargs={'proveedor_id': solicitud.proveedor_id})
@@ -1165,47 +1168,36 @@ def iniciar_auditoria_oc(request, pk):
 @login_required
 @require_POST
 def cancelar_orden_compra(request, pk):
-    """
-    Cancela una Orden de Compra.
-    - Si el estatus es 'Aprobada', reabre la solicitud de origen.
-    - Si el estatus es 'Borrador', simplemente la cancela.
-    - No permite cancelar si ya está 'Auditada'.
-    """
     orden = get_object_or_404(OrdenCompra, pk=pk)
-
-    # REGLA 1: No se puede cancelar una orden que ya ha sido auditada.
-    if orden.estatus == 'AUDITADA':
-        messages.error(request, f"La orden {orden.folio} ya fue auditada y no puede ser cancelada.")
+    
+    # Validar que no esté ya finalizada o cancelada
+    if orden.estatus in ['AUDITADA', 'CANCELADA', 'CERRADA']:
+        messages.error(request, f"No se puede cancelar la orden {orden.folio} porque está en estatus {orden.get_estatus_display()}.")
         return redirect('detalle_orden_compra', pk=pk)
 
-    # REGLA 2: No se puede cancelar si ya está cancelada.
-    if orden.estatus == 'CANCELADA':
-        messages.warning(request, f"La orden {orden.folio} ya se encuentra cancelada.")
-        return redirect('detalle_orden_compra', pk=pk)
-
-    # REGLA 3: Solo se puede cancelar desde 'Aprobada' o 'Borrador'
-    if orden.estatus not in ['APROBADA', 'BORRADOR']:
-        messages.error(request, f"La orden no puede ser cancelada en su estatus actual ('{orden.get_estatus_display()}').")
-        return redirect('detalle_orden_compra', pk=pk)
+    # --- CORRECCIÓN AQUÍ: Permitir cancelar PENDIENTE y APROBADA ---
+    if orden.estatus not in ['APROBADA', 'PENDIENTE']:
+         messages.error(request, f"No se puede cancelar en el estatus actual.")
+         return redirect('detalle_orden_compra', pk=pk)
+    # ---------------------------------------------------------------
 
     try:
         with transaction.atomic():
             estatus_anterior = orden.get_estatus_display()
             orden.estatus = 'CANCELADA'
             orden.save()
-
-            # Si la orden venía de una solicitud, la reabrimos
+            
+            # Si la orden venía de una solicitud y estaba aprobada, reabrimos la solicitud
             if orden.solicitud_origen and estatus_anterior == 'Aprobada':
                 solicitud = orden.solicitud_origen
-                solicitud.estatus = 'APROBADA'
+                solicitud.estatus = 'APROBADA' # O PENDIENTE_APROBACION según tu lógica
                 solicitud.save()
-                messages.success(request, f"Orden {orden.folio} cancelada. La solicitud {solicitud.folio} ha sido reabierta.")
+                messages.success(request, f"Orden {orden.folio} cancelada. Solicitud reabierta.")
             else:
-                messages.success(request, f"Orden de Compra {orden.folio} ha sido cancelada correctamente.")
-
+                messages.success(request, f"La Orden de Compra {orden.folio} ha sido CANCELADA correctamente.")
     except Exception as e:
-        messages.error(request, f"Ocurrió un error inesperado al cancelar la orden: {e}")
-
+        messages.error(request, f"Error al cancelar la orden: {e}")
+        
     return redirect('detalle_orden_compra', pk=pk)
 
 @login_required

@@ -8,7 +8,6 @@
             <h2 class="h4 fw-bold text-primary mb-0">Órdenes de Compra</h2>
             <p class="text-muted mb-0">Gestiona y revisa todas las órdenes de compra</p>
         </div>
-        {# <a href="#" class="btn btn-primary"><i class="fas fa-plus me-2"></i> Nueva Orden Manual</a> #}
     </div>
 
     <div class="card border-0 shadow-sm mb-4">
@@ -162,27 +161,35 @@
                                 </div>
                             </td>
                             <td>
-                                {% with estatus_display=orden.get_estatus_display %}
-                                    {% if orden.estatus == 'BORRADOR' %}
-                                        <span class="badge bg-secondary text-white fw-bold py-2 px-3"><i class="fas fa-pencil-alt me-1"></i> {{ estatus_display }}</span>
-                                    {% elif orden.estatus == 'APROBADA' or orden.estatus == 'ENVIADA' %}
-                                        <span class="badge bg-success text-white fw-bold py-2 px-3"><i class="fas fa-check-circle me-1"></i> {{ estatus_display }}</span>
+                                {% if orden.estatus == 'PENDIENTE' %}
+                                    <span class="badge bg-secondary text-white fw-bold py-2 px-3">
+                                        <i class="fas fa-pencil-alt me-1"></i> Pendiente
+                                    </span>
+                                
+                                {% elif orden.estatus == 'APROBADA' %}
+                                    <span class="badge bg-primary text-white fw-bold py-2 px-3">
+                                        <i class="fas fa-check me-1"></i> Aprobada
+                                    </span>
+                                
+                                {% elif orden.estatus == 'LISTA_PARA_AUDITAR' %}
+                                    <span class="badge bg-warning text-dark fw-bold py-2 px-3">
+                                        <i class="fas fa-search me-1"></i> Por Auditar
+                                    </span>
+                                
+                                {% elif orden.estatus == 'AUDITADA' %}
+                                    <span class="badge bg-success text-white fw-bold py-2 px-3">
+                                        <i class="fas fa-check-circle me-1"></i> Auditada
+                                    </span>
                                     
-                                    {% elif orden.estatus == 'AUDITADA' %}
-                                        <span class="badge bg-primary text-white fw-bold py-2 px-3"><i class="fas fa-stamp me-1"></i> {{ estatus_display }}</span>
-                                    {% elif orden.estatus == 'RECIBIDA_PARCIAL' %}
-                                        <span class="badge bg-primary text-white fw-bold py-2 px-3"><i class="fas fa-dolly-flatbed me-1"></i> {{ estatus_display }}</span>
-                                    {% elif orden.estatus == 'RECIBIDA_TOTAL' %}
-                                        <span class="badge bg-info text-white fw-bold py-2 px-3"><i class="fas fa-check-double me-1"></i> {{ estatus_display }}</span>
-                                    {% elif orden.estatus == 'EN_AUDITORIA' %}
-                                        <span class="badge bg-warning text-dark fw-bold py-2 px-3"><i class="fas fa-search-dollar me-1"></i> {{ estatus_display }}</span>
-                                    {% elif orden.estatus == 'CANCELADA' %}
-                                        <span class="badge bg-danger text-white fw-bold py-2 px-3"><i class="fas fa-times-circle me-1"></i> {{ estatus_display }}</span>
-                                    {% elif orden.estatus == 'CERRADA' %}
-                                        <span class="badge bg-dark text-white fw-bold py-2 px-3"><i class="fas fa-archive me-1"></i> {{ estatus_display }}</span>
-                                    {% endif %}
-                                {% endwith %}
-                                </td>
+                                {% elif orden.estatus == 'CANCELADA' %}
+                                    <span class="badge bg-danger text-white fw-bold py-2 px-3">
+                                        <i class="fas fa-times-circle me-1"></i> Cancelada
+                                    </span>
+                                    
+                                {% else %}
+                                    <span class="badge bg-info text-white fw-bold py-2 px-3">{{ orden.get_estatus_display }}</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if orden.solicitud_origen %}
                                     <a href="{% url 'detalle_solicitud' orden.solicitud_origen.pk %}" class="text-decoration-none">
@@ -197,7 +204,7 @@
                                 {% endif %}
                             </td>
                             <td class="text-end pe-4">
-                                {% if orden.estatus == 'BORRADOR' %}
+                                {% if orden.estatus == 'PENDIENTE' %}
                                     <a href="{% url 'terminar_orden_compra' orden.pk %}" class="btn btn-sm btn-warning rounded-pill">
                                         <i class="fas fa-edit me-1"></i> Terminar
                                     </a>

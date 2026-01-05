@@ -1,106 +1,101 @@
-import os
-from django.conf import settings
-from django.core.files.base import ContentFile
-# Libreria satcfdi (instalar con pip install satcfdi)
-from satcfdi.create.cfd import cfdi40
-from satcfdi.pacs import finkok # Ejemplo usando Finkok
+import requests
+from django.utils import timezone
 
-def generar_xml_factura(factura):
-    """
-    Construye el objeto CFDI 4.0 basado en el modelo Factura
-    """
-    # 1. Configuración del Emisor
-    emisor = cfdi40.Emisor(
-        rfc=factura.emisor.rfc,
-        nombre=factura.emisor.razon_social,
-        regimen_fiscal=factura.emisor.regimen_fiscal.clave
-    )
+# === CONFIGURACIÓN DE CONEXIÓN ACTUALIZADA ===
+BASE_URL = "https://test.fiscalapi.com/api/v4/invoices/income"
+API_KEY = "sk_test_4d2423ab_2305_4b06_a801_9aed2a1ad926" # Nueva llave proporcionada
+TENANT_KEY = "6b1d48f4-f36a-468f-a411-8addac954c24"
 
-    # 2. Configuración del Receptor
-    receptor = cfdi40.Receptor(
-        rfc=factura.receptor.rfc,
-        nombre=factura.receptor.razon_social,
-        uso_cfdi=factura.uso_cfdi.clave,
-        domicilio_fiscal_receptor=factura.receptor.codigo_postal,
-        regimen_fiscal_receptor=factura.receptor.regimen_fiscal.clave
-    )
+# IDs DE REFERENCIA EN EL SERVIDOR (Validados anteriormente)
+ISSUER_ID = "aff82d34-7e56-4369-bd9c-25ad56c3151a"
+CER_ID = "2e24ef06-a8bf-4cf5-8a2e-d39c797d0e36"
+KEY_ID = "2757c6e2-43ad-405f-9323-50c51fdaa4ab"
 
-    # 3. Construcción de Conceptos
-    conceptos_cfdi = []
-    for c in factura.conceptos.all():
-        impuestos_concepto = {
-            'Traslados': [cfdi40.Traslado(
-                base=c.importe,
-                impuesto='002', # IVA
-                tipo_factor='Tasa',
-                tasa_o_cuota=c.iva_tasa,
-                importe=round(float(c.importe) * float(c.iva_tasa), 2)
-            )]
+def timbrar_factura_api(factura_obj):
+    items_payload = []
+    for c in factura_obj.conceptos.all():
+        # Nodo de impuestos (IVA 16% si no es el código genérico 01010101)
+        tax_obj = "02" if c.clave_prod_serv != '01010101' else "01"
+        items_payload.append({
+            "itemCode": c.clave_prod_serv,
+            "itemSku": c.clave_prod_serv,
+            "quantity": float(c.cantidad),
+            "unitOfMeasurementCode": c.clave_unidad,
+            "description": c.descripcion,
+            "unitPrice": float(c.valor_unitario),
+            "taxObjectCode": tax_obj,
+            "itemTaxes": [{
+                "taxCode": "002", "taxTypeCode": "Tasa", "taxRate": 0.16, "taxFlagCode": "T"
+            }] if tax_obj == "02" else []
+        })
+
+    payload = {
+        "versionCode": "4.0",
+        "series": factura_obj.serie or "T",
+        "date": timezone.localtime(factura_obj.fecha_emision).strftime('%Y-%m-%dT%H:%M:%S'),
+        "paymentFormCode": factura_obj.forma_pago or "01",
+        "paymentMethodCode": factura_obj.metodo_pago or "PUE",
+        "currencyCode": "MXN",
+        "typeCode": "I",
+        "expeditionZipCode": "06370",
+        "exchangeRate": 1,
+        "exportCode": "01",
+        "issuer": { 
+            "id": ISSUER_ID,
+            "taxCredentials": [
+                {"id": CER_ID},
+                {"id": KEY_ID}
+            ]
+        },
+        "recipient": {
+            "tin": factura_obj.receptor.rfc,
+            "legalName": factura_obj.receptor.razon_social,
+            "zipCode": factura_obj.receptor.codigo_postal,
+            "taxRegimeCode": factura_obj.receptor.regimen_fiscal,
+            "cfdiUseCode": factura_obj.uso_cfdi,
+            "email": "facturacion@3r_recycling.com"
+        },
+        "items": items_payload
+    }
+
+    # Requisito CFDI 4.0 para Público en General
+    if factura_obj.receptor.rfc == "XAXX010101000":
+        fecha = timezone.localtime(factura_obj.fecha_emision)
+        payload["globalInformation"] = {
+            "periodicityCode": "01", # Diario
+            "monthCode": fecha.strftime('%m'),
+            "year": int(fecha.strftime('%Y'))
         }
+
+    headers = {
+        'Content-Type': 'application/json',
+        'X-API-KEY': API_KEY,
+        'X-TENANT-KEY': TENANT_KEY,
+        'X-TIME-ZONE': 'America/Mexico_City'
+    }
+
+    try:
+        response = requests.post(BASE_URL, headers=headers, json=payload)
         
-        # Si hay retención (Reciclaje)
-        if c.iva_ret_tasa > 0:
-            impuestos_concepto['Retenciones'] = [cfdi40.Retencion(
-                base=c.importe,
-                impuesto='002',
-                tipo_factor='Tasa',
-                tasa_o_cuota=c.iva_ret_tasa,
-                importe=round(float(c.importe) * float(c.iva_ret_tasa), 2)
-            )]
+        # Validación de respuesta técnica
+        if response.status_code == 401:
+            return {'success': False, 'error': "ERROR 401: Acceso denegado. Llave o Tenant incorrectos."}
 
-        conceptos_cfdi.append(cfdi40.Concepto(
-            clave_prod_serv=c.clave_prod_serv.clave,
-            cantidad=c.cantidad,
-            clave_unidad=c.clave_unidad.clave,
-            unidad=c.clave_unidad.descripcion,
-            descripcion=c.descripcion,
-            valor_unitario=c.valor_unitario,
-            importe=c.importe,
-            objeto_imp= '02', # Sí objeto de impuesto
-            impuestos=impuestos_concepto
-        ))
+        data = response.json()
 
-    # 4. Crear el Comprobante
-    invoice = cfdi40.Comprobante(
-        serie="A",
-        folio=factura.folio,
-        fecha=factura.fecha_emision.isoformat(timespec='seconds'),
-        forma_pago=factura.forma_pago.clave,
-        metodo_pago=factura.metodo_pago.clave,
-        moneda=factura.moneda,
-        tipo_cambio=1,
-        lugar_expedicion=factura.emisor.codigo_postal,
-        emisor=emisor,
-        receptor=receptor,
-        conceptos=conceptos_cfdi,
-        subtotal=factura.subtotal,
-        total=factura.total,
-        exportacion='01', # No aplica
-    )
-    
-    # 5. Sellar (Requiere tus archivos CSD en settings)
-    # invoice.sign(key=settings.CSD_KEY, cer=settings.CSD_CER, password=settings.CSD_PASSWORD)
-    # return invoice.process()
-    
-    # NOTA: Como no tienes los archivos reales CSD cargados, esto fallará si lo ejecutas.
-    # Debes configurar settings.CSD_KEY apuntando a tu archivo .key real.
-    return None 
+        if response.status_code == 200 and data.get('succeeded'):
+            res_data = data.get('data', {})
+            return {
+                'success': True, 
+                'data': {
+                    'uuid': res_data.get('uuid'), 
+                    'xml': res_data.get('xml') or (res_data.get('responses', [{}])[0].get('invoiceBase64'))
+                }
+            }
+        else:
+            # Imprimimos el error del SAT para corregir datos si es necesario
+            print(f"❌ DETALLE TÉCNICO: {data}")
+            return {'success': False, 'error': data.get('message', 'Error en timbrado')}
 
-def timbrar_con_pac(xml_bytes, factura):
-    """
-    Envía el XML sellado al PAC para obtener el UUID.
-    Esto es un SIMULADOR para que funcione tu demo.
-    """
-    # Aquí iría la conexión real con:
-    # pac = finkok.Finkok(user='usuario', password='password')
-    # respuesta = pac.stamp(xml_bytes)
-    
-    # SIMULACIÓN DE ÉXITO:
-    import uuid
-    factura.uuid = str(uuid.uuid4())
-    factura.estatus = 'TIMBRADO'
-    
-    # Guardamos el XML final
-    # factura.xml_file.save(f"{factura.uuid}.xml", ContentFile(xml_bytes))
-    factura.save()
-    return True
+    except Exception as e:
+        return {'success': False, 'error': str(e)}

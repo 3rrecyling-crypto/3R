@@ -9,6 +9,9 @@ from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.db.models import Sum, Count, Q
 import csv
+from .services import timbrar_factura_api
+from django.core.files.base import ContentFile
+import base64
 
 # Modelos
 from .models import Factura, ConceptoFactura, DatosFiscales, ComplementoPago, PagoDoctoRelacionado
@@ -220,6 +223,7 @@ def generar_factura_accion(request):
                 messages.error(request, "Error: El cliente sigue sin datos fiscales.")
                 return redirect('remisiones_por_facturar')
 
+            # 1. Crear la estructura básica de la factura en DB
             factura = Factura.objects.create(
                 emisor=emisor,
                 receptor=receptor,
@@ -230,7 +234,8 @@ def generar_factura_accion(request):
                 moneda=form.cleaned_data['moneda'],
                 tipo_cambio=form.cleaned_data['tipo_cambio'],
                 subtotal=0, 
-                monto_total=0
+                monto_total=0,
+                estado='pendiente' # Nace pendiente hasta que timbremos
             )
             factura.remisiones.set(remisiones)
 
@@ -239,6 +244,7 @@ def generar_factura_accion(request):
             retenciones = 0
             aplicar_ret = form.cleaned_data.get('aplicar_retencion')
 
+            # 2. Procesar Conceptos
             for r in remisiones:
                 precio_input = request.POST.get(f"precio_{r.id}", "0")
                 try:
@@ -246,6 +252,7 @@ def generar_factura_accion(request):
                 except ValueError:
                     precio_unitario = 0.0
                 
+                # Actualizar tarifa en remisión original
                 r.tarifa = precio_unitario
                 r.save() 
 
@@ -274,16 +281,50 @@ def generar_factura_accion(request):
                 impuestos += iva
                 retenciones += ret
 
+            # 3. Guardar Totales Locales
             factura.subtotal = subtotal
             factura.impuestos_trasladados = impuestos
             factura.impuestos_retenidos = retenciones
             factura.monto_total = subtotal + impuestos - retenciones
-            
-            factura.estado = 'timbrado' 
-            factura.fecha_timbrado = timezone.now()
-            factura.save()
+            factura.save() # Guardamos antes de enviar a la API
 
-            messages.success(request, f"Factura {factura.folio} generada correctamente.")
+            # --- INTEGRACIÓN API DE TIMBRADO ---
+            # Llamamos al servicio (services.py)
+            resultado = timbrar_factura_api(factura)
+
+            if resultado['success']:
+                data_sat = resultado['data']
+                
+                # Extraer datos del éxito (Ajusta las claves según respuesta real de FiscalAPI)
+                # Usualmente regresan 'uuid' o 'UUID' y 'xml' o 'XML'
+                uuid = data_sat.get('uuid') or data_sat.get('UUID')
+                xml_b64 = data_sat.get('xml') or data_sat.get('XML')
+
+                factura.folio_fiscal = uuid
+                factura.estado = 'timbrado'
+                factura.fecha_timbrado = timezone.now()
+
+                # Decodificar y guardar el XML si viene en la respuesta
+                if xml_b64:
+                    try:
+                        xml_content = base64.b64decode(xml_b64)
+                        filename = f"{uuid}.xml" if uuid else f"factura_{factura.id}.xml"
+                        factura.archivo_xml.save(filename, ContentFile(xml_content), save=False)
+                    except Exception as e:
+                        print(f"Error guardando XML: {e}")
+
+                factura.save()
+                messages.success(request, f"Factura {factura.folio} TIMBRADA correctamente. UUID: {uuid}")
+            
+            else:
+                # Si falló el timbrado
+                error_msg = resultado.get('error', 'Error desconocido')
+                factura.estado = 'error' # Marcamos como error para revisar
+                factura.save()
+                messages.error(request, f"Error al timbrar en SAT: {error_msg}")
+            
+            # -----------------------------------
+
             return redirect('detalle_factura_cliente', pk=factura.pk)
 
     return redirect('dashboard_facturacion')

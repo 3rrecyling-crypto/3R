@@ -193,3 +193,8 @@ TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
 TWILIO_WHATSAPP_FROM = 'whatsapp:+14155238886'           # Número Sandbox o tu número verificado
 TWILIO_WHATSAPP_TO_APPROVER = 'whatsapp:+5218123465830'  # El número del jefe/aprobador
 TWILIO_CONTENT_SID = os.getenv('TWILIO_CONTENT_SID')
+
+
+FISCALAPI_KEY = 'sk_test_332d6810_cbbc_45e1_aa05_c1d4b0cad058'
+# URL base de pruebas (Revisa la documentación de tu proveedor para confirmar esta URL)
+FISCALAPI_URL = 'https://test.fiscalapi.com/api/v4'
