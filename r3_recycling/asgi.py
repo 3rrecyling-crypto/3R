@@ -6,8 +6,7 @@ from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
 import chat.routing  # Asegúrate de que esta línea esté presente
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'PROYECTO.settings')
-
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'r3_recycling.settings')
 application = ProtocolTypeRouter({
     # Manejador para las peticiones HTTP normales (tus vistas de Django)
     "http": get_asgi_application(),
