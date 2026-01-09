@@ -1,41 +1,28 @@
-# compras/utils.py
 import json
 from twilio.rest import Client
 from django.conf import settings
-import json
 
-
-def enviar_whatsapp_solicitud(solicitud, dominio_web="https://3recycling.com.mx"):
+def enviar_whatsapp_solicitud(solicitud):
     try:
+        # Validación de seguridad
         if not settings.TWILIO_ACCOUNT_SID or not settings.TWILIO_AUTH_TOKEN:
             return False
 
         client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
 
-        # 1. Calcular el Total ($$)
-        total = 0
-        for detalle in solicitud.detalles.all():
-            cant = detalle.cantidad or 0
-            precio = detalle.precio_unitario or 0
-            total += cant * precio
+        # 1. Calcular Total de forma segura
+        total = sum((d.cantidad or 0) * (d.precio_unitario or 0) for d in solicitud.detalles.all())
 
-        # 2. Generar el Link al PDF
-        link_pdf = f"{dominio_web}/compras/solicitudes/{solicitud.pk}/pdf/"
+        # 2. Resumen CORTO (Sin URL, dejamos que el botón haga el trabajo)
+        # Esto asegura que no excedas el límite de caracteres de la variable
+        resumen = f"{solicitud.empresa.nombre} - Prov: {solicitud.proveedor.razon_social} - Total: ${total:,.2f}"
 
-        # 3. Construir el resumen (Texto plano para evitar errores de plantilla)
-        # Formato: Empresa - Proveedor - Total - Link
-        resumen = (
-            f"{solicitud.empresa.nombre} - Prov: {solicitud.proveedor.razon_social} "
-            f"- Total: ${total:,.2f} - "
-            f"PDF: {link_pdf}"
-        )
-
-        # Variables para la plantilla {{1}} y {{2}}
         variables = {
-            "1": solicitud.folio,
-            "2": resumen 
+            "1": str(solicitud.folio),  # Variable {{1}}
+            "2": resumen                # Variable {{2}}
         }
 
+        # 3. Enviar
         message = client.messages.create(
             from_=settings.TWILIO_WHATSAPP_FROM,
             to=settings.TWILIO_WHATSAPP_TO_APPROVER,
@@ -43,11 +30,9 @@ def enviar_whatsapp_solicitud(solicitud, dominio_web="https://3recycling.com.mx"
             content_variables=json.dumps(variables)
         )
         
-        print(f"Mensaje enviado SID: {message.sid}")
+        print(f"✅ WhatsApp enviado. SID: {message.sid}")
         return True
 
     except Exception as e:
-        print(f"Error enviando WhatsApp: {e}")
+        print(f"❌ Error enviando WhatsApp: {e}")
         return False
-    
-    
