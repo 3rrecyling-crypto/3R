@@ -190,7 +190,7 @@ BANXICO_API_TOKEN = os.environ.get('BANXICO_API_TOKEN')
 # Credenciales de Twilio
 TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
 TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
-TWILIO_WHATSAPP_FROM = 'whatsapp:+14155238886'           # Número Sandbox o tu número verificado
+TWILIO_WHATSAPP_FROM = 'whatsapp:+15707125385'           # Número Sandbox o tu número verificado
 TWILIO_WHATSAPP_TO_APPROVER = 'whatsapp:+5218123465830'  # El número del jefe/aprobador
 TWILIO_CONTENT_SID = os.getenv('TWILIO_CONTENT_SID')
 
