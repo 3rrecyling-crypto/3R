@@ -52,7 +52,7 @@ from django.http import HttpResponse
 from django.contrib.auth.models import User
 from twilio.twiml.messaging_response import MessagingResponse
 from .models import SolicitudCompra
-from .utils import enviar_whatsapp_aprobador # <--- Importas la función de arriba
+from .utils import enviar_whatsapp_solicitud
 # --- DASHBOARD ---
 
 @login_required
