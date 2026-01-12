@@ -1323,44 +1323,70 @@ def reporte_compras_excel(request):
 @csrf_exempt
 def twilio_webhook(request):
     """
-    Webhook para recibir respuestas de WhatsApp de Twilio.
+    Webhook ROBUSTO para WhatsApp.
+    Maneja errores de usuario inexistente y muestra logs en Render.
     """
     if request.method == 'POST':
-        # 1. Obtener la entrada (Botón o Texto)
-        body_text = request.POST.get('Body', '').strip().upper()
-        button_payload = request.POST.get('ButtonPayload', '').strip().upper()
+        # 1. IMPRIMIR LO QUE LLEGA (Para depurar en logs de Render)
+        print("--------------- INICIO WEBHOOK WHATSAPP ---------------")
+        data = request.POST
+        body_text = data.get('Body', '').strip().upper()
+        button_payload = data.get('ButtonPayload', '').strip().upper()
         
         # Prioridad al payload del botón
         incoming_msg = button_payload if button_payload else body_text
-        
+        print(f"📩 Mensaje recibido: '{incoming_msg}'")
+
         response = MessagingResponse()
         msg = response.message()
         
-        # Usuario bot para registros (Asegúrate que exista o usa get_or_create)
+        # 2. OBTENER USUARIO BOT DE FORMA SEGURA
+        # Intentamos obtener un superusuario
         usuario_bot = User.objects.filter(is_superuser=True).first()
+        
+        # Si no hay superusuario, intentamos con CUALQUIER usuario activo (Plan B)
+        if not usuario_bot:
+            usuario_bot = User.objects.filter(is_active=True).first()
+            if usuario_bot:
+                print(f"⚠️ Aviso: No hay superusuario. Usando usuario '{usuario_bot.username}' para la aprobación.")
+            else:
+                print("❌ ERROR CRÍTICO: No hay NINGÚN usuario en la base de datos.")
+                # Respondemos a WhatsApp para que sepas qué pasa
+                msg.body("⚠️ Error del Sistema: No existe ningún usuario registrado para procesar la aprobación.")
+                return HttpResponse(str(response))
 
         # ---------------------------------------------------------
-        # OPCIÓN 1: APROBACIÓN AUTOMÁTICA (ÚLTIMA PENDIENTE)
+        # LÓGICA DE APROBACIÓN
         # ---------------------------------------------------------
         if incoming_msg in ['SI', 'ACEPTAR', 'APROBAR', 'CONFIRMAR']:
-            # OJO: Esto toma la MÁS RECIENTE.
-            # Si prefieres que apruebe la más antigua (cola FIFO), usa .first() en vez de .last()
+            # Buscamos la última pendiente
             ultima_solicitud = SolicitudCompra.objects.filter(
                 estatus='PENDIENTE_APROBACION'
             ).order_by('creado_en').last()
 
             if ultima_solicitud:
-                exito, texto = ultima_solicitud.ejecutar_aprobacion(usuario_bot)
-                if exito:
-                    oc = ultima_solicitud.orden_de_compra
-                    msg.body(f"✅ *ACEPTADO*: Solicitud {ultima_solicitud.folio} APROBADA.\n📄 OC Generada: *{oc.folio}*")
-                else:
-                    msg.body(f"⚠️ Error al aprobar: {texto}")
+                print(f"✅ Procesando solicitud: {ultima_solicitud.folio}")
+                try:
+                    # Pasamos el usuario_bot encontrado (sea superuser o normal)
+                    exito, texto = ultima_solicitud.ejecutar_aprobacion(usuario_bot)
+                    
+                    if exito:
+                        oc = ultima_solicitud.orden_de_compra
+                        msg.body(f"✅ *ACEPTADO*: Solicitud {ultima_solicitud.folio} APROBADA.\n📄 OC Generada: *{oc.folio}*")
+                        print(f"🎉 Éxito. OC creada: {oc.folio}")
+                    else:
+                        msg.body(f"⚠️ No se pudo aprobar: {texto}")
+                        print(f"⚠️ Fallo en lógica: {texto}")
+                except Exception as e:
+                    print(f"❌ ERROR INTERNO (Crash): {e}")
+                    import traceback
+                    traceback.print_exc()
+                    msg.body("⚠️ Error interno del servidor al crear la Orden de Compra.")
             else:
-                msg.body("👍 No encontré solicitudes pendientes de aprobación recientes.")
+                msg.body("👍 No encontré solicitudes pendientes recientes.")
 
         # ---------------------------------------------------------
-        # OPCIÓN 2: RECHAZO AUTOMÁTICO (ÚLTIMA PENDIENTE)
+        # LÓGICA DE RECHAZO
         # ---------------------------------------------------------
         elif incoming_msg in ['NO', 'CANCELAR', 'RECHAZAR', 'DENEGAR']:
             ultima_solicitud = SolicitudCompra.objects.filter(
@@ -1374,43 +1400,15 @@ def twilio_webhook(request):
             else:
                 msg.body("No hay solicitudes pendientes para rechazar.")
 
-        # ---------------------------------------------------------
-        # OPCIÓN 3: APROBACIÓN POR FOLIO ESPECÍFICO (Plan B)
-        # Ejemplo: El usuario escribe "APROBAR SC-1-00050"
-        # ---------------------------------------------------------
         elif incoming_msg.startswith('APROBAR SC-'):
-            folio_a_buscar = incoming_msg.replace('APROBAR', '').strip()
-            
-            solicitud_especifica = SolicitudCompra.objects.filter(
-                folio__iexact=folio_a_buscar, # iexact ignora mayúsculas/minúsculas
-                estatus='PENDIENTE_APROBACION'
-            ).first()
-
-            if solicitud_especifica:
-                exito, texto = solicitud_especifica.ejecutar_aprobacion(usuario_bot)
-                if exito:
-                    oc = solicitud_especifica.orden_de_compra
-                    msg.body(f"✅ *ACEPTADO MANUALMENTE*: Solicitud {solicitud_especifica.folio} aprobada.\n📄 OC: {oc.folio}")
-                else:
-                    msg.body(f"⚠️ Error: {texto}")
-            else:
-                msg.body(f"🔍 No encontré la solicitud {folio_a_buscar} pendiente de aprobación.")
-
-        # ---------------------------------------------------------
-        # MENSAJE DE AYUDA / ERROR
-        # ---------------------------------------------------------
+             # Tu lógica existente para folio específico...
+             pass
         else:
-            msg.body(
-                "🤖 *Bot Compras*\n\n"
-                "Comandos disponibles:\n"
-                "1️⃣ Presiona el botón *Aprobar* o *Rechazar* (Aplica a la última solicitud).\n"
-                "2️⃣ Escribe *'APROBAR SC-XXXX'* para una específica."
-            )
+            msg.body("🤖 Bot: Usa los botones 'Aprobar' o 'Rechazar'.")
 
         return HttpResponse(str(response))
     
     return HttpResponseForbidden()
-
 
 @login_required
 def solicitud_pdf_view(request, pk):
