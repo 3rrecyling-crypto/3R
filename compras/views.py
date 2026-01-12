@@ -18,6 +18,7 @@ from django.http import HttpResponse
 from django.db import transaction
 from django.db.models import Q
 from django.contrib import messages
+from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 from django.http import JsonResponse, HttpResponseForbidden
 from django.utils import timezone
 from django.contrib.auth.models import User
@@ -105,40 +106,7 @@ def dashboard_compras(request):
 # ... (Otras vistas, asegúrate de cambiar 'BORRADOR' por 'PENDIENTE' en aprobar_solicitud y generar_oc) ...
 
 # --- WEBHOOK WHATSAPP ACTUALIZADO ---
-@csrf_exempt
-def twilio_webhook(request):
-    if request.method == 'POST':
-        incoming_msg = request.POST.get('Body', '').strip().upper()
-        response = MessagingResponse()
-        msg = response.message()
-        usuario_bot = User.objects.filter(is_superuser=True).first()
 
-        if incoming_msg == 'SI':
-            ultima_solicitud = SolicitudCompra.objects.filter(estatus='PENDIENTE_APROBACION').order_by('creado_en').last()
-            if ultima_solicitud:
-                exito, texto = ultima_solicitud.ejecutar_aprobacion(usuario_bot)
-                if exito:
-                    # Obtenemos la OC recién creada
-                    oc = ultima_solicitud.orden_de_compra
-                    msg.body(f"✅ *Solicitud {ultima_solicitud.folio} APROBADA*\n\n📄 Se generó la *OC {oc.folio}* en estatus *PENDIENTE*.\n\n⚠️ Ingresa al sistema para completar detalles y emitirla al proveedor.")
-                else:
-                    msg.body(f"⚠️ Error: {texto}")
-            else:
-                msg.body("👍 No hay solicitudes pendientes recientes.")
-
-        elif incoming_msg == 'NO':
-            ultima_solicitud = SolicitudCompra.objects.filter(estatus='PENDIENTE_APROBACION').order_by('creado_en').last()
-            if ultima_solicitud:
-                ultima_solicitud.estatus = 'RECHAZADA'
-                ultima_solicitud.save()
-                msg.body(f"🚫 Solicitud {ultima_solicitud.folio} RECHAZADA.")
-            else:
-                msg.body("No hay solicitudes pendientes.")
-
-        # ... (Resto del código igual)
-
-        return HttpResponse(str(response))
-    return HttpResponseForbidden()
 
 class ProveedorListView(LoginRequiredMixin, ListView):
     model = Proveedor
@@ -1355,23 +1323,28 @@ def reporte_compras_excel(request):
 @csrf_exempt
 def twilio_webhook(request):
     """
-    Recibe mensajes de WhatsApp.
-    Maneja:
-    1. Botones "SI" / "NO" (Actúan sobre la última solicitud pendiente)
-    2. Comandos explícitos "APROBAR SC-..." (Para aprobar una específica antigua)
+    Webhook para recibir respuestas de WhatsApp de Twilio.
     """
     if request.method == 'POST':
-        incoming_msg = request.POST.get('Body', '').strip().upper()
+        # 1. Obtener la entrada (Botón o Texto)
+        body_text = request.POST.get('Body', '').strip().upper()
+        button_payload = request.POST.get('ButtonPayload', '').strip().upper()
+        
+        # Prioridad al payload del botón
+        incoming_msg = button_payload if button_payload else body_text
         
         response = MessagingResponse()
         msg = response.message()
         
-        # Obtenemos el usuario Bot o Admin para firmar la acción
+        # Usuario bot para registros (Asegúrate que exista o usa get_or_create)
         usuario_bot = User.objects.filter(is_superuser=True).first()
 
-        # --- CASO 1: BOTÓN "SI" ---
-        if incoming_msg == 'SI':
-            # Buscamos la solicitud pendiente MÁS RECIENTE
+        # ---------------------------------------------------------
+        # OPCIÓN 1: APROBACIÓN AUTOMÁTICA (ÚLTIMA PENDIENTE)
+        # ---------------------------------------------------------
+        if incoming_msg in ['SI', 'ACEPTAR', 'APROBAR', 'CONFIRMAR']:
+            # OJO: Esto toma la MÁS RECIENTE.
+            # Si prefieres que apruebe la más antigua (cola FIFO), usa .first() en vez de .last()
             ultima_solicitud = SolicitudCompra.objects.filter(
                 estatus='PENDIENTE_APROBACION'
             ).order_by('creado_en').last()
@@ -1379,15 +1352,17 @@ def twilio_webhook(request):
             if ultima_solicitud:
                 exito, texto = ultima_solicitud.ejecutar_aprobacion(usuario_bot)
                 if exito:
-                    msg.body(f"✅ Confirmado: Solicitud {ultima_solicitud.folio} APROBADA.\nOC generada.")
+                    oc = ultima_solicitud.orden_de_compra
+                    msg.body(f"✅ *ACEPTADO*: Solicitud {ultima_solicitud.folio} APROBADA.\n📄 OC Generada: *{oc.folio}*")
                 else:
-                    msg.body(f"⚠️ No se pudo aprobar {ultima_solicitud.folio}: {texto}")
+                    msg.body(f"⚠️ Error al aprobar: {texto}")
             else:
-                msg.body("👍 Todo al día. No encontré solicitudes pendientes de aprobación recientes.")
+                msg.body("👍 No encontré solicitudes pendientes de aprobación recientes.")
 
-        # --- CASO 2: BOTÓN "NO" ---
-        elif incoming_msg == 'NO':
-            # Buscamos la solicitud pendiente MÁS RECIENTE
+        # ---------------------------------------------------------
+        # OPCIÓN 2: RECHAZO AUTOMÁTICO (ÚLTIMA PENDIENTE)
+        # ---------------------------------------------------------
+        elif incoming_msg in ['NO', 'CANCELAR', 'RECHAZAR', 'DENEGAR']:
             ultima_solicitud = SolicitudCompra.objects.filter(
                 estatus='PENDIENTE_APROBACION'
             ).order_by('creado_en').last()
@@ -1395,36 +1370,42 @@ def twilio_webhook(request):
             if ultima_solicitud:
                 ultima_solicitud.estatus = 'RECHAZADA'
                 ultima_solicitud.save()
-                msg.body(f"🚫 Enterado: Solicitud {ultima_solicitud.folio} ha sido RECHAZADA.")
+                msg.body(f"🚫 *RECHAZADA*: La solicitud {ultima_solicitud.folio} ha sido cancelada.")
             else:
                 msg.body("No hay solicitudes pendientes para rechazar.")
 
-        # --- CASO 3: COMANDO EXPLÍCITO (APROBAR SC-...) ---
-        elif incoming_msg.startswith('APROBAR'):
-            try:
-                partes = incoming_msg.split()
-                if len(partes) < 2:
-                    msg.body("⚠️ Error: Faltó el folio. Ejemplo: APROBAR SC-1-00050")
-                else:
-                    folio = partes[1]
-                    solicitud = SolicitudCompra.objects.get(folio=folio)
-                    exito, texto = solicitud.ejecutar_aprobacion(usuario_bot)
-                    if exito:
-                        msg.body(f"✅ {texto}")
-                    else:
-                        msg.body(f"❌ {texto}")
-            except SolicitudCompra.DoesNotExist:
-                msg.body(f"🔍 No encontré el folio {folio}.")
-            except Exception as e:
-                msg.body(f"Error: {str(e)}")
+        # ---------------------------------------------------------
+        # OPCIÓN 3: APROBACIÓN POR FOLIO ESPECÍFICO (Plan B)
+        # Ejemplo: El usuario escribe "APROBAR SC-1-00050"
+        # ---------------------------------------------------------
+        elif incoming_msg.startswith('APROBAR SC-'):
+            folio_a_buscar = incoming_msg.replace('APROBAR', '').strip()
+            
+            solicitud_especifica = SolicitudCompra.objects.filter(
+                folio__iexact=folio_a_buscar, # iexact ignora mayúsculas/minúsculas
+                estatus='PENDIENTE_APROBACION'
+            ).first()
 
-        # --- CASO 4: CUALQUIER OTRA COSA ---
+            if solicitud_especifica:
+                exito, texto = solicitud_especifica.ejecutar_aprobacion(usuario_bot)
+                if exito:
+                    oc = solicitud_especifica.orden_de_compra
+                    msg.body(f"✅ *ACEPTADO MANUALMENTE*: Solicitud {solicitud_especifica.folio} aprobada.\n📄 OC: {oc.folio}")
+                else:
+                    msg.body(f"⚠️ Error: {texto}")
+            else:
+                msg.body(f"🔍 No encontré la solicitud {folio_a_buscar} pendiente de aprobación.")
+
+        # ---------------------------------------------------------
+        # MENSAJE DE AYUDA / ERROR
+        # ---------------------------------------------------------
         else:
-             msg.body(
-                 "🤖 Soy el Bot de Compras.\n"
-                 "- Usa los botones SI/NO para lo más reciente.\n"
-                 "- Escribe 'APROBAR [FOLIO]' para una específica."
-             )
+            msg.body(
+                "🤖 *Bot Compras*\n\n"
+                "Comandos disponibles:\n"
+                "1️⃣ Presiona el botón *Aprobar* o *Rechazar* (Aplica a la última solicitud).\n"
+                "2️⃣ Escribe *'APROBAR SC-XXXX'* para una específica."
+            )
 
         return HttpResponse(str(response))
     
@@ -1480,3 +1461,51 @@ def solicitud_pdf_view(request, pk):
     if pisa_status.err:
        return HttpResponse('Error generando PDF')
     return response
+
+
+def solicitud_pdf_public_view(request, signed_pk):
+    """
+    Vista que permite ver el PDF sin estar logueado, 
+    siempre y cuando la firma (token) sea válida y no haya expirado.
+    """
+    signer = TimestampSigner()
+    try:
+        # Verifica el token. Max age = tiempo en segundos (ej. 48 horas = 172800)
+        original_pk = signer.unsign(signed_pk, max_age=172800)
+        solicitud = get_object_or_404(SolicitudCompra, pk=original_pk)
+        
+        # Reutilizamos la lógica de tu vista PDF existente
+        # (Copiar el código de solicitud_pdf_view o llamar a una función común)
+        template_path = 'compras/orden_compra_pdf_template.html'
+        
+        # Mapeos necesarios para el template
+        solicitud.creado_por = solicitud.solicitante
+        solicitud.fecha_emision = solicitud.creado_en
+        solicitud.moneda = "MXN"
+        if solicitud.proveedor and solicitud.proveedor.dias_credito:
+            solicitud.condiciones_pago = f"{solicitud.proveedor.dias_credito} días crédito"
+        else:
+            solicitud.condiciones_pago = "Contado / N/A"
+
+        total = sum([(d.cantidad or 0) * (d.precio_unitario or 0) for d in solicitud.detalles.all()])
+        
+        context = {
+            'orden': solicitud,
+            'empresa': solicitud.empresa,
+            'total_general': total,
+            'titulo_documento': "SOLICITUD DE COMPRA (Vista Previa)"
+        }
+
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename="SC_{solicitud.folio}.pdf"'
+
+        template = get_template(template_path)
+        html = template.render(context)
+        pisa_status = pisa.CreatePDF(html, dest=response)
+        
+        if pisa_status.err:
+           return HttpResponse('Error generando PDF')
+        return response
+
+    except (BadSignature, SignatureExpired):
+        return HttpResponseForbidden("El enlace ha expirado o no es válido.")

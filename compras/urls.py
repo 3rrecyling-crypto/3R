@@ -66,4 +66,5 @@ urlpatterns = [
     path('reportes/excel-compras/', views.reporte_compras_excel, name='reporte_compras_excel'),
     path('webhooks/whatsapp/', views.twilio_webhook, name='twilio_webhook'),
     path('solicitudes/<int:pk>/pdf/', views.solicitud_pdf_view, name='solicitud_pdf'),
+    path('solicitudes/public-pdf/<str:signed_pk>/', views.solicitud_pdf_public_view, name='solicitud_pdf_public'),
 ]
