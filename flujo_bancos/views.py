@@ -19,8 +19,9 @@ from decimal import Decimal # <--- IMPORTANTE: AGREGAR ESTO AL INICIO
 # Importaciones de AWS S3
 import boto3
 from botocore.exceptions import BotoCoreError, NoCredentialsError
-from .models import Movimiento, Cuenta # Solo deja los modelos reales# Importaciones de Excel
+from .models import Movimiento, Cuenta, ComprobanteFiscal # Solo deja los modelos reales# Importaciones de Excel
 import openpyxl
+import xml.etree.ElementTree as ET
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
 # Importaciones locales (Modelos y Forms)
@@ -30,7 +31,7 @@ from .forms import (
     TransferenciaForm, 
     CuentaForm, 
     TerceroForm, 
-    ImportarTxtForm  # <--- Asegúrate que esto esté importado
+    ImportarTxtForm, ImportarExcelForm, ComprobanteForm  # <--- Asegúrate que esto esté importado
 )
 
 # ---------------------------------------------------------
@@ -210,130 +211,75 @@ def dashboard(request):
 # ---------------------------------------------------------
 def importar_movimientos(request):
     if request.method == 'POST':
-        form = ImportarTxtForm(request.POST, request.FILES)
+        form = ImportarExcelForm(request.POST, request.FILES)
         if form.is_valid():
             cuenta = form.cleaned_data['cuenta_destino']
-            archivo = request.FILES['archivo_txt']
+            archivo = request.FILES['archivo_excel']
             
-            # 1. Leer archivo intentando utf-8, luego latin-1
             try:
-                decoded_file = archivo.read().decode('utf-8')
-            except UnicodeDecodeError:
-                archivo.seek(0)
-                decoded_file = archivo.read().decode('latin-1')
-
-            lineas = decoded_file.splitlines()
-            contador_exito = 0
-            errores = []
-            
-            # Variables para capturar el saldo más reciente
-            saldo_final_txt = None
-            fecha_cierre_txt = None
-
-            for i, linea in enumerate(lineas, start=1):
-                # Omitir líneas vacías o encabezados
-                if not linea.strip() or "Concepto" in linea or "Saldo" in linea:
-                    continue
+                # Cargar el libro de trabajo (workbook)
+                wb = openpyxl.load_workbook(archivo)
+                ws = wb.active # Toma la primera hoja activa
                 
-                # --- CORRECCIÓN 1: Definir 'datos' separando por tabulación ---
-                datos = linea.split('\t')
-
-                # Validar que la línea tenga al menos 4 columnas para evitar errores de índice
-                if len(datos) < 4:
-                    continue
-
-                # --- CORRECCIÓN 2: Definir las variables extrayéndolas de 'datos' ---
-                fecha_str = datos[0].strip()   # <--- Aquí definimos fecha_str
-                concepto = datos[1].strip()
-                cargo_str = datos[2].strip()
-                abono_str = datos[3].strip()
+                count_creados = 0
                 
-                # El saldo suele venir en la columna 4 (índice 4)
-                saldo_str = "0"
-                if len(datos) >= 5: 
-                    saldo_str = datos[4].strip()
+                # Leemos fila por fila desde la 2 (saltando encabezados)
+                # Al no usar reversed(), se leerá en el mismo orden visual del Excel
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    # row es una tupla: (Col A, Col B, Col C, Col D, ...)
+                    # Asumiendo orden: FECHA | CONCEPTO | CARGO | ABONO
+                    
+                    fecha_raw = row[0]
+                    concepto = row[1]
+                    cargo_raw = row[2]
+                    abono_raw = row[3]
+                    
+                    # Si la fila no tiene fecha, la saltamos (fila vacía)
+                    if not fecha_raw:
+                        continue
 
-                # Limpieza y conversión de números
-                def limpiar_numero(valor):
-                    if not valor: return Decimal(0)
-                    # Quitamos comas y espacios
-                    limpio = valor.replace(',', '').strip()
-                    return Decimal(limpio) if limpio else Decimal(0)
+                    # --- CORRECCIÓN DEL ERROR DECIMAL ---
+                    # 1. Convertimos a string primero para evitar error de float
+                    # 2. Si viene vacío (None), ponemos '0'
+                    str_cargo = str(cargo_raw) if cargo_raw is not None else '0'
+                    str_abono = str(abono_raw) if abono_raw is not None else '0'
 
-                try:
-                    cargo = limpiar_numero(cargo_str)
-                    abono = limpiar_numero(abono_str)
-                    saldo_linea = limpiar_numero(saldo_str)
-                except:
-                    continue # Si fallan los números, saltamos la línea
+                    # 3. Convertimos a Decimal de Django/Python
+                    cargo_decimal = Decimal(str_cargo)
+                    abono_decimal = Decimal(str_abono)
+                    # ------------------------------------
 
-                # Parseo de Fecha
-                fecha = None
-                for fmt in ['%d-%m-%Y', '%d/%m/%Y', '%Y-%m-%d']:
-                    try:
-                        fecha = datetime.strptime(fecha_str, fmt).date()
-                        break
-                    except ValueError: continue
-                
-                if not fecha: continue
-
-                # --- LÓGICA DE SALDO (Capturar el primero que aparece = más reciente) ---
-                if saldo_final_txt is None:
-                    saldo_final_txt = saldo_linea
-                    fecha_cierre_txt = fecha
-                
-                # Guardar movimiento en BD
-                try:
+                    # Evitar duplicados exactos
                     existe = Movimiento.objects.filter(
-                        cuenta=cuenta, 
-                        fecha=fecha, 
-                        concepto=concepto, 
-                        cargo=cargo, 
-                        abono=abono
+                        cuenta=cuenta,
+                        fecha=fecha_raw,
+                        concepto=concepto,
+                        cargo=cargo_decimal,
+                        abono=abono_decimal
                     ).exists()
                     
                     if not existe:
                         Movimiento.objects.create(
                             cuenta=cuenta,
-                            fecha=fecha,
-                            concepto=concepto,
-                            cargo=cargo,
-                            abono=abono,
-                            saldo_banco=saldo_linea,
-                            comentarios='Importado TXT',
-                            auditado=False
+                            fecha=fecha_raw,
+                            concepto=concepto or "Sin concepto",
+                            cargo=cargo_decimal,
+                            abono=abono_decimal,
+                            estatus='PENDIENTE'
                         )
-                        contador_exito += 1
-                except Exception as e:
-                    errores.append(f"Línea {i}: Error al guardar.")
-
-            # --- AJUSTE DE SALDO DE LA CUENTA ---
-            if saldo_final_txt is not None:
-                # Calculamos totales actuales en BD
-                agregados = Movimiento.objects.filter(cuenta=cuenta).aggregate(
-                    total_abono=Sum('abono'), 
-                    total_cargo=Sum('cargo')
-                )
-                suma_abonos = agregados['total_abono'] or 0
-                suma_cargos = agregados['total_cargo'] or 0
+                        count_creados += 1
                 
-                # Fórmula inversa para hallar el saldo inicial correcto
-                nuevo_inicial = saldo_final_txt - suma_abonos + suma_cargos
+                messages.success(request, f"Se cargaron {count_creados} movimientos. Orden respetado tal cual el Excel.")
+                return redirect('lista_movimientos')
                 
-                cuenta.saldo_inicial = nuevo_inicial
-                cuenta.save()
-                
-                messages.success(request, f"✅ Saldo ajustado al Banco: ${saldo_final_txt:,.2f}")
-
-            if contador_exito > 0:
-                messages.success(request, f"Se importaron {contador_exito} movimientos correctamente.")
-            elif not errores:
-                messages.warning(request, "No se encontraron movimientos nuevos.")
-            
-            return redirect('lista_movimientos')
+            except Exception as e:
+                # Muestra el error específico si vuelve a fallar
+                messages.error(request, f"Error crítico al importar: {str(e)}")
+    else:
+        form = ImportarExcelForm()
     
-    return redirect('dashboard_bancos')
-
+    # Nota: Asegúrate que esta ruta coincida con donde guardaste el HTML nuevo
+    return render(request, 'flujo_bancos/importar_movimientos.html', {'form': form})
 # ---------------------------------------------------------
 # CANCELAR TRANSFERENCIA
 # ---------------------------------------------------------
@@ -1002,3 +948,78 @@ def lista_transferencias(request):
     }
     # Asegúrate de tener este template o usa 'lista_movimientos.html' temporalmente
     return render(request, 'flujo_bancos/lista_transferencias.html', context)
+
+def subir_comprobante(request, movimiento_id):
+    movimiento = get_object_or_404(Movimiento, pk=movimiento_id)
+    
+    if request.method == 'POST':
+        form = ComprobanteForm(request.POST, request.FILES)
+        if form.is_valid():
+            comprobante = form.save(commit=False)
+            comprobante.movimiento = movimiento
+            
+            # --- PROCESAMIENTO XML ---
+            if comprobante.archivo_xml:
+                try:
+                    tree = ET.parse(comprobante.archivo_xml)
+                    root = tree.getroot()
+                    
+                    # Definir Namespaces del SAT (CFDI 4.0 o 3.3)
+                    ns = {
+                        'cfdi': 'http://www.sat.gob.mx/cfd/4', # Cambiar a /3 si usas cfdi 3.3
+                        'tfd': 'http://www.sat.gob.mx/TimbreFiscalDigital'
+                    }
+                    # Soporte fallback para CFDI 3.3 si el 4 falla
+                    if 'cfdi' not in root.tag:
+                         ns['cfdi'] = 'http://www.sat.gob.mx/cfd/3'
+
+                    # 1. Extraer UUID
+                    tfd_node = root.find('.//tfd:TimbreFiscalDigital', ns)
+                    if tfd_node is not None:
+                        comprobante.uuid = tfd_node.get('UUID')
+
+                    # 2. Extraer IVA (Impuestos Trasladados)
+                    # Buscamos en el nodo global de impuestos (Comprobante tipo I)
+                    # Si es XML de Pagos (tipo P), la lógica es más compleja, aquí priorizamos facturas
+                    total_iva = Decimal('0.00')
+                    
+                    traslados = root.findall('.//cfdi:Impuestos/cfdi:Traslados/cfdi:Traslado', ns)
+                    for t in traslados:
+                        impuesto = t.get('Impuesto')
+                        importe = t.get('Importe')
+                        if impuesto == '002' and importe: # 002 es IVA
+                            total_iva += Decimal(importe)
+                    
+                    comprobante.monto_iva = total_iva
+                    
+                except Exception as e:
+                    messages.warning(request, f"El archivo se subió, pero hubo error leyendo el XML: {e}")
+            
+            comprobante.save()
+            
+            # Actualizar el total de IVA en el Movimiento Padre
+            recalcular_iva_movimiento(movimiento)
+            
+            messages.success(request, "Comprobante agregado y validado.")
+            return redirect('detalle_movimiento', pk=movimiento.pk)
+    else:
+        # Si entran por GET, redirigir al detalle
+        return redirect('detalle_movimiento', pk=movimiento.pk)
+    
+    
+def recalcular_iva_movimiento(movimiento):
+    """ Suma el IVA de todos los comprobantes hijos y actualiza el movimiento """
+    total = sum(c.monto_iva for c in movimiento.comprobantes.all())
+    movimiento.iva_total_xml = total
+    movimiento.save()
+
+def eliminar_comprobante(request, comprobante_id):
+    comp = get_object_or_404(ComprobanteFiscal, pk=comprobante_id)
+    mov_id = comp.movimiento.pk
+    comp.delete()
+    
+    # Recalcular al borrar
+    recalcular_iva_movimiento(Movimiento.objects.get(pk=mov_id))
+    
+    messages.success(request, "Comprobante eliminado.")
+    return redirect('detalle_movimiento', pk=mov_id)

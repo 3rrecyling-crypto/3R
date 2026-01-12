@@ -52,7 +52,7 @@ class Movimiento(models.Model):
     cargo = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Cargo (Egreso)")
     abono = models.DecimalField(max_digits=15, decimal_places=2, default=0, verbose_name="Abono (Ingreso)")
     saldo_banco = models.DecimalField(max_digits=15, decimal_places=2, default=0, blank=True, null=True, verbose_name="Saldo")
-
+    iva_total_xml = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, verbose_name="IVA Extraído (XML)")
     # Relaciones Opcionales (para permitir guardar borradores/importados)
     unidad_negocio = models.ForeignKey(UnidadNegocio, on_delete=models.SET_NULL, null=True, blank=True)
     categoria = models.ForeignKey(Categoria, on_delete=models.SET_NULL, null=True, blank=True)
@@ -112,3 +112,15 @@ class Tercero(models.Model):
 
     def __str__(self):
         return self.nombre
+    
+    
+class ComprobanteFiscal(models.Model):
+    movimiento = models.ForeignKey(Movimiento, related_name='comprobantes', on_delete=models.CASCADE)
+    archivo_xml = models.FileField(upload_to='xmls/%Y/%m/', blank=True, null=True)
+    archivo_pdf = models.FileField(upload_to='pdfs/%Y/%m/', blank=True, null=True)
+    uuid = models.CharField(max_length=36, blank=True, null=True, verbose_name="Folio Fiscal (UUID)")
+    monto_iva = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    fecha_subida = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Comprobante {self.uuid} - {self.movimiento}"

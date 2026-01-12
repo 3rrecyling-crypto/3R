@@ -6,7 +6,7 @@ from .models import (
     RegistroLogistico, EntradaMaquila, Profile
 )
 
-# --- INLINES (Tablas dentro de otras tablas) ---
+# --- INLINES ---
 
 class DetalleRemisionInline(admin.TabularInline):
     model = DetalleRemision
@@ -17,14 +17,10 @@ class DetalleRemisionInline(admin.TabularInline):
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    # MODIFICADO: Cambiamos 'empresa' por 'get_empresas_autorizadas' para evitar el error E108
     list_display = ('user', 'area', 'telefono', 'get_empresas_autorizadas')
     search_fields = ('user__username', 'user__email', 'area')
-    
-    # MODIFICADO: Agregamos esto para ver el selector de empresas de izquierda a derecha
     filter_horizontal = ('empresas_autorizadas',) 
 
-    # Función auxiliar para mostrar las empresas en la lista (Django no muestra M2M directo)
     def get_empresas_autorizadas(self, obj):
         return ", ".join([e.nombre for e in obj.empresas_autorizadas.all()])
     get_empresas_autorizadas.short_description = 'Empresas Asignadas'
@@ -63,6 +59,8 @@ class UnidadAdmin(admin.ModelAdmin):
     list_filter = ('asset_type', 'operational_status', 'ownership', 'empresas')
     search_fields = ('internal_id', 'license_plate', 'vin')
     filter_horizontal = ('empresas',)
+    # OPTIMIZACIÓN: Paginación para evitar cargas lentas
+    list_per_page = 50
 
 @admin.register(Contenedor)
 class ContenedorAdmin(admin.ModelAdmin):
@@ -91,6 +89,11 @@ class RemisionAdmin(admin.ModelAdmin):
     date_hierarchy = 'fecha'
     inlines = [DetalleRemisionInline]
     autocomplete_fields = ['empresa', 'operador', 'linea_transporte', 'unidad', 'contenedor', 'origen', 'destino', 'cliente']
+    
+    # --- CORRECCIÓN ERROR TOOMANYFIELDS ---
+    # Esto limita la vista a 50 registros por página, evitando que el formulario 
+    # de administración envíe más de 1000 campos al servidor de una sola vez.
+    list_per_page = 50
 
 @admin.register(InventarioPatio)
 class InventarioPatioAdmin(admin.ModelAdmin):
@@ -104,6 +107,7 @@ class DescargaAdmin(admin.ModelAdmin):
     list_display = ('origen', 'destino', 'material', 'cantidad', 'fecha_descarga', 'registrado_por')
     list_filter = ('fecha_descarga', 'origen', 'destino', 'material')
     date_hierarchy = 'fecha_descarga'
+    list_per_page = 50
 
 @admin.register(RegistroLogistico)
 class RegistroLogisticoAdmin(admin.ModelAdmin):
@@ -112,6 +116,8 @@ class RegistroLogisticoAdmin(admin.ModelAdmin):
     search_fields = ('remision', 'boleta_bascula', 'chofer__nombre')
     date_hierarchy = 'fecha_carga'
     autocomplete_fields = ['transportista', 'chofer', 'tractor', 'tolva', 'material']
+    # OPTIMIZACIÓN
+    list_per_page = 50
 
 @admin.register(EntradaMaquila)
 class EntradaMaquilaAdmin(admin.ModelAdmin):
@@ -119,3 +125,5 @@ class EntradaMaquilaAdmin(admin.ModelAdmin):
     list_filter = ('status', 'fecha_ingreso', 'alerta')
     search_fields = ('c_id_remito', 'num_boleta_remision', 'transporte')
     date_hierarchy = 'fecha_ingreso'
+    # OPTIMIZACIÓN
+    list_per_page = 50

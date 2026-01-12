@@ -199,3 +199,4 @@ FISCALAPI_KEY = 'sk_test_332d6810_cbbc_45e1_aa05_c1d4b0cad058'
 # URL base de pruebas (Revisa la documentación de tu proveedor para confirmar esta URL)
 FISCALAPI_URL = 'https://test.fiscalapi.com/api/v4'
 DOMAIN_URL = "https://3recycling.com.mx/"
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 20000

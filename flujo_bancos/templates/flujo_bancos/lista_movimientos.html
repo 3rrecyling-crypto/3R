@@ -161,8 +161,8 @@
                 <p class="text-muted mb-0">Control financiero y auditoría de cuentas</p>
             </div>
             <div class="d-flex gap-2">
-                <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#importarModal">
-                    <i class="fas fa-file-upload me-2"></i> Importar TXT
+                <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#importarModal">
+                    <i class="fas fa-file-excel me-2"></i> Importar Excel
                 </button>
                 
                 <div class="dropdown excel-dropdown">
@@ -349,7 +349,7 @@
                                     <a href="{% url 'eliminar_movimiento' mov.id %}" 
                                        class="btn btn-icon btn-outline-danger" 
                                        title="Eliminar Movimiento"
-                                       onclick="return confirm(⚠️ ¿Estás seguro de ELIMINAR este movimiento? Esta acción no se puede deshacer.')">
+                                       onclick="return confirm('⚠️ ¿Estás seguro de ELIMINAR este movimiento? Esta acción no se puede deshacer.')">
                                         <i class="fas fa-trash"></i>
                                     </a>
                                 {% endif %}
@@ -417,19 +417,19 @@
 <div class="modal fade" id="importarModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title"><i class="fas fa-file-import me-2"></i>Importar Movimientos</h5>
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-file-excel me-2"></i>Importar Movimientos (Excel)</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             
             <form method="post" action="{% url 'importar_movimientos' %}" enctype="multipart/form-data">
                 {% csrf_token %}
                 <div class="modal-body">
-                    <div class="alert alert-info d-flex align-items-center mb-3">
-                        <i class="fas fa-info-circle fa-2x me-3"></i>
+                    <div class="alert alert-light border d-flex align-items-center mb-3">
+                        <i class="fas fa-info-circle fa-2x me-3 text-success"></i>
                         <div>
-                            <strong>Formato:</strong><br>
-                            <code>FECHA | CONCEPTO | CARGO | ABONO</code>
+                            <strong>Orden de Columnas:</strong><br>
+                            <code class="text-dark">FECHA | CONCEPTO | CARGO | ABONO</code>
                         </div>
                     </div>
 
@@ -448,13 +448,13 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Archivo TXT</label>
-                        <input type="file" name="archivo_txt" class="form-control" accept=".txt" required>
+                        <label class="form-label fw-bold">Archivo Excel (.xlsx)</label>
+                        <input type="file" name="archivo_excel" class="form-control" accept=".xlsx, .xls" required>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary fw-bold">Importar</button>
+                    <button type="submit" class="btn btn-success fw-bold">Importar Excel</button>
                 </div>
             </form>
         </div>

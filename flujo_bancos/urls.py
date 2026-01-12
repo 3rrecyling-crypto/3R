@@ -36,4 +36,6 @@ urlpatterns = [
     path('subcategorias/editar/<int:pk>/', views.editar_subcategoria, name='bancos_editar_subcategoria'),
     path('subcategorias/eliminar/<int:pk>/', views.eliminar_subcategoria, name='bancos_eliminar_subcategoria'),
     path('movimientos/eliminar/<int:pk>/', views.eliminar_movimiento, name='eliminar_movimiento'),
+    path('movimientos/subir-comprobante/<int:movimiento_id>/', views.subir_comprobante, name='subir_comprobante'),
+    path('movimientos/borrar-comprobante/<int:comprobante_id>/', views.eliminar_comprobante, name='eliminar_comprobante'),
 ]

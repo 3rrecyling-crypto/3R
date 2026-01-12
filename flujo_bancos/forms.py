@@ -1,6 +1,6 @@
 from django import forms
 from .models import Movimiento, Cuenta, SubCategoria, Operacion, Tercero
-
+from .models import Cuenta, Movimiento, ComprobanteFiscal
 
 # 2. FORMULARIO PRINCIPAL UNIFICADO
 # 1. FORMULARIO PARA ALTA RÁPIDA DE TERCEROS
@@ -182,4 +182,24 @@ class ActualizarSaldoForm(forms.ModelForm):
         fields = ['saldo_inicial']
         widgets = {
             'saldo_inicial': forms.NumberInput(attrs={'class': 'form-control'})
+        }
+        
+class ImportarExcelForm(forms.Form):
+    cuenta_destino = forms.ModelChoiceField(
+        queryset=Cuenta.objects.all(),
+        label="Cuenta Bancaria",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    archivo_excel = forms.FileField(
+        label="Archivo Excel (.xlsx)",
+        widget=forms.FileInput(attrs={'class': 'form-control', 'accept': '.xlsx, .xls'})
+    )
+
+class ComprobanteForm(forms.ModelForm):
+    class Meta:
+        model = ComprobanteFiscal
+        fields = ['archivo_xml', 'archivo_pdf']
+        widgets = {
+            'archivo_xml': forms.FileInput(attrs={'class': 'form-control', 'accept': '.xml'}),
+            'archivo_pdf': forms.FileInput(attrs={'class': 'form-control', 'accept': '.pdf'}),
         }
