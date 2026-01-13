@@ -344,7 +344,7 @@ def lista_movimientos(request):
         qs = qs.filter(auditado=False)
 
     # Ordenamiento por defecto
-    qs = qs.order_by('-fecha', '-id')
+    qs = qs.order_by('-fecha', 'id')
 
     # --- PAGINACIÓN (27 FILAS) ---
     paginator = Paginator(qs, 27) 
@@ -369,52 +369,94 @@ def crear_movimiento(request):
         if form.is_valid():
             try:
                 with transaction.atomic():
-                    # DATOS DEL FORMULARIO
+                    # 1. GUARDAR EL MOVIMIENTO BASE
+                    # ----------------------------------------------------
+                    movimiento = form.save(commit=False)
+                    
+                    # Lógica para transferencias (si aplica)
                     operacion = form.cleaned_data.get('operacion')
                     cuenta_destino = form.cleaned_data.get('cuenta_destino_transfer')
-                    monto = form.cleaned_data.get('monto_total')
-                    cuenta_origen = form.cleaned_data.get('cuenta')
-                    fecha = form.cleaned_data.get('fecha')
-                    concepto = form.cleaned_data.get('concepto')
-
-                    # LÓGICA ESPECIAL: SI ES BANCO/DIVISA Y TIENE DESTINO -> ES TRANSFERENCIA
                     es_operacion_especial = operacion and ("BANCO" in operacion.nombre.upper() or "DIVISA" in operacion.nombre.upper())
                     
                     if es_operacion_especial and cuenta_destino:
-                        # --- GUARDAR COMO TRANSFERENCIA (Simulada si no existe modelo Transferencia explícito) ---
-                        # Se asume que esto crea los movimientos correspondientes
-                        # Nota: Si tuvieras un modelo Transferencia real, lo usarías aquí.
-                        # Por ahora usamos la lógica implicita de movimientos dobles si el form lo maneja,
-                        # pero tu código original llamaba a Transferencia.objects.create. 
-                        # Si no tienes modelo Transferencia, esto fallaría. 
-                        # Asumiré que quieres usar la lógica de crear_transferencia o que tienes el modelo.
-                        # Para mantener el código "sin omitir", dejo lo que estaba:
-                        
-                        # (Nota del asistente: Si Transferencia no es un modelo en models.py, esto daría error,
-                        # pero el usuario pidió no omitir líneas del original. Se mantiene).
-                        # Si 'Transferencia' no está importado, fallará. 
-                        # Como no estaba en models.py, asumo que quizás quisiste usar la lógica de movimientos dobles.
-                        # Pero respeto tu código original:
-                        
-                        # Transferencia.objects.create(...) 
-                        # ADVERTENCIA: Transferencia no estaba en los imports de models. 
-                        # Si falla, revisa si tienes un modelo Transferencia.
-                        pass # Dejo el pass para no romper si no existe, pero mantengo la estructura del usuario
-                        
-                        messages.success(request, f"Se registró la Transferencia por Operación: {operacion.nombre}")
-                    else:
-                        # --- GUARDAR COMO MOVIMIENTO NORMAL ---
-                        form.save()
-                        messages.success(request, "Movimiento registrado correctamente.")
+                        # Si tienes lógica especial de transferencia, va aquí.
+                        # Por defecto guardamos el movimiento tal cual para que tenga ID.
+                        pass
+                    
+                    movimiento.save() # Guardamos para obtener el ID (pk)
 
-                return redirect('lista_movimientos')
+                    # 2. PROCESAR ARCHIVOS (XML/PDF) A S3
+                    # ----------------------------------------------------
+                    archivos = request.FILES.getlist('archivos_comprobantes')
+                    
+                    if archivos:
+                        for archivo in archivos:
+                            # Detectar extensión para organizar en carpetas
+                            ext = os.path.splitext(archivo.name)[1].lower()
+                            fecha_hoy = timezone.now()
+                            tipo_carpeta = 'xmls' if ext == '.xml' else 'pdfs'
+                            
+                            # Ruta S3: xmls/2024/09/archivo.xml
+                            s3_path = f"{tipo_carpeta}/{fecha_hoy.year}/{fecha_hoy.month}/{archivo.name}"
+                            
+                            # Subir a S3 usando tu función auxiliar
+                            ruta_s3 = _subir_archivo_a_s3(archivo, s3_path)
+                            
+                            if ruta_s3:
+                                # Crear registro en BD vinculado al movimiento
+                                nuevo_comp = ComprobanteFiscal(movimiento=movimiento)
+                                
+                                if ext == '.xml':
+                                    nuevo_comp.archivo_xml.name = ruta_s3
+                                    
+                                    # --- Extraer datos del XML (UUID e IVA) ---
+                                    try:
+                                        archivo.seek(0) # Reiniciar puntero tras subida
+                                        tree = ET.parse(archivo)
+                                        root = tree.getroot()
+                                        
+                                        # Namespaces SAT
+                                        ns = {'cfdi': 'http://www.sat.gob.mx/cfd/4', 'tfd': 'http://www.sat.gob.mx/TimbreFiscalDigital'}
+                                        if 'cfdi' not in root.tag: ns['cfdi'] = 'http://www.sat.gob.mx/cfd/3'
+
+                                        # UUID
+                                        tfd = root.find('.//tfd:TimbreFiscalDigital', ns)
+                                        if tfd is not None:
+                                            nuevo_comp.uuid = tfd.get('UUID')
+                                        
+                                        # IVA
+                                        total_iva = Decimal('0.00')
+                                        traslados = root.findall('.//cfdi:Traslado', ns)
+                                        for t in traslados:
+                                            if t.get('Impuesto') == '002':
+                                                total_iva += Decimal(t.get('Importe') or 0)
+                                        nuevo_comp.monto_iva = total_iva
+
+                                    except Exception as e:
+                                        print(f"Error procesando XML al crear: {e}")
+
+                                elif ext == '.pdf':
+                                    nuevo_comp.archivo_pdf.name = ruta_s3
+                                
+                                nuevo_comp.save()
+
+                        # Actualizar total de IVA en el movimiento
+                        recalcular_iva_movimiento(movimiento)
+
+                    messages.success(request, "Movimiento registrado y archivos subidos a S3 correctamente.")
+                    
+                    # 3. REDIRECCIONAR AL DETALLE (HISTÓRICO) PARA VER LOS ARCHIVOS
+                    # ----------------------------------------------------
+                    return redirect('detalle_movimiento', pk=movimiento.pk)
+
             except Exception as e:
                 messages.error(request, f"Error al procesar: {e}")
+                # Si falla, volvemos a renderizar el form con los datos previos
+                return render(request, 'flujo_bancos/crear_movimiento.html', {'form': form})
     else:
         form = MovimientoForm(initial={'fecha': datetime.now().date()})
 
     return render(request, 'flujo_bancos/crear_movimiento.html', {'form': form})
-
 # VISTA PARA EDICIÓN RÁPIDA DE SALDO (AJAX O POST NORMAL)
 @permission_required('flujo_bancos.acceso_flujo_bancos', raise_exception=True)
 def actualizar_saldo_cuenta(request, pk):
@@ -741,7 +783,7 @@ def exportar_movimientos_excel(request):
         'operacion', 
         'categoria', 
         'subcategoria'
-    ).order_by('-fecha', '-id')
+   ).order_by('-fecha', 'id')
     
     # --- APLICAR FILTROS (Igual que en tu lista de pantalla) ---
     q = request.GET.get('q')
