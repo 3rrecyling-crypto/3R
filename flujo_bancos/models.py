@@ -124,7 +124,7 @@ class Movimiento(models.Model):
     class Meta:
         verbose_name = "Movimiento"
         verbose_name_plural = "Movimientos"
-        ordering = ['-fecha', '-id']
+        ordering = ['-fecha', 'id']
         
         
 class Tercero(models.Model):

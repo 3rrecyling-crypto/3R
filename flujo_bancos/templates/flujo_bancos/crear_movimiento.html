@@ -148,6 +148,8 @@
                     <form method="post" id="movimientoForm" enctype="multipart/form-data" novalidate>
                         {% csrf_token %}
                         
+                        <input type="hidden" name="ids_eliminar" id="ids_eliminar" value="">
+
                         <div class="row g-3 mb-4">
                             <div class="col-md-2">
                                 <label class="form-label fw-bold"><i class="fas fa-calendar-alt me-1 text-primary"></i>Fecha</label>
@@ -222,7 +224,7 @@
                                         <label class="form-label text-muted fw-bold">Agregar XMLs y PDFs</label>
                                         <input type="file" id="input-archivos" name="archivos_comprobantes" class="form-control" multiple accept=".xml,.pdf">
                                         <div class="form-text small">
-                                            Selecciona múltiples archivos. El sistema extraerá IVA y Retenciones automáticamente.
+                                            Selecciona múltiples archivos. El sistema leerá los XML para sumar el IVA automáticamente.
                                         </div>
                                     </div>
                                 </div>
@@ -241,6 +243,7 @@
                                             <div class="text-center text-muted py-2 fst-italic" style="font-size: 0.8rem;">Sin archivos XML</div>
                                         </div>
                                     </div>
+                                    
                                     <div class="col-md-6">
                                         <h6 class="text-danger border-bottom pb-2 mb-2">PDFs (Visualización)</h6>
                                         <div id="lista-pdfs" class="list-group list-group-flush small" style="max-height: 200px; overflow-y: auto;">
@@ -324,6 +327,9 @@
                         <span class="input-group-text">$</span>
                         <input type="number" step="0.01" name="saldo_inicial" id="inputSaldo" class="form-control fw-bold" required>
                     </div>
+                    <div class="form-text small mt-2">
+                        Esto ajustará el cálculo del saldo total actual.
+                    </div>
                 </div>
                 <div class="modal-footer py-1 border-0">
                     <button type="submit" class="btn btn-sm btn-dark w-100">Guardar Cambios</button>
@@ -354,27 +360,43 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
-    // --- VARIABLES DE ESTADO ---
+    // --- VARIABLES DE ESTADO Y FORMATOS ---
+    const fmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
     let currentCuentaId = null;
     let currentSaldoInicial = 0; 
     let saldoBaseCuenta = 0;     
 
-    // --- ARRAY GLOBAL PARA ARCHIVOS ---
-    let archivosGlobales = [];
+    // --- MANEJO DE ARCHIVOS (MEMORIA LOCAL) ---
+    // archivosNuevos: File Objects (Input)
+    // archivosExistentes: Objects {id, name, url, etc} (DB)
+    let archivosNuevos = [];
+    let archivosExistentes = [];
+    let idsEliminar = [];
 
-    // --- DATOS INYECTADOS ---
+    // --- DATOS INYECTADOS DESDE DJANGO (Si es edición) ---
     {% if movimiento %}
         const esEdicion = true;
         const saldoFinalGuardado = parseFloat("{{ movimiento.saldo_banco|default:0 }}");
         const abonoGuardado = parseFloat("{{ movimiento.abono|default:0 }}");
         const cargoGuardado = parseFloat("{{ movimiento.cargo|default:0 }}");
         saldoBaseCuenta = saldoFinalGuardado - abonoGuardado + cargoGuardado;
+
+        // Cargar archivos existentes
+        {% for comp in movimiento.comprobantes.all %}
+            archivosExistentes.push({
+                id: "{{ comp.id }}",
+                tipo: "{% if comp.archivo_xml %}xml{% else %}pdf{% endif %}",
+                nombre: "{% if comp.archivo_xml %}{{ comp.archivo_xml.name }}{% else %}{{ comp.archivo_pdf.name }}{% endif %}",
+                url: "{% if comp.archivo_xml %}{{ comp.archivo_xml.url }}{% else %}{{ comp.archivo_pdf.url }}{% endif %}",
+                folio: "{{ comp.uuid|slice:'-8:'|default:'S/N' }}",
+                iva: {{ comp.monto_iva|default:0 }}
+            });
+        {% endfor %}
     {% else %}
         const esEdicion = false;
     {% endif %}
 
-    const fmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
-
+    // --- FUNCIONES DE MODALES ---
     function abrirTerceroPopup(url) {
         const w = 600; const h = 700;
         const left = (window.screen.width / 2) - (w / 2);
@@ -397,6 +419,7 @@
         var modals = document.querySelectorAll('.modal');
         modals.forEach(modal => document.body.appendChild(modal));
 
+        // SELECTORES
         const $cuentaSelect = $('#id_cuenta');
         const $operacionSelect = $('#id_operacion');
         const $tipoSelect = $('#id_tipo_movimiento');
@@ -424,46 +447,58 @@
         const labelTercero = document.getElementById('label-tercero');
         const loader = document.getElementById('saldo-loader');
 
-        // VARIABLES ARCHIVOS
+        // ELEMENTOS ARCHIVOS
         const inputArchivos = document.getElementById('input-archivos');
+        const inputIdsEliminar = document.getElementById('ids_eliminar');
         const listaXmls = document.getElementById('lista-xmls');
         const listaPdfs = document.getElementById('lista-pdfs');
-        
         const badgeTotalIva = document.getElementById('badge-total-iva');
         const badgeTotalRetIva = document.getElementById('badge-total-ret-iva');
         const badgeTotalRetIsr = document.getElementById('badge-total-ret-isr');
-
         const contadorArchivos = document.getElementById('contador-archivos');
+        
         const modalPDF = new bootstrap.Modal(document.getElementById('modalVerPDF'));
         const iframePDF = document.getElementById('iframePDF');
         const tituloModalPDF = document.getElementById('tituloModalPDF');
 
         // ==========================================
-        // LÓGICA DE ARCHIVOS (LECTURA XML MEJORADA)
+        // LÓGICA DE ARCHIVOS (NUEVOS + EXISTENTES)
         // ==========================================
         
+        // 1. Escuchar Nuevos Archivos
         inputArchivos.addEventListener('change', function(e) {
             const newFiles = Array.from(e.target.files);
             
             newFiles.forEach(file => {
                 const tipo = file.name.split('.').pop().toLowerCase();
-                const fileId = Date.now() + Math.random().toString(36).substr(2, 9); 
+                const tempId = Date.now() + Math.random();
 
                 if (tipo === 'xml') {
-                    procesarYAgregarXML(file, fileId);
+                    procesarXML(file, (data) => {
+                        archivosNuevos.push({
+                            id: tempId,
+                            file: file,
+                            tipo: 'xml',
+                            data: data
+                        });
+                        renderizarArchivos();
+                    });
                 } else if (tipo === 'pdf') {
-                    archivosGlobales.push({
-                        id: fileId,
+                    archivosNuevos.push({
+                        id: tempId,
                         file: file,
                         tipo: 'pdf'
                     });
                     renderizarArchivos();
                 }
             });
-            this.value = ''; // Reset input
+            // Limpiamos el input visual para permitir re-selección
+            // La "verdad" estará en el DataTransfer que construiremos al renderizar
+            this.value = '';
         });
 
-        function procesarYAgregarXML(file, id) {
+        // 2. Procesar XML (Lectura Cliente)
+        function procesarXML(file, callback) {
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
@@ -473,18 +508,13 @@
                     const comprobante = xmlDoc.getElementsByTagName("cfdi:Comprobante")[0] || xmlDoc.getElementsByTagName("Comprobante")[0];
                     const folio = comprobante ? (comprobante.getAttribute("Folio") || "S/N") : "S/N";
                     
-                    const timbre = xmlDoc.getElementsByTagName("tfd:TimbreFiscalDigital")[0] || xmlDoc.getElementsByTagName("TimbreFiscalDigital")[0];
-                    const uuid = timbre ? timbre.getAttribute("UUID") : "Sin UUID";
-
                     let iva = 0;
                     let retIva = 0;
                     let retIsr = 0;
 
-                    // 1. SUMAR IVA TRASLADADO Y RETENCIONES GLOBAL
+                    // Extracción Simplificada para UI (la real se hace en Backend)
                     const impuestosNodes = xmlDoc.getElementsByTagName("cfdi:Impuestos");
                     let impuestosGlobal = null;
-                    
-                    // Buscar el nodo Impuestos que es hijo directo de Comprobante
                     for(let i=0; i<impuestosNodes.length; i++) {
                         if (impuestosNodes[i].parentNode.nodeName.includes("Comprobante")) {
                             impuestosGlobal = impuestosNodes[i];
@@ -492,134 +522,81 @@
                         }
                     }
 
-                    // Estrategia híbrida: Leer totales globales y si fallan, sumar conceptos
-                    let foundIva = false;
-                    
                     if (impuestosGlobal) {
-                        // Intentar leer atributo global Trasladado
                         if (impuestosGlobal.getAttribute("TotalImpuestosTrasladados")) {
                             iva = parseFloat(impuestosGlobal.getAttribute("TotalImpuestosTrasladados"));
-                            foundIva = true;
                         }
-                        
-                        // Leer RETENCIONES del nodo global
-                        const retencionesGlobales = impuestosGlobal.getElementsByTagName("cfdi:Retencion");
-                        for(let i=0; i<retencionesGlobales.length; i++) {
-                            const r = retencionesGlobales[i];
-                            const imp = r.getAttribute("Impuesto");
-                            const importe = parseFloat(r.getAttribute("Importe") || "0");
-                            
-                            if (imp === "002") retIva += importe; // IVA Retenido
-                            if (imp === "001") retIsr += importe; // ISR Retenido
+                        const retenciones = impuestosGlobal.getElementsByTagName("cfdi:Retencion");
+                        for(let i=0; i<retenciones.length; i++) {
+                            const imp = retenciones[i].getAttribute("Impuesto");
+                            const val = parseFloat(retenciones[i].getAttribute("Importe") || 0);
+                            if(imp === "002") retIva += val;
+                            if(imp === "001") retIsr += val;
                         }
-                    }
-
-                    // Fallback para IVA (si no se encontró en global)
-                    if (!foundIva) {
+                    } else {
+                        // Fallback conceptos
                         const traslados = xmlDoc.getElementsByTagName("cfdi:Traslado");
-                        for (let i = 0; i < traslados.length; i++) {
-                            const t = traslados[i];
-                            if (t.getAttribute("Impuesto") === "002" && t.getAttribute("Importe")) {
-                                iva += parseFloat(t.getAttribute("Importe"));
+                        for (let i=0; i<traslados.length; i++) {
+                            if (traslados[i].getAttribute("Impuesto")==="002") {
+                                iva += parseFloat(traslados[i].getAttribute("Importe")||0);
                             }
                         }
                     }
-                    
-                    // Fallback para Retenciones (si no estaban en global y son cero)
-                    if (retIva === 0 && retIsr === 0) {
-                        const retenciones = xmlDoc.getElementsByTagName("cfdi:Retencion");
-                        for (let i = 0; i < retenciones.length; i++) {
-                            const r = retenciones[i];
-                            const imp = r.getAttribute("Impuesto");
-                            const importe = parseFloat(r.getAttribute("Importe") || "0");
-                            
-                            if (imp === "002") retIva += importe;
-                            if (imp === "001") retIsr += importe;
-                        }
-                    }
 
-                    archivosGlobales.push({
-                        id: id,
-                        file: file,
-                        tipo: 'xml',
-                        datos_xml: {
-                            folio: folio,
-                            uuid: uuid,
-                            iva: iva || 0,
-                            retIva: retIva || 0,
-                            retIsr: retIsr || 0
-                        }
-                    });
-
-                    renderizarArchivos();
+                    callback({ folio: folio, iva: iva, retIva: retIva, retIsr: retIsr });
 
                 } catch (error) {
-                    console.error("Error parseando XML:", error);
+                    console.error("Error XML", error);
+                    callback({ folio: 'Error', iva: 0, retIva: 0, retIsr: 0 });
                 }
             };
             reader.readAsText(file);
         }
 
+        // 3. Renderizar Listas (Mezcla Nuevos y Existentes)
         function renderizarArchivos() {
             listaXmls.innerHTML = '';
             listaPdfs.innerHTML = '';
             
-            let totalIva = 0;
-            let totalRetIva = 0;
-            let totalRetIsr = 0;
-            
-            const dataTransfer = new DataTransfer();
+            // Totales acumulados (Solo de nuevos para sumar al input, o visualización)
+            let sumIva = 0; 
+            let sumRetIva = 0; 
+            let sumRetIsr = 0;
 
-            if (archivosGlobales.length === 0) {
-                listaXmls.innerHTML = '<div class="text-center text-muted py-2 fst-italic" style="font-size: 0.8rem;">Sin archivos XML</div>';
-                listaPdfs.innerHTML = '<div class="text-center text-muted py-2 fst-italic" style="font-size: 0.8rem;">Sin archivos PDF</div>';
-            }
+            const dt = new DataTransfer();
 
-            archivosGlobales.forEach((item) => {
-                dataTransfer.items.add(item.file);
-
+            // A) RENDERIZAR EXISTENTES (BD)
+            archivosExistentes.forEach(item => {
+                const nombreCorto = item.nombre.split('/').pop().substring(0, 8);
+                const div = document.createElement('div');
+                div.className = "list-group-item d-flex justify-content-between align-items-center py-1";
+                
                 if (item.tipo === 'xml') {
-                    // Acumular Totales
-                    totalIva += item.datos_xml.iva;
-                    totalRetIva += item.datos_xml.retIva;
-                    totalRetIsr += item.datos_xml.retIsr;
-
-                    // CAMBIO AQUÍ: MOSTRAR NOMBRE DE ARCHIVO CORTADO
-                    const div = document.createElement('div');
-                    div.className = "list-group-item d-flex justify-content-between align-items-center py-1";
                     div.innerHTML = `
                         <div class="d-flex align-items-center w-100">
                             <i class="fas fa-file-code text-success me-2"></i>
                             <div class="flex-grow-1">
-                                <span class="fw-bold" title="${item.file.name}">${item.file.name.slice(0, 8)}</span>
-                                <div class="text-muted" style="font-size:0.7rem">Folio: ${item.datos_xml.folio}</div>
+                                <a href="${item.url}" target="_blank" class="fw-bold text-decoration-none" title="${item.nombre}">${nombreCorto}...</a>
+                                <div class="text-muted" style="font-size:0.7rem">Folio: ${item.folio} (Guardado)</div>
                             </div>
                             <div class="text-end me-2" style="font-size:0.75rem;">
-                                <div class="text-success">IVA: $${item.datos_xml.iva.toFixed(2)}</div>
-                                ${item.datos_xml.retIva > 0 ? `<div class="text-warning text-dark">Ret IVA: $${item.datos_xml.retIva.toFixed(2)}</div>` : ''}
-                                ${item.datos_xml.retIsr > 0 ? `<div class="text-info text-dark">Ret ISR: $${item.datos_xml.retIsr.toFixed(2)}</div>` : ''}
+                                <div class="text-success">$${item.iva.toFixed(2)}</div>
                             </div>
-                            <span class="btn-eliminar-archivo" onclick="eliminarArchivo('${item.id}')" title="Quitar archivo">
+                            <span class="btn-eliminar-archivo" onclick="eliminarExistente('${item.id}')" title="Borrar de BD">
                                 <i class="fas fa-times"></i>
                             </span>
                         </div>
                     `;
                     listaXmls.appendChild(div);
-
-                } else if (item.tipo === 'pdf') {
-                    const fileURL = URL.createObjectURL(item.file);
-                    const div = document.createElement('div');
-                    div.className = "list-group-item d-flex justify-content-between align-items-center py-2";
+                } else {
                     div.innerHTML = `
                         <div class="d-flex align-items-center w-100">
-                            <div class="text-truncate flex-grow-1" style="max-width: 70%;" title="${item.file.name}">
-                                <i class="fas fa-file-pdf text-danger me-2"></i>${item.file.name}
+                            <div class="text-truncate flex-grow-1" style="max-width: 70%;" title="${item.nombre}">
+                                <i class="fas fa-file-pdf text-danger me-2"></i>
+                                <a href="${item.url}" target="_blank" class="text-decoration-none text-dark">${nombreCorto}...</a>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-danger btn-ver-pdf shadow-sm me-2" 
-                                    data-url="${fileURL}" data-name="${item.file.name}">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            <span class="btn-eliminar-archivo" onclick="eliminarArchivo('${item.id}')" title="Quitar archivo">
+                            <span class="badge bg-secondary me-2" style="font-size:0.7rem">Guardado</span>
+                            <span class="btn-eliminar-archivo" onclick="eliminarExistente('${item.id}')" title="Borrar de BD">
                                 <i class="fas fa-times"></i>
                             </span>
                         </div>
@@ -628,18 +605,88 @@
                 }
             });
 
-            inputArchivos.files = dataTransfer.files;
-            contadorArchivos.innerText = `${archivosGlobales.length} archivos`;
+            // B) RENDERIZAR NUEVOS (Input)
+            archivosNuevos.forEach(item => {
+                dt.items.add(item.file); // Añadir al input real
+
+                const nombreCorto = item.file.name.substring(0, 8);
+                const div = document.createElement('div');
+                div.className = "list-group-item d-flex justify-content-between align-items-center py-1 bg-light";
+
+                if (item.tipo === 'xml') {
+                    // Sumar impuestos de los nuevos para pre-llenar inputs si se desea
+                    sumIva += item.data.iva;
+                    sumRetIva += item.data.retIva;
+                    sumRetIsr += item.data.retIsr;
+
+                    div.innerHTML = `
+                        <div class="d-flex align-items-center w-100">
+                            <i class="fas fa-file-code text-success me-2"></i>
+                            <div class="flex-grow-1">
+                                <span class="fw-bold" title="${item.file.name}">${nombreCorto}...</span>
+                                <div class="text-muted" style="font-size:0.7rem">Folio: ${item.data.folio} <span class="text-primary">(Nuevo)</span></div>
+                            </div>
+                            <div class="text-end me-2" style="font-size:0.75rem;">
+                                <div class="text-success">$${item.data.iva.toFixed(2)}</div>
+                            </div>
+                            <span class="btn-eliminar-archivo" onclick="eliminarNuevo(${item.id})" title="Quitar">
+                                <i class="fas fa-times"></i>
+                            </span>
+                        </div>
+                    `;
+                    listaXmls.appendChild(div);
+                } else {
+                    const fileURL = URL.createObjectURL(item.file);
+                    div.innerHTML = `
+                        <div class="d-flex align-items-center w-100">
+                            <div class="text-truncate flex-grow-1" style="max-width: 70%;" title="${item.file.name}">
+                                <i class="fas fa-file-pdf text-danger me-2"></i>${nombreCorto}...
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger btn-ver-pdf shadow-sm me-2 py-0" 
+                                    data-url="${fileURL}" data-name="${item.file.name}">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <span class="btn-eliminar-archivo" onclick="eliminarNuevo(${item.id})" title="Quitar">
+                                <i class="fas fa-times"></i>
+                            </span>
+                        </div>
+                    `;
+                    listaPdfs.appendChild(div);
+                }
+            });
+
+            // Actualizar Input File Real
+            inputArchivos.files = dt.files;
             
-            // Actualizar inputs del formulario y Badges
-            actualizarTotalesImpuestos(totalIva, totalRetIva, totalRetIsr);
-            
+            // Actualizar Contadores
+            const totalFiles = archivosExistentes.length + archivosNuevos.length;
+            contadorArchivos.innerText = `${totalFiles} archivos`;
+
+            // Actualizar UI de Totales (Solo informativos de lo que se está subiendo ahora + existente)
+            // Nota: Aquí sumamos solo lo nuevo para actualizar los inputs del form
+            if (archivosNuevos.length > 0) {
+                actualizarTotalesImpuestos(sumIva, sumRetIva, sumRetIsr);
+            }
+
             asignarEventosPDF();
         }
 
-        window.eliminarArchivo = function(id) {
-            archivosGlobales = archivosGlobales.filter(item => item.id !== id);
-            renderizarArchivos(); 
+        // --- FUNCIONES DE ELIMINACIÓN ---
+        window.eliminarExistente = function(id) {
+            if(confirm("¿Estás seguro de eliminar este archivo guardado? Se borrará al guardar.")) {
+                // Quitar de la lista visual
+                archivosExistentes = archivosExistentes.filter(item => item.id !== id);
+                // Agregar al input oculto para borrar en backend
+                idsEliminar.push(id);
+                inputIdsEliminar.value = idsEliminar.join(',');
+                renderizarArchivos();
+            }
+        };
+
+        window.eliminarNuevo = function(id) {
+            // Quitar de la lista de nuevos
+            archivosNuevos = archivosNuevos.filter(item => item.id !== id);
+            renderizarArchivos();
         };
 
         function asignarEventosPDF() {
@@ -653,17 +700,20 @@
         }
 
         function actualizarTotalesImpuestos(iva, retIva, retIsr) {
-            // Actualizar Badges
-            badgeTotalIva.textContent = `IVA: ${fmt.format(iva)}`;
+            // Esta función suma lo NUEVO a lo que ya pueda haber en los inputs (opcional)
+            // O simplemente reemplaza. En este caso, reemplazamos para evitar doble suma al re-renderizar.
+            // Si es edición, cuidado con sobrescribir valores manuales.
+            // Estrategia segura: Mostrar en Badges y dejar que usuario decida o sumar al valor actual.
+            
+            // Aquí actualizamos los badges visuales
+            badgeTotalIva.textContent = `IVA Nuevo: ${fmt.format(iva)}`;
             badgeTotalRetIva.textContent = `Ret IVA: ${fmt.format(retIva)}`;
-            badgeTotalRetIsr.textContent = `Ret ISR: ${fmt.format(retIsr)}`;
             
-            // Actualizar Inputs del Formulario
-            inputIva.value = iva.toFixed(2);
-            inputRetIva.value = retIva.toFixed(2);
-            inputRetIsr.value = retIsr.toFixed(2);
+            // Actualizamos los inputs solo si hay valores > 0 para ayudar al usuario
+            if (iva > 0) inputIva.value = iva.toFixed(2);
+            if (retIva > 0) inputRetIva.value = retIva.toFixed(2);
+            if (retIsr > 0) inputRetIsr.value = retIsr.toFixed(2);
             
-            // Disparar recálculo de saldo
             inputIva.dispatchEvent(new Event('input'));
         }
 
@@ -792,6 +842,10 @@
         if ($cuentaSelect.val()) {
             fetchSaldo(); 
         }
+        
+        // Renderizar inicial (si hay archivos existentes)
+        renderizarArchivos();
+        
         checkOperacion();
         actualizarCalculos();
     });

@@ -344,7 +344,7 @@ def lista_movimientos(request):
         qs = qs.filter(auditado=False)
 
     # Ordenamiento por defecto
-    qs = qs.order_by('-fecha', 'id')
+    qs = qs.order_by('fecha', 'id')
 
     # --- PAGINACIÓN (27 FILAS) ---
     paginator = Paginator(qs, 27) 
@@ -482,82 +482,72 @@ def editar_movimiento(request, pk):
         form = MovimientoForm(request.POST, request.FILES, instance=movimiento_original)
         if form.is_valid():
             movimiento = form.save(commit=False)
-            
-            # 1. Manejo del Comprobante Único (Campo legacy del modelo, si lo usas)
-            if 'comprobante' in request.FILES:
-                if movimiento_original.comprobante:
-                    _eliminar_archivo_de_s3(str(movimiento_original.comprobante))
-                
-                archivo = request.FILES['comprobante']
-                _nombre_base, extension = os.path.splitext(archivo.name)
-                s3_path = f"movimientos/{movimiento.pk}/comprobante{extension}"
-                ruta_guardada = _subir_archivo_a_s3(archivo, s3_path)
-                if ruta_guardada:
-                    movimiento.comprobante = ruta_guardada
-            
-            movimiento.save() # Guardamos la info básica primero
+            movimiento.save() # Guardar cambios básicos
 
             # ---------------------------------------------------------
-            # 2. NUEVO: Procesar Múltiples Archivos (Galería S3)
+            # A. ELIMINAR ARCHIVOS MARCADOS (Desde la "tachita" en el HTML)
+            # ---------------------------------------------------------
+            ids_eliminar = request.POST.get('ids_eliminar', '')
+            if ids_eliminar:
+                lista_ids = ids_eliminar.split(',')
+                for comp_id in lista_ids:
+                    if comp_id:
+                        # Buscamos el comprobante asegurando que pertenece a este movimiento
+                        comp = ComprobanteFiscal.objects.filter(id=comp_id, movimiento=movimiento).first()
+                        if comp:
+                            # Borrar de S3
+                            if comp.archivo_xml: _eliminar_archivo_de_s3(comp.archivo_xml.name)
+                            if comp.archivo_pdf: _eliminar_archivo_de_s3(comp.archivo_pdf.name)
+                            # Borrar de BD
+                            comp.delete()
+
+            # ---------------------------------------------------------
+            # B. SUBIR NUEVOS ARCHIVOS A S3
             # ---------------------------------------------------------
             archivos = request.FILES.getlist('archivos_comprobantes')
-            
             if archivos:
                 for archivo in archivos:
-                    # Determinar si es XML o PDF para la ruta S3
                     ext = os.path.splitext(archivo.name)[1].lower()
                     fecha_hoy = timezone.now()
                     tipo_carpeta = 'xmls' if ext == '.xml' else 'pdfs'
-                    
-                    # Ruta: xmls/2023/10/archivo.xml
                     s3_path = f"{tipo_carpeta}/{fecha_hoy.year}/{fecha_hoy.month}/{archivo.name}"
                     
-                    # Subir a S3
                     ruta_s3 = _subir_archivo_a_s3(archivo, s3_path)
                     
                     if ruta_s3:
-                        # Crear el objeto en BD vinculado a este movimiento
                         nuevo_comp = ComprobanteFiscal(movimiento=movimiento)
-                        
                         if ext == '.xml':
                             nuevo_comp.archivo_xml.name = ruta_s3
-                            
-                            # --- Procesar datos del XML ---
+                            # Procesar XML para datos
                             try:
-                                archivo.seek(0) # Regresar puntero al inicio tras subir a S3
+                                archivo.seek(0)
                                 tree = ET.parse(archivo)
                                 root = tree.getroot()
-                                
-                                # Namespaces
                                 ns = {'cfdi': 'http://www.sat.gob.mx/cfd/4', 'tfd': 'http://www.sat.gob.mx/TimbreFiscalDigital'}
                                 if 'cfdi' not in root.tag: ns['cfdi'] = 'http://www.sat.gob.mx/cfd/3'
 
-                                # Extraer UUID
                                 tfd = root.find('.//tfd:TimbreFiscalDigital', ns)
-                                if tfd is not None:
-                                    nuevo_comp.uuid = tfd.get('UUID')
+                                if tfd is not None: nuevo_comp.uuid = tfd.get('UUID')
                                 
-                                # Extraer IVA
                                 total_iva = Decimal('0.00')
                                 traslados = root.findall('.//cfdi:Traslado', ns)
                                 for t in traslados:
                                     if t.get('Impuesto') == '002':
                                         total_iva += Decimal(t.get('Importe') or 0)
                                 nuevo_comp.monto_iva = total_iva
-
-                            except Exception as e:
-                                print(f"Error procesando XML en edición: {e}")
-
+                            except Exception:
+                                pass
                         elif ext == '.pdf':
                             nuevo_comp.archivo_pdf.name = ruta_s3
                         
                         nuevo_comp.save()
 
-                # Actualizar el total de IVA del movimiento sumando lo nuevo
-                recalcular_iva_movimiento(movimiento)
+            # Recalcular totales después de borrar y agregar
+            recalcular_iva_movimiento(movimiento)
 
-            messages.success(request, 'Movimiento actualizado y archivos subidos a S3 correctamente.')
-            return redirect('lista_movimientos')
+            messages.success(request, 'Movimiento actualizado correctamente.')
+            # Redirigimos al detalle para ver cómo quedó todo
+            return redirect('detalle_movimiento', pk=movimiento.pk)
     else:
         form = MovimientoForm(instance=movimiento_original)
 
@@ -783,7 +773,7 @@ def exportar_movimientos_excel(request):
         'operacion', 
         'categoria', 
         'subcategoria'
-   ).order_by('-fecha', 'id')
+   ).order_by('fecha', 'id')
     
     # --- APLICAR FILTROS (Igual que en tu lista de pantalla) ---
     q = request.GET.get('q')
@@ -947,7 +937,7 @@ def exportar_transferencias_excel(request):
 
     salidas = Movimiento.objects.filter(cargo__gt=0).filter(
         Q(concepto__icontains='(Envío a') | Q(concepto__icontains='Transferencia')
-    ).select_related('cuenta').order_by('-fecha', '-id')
+    ).select_related('cuenta').order_by('fecha', 'id')
 
     row_num = 2
 
@@ -1117,7 +1107,7 @@ def lista_transferencias(request):
         cargo__gt=0
     ).filter(
         Q(concepto__icontains='(Envío a') | Q(concepto__icontains='Transferencia')
-    ).select_related('cuenta').order_by('-fecha', '-id')
+    ).select_related('cuenta').order_by('fecha', 'id')
 
     # Paginación (opcional, igual que en movimientos)
     paginator = Paginator(transferencias, 20)
