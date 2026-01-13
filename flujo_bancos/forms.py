@@ -16,26 +16,34 @@ class TerceroForm(forms.ModelForm):
 
 # 2. FORMULARIO PRINCIPAL UNIFICADO
 class MovimientoForm(forms.ModelForm):
-    # Campos extras para la interfaz
+    # --- CAMPOS EXTRAS (INTERFAZ) ---
     TIPO_CHOICES = [('ingreso', 'Ingreso (Abono)'), ('egreso', 'Egreso (Cargo)')]
     
+    # Agregamos required=False aquí
     tipo_movimiento = forms.ChoiceField(
         choices=TIPO_CHOICES, 
+        required=False,
         widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_tipo_movimiento'}),
         label="Tipo"
     )
     
+    # Agregamos required=False aquí
     monto_total = forms.DecimalField(
         max_digits=12, decimal_places=2, 
+        required=False,
         widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'id': 'id_monto_total'}),
         label="Monto"
     )
 
     tercero_obj = forms.ModelChoiceField(
         queryset=Tercero.objects.all().order_by('nombre'), 
-        required=False, label="Tercero",
+        required=False, 
+        label="Tercero",
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+
+    # Si en tu HTML usas 'cuenta_destino_transfer', defínela aquí opcionalmente
+    cuenta_destino_transfer = forms.CharField(required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
 
     class Meta:
         model = Movimiento
@@ -43,6 +51,7 @@ class MovimientoForm(forms.ModelForm):
             'fecha', 'concepto', 'unidad_negocio', 'operacion', 
             'categoria', 'subcategoria', 'cuenta', 
             'iva', 'ret_iva', 'ret_isr', 'comentarios', 'comprobante'
+            # Agrega aquí cualquier otro campo del modelo que falte
         ]
         widgets = {
             'fecha': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
@@ -61,10 +70,16 @@ class MovimientoForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['iva'].required = False
-        
-        # Precarga de datos al editar
+
+        # --- CAMBIO PRINCIPAL: HACER TODO OPCIONAL ---
+        # Recorremos todos los campos (fecha, cuenta, subcategoria, etc.)
+        # y les decimos a Django que NO son obligatorios.
+        for field_name, field in self.fields.items():
+            field.required = False
+
+        # --- LÓGICA DE PRECARGA (EDICIÓN) ---
         if self.instance and self.instance.pk:
+            # Precargar Monto y Tipo
             if self.instance.cargo > 0:
                 self.fields['monto_total'].initial = self.instance.cargo
                 self.fields['tipo_movimiento'].initial = 'egreso'
@@ -72,37 +87,58 @@ class MovimientoForm(forms.ModelForm):
                 self.fields['monto_total'].initial = self.instance.abono
                 self.fields['tipo_movimiento'].initial = 'ingreso'
             
+            # Precargar Tercero
             if self.instance.tercero:
                 tercero = Tercero.objects.filter(nombre=self.instance.tercero).first()
-                if tercero: self.fields['tercero_obj'].initial = tercero
+                if tercero: 
+                    self.fields['tercero_obj'].initial = tercero
 
+            # Filtrar Subcategorías según la Categoría guardada
             if self.instance.categoria:
                  self.fields['subcategoria'].queryset = SubCategoria.objects.filter(categoria=self.instance.categoria)
             else:
                  self.fields['subcategoria'].queryset = SubCategoria.objects.none()
 
-            if 'categoria' in self.data:
-                try:
-                    categoria_id = int(self.data.get('categoria'))
-                    self.fields['subcategoria'].queryset = SubCategoria.objects.filter(categoria_id=categoria_id)
-                except: pass
+        # --- LÓGICA DINÁMICA (POST) ---
+        # Si el usuario envió el formulario (POST), filtramos subcategorías
+        # basándonos en lo que seleccionó en 'categoria'
+        if 'categoria' in self.data:
+            try:
+                categoria_id = int(self.data.get('categoria'))
+                self.fields['subcategoria'].queryset = SubCategoria.objects.filter(categoria_id=categoria_id)
+            except (ValueError, TypeError):
+                pass
+        elif not self.instance.pk:
+            # Si es nuevo y no hay datos, lista vacía
+            self.fields['subcategoria'].queryset = SubCategoria.objects.none()
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        tercero = self.cleaned_data.get('tercero_obj')
-        if tercero: instance.tercero = tercero.nombre
         
+        # Guardar nombre del Tercero (solo si se seleccionó uno)
+        tercero = self.cleaned_data.get('tercero_obj')
+        if tercero: 
+            instance.tercero = tercero.nombre
+        
+        # Mapear Monto (si está vacío usa 0)
+        monto = self.cleaned_data.get('monto_total') or 0 
         tipo = self.cleaned_data.get('tipo_movimiento')
-        monto = self.cleaned_data.get('monto_total', 0)
         
         if tipo == 'egreso':
             instance.cargo = monto
             instance.abono = 0
-        else:
+        elif tipo == 'ingreso':
             instance.abono = monto
             instance.cargo = 0
+        else:
+            # Si no seleccionó tipo, dejamos ambos en 0 o respetamos lo que tuviera la instancia
+            if not instance.pk: # Solo si es nuevo forzamos 0
+                instance.abono = 0
+                instance.cargo = 0
             
-        if commit: instance.save()
+        if commit: 
+            instance.save()
+            
         return instance
 
 class TransferenciaForm(forms.Form):

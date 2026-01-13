@@ -690,7 +690,19 @@ def crear_remision(request):
     )
     empresa_seleccionada = None
 
+    # Diccionario para persistir datos manuales en caso de error
+    valores_manuales = {
+        'operador': '',
+        'unidad': '',
+        'contenedor': ''
+    }
+
     if request.method == 'POST':
+        # 1. Capturamos INMEDIATAMENTE el texto manual para devolverlo si hay error
+        valores_manuales['operador'] = request.POST.get('operador_texto', '').strip().upper()
+        valores_manuales['unidad'] = request.POST.get('unidad_texto', '').strip().upper()
+        valores_manuales['contenedor'] = request.POST.get('contenedor_texto', '').strip().upper()
+
         empresa_id = request.POST.get('empresa')
         if empresa_id:
             try:
@@ -713,6 +725,33 @@ def crear_remision(request):
             try:
                 with transaction.atomic(): 
                     remision = form.save(commit=False)
+
+                    # --- [LÓGICA CORREGIDA: TEXTO LIBRE] ---
+                    # Si hay texto manual, lo guardamos en los campos manuales 
+                    # y DESVINCULAMOS la relación con el catálogo (Foreign Key = None)
+                    
+                    # 1. Operador
+                    if valores_manuales['operador']:
+                        remision.operador_manual = valores_manuales['operador']
+                        remision.operador = None 
+                    else:
+                        # Si no escribió manual, asegurarse de limpiar el campo manual por si acaso
+                        remision.operador_manual = None
+
+                    # 2. Unidad
+                    if valores_manuales['unidad']:
+                        remision.unidad_manual = valores_manuales['unidad']
+                        remision.unidad = None
+                    else:
+                        remision.unidad_manual = None
+
+                    # 3. Contenedor
+                    if valores_manuales['contenedor']:
+                        remision.contenedor_manual = valores_manuales['contenedor']
+                        remision.contenedor = None
+                    else:
+                        remision.contenedor_manual = None
+                    # ---------------------------------------
                     
                     # Seguridad y Folio
                     if not request.user.is_superuser and remision.empresa:
@@ -723,16 +762,13 @@ def crear_remision(request):
                     if empresa_seleccionada and empresa_seleccionada.prefijo:
                         remision.remision = calcular_siguiente_folio(empresa_seleccionada.prefijo)
                     
-                    # === GUARDAR ARCHIVO ÚNICO ===
+                    # Guardar Archivo
                     if 'evidencia_documento' in request.FILES:
                         archivo = request.FILES['evidencia_documento']
-                        # Definir ruta: remisiones/FOLIO/evidencia_NOMBRE
                         s3_path = f"remisiones/{remision.remision}/evidencia_{archivo.name}"
-                        
                         ruta_s3 = _subir_archivo_a_s3(archivo, s3_path)
                         if ruta_s3:
                             remision.evidencia_documento = ruta_s3
-                    # =============================
 
                     remision.save() 
                     formset.instance = remision
@@ -744,6 +780,7 @@ def crear_remision(request):
                 
             except Exception as e:
                 messages.error(request, f'Error al guardar: {e}')
+                # Aquí no hacemos nada especial, 'valores_manuales' ya tiene los datos para el render
     else:
         form = RemisionForm(user=request.user)
         formset = DetalleFormSet(
@@ -751,7 +788,14 @@ def crear_remision(request):
             form_kwargs={'material_queryset': Material.objects.none(), 'lugar_queryset': Lugar.objects.none()}
         )
 
-    context = {'form': form, 'formset': formset, 'titulo': 'Nueva Remisión', 'is_editing': False}
+    context = {
+        'form': form,
+        'formset': formset,
+        'titulo': 'Nueva Remisión',
+        'is_editing': False,
+        'valores_manuales': valores_manuales, # o el diccionario que tengas
+        'remision': None  # <--- AGREGA ESTA LÍNEA
+    }
     return render(request, 'ternium/remision_formulario.html', context)
 
 @login_required
@@ -775,7 +819,22 @@ def editar_remision(request, pk):
     
     empresa_para_form = remision_original.empresa
 
+    # 1. INICIALIZAR VALORES MANUALES (Desde BD por defecto)
+    # Esto asegura que al abrir la edición, veas el texto que ya estaba guardado.
+    valores_manuales = {
+        'operador': remision_original.operador_manual or '',
+        'unidad': remision_original.unidad_manual or '',
+        'contenedor': remision_original.contenedor_manual or ''
+    }
+
     if request.method == 'POST':
+        # 2. CAPTURAR VALORES DE TEXTO DEL POST
+        # Si el usuario modificó el texto, actualizamos el diccionario.
+        # Esto también sirve para persistencia si el formulario falla.
+        valores_manuales['operador'] = request.POST.get('operador_texto', '').strip().upper()
+        valores_manuales['unidad'] = request.POST.get('unidad_texto', '').strip().upper()
+        valores_manuales['contenedor'] = request.POST.get('contenedor_texto', '').strip().upper()
+
         form = RemisionForm(request.POST, request.FILES, instance=remision_original, empresa=empresa_para_form, user=request.user)
         
         material_qs = Material.objects.filter(empresas=empresa_para_form)
@@ -789,18 +848,42 @@ def editar_remision(request, pk):
         if form.is_valid() and formset.is_valid():
             try:
                 with transaction.atomic():
-                    # 1. Revertir inventario
+                    # a) Revertir inventario previo
                     _update_inventory_from_remision(remision_original, revert=True)
                     
                     remision = form.save(commit=False)
-                    
+
+                    # --- [LÓGICA GUARDADO MANUAL] ---
+                    # Si hay texto en el input manual, lo guardamos y limpiamos la relación de catálogo.
+                    # Si NO hay texto manual, limpiamos el campo manual (por si antes tenía algo y ahora se usa catálogo).
+
+                    # 1. Operador
+                    if valores_manuales['operador']:
+                        remision.operador_manual = valores_manuales['operador']
+                        remision.operador = None 
+                    else:
+                        remision.operador_manual = None
+
+                    # 2. Unidad
+                    if valores_manuales['unidad']:
+                        remision.unidad_manual = valores_manuales['unidad']
+                        remision.unidad = None
+                    else:
+                        remision.unidad_manual = None
+
+                    # 3. Contenedor
+                    if valores_manuales['contenedor']:
+                        remision.contenedor_manual = valores_manuales['contenedor']
+                        remision.contenedor = None
+                    else:
+                        remision.contenedor_manual = None
+                    # --------------------------------
+
                     # === ACTUALIZAR ARCHIVO ÚNICO ===
                     if 'evidencia_documento' in request.FILES:
-                        # a) Borrar archivo anterior de S3 si existe
                         if remision_original.evidencia_documento and hasattr(remision_original.evidencia_documento, 'name'):
                             _eliminar_archivo_de_s3(remision_original.evidencia_documento.name)
                         
-                        # b) Subir nuevo archivo
                         archivo = request.FILES['evidencia_documento']
                         s3_path = f"remisiones/{remision.remision}/evidencia_{archivo.name}"
                         ruta_s3 = _subir_archivo_a_s3(archivo, s3_path)
@@ -812,7 +895,7 @@ def editar_remision(request, pk):
                     remision.save()
                     formset.save()
                     
-                    # 2. Actualizar inventario
+                    # b) Actualizar inventario nuevo
                     _update_inventory_from_remision(remision, revert=False)
                     messages.success(request, 'Remisión actualizada correctamente.')
                     return redirect('detalle_remision', pk=remision.pk)
@@ -827,7 +910,13 @@ def editar_remision(request, pk):
             form_kwargs={'material_queryset': material_qs, 'lugar_queryset': lugar_qs}
         )
 
-    context = {'form': form, 'formset': formset, 'remision': remision_original, 'is_editing': True}
+    context = {
+        'form': form, 
+        'formset': formset, 
+        'remision': remision_original, 
+        'is_editing': True,
+        'valores_manuales': valores_manuales # IMPORTANTE: Pasar al contexto para el HTML
+    }
     return render(request, 'ternium/remision_formulario.html', context)
 
 @login_required
@@ -1139,6 +1228,7 @@ def get_catalogos_por_empresa(request, empresa_id):
         # La línea 'unidades' fallaba porque 'models.F' no estaba definido.
         # Al importar 'F' directamente, ahora funciona correctamente.
         data = {
+            'operadores': list(Operador.objects.filter(empresas__id=empresa_id).values('id', 'nombre')),
             'lineas_transporte': list(LineaTransporte.objects.filter(empresas__id=empresa_id).values('id', 'nombre')),
             'materiales': list(Material.objects.filter(empresas__id=empresa_id).values('id', 'nombre')),
             'unidades': list(Unidad.objects.filter(empresas__id=empresa_id).values('id', nombre=F('internal_id'), placas=F('license_plate'))),

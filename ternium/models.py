@@ -478,7 +478,9 @@ class Remision(models.Model):
     inicia_dlv = models.DateTimeField(verbose_name="Inicia Descarga", null=True, blank=True)
     termina_dlv = models.DateTimeField(verbose_name="Termina Descarga", null=True, blank=True)
     folio_dlv = models.CharField(max_length=50, verbose_name="Folio Descarga", blank=True)
-    
+    operador_manual = models.CharField(max_length=200, blank=True, null=True, verbose_name="Operador (Manual)")
+    unidad_manual = models.CharField(max_length=100, blank=True, null=True, verbose_name="Unidad (Manual)")
+    contenedor_manual = models.CharField(max_length=100, blank=True, null=True, verbose_name="Contenedor (Manual)")
     # --- CAMPO NUEVO PARA EL ARCHIVO ---
     # Usamos FileField. Aunque subamos a S3 manual, esto ayuda al formulario a renderizar el input.
     evidencia_documento = models.FileField(

@@ -106,12 +106,18 @@
         opacity: 1;
     }
     
-    /* --- CORRECCIÓN Z-INDEX MODAL (EXTREMA) --- */
     .modal-backdrop {
         z-index: 10050 !important;
     }
     .modal {
         z-index: 10060 !important;
+    }
+    
+    /* Clase para input de texto alternativo */
+    .campo-texto-alternativo {
+        text-transform: uppercase; 
+        background-color: #fff8e1; /* Color crema para indicar manual */
+        border-color: #ffc107;
     }
 </style>
 {% endblock %}
@@ -145,7 +151,7 @@
                         <select class="form-select" disabled>
                             <option selected>{{ remision.empresa.nombre }}</option>
                         </select>
-                        <input type="hidden" name="empresa" value="{{ form.empresa.value }}">
+                        <input type="hidden" name="empresa" id="id_empresa" value="{{ form.empresa.value }}">
                     {% else %}
                         {{ form.empresa }}
                         <div class="form-error">{{ form.empresa.errors }}</div>
@@ -173,10 +179,59 @@
         <div class="card mb-4">
             <div class="card-header"><h5><i class="fas fa-truck me-2"></i>Transporte</h5></div>
             <div class="card-body"><div class="row g-3">
-                <div class="col-md-6"><label for="{{ form.linea_transporte.id_for_label }}" class="form-label">{{ form.linea_transporte.label }}</label>{{ form.linea_transporte }}<div class="form-error">{{ form.linea_transporte.errors }}</div></div>
-                <div class="col-md-6"><label for="{{ form.operador.id_for_label }}" class="form-label">{{ form.operador.label }}</label>{{ form.operador }}<div class="form-error">{{ form.operador.errors }}</div></div>
-                <div class="col-md-6"><label for="{{ form.unidad.id_for_label }}" class="form-label">{{ form.unidad.label }}</label>{{ form.unidad }}<div class="form-error">{{ form.unidad.errors }}</div></div>
-                <div class="col-md-6"><label for="{{ form.contenedor.id_for_label }}" class="form-label">{{ form.contenedor.label }}</label>{{ form.contenedor }}<div class="form-error">{{ form.contenedor.errors }}</div></div>
+                <div class="col-md-6">
+                    <label for="{{ form.linea_transporte.id_for_label }}" class="form-label">{{ form.linea_transporte.label }}</label>
+                    {{ form.linea_transporte }}
+                    <div class="form-error">{{ form.linea_transporte.errors }}</div>
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="{{ form.operador.id_for_label }}" class="form-label">{{ form.operador.label }}</label>
+                    
+                    <div class="campo-select-wrapper">
+                        {{ form.operador }}
+                    </div>
+                    
+                    <input type="text" name="operador_texto" id="id_operador_texto" 
+                           class="form-control campo-texto-alternativo" style="display:none;" 
+                           placeholder="ESCRIBA EL NOMBRE DEL OPERADOR"
+                           value="{% if valores_manuales.operador %}{{ valores_manuales.operador }}{% elif remision %}{{ remision.operador_manual|default:'' }}{% endif %}"
+                           oninput="this.value = this.value.toUpperCase()">
+                    
+                    <div class="form-error">{{ form.operador.errors }}</div>
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="{{ form.unidad.id_for_label }}" class="form-label">{{ form.unidad.label }}</label>
+                    
+                    <div class="campo-select-wrapper">
+                        {{ form.unidad }}
+                    </div>
+
+                    <input type="text" name="unidad_texto" id="id_unidad_texto" 
+                           class="form-control campo-texto-alternativo" style="display:none;" 
+                           placeholder="ESCRIBA ID O PLACAS DE UNIDAD"
+                           value="{% if valores_manuales.unidad %}{{ valores_manuales.unidad }}{% elif remision %}{{ remision.unidad_manual|default:'' }}{% endif %}"
+                           oninput="this.value = this.value.toUpperCase()">
+
+                    <div class="form-error">{{ form.unidad.errors }}</div>
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="{{ form.contenedor.id_for_label }}" class="form-label">{{ form.contenedor.label }}</label>
+                    
+                    <div class="campo-select-wrapper">
+                        {{ form.contenedor }}
+                    </div>
+
+                    <input type="text" name="contenedor_texto" id="id_contenedor_texto" 
+                           class="form-control campo-texto-alternativo" style="display:none;" 
+                           placeholder="ESCRIBA ID O PLACAS DE CONTENEDOR"
+                           value="{% if valores_manuales.contenedor %}{{ valores_manuales.contenedor }}{% elif remision %}{{ remision.contenedor_manual|default:'' }}{% endif %}"
+                           oninput="this.value = this.value.toUpperCase()">
+
+                    <div class="form-error">{{ form.contenedor.errors }}</div>
+                </div>
             </div></div>
         </div>
 
@@ -294,14 +349,12 @@
     </div>
   </div>
 </div>
-
 {% endblock content %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
-// --- SOLUCIÓN AL BLOQUEO DEL MODAL ---
 document.addEventListener("DOMContentLoaded", function() {
     var modalEl = document.getElementById('universalModal');
     if(modalEl) {
@@ -309,7 +362,6 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 
-// Variable global para guardar el dataURI del input
 let currentPreviewData = null;
 let currentPreviewType = null;
 
@@ -346,16 +398,25 @@ function openPreviewModalFromInput() {
 $(document).ready(function() {
     
     const IS_EDITING = {{ is_editing|yesno:"true,false" }}; 
-    // AGREGAMOS clientes a la caché
     let cachedCatalogData = { materiales: [], lugares: [] };
     
     const formContainer = $('#form-container');
     const addButton = $('#add-form');
     const totalFormsInput = $('#id_detalles-TOTAL_FORMS');
+    // NOTA: Gracias al cambio del HTML, esto ahora encuentra el input hidden en edición
     const empresaSelect = $('#id_empresa'); 
     const remisionInput = $('#id_remision_display');
-    const destinoSelect = $('#id_destino'); // Referencia al select de destino
+    const destinoSelect = $('#id_destino'); 
     const emptyFormTemplate = $('#empty-form-template').html();
+    
+    const lineaTransporteSelect = $('#id_linea_transporte');
+    const operadorSelect = $('#id_operador');
+    const unidadSelect = $('#id_unidad');
+    const contenedorSelect = $('#id_contenedor');
+
+    const operadorInput = $('#id_operador_texto');
+    const unidadInput = $('#id_unidad_texto');
+    const contenedorInput = $('#id_contenedor_texto');
 
     function initializeSelect2(context) {
         $(context).find('select:not([data-select2-id])').select2({
@@ -365,22 +426,58 @@ $(document).ready(function() {
     }
     
     function populateSelect(selectElement, options) {
-        const currentVal = $(selectElement).val();
+        const currentVal = $(selectElement).val(); 
         $(selectElement).empty().append('<option value=""></option>');
         if (options) {
-            // Asumimos que options tiene {id, nombre} o {id, placas}. 
-            // Si usas el mismo endpoint para destino, usará 'nombre'.
             options.forEach(i => $(selectElement).append(new Option(i.nombre || i.placas, i.id)));
         }
-        // Si el valor previo existe en las nuevas opciones, se mantiene
         if(currentVal) {
             $(selectElement).val(currentVal).trigger('change');
         }
     }
 
+    function toggleTransportFields() {
+        var selectedText = "";
+        if (lineaTransporteSelect.find("option:selected").length > 0) {
+            selectedText = lineaTransporteSelect.find("option:selected").text().toUpperCase();
+        }
+
+        if (selectedText.includes("3R")) {
+            // MODO 3R
+            operadorSelect.parent().show();
+            operadorSelect.next('.select2-container').show();
+            operadorInput.hide(); 
+            
+            unidadSelect.parent().hide();
+            unidadSelect.next('.select2-container').hide();
+            unidadInput.show();
+            
+            contenedorSelect.parent().hide();
+            contenedorSelect.next('.select2-container').hide();
+            contenedorInput.show();
+            
+        } else {
+            // MODO TERCEROS
+            operadorSelect.parent().hide();
+            operadorSelect.next('.select2-container').hide();
+            operadorInput.show();
+            
+            unidadSelect.parent().hide();
+            unidadSelect.next('.select2-container').hide();
+            unidadInput.show();
+            
+            contenedorSelect.parent().hide();
+            contenedorSelect.next('.select2-container').hide();
+            contenedorInput.show();
+        }
+    }
+
     initializeSelect2(document);
 
-    // --- PREVISUALIZACIÓN DE ARCHIVO NUEVO ---
+    lineaTransporteSelect.on('change', function() {
+        toggleTransportFields();
+    });
+
     $('#id_evidencia_documento').change(function(){
         const file = this.files[0];
         const previewContainer = $('#preview-container');
@@ -396,17 +493,10 @@ $(document).ready(function() {
 
                 if (file.type === 'application/pdf') {
                     currentPreviewType = 'pdf';
-                    contentDiv.html(`
-                        <div class="p-3 bg-white">
-                            <i class="fas fa-file-pdf fa-4x text-danger"></i>
-                            <div class="mt-2 fw-bold text-dark">PDF Seleccionado</div>
-                        </div>
-                    `);
+                    contentDiv.html('<div class="p-3 bg-white"><i class="fas fa-file-pdf fa-4x text-danger"></i><div class="mt-2 fw-bold text-dark">PDF Seleccionado</div></div>');
                 } else if (file.type.startsWith('image/')) {
                     currentPreviewType = 'image';
-                    contentDiv.html(`
-                        <img src="${e.target.result}" style="max-height: 200px; display: block;" class="img-fluid rounded">
-                    `);
+                    contentDiv.html(`<img src="${e.target.result}" style="max-height: 200px; display: block;" class="img-fluid rounded">`);
                 } else {
                     currentPreviewType = null;
                     contentDiv.html('<div class="p-3 text-muted">Vista previa no disponible</div>');
@@ -419,41 +509,40 @@ $(document).ready(function() {
         }
     });
 
-    // --- LÓGICA DE EMPRESAS Y CATALOGOS ---
     empresaSelect.on('change', function() { 
         const empresaId = $(this).val();
-        
         if (!empresaId) {
              addButton.prop('disabled', true);
              if (!IS_EDITING) remisionInput.val(''); 
              return;
         }
         
-        // 1. Cargar Catálogos
         fetch(`/api/get-catalogos/${empresaId}/`) 
             .then(response => response.json())
             .then(data => {
                 cachedCatalogData.materiales = data.materiales || [];
-                // Guardamos los lugares de destino para usarlos en la tabla de clientes
                 cachedCatalogData.lugares = data.lugares_destino || []; 
 
                 populateSelect($('#id_linea_transporte'), data.lineas_transporte);
+                
+                // CORRECCIÓN: Llenar el Select de Operadores
+                populateSelect($('#id_operador'), data.operadores);
+                
                 populateSelect($('#id_unidad'), data.unidades);
                 populateSelect($('#id_contenedor'), data.contenedores);
                 populateSelect($('#id_origen'), data.lugares_origen);
-                populateSelect(destinoSelect, cachedCatalogData.lugares); // Llenar Destino principal
+                populateSelect(destinoSelect, cachedCatalogData.lugares); 
                 
-                // Llenar los selects en las filas EXISTENTES
                 formContainer.find('.detalle-form-row').each(function() {
                     populateSelect($(this).find('select[name$="-material"]'), cachedCatalogData.materiales);
-                    // AQUÍ SE LLENA EL CLIENTE CON LA MISMA LISTA QUE DESTINO
                     populateSelect($(this).find('select[name$="-cliente"]'), cachedCatalogData.lugares);
                 });
+                
+                toggleTransportFields();
             })
             .catch(error => console.error("Error catálogos:", error))
             .finally(() => { addButton.prop('disabled', false); });
             
-        // 2. OBTENER FOLIO CONSECUTIVO
         if (!IS_EDITING) {
              remisionInput.val('Generando folio...');
              fetch(`/api/get-next-remision/${empresaId}/`)
@@ -471,45 +560,39 @@ $(document).ready(function() {
         }
     });
 
-    // --- SINCRONIZACIÓN DESTINO -> CLIENTE ---
-    // Cuando cambia el Destino principal, actualizamos los Clientes de la tabla
     destinoSelect.on('change', function() {
         const selectedDestinoId = $(this).val();
         if (selectedDestinoId) {
-            // Actualiza todos los selectores de cliente en la tabla
             formContainer.find('select[name$="-cliente"]').val(selectedDestinoId).trigger('change');
         }
     });
 
-    // Trigger inicial si ya hay empresa seleccionada
+    // Si hay un valor seleccionado (por ejemplo, al editar), disparamos el change
     if (empresaSelect.val()) { 
         empresaSelect.trigger('change');
     } else {
         addButton.prop('disabled', true);
+        toggleTransportFields();
     }
     
-    // --- MANEJO DE FILAS DINÁMICAS ---
     addButton.on('click', function() { 
         const formIndex = parseInt(totalFormsInput.val());
         const newRowHtml = emptyFormTemplate.replace(/__prefix__/g, formIndex);
         const newRow = $(newRowHtml);
         formContainer.append(newRow);
         
-        // 1. Llenar Materiales
         const materialSelect = newRow.find('select[name$="-material"]'); 
         populateSelect(materialSelect, cachedCatalogData.materiales);
         
-        // 2. Llenar Clientes con las opciones de destino
         const clienteSelect = newRow.find('select[name$="-cliente"]');
         populateSelect(clienteSelect, cachedCatalogData.lugares);
 
-        // 3. Pre-seleccionar el destino actual en la nueva fila (si existe)
         const currentDestino = destinoSelect.val();
         if (currentDestino) {
             clienteSelect.val(currentDestino);
         }
 
-        initializeSelect2(newRow); // Inicializar Select2
+        initializeSelect2(newRow); 
         totalFormsInput.val(formIndex + 1);
     });
     

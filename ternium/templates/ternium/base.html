@@ -339,6 +339,7 @@
                     </li>
                     {% endif %}
 
+                    {% if perms.flujo_bancos.acceso_flujo_bancos %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navBancos" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-university me-1"></i> Bancos y Flujos
@@ -361,6 +362,8 @@
                             </a></li>
                         </ul>
                     </li>
+                    {% endif %}
+
                     {% if perms.ternium.acceso_catalogos %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navCatalogos" role="button" data-bs-toggle="dropdown">
