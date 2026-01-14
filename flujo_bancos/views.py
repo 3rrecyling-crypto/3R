@@ -371,35 +371,48 @@ def importar_movimientos(request):
             archivo = request.FILES['archivo_excel']
             
             try:
-                # Cargar el libro de trabajo (workbook)
                 wb = openpyxl.load_workbook(archivo)
-                ws = wb.active # Toma la primera hoja activa
+                ws = wb.active 
                 
                 count_creados = 0
+                saldo_banco_excel = None # Variable para guardar el saldo real del banco
                 
-                # Leemos fila por fila desde la 2 (saltando encabezados)
-                for row in ws.iter_rows(min_row=2, values_only=True):
-                    # Asumiendo orden: FECHA | CONCEPTO | CARGO | ABONO
+                # Iteramos usando enumerate para saber cuál es la primera fila (i=0)
+                for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True)):
+                    # Estructura esperada: Col 0=Fecha | Col 1=Concepto | Col 2=Cargo | Col 3=Abono | Col 4=Saldo
                     
                     fecha_raw = row[0]
+                    if not fecha_raw: continue 
+
+                    # --- LÓGICA NUEVA: CAPTURAR SALDO DEL PRIMER MOVIMIENTO ---
+                    # El primer renglón del Excel tiene el saldo más actual.
+                    if i == 0 and len(row) >= 5:
+                        val_saldo = row[4] # Columna E (Saldo)
+                        if val_saldo is not None:
+                            try:
+                                # Limpieza por si viene con signos de pesos o comas
+                                if isinstance(val_saldo, str):
+                                    val_saldo = val_saldo.replace(',', '').replace('$', '')
+                                saldo_banco_excel = Decimal(str(val_saldo))
+                            except:
+                                pass # Si falla el formato, ignoramos la actualización de saldo
+
+                    # --- PROCESAMIENTO NORMAL DEL MOVIMIENTO ---
                     concepto = row[1]
                     cargo_raw = row[2]
                     abono_raw = row[3]
                     
-                    # Si la fila no tiene fecha, la saltamos (fila vacía)
-                    if not fecha_raw:
-                        continue
-
-                    # 1. Convertimos a string primero para evitar error de float
-                    # 2. Si viene vacío (None), ponemos '0'
                     str_cargo = str(cargo_raw) if cargo_raw is not None else '0'
                     str_abono = str(abono_raw) if abono_raw is not None else '0'
+                    
+                    # Limpieza de montos
+                    str_cargo = str_cargo.replace(',', '').replace('$', '')
+                    str_abono = str_abono.replace(',', '').replace('$', '')
 
-                    # 3. Convertimos a Decimal de Django/Python
-                    cargo_decimal = Decimal(str_cargo)
-                    abono_decimal = Decimal(str_abono)
+                    cargo_decimal = Decimal(str_cargo) if str_cargo else Decimal(0)
+                    abono_decimal = Decimal(str_abono) if str_abono else Decimal(0)
 
-                    # Evitar duplicados exactos
+                    # Evitar duplicados
                     existe = Movimiento.objects.filter(
                         cuenta=cuenta,
                         fecha=fecha_raw,
@@ -415,21 +428,39 @@ def importar_movimientos(request):
                             concepto=concepto or "Sin concepto",
                             cargo=cargo_decimal,
                             abono=abono_decimal,
-                            estatus='PENDIENTE'
+                            estatus='PENDIENTE' # Se marca pendiente hasta clasificar
                         )
                         count_creados += 1
                 
-                messages.success(request, f"Se cargaron {count_creados} movimientos. Orden respetado tal cual el Excel.")
+                # --- ACTUALIZACIÓN DE SALDO INICIAL ---
+                # Si leímos el saldo del Excel, ajustamos la cuenta para que cuadre en el Dashboard.
+                # Fórmula: Saldo_Inicial = Saldo_Excel - (Total_Abonos - Total_Cargos)
+                if saldo_banco_excel is not None:
+                    totales = Movimiento.objects.filter(cuenta=cuenta).aggregate(
+                        sum_abono=Sum('abono'), 
+                        sum_cargo=Sum('cargo')
+                    )
+                    total_abonos = totales['sum_abono'] or 0
+                    total_cargos = totales['sum_cargo'] or 0
+                    
+                    # Ingeniería inversa para que el Saldo Actual (propiedad calculada) dé exacto
+                    nuevo_saldo_inicial = saldo_banco_excel - (total_abonos - total_cargos)
+                    
+                    cuenta.saldo_inicial = nuevo_saldo_inicial
+                    cuenta.save()
+                    
+                    messages.success(request, f"Importados {count_creados} movimientos. Saldo actualizado a ${saldo_banco_excel:,.2f} (según Excel).")
+                else:
+                    messages.success(request, f"Importados {count_creados} movimientos. (No se encontró columna Saldo para actualizar).")
+
                 return redirect('lista_movimientos')
                 
             except Exception as e:
-                # Muestra el error específico si vuelve a fallar
                 messages.error(request, f"Error crítico al importar: {str(e)}")
     else:
         form = ImportarExcelForm()
     
     return render(request, 'flujo_bancos/importar_movimientos.html', {'form': form})
-
 # ---------------------------------------------------------
 # CANCELAR TRANSFERENCIA
 # ---------------------------------------------------------

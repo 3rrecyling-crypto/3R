@@ -33,6 +33,9 @@ class MovimientoAdmin(admin.ModelAdmin):
     list_per_page = 20
 
     def concepto_corto(self, obj):
+        # CORRECCIÓN: Verificar si existe el concepto antes de medir su longitud
+        if not obj.concepto:
+            return "-"
         return (obj.concepto[:40] + '..') if len(obj.concepto) > 40 else obj.concepto
     concepto_corto.short_description = "Concepto"
 
