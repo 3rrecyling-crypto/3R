@@ -103,6 +103,71 @@ def _eliminar_archivo_de_s3(ruta_completa_s3):
     except (BotoCoreError, NoCredentialsError, Exception) as e:
         print(f"Error al eliminar archivo antiguo de S3: {e}")
         
+        
+def procesar_datos_xml_desde_bytes(contenido_bytes):
+    """
+    Lee bytes del XML, extrae UUID y busca impuestos agresivamente
+    (Funciona para tu XML A-2728.xml y otros formatos).
+    """
+    datos = {
+        'uuid': None, 
+        'iva': Decimal('0.00'), 
+        'ret_iva': Decimal('0.00'), 
+        'ret_isr': Decimal('0.00')
+    }
+    
+    try:
+        xml_buffer = BytesIO(contenido_bytes)
+        tree = ET.parse(xml_buffer)
+        root = tree.getroot()
+        
+        # Namespaces
+        ns = {'cfdi': 'http://www.sat.gob.mx/cfd/4', 'tfd': 'http://www.sat.gob.mx/TimbreFiscalDigital'}
+        if 'http://www.sat.gob.mx/cfd/3' in root.tag:
+            ns['cfdi'] = 'http://www.sat.gob.mx/cfd/3'
+
+        # 1. UUID
+        tfd = root.find('.//tfd:TimbreFiscalDigital', ns)
+        if tfd is not None:
+            datos['uuid'] = tfd.get('UUID')
+
+        # 2. IMPUESTOS GLOBALES (Prioridad)
+        impuestos_node = root.find('cfdi:Impuestos', ns)
+        
+        if impuestos_node is not None:
+            # IVA Trasladado
+            traslados_totales = impuestos_node.get('TotalImpuestosTrasladados')
+            if traslados_totales:
+                datos['iva'] = Decimal(traslados_totales)
+            
+            # Retenciones Globales
+            retenciones = impuestos_node.findall('cfdi:Retenciones/cfdi:Retencion', ns)
+            for ret in retenciones:
+                imp = ret.get('Impuesto')
+                importe = Decimal(ret.get('Importe') or 0)
+                if imp == '002': datos['ret_iva'] += importe
+                if imp == '001': datos['ret_isr'] += importe
+
+        # 3. FALLBACK CONCEPTOS (Si no se halló en globales)
+        if datos['iva'] == 0 and datos['ret_iva'] == 0 and datos['ret_isr'] == 0:
+            conceptos = root.findall('cfdi:Conceptos/cfdi:Concepto', ns)
+            for c in conceptos:
+                # Traslados
+                for t in c.findall('.//cfdi:Traslado', ns):
+                    if t.get('Impuesto') == '002':
+                        datos['iva'] += Decimal(t.get('Importe') or 0)
+                # Retenciones
+                for r in c.findall('.//cfdi:Retencion', ns):
+                    imp = r.get('Impuesto')
+                    val = Decimal(r.get('Importe') or 0)
+                    if imp == '002': datos['ret_iva'] += val
+                    if imp == '001': datos['ret_isr'] += val
+
+    except Exception as e:
+        print(f"Error procesando XML interno: {e}")
+    
+    return datos
+        
 def procesar_datos_xml(archivo_obj):
     """
     Lee un archivo, crea una copia en memoria (BytesIO) para no cerrar el original,
@@ -450,51 +515,47 @@ def crear_movimiento(request):
         if form.is_valid():
             try:
                 with transaction.atomic():
-                    # 1. Guardar Movimiento Base
+                    # 1. Guardar Movimiento
                     movimiento = form.save()
 
                     # 2. Procesar Archivos
                     archivos = request.FILES.getlist('archivos_comprobantes')
                     if archivos:
                         for archivo in archivos:
-                            # Leer contenido en memoria
+                            # Leemos en memoria para no gastar el puntero
                             contenido_bytes = archivo.read()
                             
                             ext = os.path.splitext(archivo.name)[1].lower()
                             fecha_hoy = timezone.now()
-                            # Ruta relativa sin 'media/'
                             s3_path = f"{'xmls' if ext == '.xml' else 'pdfs'}/{fecha_hoy.year}/{fecha_hoy.month}/{archivo.name}"
                             
                             nuevo_comp = ComprobanteFiscal(movimiento=movimiento)
 
-                            # Procesar XML para obtener datos fiscales
+                            # A) Extracción de Datos (Solo si es XML)
                             if ext == '.xml':
                                 datos_xml = procesar_datos_xml_desde_bytes(contenido_bytes)
+                                # GUARDAMOS EN LA TABLA
                                 nuevo_comp.uuid = datos_xml['uuid']
                                 nuevo_comp.monto_iva = datos_xml['iva']
                                 nuevo_comp.monto_ret_iva = datos_xml['ret_iva']
                                 nuevo_comp.monto_ret_isr = datos_xml['ret_isr']
 
-                            # Subir a S3 usando la función proporcionada
-                            archivo_memoria = BytesIO(contenido_bytes)
-                            ruta_guardada = _subir_archivo_a_s3(archivo_memoria, s3_path)
+                            # B) Subida a S3
+                            memoria = BytesIO(contenido_bytes)
+                            ruta = _subir_archivo_a_s3(memoria, s3_path)
                             
-                            if ruta_guardada:
-                                if ext == '.xml':
-                                    nuevo_comp.archivo_xml.name = ruta_guardada
-                                else:
-                                    nuevo_comp.archivo_pdf.name = ruta_guardada
-                                
-                                nuevo_comp.save()
+                            if ruta:
+                                if ext == '.xml': nuevo_comp.archivo_xml.name = ruta
+                                else: nuevo_comp.archivo_pdf.name = ruta
+                                nuevo_comp.save() # Commit a la tabla ComprobanteFiscal
 
-                        # 3. Recalcular totales sumando lo que acabamos de guardar
+                        # 3. Actualizar Movimiento con la suma de la tabla
                         recalcular_iva_movimiento(movimiento)
 
-                    messages.success(request, "Movimiento registrado correctamente.")
+                    messages.success(request, "Movimiento registrado.")
                     return redirect('detalle_movimiento', pk=movimiento.pk)
 
             except Exception as e:
-                print(f"Error al crear: {e}")
                 messages.error(request, f"Error: {e}")
                 return render(request, 'flujo_bancos/crear_movimiento.html', {'form': form})
     else:
@@ -528,19 +589,18 @@ def editar_movimiento(request, pk):
                 with transaction.atomic():
                     movimiento = form.save()
 
-                    # A. Eliminar archivos
+                    # Eliminar viejos
                     ids_eliminar = request.POST.get('ids_eliminar', '')
                     if ids_eliminar:
                         for comp_id in ids_eliminar.split(','):
                             if comp_id:
-                                comp = ComprobanteFiscal.objects.filter(id=comp_id, movimiento=movimiento).first()
-                                if comp:
-                                    # Usar la función de borrado de S3
-                                    if comp.archivo_xml: _eliminar_archivo_de_s3(comp.archivo_xml.name)
-                                    if comp.archivo_pdf: _eliminar_archivo_de_s3(comp.archivo_pdf.name)
-                                    comp.delete()
+                                c = ComprobanteFiscal.objects.filter(id=comp_id, movimiento=movimiento).first()
+                                if c:
+                                    if c.archivo_xml: _eliminar_archivo_de_s3(c.archivo_xml.name)
+                                    if c.archivo_pdf: _eliminar_archivo_de_s3(c.archivo_pdf.name)
+                                    c.delete()
 
-                    # B. Subir nuevos archivos
+                    # Subir nuevos
                     archivos = request.FILES.getlist('archivos_comprobantes')
                     if archivos:
                         for archivo in archivos:
@@ -558,27 +618,20 @@ def editar_movimiento(request, pk):
                                 nuevo_comp.monto_ret_iva = datos_xml['ret_iva']
                                 nuevo_comp.monto_ret_isr = datos_xml['ret_isr']
 
-                            archivo_memoria = BytesIO(contenido_bytes)
-                            ruta_guardada = _subir_archivo_a_s3(archivo_memoria, s3_path)
+                            memoria = BytesIO(contenido_bytes)
+                            ruta = _subir_archivo_a_s3(memoria, s3_path)
                             
-                            if ruta_guardada:
-                                if ext == '.xml':
-                                    nuevo_comp.archivo_xml.name = ruta_guardada
-                                else:
-                                    nuevo_comp.archivo_pdf.name = ruta_guardada
+                            if ruta:
+                                if ext == '.xml': nuevo_comp.archivo_xml.name = ruta
+                                else: nuevo_comp.archivo_pdf.name = ruta
                                 nuevo_comp.save()
 
-                    # C. Recalcular totales
                     recalcular_iva_movimiento(movimiento)
 
-                messages.success(request, 'Movimiento actualizado correctamente.')
+                messages.success(request, 'Movimiento actualizado.')
                 return redirect('detalle_movimiento', pk=movimiento.pk)
-
             except Exception as e:
-                messages.error(request, f"Error al editar: {e}")
-                return render(request, 'flujo_bancos/crear_movimiento.html', {
-                    'form': form, 'movimiento': movimiento_original
-                })
+                messages.error(request, f"Error: {e}")
     else:
         form = MovimientoForm(instance=movimiento_original)
 
@@ -699,19 +752,16 @@ def auditar_movimiento(request, pk):
 @permission_required('flujo_bancos.acceso_flujo_bancos', raise_exception=True)
 def detalle_movimiento(request, pk):
     mov = get_object_or_404(Movimiento, pk=pk)
-    
-    # IMPORTANTE: Ya no leemos S3 aquí para evitar "Access Denied" y lentitud.
-    # Confiamos en los datos guardados en la BD (ComprobanteFiscal)
-    
+    # Leemos directo de la BD, NO de S3 (Rápido y Seguro)
     comprobantes = mov.comprobantes.all()
-    lista_xmls = []
     
+    lista_xmls = []
     for comp in comprobantes:
         datos = {
             'obj': comp,
             'uuid': comp.uuid or '---',
             'iva': comp.monto_iva,
-            'ret_iva': comp.monto_ret_iva,
+            'ret_iva': comp.monto_ret_iva, 
             'ret_isr': comp.monto_ret_isr,
             'es_xml': bool(comp.archivo_xml)
         }
@@ -723,11 +773,7 @@ def detalle_movimiento(request, pk):
         'ret_isr': mov.ret_isr
     }
 
-    context = {
-        'mov': mov,
-        'lista_xmls': lista_xmls,
-        'totales_xml': totales
-    }
+    context = {'mov': mov, 'lista_xmls': lista_xmls, 'totales_xml': totales}
     return render(request, 'flujo_bancos/detalle_movimiento.html', context)
 
 # ---------------------------------------------------------
@@ -1089,53 +1135,50 @@ def lista_transferencias(request):
 @permission_required('flujo_bancos.acceso_flujo_bancos', raise_exception=True)
 def subir_comprobante(request, movimiento_id):
     movimiento = get_object_or_404(Movimiento, pk=movimiento_id)
-    
     if request.method == 'POST':
         form = ComprobanteForm(request.POST, request.FILES)
         if form.is_valid():
-            comprobante = form.save(commit=False)
-            comprobante.movimiento = movimiento
+            comp = form.save(commit=False)
+            comp.movimiento = movimiento
             
-            # Procesar XML
+            # XML
             if 'archivo_xml' in request.FILES:
                 f = request.FILES['archivo_xml']
-                contenido_bytes = f.read()
+                contenido = f.read()
                 
-                fecha_hoy = timezone.now()
-                path = f"xmls/{fecha_hoy.year}/{fecha_hoy.month}/{f.name}"
+                path = f"xmls/{timezone.now().year}/{timezone.now().month}/{f.name}"
                 
-                # Datos fiscales
-                datos = procesar_datos_xml_desde_bytes(contenido_bytes)
-                comprobante.uuid = datos['uuid']
-                comprobante.monto_iva = datos['iva']
-                comprobante.monto_ret_iva = datos['ret_iva']
-                comprobante.monto_ret_isr = datos['ret_isr']
+                datos = procesar_datos_xml_desde_bytes(contenido)
+                comp.uuid = datos['uuid']
+                comp.monto_iva = datos['iva']
+                comp.monto_ret_iva = datos['ret_iva']
+                comp.monto_ret_isr = datos['ret_isr']
                 
-                # Subir S3
-                memoria = BytesIO(contenido_bytes)
+                memoria = BytesIO(contenido)
                 ruta = _subir_archivo_a_s3(memoria, path)
-                if ruta: comprobante.archivo_xml.name = ruta
+                if ruta: comp.archivo_xml.name = ruta
 
-            # Procesar PDF
+            # PDF
             if 'archivo_pdf' in request.FILES:
                 f = request.FILES['archivo_pdf']
-                contenido_bytes = f.read()
-                fecha_hoy = timezone.now()
-                path = f"pdfs/{fecha_hoy.year}/{fecha_hoy.month}/{f.name}"
-                
-                memoria = BytesIO(contenido_bytes)
+                contenido = f.read()
+                path = f"pdfs/{timezone.now().year}/{timezone.now().month}/{f.name}"
+                memoria = BytesIO(contenido)
                 ruta = _subir_archivo_a_s3(memoria, path)
-                if ruta: comprobante.archivo_pdf.name = ruta
+                if ruta: comp.archivo_pdf.name = ruta
 
-            comprobante.save()
+            comp.save()
             recalcular_iva_movimiento(movimiento)
             
-            messages.success(request, "Comprobante subido y procesado.")
+            messages.success(request, "Comprobante subido.")
             return redirect('detalle_movimiento', pk=movimiento.pk)
     return redirect('detalle_movimiento', pk=movimiento.pk)
     
 def recalcular_iva_movimiento(movimiento):
-    """ Suma impuestos de TODOS los comprobantes y actualiza el Movimiento """
+    """
+    Suma los datos guardados en la BD (Tabla ComprobanteFiscal)
+    y actualiza el Movimiento padre. NO lee archivos.
+    """
     comps = movimiento.comprobantes.all()
     
     total_iva = sum(c.monto_iva for c in comps)
@@ -1147,7 +1190,6 @@ def recalcular_iva_movimiento(movimiento):
     movimiento.ret_isr = total_ret_isr
     movimiento.iva_total_xml = total_iva
     
-    movimiento.save()
     movimiento.save()
 
 @permission_required('flujo_bancos.acceso_flujo_bancos', raise_exception=True)
@@ -1167,74 +1209,3 @@ def eliminar_comprobante(request, comprobante_id):
     messages.success(request, "Comprobante eliminado.")
     return redirect('detalle_movimiento', pk=mov_id)
 
-
-def procesar_datos_xml_desde_bytes(contenido_bytes):
-    """
-    Recibe el contenido RAW (bytes) del archivo.
-    Extrae UUID, IVA y Retenciones buscando en Globales y Conceptos.
-    """
-    datos = {
-        'uuid': None, 
-        'iva': Decimal('0.00'), 
-        'ret_iva': Decimal('0.00'), 
-        'ret_isr': Decimal('0.00')
-    }
-    
-    try:
-        # Crear un stream en memoria exclusivo para el parser XML
-        xml_buffer = BytesIO(contenido_bytes)
-        
-        tree = ET.parse(xml_buffer)
-        root = tree.getroot()
-        
-        # Namespaces
-        ns = {'cfdi': 'http://www.sat.gob.mx/cfd/4', 'tfd': 'http://www.sat.gob.mx/TimbreFiscalDigital'}
-        if 'cfdi' not in root.tag: ns['cfdi'] = 'http://www.sat.gob.mx/cfd/3'
-
-        # 1. UUID
-        tfd = root.find('.//tfd:TimbreFiscalDigital', ns)
-        if tfd is not None:
-            datos['uuid'] = tfd.get('UUID')
-
-        # 2. Impuestos Globales (Prioridad 1)
-        impuestos_node = root.find('cfdi:Impuestos', ns)
-        encontrado_global = False
-        
-        if impuestos_node is not None:
-            total_traslados = impuestos_node.get('TotalImpuestosTrasladados')
-            if total_traslados:
-                datos['iva'] = Decimal(total_traslados)
-                encontrado_global = True
-            
-            retenciones = impuestos_node.findall('cfdi:Retenciones/cfdi:Retencion', ns)
-            if retenciones:
-                for ret in retenciones:
-                    imp = ret.get('Impuesto')
-                    importe = Decimal(ret.get('Importe') or 0)
-                    if imp == '002': datos['ret_iva'] += importe
-                    if imp == '001': datos['ret_isr'] += importe
-                encontrado_global = True
-
-        # 3. Fallback Conceptos (Si no hay globales o faltan datos)
-        # Buscar IVA si es 0
-        if datos['iva'] == 0:
-            conceptos = root.findall('cfdi:Conceptos/cfdi:Concepto', ns)
-            for c in conceptos:
-                for t in c.findall('.//cfdi:Traslado', ns):
-                    if t.get('Impuesto') == '002':
-                        datos['iva'] += Decimal(t.get('Importe') or 0)
-        
-        # Buscar Retenciones si son 0
-        if datos['ret_iva'] == 0 and datos['ret_isr'] == 0:
-            conceptos = root.findall('cfdi:Conceptos/cfdi:Concepto', ns)
-            for c in conceptos:
-                for r in c.findall('.//cfdi:Retencion', ns):
-                    imp = r.get('Impuesto')
-                    val = Decimal(r.get('Importe') or 0)
-                    if imp == '002': datos['ret_iva'] += val
-                    if imp == '001': datos['ret_isr'] += val
-
-    except Exception as e:
-        print(f"Error procesando XML bytes: {e}")
-    
-    return datos
