@@ -682,6 +682,7 @@ class RegistroLogistico(models.Model):
         ('PENDIENTE', 'Pendiente'),
         ('TERMINADO', 'Terminado'),
         ('AUDITADO', 'Auditado'),
+        ('CANCELADO', 'Cancelado'), # <--- Estatus Agregado
     ]
     
     remision = models.CharField(max_length=100, unique=True, verbose_name="Número de Remisión")
@@ -736,7 +737,6 @@ class RegistroLogistico(models.Model):
         verbose_name_plural = "Registros Logísticos"
         ordering = ['-fecha_carga', '-creado_en']
         indexes = [models.Index(fields=['remision']), models.Index(fields=['status'])]
-        # --- NUEVO ---
         permissions = [
             ("can_audit_logistica", "Puede auditar logística"),
         ]
@@ -784,12 +784,16 @@ class RegistroLogistico(models.Model):
         return self.documentos_completos
 
     def save(self, *args, **kwargs):
-        if self.pk and self.status == 'AUDITADO':
+        # 1. BLOQUEO DE EDICIÓN: Si ya está finalizado (Auditado o Cancelado)
+        if self.pk:
             old_instance = RegistroLogistico.objects.get(pk=self.pk)
-            if old_instance.status == 'AUDITADO':
-                raise PermissionDenied("No se puede modificar un registro logístico que ya ha sido auditado.")
+            if old_instance.status in ['AUDITADO', 'CANCELADO']:
+                # Si el estatus no cambia, significa que estamos intentando editar campos de un registro bloqueado.
+                if self.status == old_instance.status:
+                    raise PermissionDenied(f"No se puede modificar un registro logístico con estatus {old_instance.get_status_display()}.")
 
-        if self.status != 'AUDITADO':
+        # 2. LÓGICA AUTOMÁTICA DE ESTATUS (Solo si no está Cancelado ni Auditado)
+        if self.status not in ['AUDITADO', 'CANCELADO']:
             if self._is_terminado():
                 self.status = 'TERMINADO'
             else:
@@ -798,8 +802,9 @@ class RegistroLogistico(models.Model):
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        if self.status == 'AUDITADO':
-            raise PermissionDenied("No se puede eliminar un registro logístico auditado.")
+        # 3. BLOQUEO DE ELIMINACIÓN
+        if self.status in ['AUDITADO', 'CANCELADO']:
+            raise PermissionDenied(f"No se puede eliminar un registro logístico con estatus {self.get_status_display()}.")
         super().delete(*args, **kwargs)
         
 
@@ -808,6 +813,7 @@ class EntradaMaquila(models.Model):
         ('PENDIENTE', 'Pendiente'),
         ('TERMINADO', 'Terminado'),
         ('AUDITADO', 'Auditado'),
+        ('CANCELADO', 'Cancelado'), # <--- Estatus Agregado
     ]
 
     c_id_remito = models.CharField(max_length=255, verbose_name="ID Remito", help_text="Identificador único del remito de entrada")
@@ -849,7 +855,6 @@ class EntradaMaquila(models.Model):
             models.Index(fields=['fecha_ingreso']),
             models.Index(fields=['status']),
         ]
-        # --- NUEVO ---
         permissions = [
             ("can_audit_entrada", "Puede auditar entradas de maquila"),
         ]
@@ -883,6 +888,7 @@ class EntradaMaquila(models.Model):
         return self.documentos_completos
 
     def save(self, *args, **kwargs):
+        # Cálculos de peso
         if self.peso_bruto is not None and self.peso_tara is not None:
             self.peso_neto = self.peso_bruto - self.peso_tara
         if self.peso_remision is not None and self.peso_neto is not None:
@@ -894,12 +900,16 @@ class EntradaMaquila(models.Model):
                 self.porcentaje_faltante = 0
                 self.alerta = False
 
-        if self.pk and self.status == 'AUDITADO':
+        # 1. BLOQUEO DE EDICIÓN: Si ya está finalizado (Auditado o Cancelado)
+        if self.pk:
             old_instance = EntradaMaquila.objects.get(pk=self.pk)
-            if old_instance.status == 'AUDITADO':
-                raise PermissionDenied("No se puede modificar una entrada que ya ha sido auditada.")
+            if old_instance.status in ['AUDITADO', 'CANCELADO']:
+                # Si el estatus no cambia (es decir, intentan editar campos), bloquear.
+                if self.status == old_instance.status:
+                    raise PermissionDenied(f"No se puede modificar una entrada con estatus {old_instance.get_status_display()}.")
         
-        if self.status != 'AUDITADO':
+        # 2. LÓGICA AUTOMÁTICA (Solo si no es Auditado ni Cancelado)
+        if self.status not in ['AUDITADO', 'CANCELADO']:
             if self._is_terminado():
                 self.status = 'TERMINADO'
             else:
@@ -908,8 +918,9 @@ class EntradaMaquila(models.Model):
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
-        if self.status == 'AUDITADO':
-            raise PermissionDenied("No se puede eliminar una entrada que ya ha sido auditada.")
+        # 3. BLOQUEO DE ELIMINACIÓN
+        if self.status in ['AUDITADO', 'CANCELADO']:
+            raise PermissionDenied(f"No se puede eliminar una entrada con estatus {self.get_status_display()}.")
         super().delete(*args, **kwargs)
 
 

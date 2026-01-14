@@ -136,7 +136,7 @@ urlpatterns = [
     # ======================================================
     path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
-    
+    path('entradas/<int:pk>/cancelar/', views.cancelar_entrada, name='cancelar_entrada'),
     # Portal específico para clientes/ternium
     path('ternium/', views.home_portal_view, name='ternium_portal'),
     path('portal/', views.home_portal_view, name='home_portal'),

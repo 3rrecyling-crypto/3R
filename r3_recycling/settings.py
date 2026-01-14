@@ -122,8 +122,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # Internacionalización (sin cambios)
-LANGUAGE_CODE = "en-us"
-TIME_ZONE = "UTC"
+LANGUAGE_CODE = "es-mx"
+TIME_ZONE = "America/Monterrey"
 USE_I1N = True
 USE_TZ = True
 

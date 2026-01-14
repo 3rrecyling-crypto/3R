@@ -13,6 +13,10 @@
                     Registros de Salidas 
                 </h4>
                 <div>
+                    <a href="{% url 'lista_entradas' %}" class="btn btn-light btn-sm px-3 me-2" style="color: var(--primary-color); font-weight: 600;" title="Ir a módulo de Entradas">
+                        <i class="fas fa-sign-in-alt me-2"></i>Entradas a Ternium
+                    </a>
+
                     <a href="{% url 'crear_registro_logistica' %}" class="btn btn-light btn-sm px-3 me-2">
                         <i class="fas fa-plus me-2"></i>Nuevo Registro
                     </a>
@@ -84,6 +88,10 @@
                                     <span class="badge bg-info">{{ registro.get_status_display }}</span>
                                 {% elif registro.status == 'AUDITADO' %}
                                     <span class="badge bg-success">{{ registro.get_status_display }}</span>
+                                {% elif registro.status == 'CANCELADO' %}
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-ban me-1"></i> Cancelado
+                                    </span>
                                 {% endif %}
                             </td>
                             <td>
@@ -103,17 +111,31 @@
                                        class="btn btn-outline-primary" title="Ver Detalles">
                                         <i class="fas fa-eye"></i>
                                     </a>
-                                    {% if registro.status != 'AUDITADO' %}
-                                    <a href="{% url 'editar_registro_logistica' registro.pk %}" 
-                                       class="btn btn-outline-warning" title="Editar">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                    {% endif %}
+                                    
                                     <a href="{% url 'descargar_paquete_zip' registro.pk %}" 
                                        class="btn btn-outline-info" title="Descargar ZIP">
                                         <i class="fas fa-file-archive"></i>
                                     </a>
+
+                                    {% if registro.status != 'AUDITADO' and registro.status != 'CANCELADO' %}
+                                        <a href="{% url 'editar_registro_logistica' registro.pk %}" 
+                                           class="btn btn-outline-warning" title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+
+                                        <button type="button" class="btn btn-outline-dark" 
+                                                onclick="confirmarCancelacionLogistica('{{ registro.pk }}')" 
+                                                title="Cancelar Registro">
+                                            <i class="fas fa-ban"></i>
+                                        </button>
+                                    {% endif %}
                                 </div>
+
+                                {% if registro.status != 'AUDITADO' and registro.status != 'CANCELADO' %}
+                                <form id="form-cancelar-logistica-{{ registro.pk }}" action="{% url 'cancelar_registro_logistica' pk=registro.pk %}" method="POST" style="display: none;">
+                                    {% csrf_token %}
+                                </form>
+                                {% endif %}
                             </td>
                         </tr>
                         {% empty %}
@@ -289,6 +311,16 @@
     color: white;
   }
   
+  /* Botón Dark para cancelar */
+  .btn-outline-dark {
+      color: #343a40;
+      border-color: #343a40;
+  }
+  .btn-outline-dark:hover {
+      background-color: #343a40;
+      color: white;
+  }
+  
   .page-item.active .page-link {
     background-color: var(--primary-color);
     border-color: var(--primary-color);
@@ -321,5 +353,11 @@ document.addEventListener('DOMContentLoaded', function() {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 });
+
+function confirmarCancelacionLogistica(id) {
+    if (confirm('¿Estás seguro de que deseas CANCELAR este registro de logística? El registro quedará bloqueado y no se podrá editar.')) {
+        document.getElementById('form-cancelar-logistica-' + id).submit();
+    }
+}
 </script>
 {% endblock extra_js %}

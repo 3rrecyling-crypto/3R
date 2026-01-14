@@ -275,6 +275,12 @@ def crear_entrada(request):
 def editar_entrada(request, pk):
     entrada_original = get_object_or_404(EntradaMaquila, pk=pk)
     
+    # --- NUEVA VALIDACIÓN ---
+    if entrada_original.status == 'CANCELADO':
+        messages.error(request, "No se puede editar una entrada CANCELADA.")
+        return redirect('lista_entradas')
+    # ------------------------
+
     if request.method == 'POST':
         form = EntradaMaquilaForm(request.POST, request.FILES, instance=entrada_original)
         if form.is_valid():
@@ -1051,12 +1057,15 @@ class RegistroLogisticoUpdateView(UpdateView):
     form_class = RegistroLogisticoForm
     template_name = 'ternium/formulario_logistica_ternium.html'
     
+    # --- MÉTODO DISPATCH ACTUALIZADO ---
     def dispatch(self, request, *args, **kwargs):
         registro = self.get_object()
-        if registro.status == 'AUDITADO':
-            messages.error(request, "No se puede editar un registro auditado.")
+        # Verificamos si está Auditado O Cancelado
+        if registro.status in ['AUDITADO', 'CANCELADO']:
+            messages.error(request, f"No se puede editar un registro con estatus {registro.get_status_display()}.")
             return redirect('detalle_registro_logistica', pk=registro.pk)
         return super().dispatch(request, *args, **kwargs)
+    # -----------------------------------
 
     def get_success_url(self):
         return reverse_lazy('detalle_registro_logistica', kwargs={'pk': self.object.pk})
@@ -3116,3 +3125,35 @@ def importar_evidencias_masivas(request):
     
     # Si intentan entrar por GET a esta URL específica, los mandamos al importador general
     return redirect('importar_remisiones_excel')
+
+@login_required
+@require_POST
+def cancelar_entrada(request, pk):
+    entrada = get_object_or_404(EntradaMaquila, pk=pk)
+    
+    if entrada.status == 'AUDITADO':
+        messages.error(request, 'No se puede cancelar una entrada auditada.')
+    elif entrada.status == 'CANCELADO':
+        messages.warning(request, 'Esta entrada ya estaba cancelada.')
+    else:
+        entrada.status = 'CANCELADO'
+        entrada.save(update_fields=['status']) 
+        messages.success(request, f'La entrada {entrada.c_id_remito} ha sido CANCELADA.')
+        
+    return redirect('lista_entradas')
+
+@login_required
+@require_POST
+def cancelar_registro_logistica(request, pk):
+    registro = get_object_or_404(RegistroLogistico, pk=pk)
+    
+    if registro.status == 'AUDITADO':
+        messages.error(request, 'No se puede cancelar un registro auditado.')
+    elif registro.status == 'CANCELADO':
+        messages.warning(request, 'Este registro ya estaba cancelado.')
+    else:
+        registro.status = 'CANCELADO'
+        registro.save(update_fields=['status'])
+        messages.success(request, f'El registro {registro.remision} ha sido CANCELADO.')
+        
+    return redirect('lista_registros_logistica')

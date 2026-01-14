@@ -23,7 +23,7 @@
         margin-bottom: 1.5rem;
     }
 
-    /* --- Tabla Profesional (Estilo Logística) --- */
+    /* --- Tabla Profesional --- */
     .table-card {
         background: #fff;
         border-radius: 8px;
@@ -33,8 +33,8 @@
     }
 
     .table thead th {
-        background-color: #f5f9ff; /* Mismo azul claro que logística */
-        color: #0056b3;           /* Mismo color de texto que logística */
+        background-color: #f5f9ff;
+        color: #0056b3;
         font-weight: 600;
         text-transform: uppercase;
         font-size: 0.85rem;
@@ -72,28 +72,20 @@
     .badge-soft-danger { background-color: rgba(250, 92, 124, 0.18); color: #fa5c7c; }
     .badge-soft-info { background-color: rgba(57, 175, 209, 0.18); color: #39afd1; }
 
-    /* --- Botones de Acción (Estilo Logística) --- */
-    .btn-group .btn {
-        border-radius: 6px !important;
-        margin-right: 5px;
-    }
+    /* --- Botones --- */
+    .btn-group .btn { border-radius: 6px !important; margin-right: 5px; }
     .btn-group .btn:last-child { margin-right: 0; }
-
-    /* Botón Info (Descargas) */
+    
     .btn-outline-info { color: #17a2b8; border-color: #17a2b8; }
     .btn-outline-info:hover { background-color: #17a2b8; color: white; }
-
-    /* Botón Warning (Editar) */
     .btn-outline-warning { color: #ffc107; border-color: #ffc107; }
     .btn-outline-warning:hover { background-color: #ffc107; color: #212529; }
-
-    /* Botón Primary (Ver) */
     .btn-outline-primary { color: #0056b3; border-color: #0056b3; }
     .btn-outline-primary:hover { background-color: #0056b3; color: white; }
-
-    /* Botón Danger (Eliminar) */
     .btn-outline-danger { color: #dc3545; border-color: #dc3545; }
     .btn-outline-danger:hover { background-color: #dc3545; color: white; }
+    .btn-outline-dark { color: #343a40; border-color: #343a40; }
+    .btn-outline-dark:hover { background-color: #343a40; color: white; }
 </style>
 
 <div class="container-fluid px-4">
@@ -109,6 +101,10 @@
             </nav>
         </div>
         <div class="d-flex gap-2">
+            <a href="{% url 'lista_registros_logistica' %}" class="btn btn-outline-dark shadow-sm" title="Ir a módulo de Salidas">
+                <i class="fas fa-sign-out-alt me-2"></i>Salidas Ternium
+            </a>
+            
             <a href="{% url 'export_entradas_excel' %}" class="btn btn-light border text-success fw-bold">
                 <i class="fas fa-file-excel me-2"></i>Excel
             </a>
@@ -139,6 +135,7 @@
                         <option value="PENDIENTE" {% if request.GET.status == 'PENDIENTE' %}selected{% endif %}>Pendiente</option>
                         <option value="TERMINADO" {% if request.GET.status == 'TERMINADO' %}selected{% endif %}>Terminado</option>
                         <option value="AUDITADO" {% if request.GET.status == 'AUDITADO' %}selected{% endif %}>Auditado</option>
+                        <option value="CANCELADO" {% if request.GET.status == 'CANCELADO' %}selected{% endif %}>Cancelado</option>
                     </select>
                 </div>
                 <div class="col-md-4 text-end">
@@ -202,6 +199,10 @@
                                 <span class="badge badge-soft-success">
                                     <i class="fas fa-lock me-1"></i> Auditado
                                 </span>
+                            {% elif entrada.status == 'CANCELADO' %}
+                                <span class="badge bg-danger">
+                                    <i class="fas fa-ban me-1"></i> Cancelado
+                                </span>
                             {% endif %}
                         </td>
 
@@ -219,12 +220,18 @@
                                     <i class="fas fa-file-archive"></i>
                                 </a>
 
-                                {% if entrada.status != 'AUDITADO' %}
+                                {% if entrada.status != 'AUDITADO' and entrada.status != 'CANCELADO' %}
                                     <a href="{% url 'editar_entrada' pk=entrada.pk %}" 
                                        class="btn btn-outline-warning" 
                                        title="Editar" data-bs-toggle="tooltip">
                                         <i class="fas fa-pencil-alt"></i>
                                     </a>
+
+                                    <button type="button" class="btn btn-outline-dark" 
+                                            onclick="confirmarCancelacionEntrada('{{ entrada.pk }}')" 
+                                            title="Cancelar Entrada" data-bs-toggle="tooltip">
+                                        <i class="fas fa-ban"></i>
+                                    </button>
 
                                     <button type="button" class="btn btn-outline-danger" 
                                             onclick="confirmarEliminacion('{{ entrada.pk }}')" 
@@ -234,8 +241,12 @@
                                 {% endif %}
                             </div>
 
-                            {% if entrada.status != 'AUDITADO' %}
+                            {% if entrada.status != 'AUDITADO' and entrada.status != 'CANCELADO' %}
                             <form id="form-eliminar-{{ entrada.pk }}" action="{% url 'eliminar_entrada' pk=entrada.pk %}" method="POST" style="display: none;">
+                                {% csrf_token %}
+                            </form>
+                            
+                            <form id="form-cancelar-{{ entrada.pk }}" action="{% url 'cancelar_entrada' pk=entrada.pk %}" method="POST" style="display: none;">
                                 {% csrf_token %}
                             </form>
                             {% endif %}
@@ -284,8 +295,14 @@
             document.getElementById('form-eliminar-' + id).submit();
         }
     }
+
+    function confirmarCancelacionEntrada(id) {
+        if (confirm('¿Estás seguro de que deseas CANCELAR esta entrada? El registro quedará bloqueado y no se podrá editar.')) {
+            document.getElementById('form-cancelar-' + id).submit();
+        }
+    }
     
-    // Inicializar Tooltips de Bootstrap (necesario para que se vean los títulos al pasar el mouse)
+    // Inicializar Tooltips de Bootstrap
     document.addEventListener('DOMContentLoaded', function () {
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
         var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
