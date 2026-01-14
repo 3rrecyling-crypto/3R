@@ -147,6 +147,9 @@ class ComprobanteFiscal(models.Model):
     uuid = models.CharField(max_length=36, blank=True, null=True, verbose_name="Folio Fiscal (UUID)")
     monto_iva = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     fecha_subida = models.DateTimeField(auto_now_add=True)
+    monto_iva = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    monto_ret_iva = models.DecimalField(max_digits=10, decimal_places=2, default=0.00) # NUEVO
+    monto_ret_isr = models.DecimalField(max_digits=10, decimal_places=2, default=0.00) # NUEVO
 
     def __str__(self):
         return f"Comprobante {self.uuid} - {self.movimiento}"
