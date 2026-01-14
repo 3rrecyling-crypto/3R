@@ -148,4 +148,5 @@ urlpatterns = [
     path('facturacion/', include('facturacion.urls')),
     path('exportar-catalogo/<str:model_name>/', views.export_catalogo_excel, name='export_catalogo_excel'),
     path('remisiones/importar-evidencias/', views.importar_evidencias_masivas, name='importar_evidencias_masivas'),
+    path('logistica/<int:pk>/cancelar/', views.cancelar_registro_logistica, name='cancelar_registro_logistica'),
 ]
