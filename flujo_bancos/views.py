@@ -554,42 +554,25 @@ def editar_movimiento(request, pk):
                     
                     if ruta_s3:
                         nuevo_comp = ComprobanteFiscal(movimiento=movimiento)
+                        
                         if ext == '.xml':
                             nuevo_comp.archivo_xml.name = ruta_s3
                             
-                            # 2. REBOBINAR EL ARCHIVO (ESTA ES LA SOLUCIÓN AL CERO)
-                            archivo.seek(0) 
+                            # 2. PROCESAMIENTO ROBUSTO (Usando la función auxiliar)
+                            # Esto asegura que UUID, IVA, RET_IVA y RET_ISR se extraigan y guarden
+                            datos_xml = procesar_datos_xml(archivo)
                             
-                            # 3. Procesar XML
-                            try:
-                                tree = ET.parse(archivo)
-                                root = tree.getroot()
-                                ns = {'cfdi': 'http://www.sat.gob.mx/cfd/4', 'tfd': 'http://www.sat.gob.mx/TimbreFiscalDigital'}
-                                if 'cfdi' not in root.tag: ns['cfdi'] = 'http://www.sat.gob.mx/cfd/3'
-
-                                tfd = root.find('.//tfd:TimbreFiscalDigital', ns)
-                                if tfd is not None: nuevo_comp.uuid = tfd.get('UUID')
-                                
-                                total_iva = Decimal('0.00')
-                                # Buscar en traslados globales o de concepto
-                                impuestos = root.findall('.//cfdi:Impuestos', ns)
-                                
-                                # Estrategia robusta: Sumar todos los traslados 002 encontrados
-                                traslados = root.findall('.//cfdi:Traslado', ns)
-                                for t in traslados:
-                                    if t.get('Impuesto') == '002':
-                                        total_iva += Decimal(t.get('Importe') or 0)
-                                        
-                                nuevo_comp.monto_iva = total_iva
-                            except Exception as e:
-                                print(f"Error leyendo XML al editar: {e}")
+                            nuevo_comp.uuid = datos_xml['uuid']
+                            nuevo_comp.monto_iva = datos_xml['iva']
+                            nuevo_comp.monto_ret_iva = datos_xml['ret_iva'] # <--- Antes esto faltaba
+                            nuevo_comp.monto_ret_isr = datos_xml['ret_isr'] # <--- Antes esto faltaba
                                 
                         elif ext == '.pdf':
                             nuevo_comp.archivo_pdf.name = ruta_s3
                         
                         nuevo_comp.save()
 
-            # Recalcular totales
+            # Recalcular totales en el Movimiento Padre
             recalcular_iva_movimiento(movimiento)
 
             messages.success(request, 'Movimiento actualizado correctamente.')
@@ -600,6 +583,7 @@ def editar_movimiento(request, pk):
     context = {
         'form': form,
         'movimiento': movimiento_original,
+        'lista_conceptos': Movimiento.objects.values_list('concepto', flat=True).distinct() # Opcional si usas datalist
     }
     return render(request, 'flujo_bancos/crear_movimiento.html', context)
 
