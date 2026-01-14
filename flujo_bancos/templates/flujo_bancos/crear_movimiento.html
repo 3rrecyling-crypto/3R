@@ -488,7 +488,7 @@
                     renderizarArchivos();
                 }
             });
-            this.value = '';
+            // NO limpiamos this.value inmediatamente aquí para no romper el DataTransfer
         });
 
         // 2. Procesar XML (Lectura Cliente)
@@ -656,6 +656,7 @@
                 }
             });
 
+            // IMPORTANTE: Sobrescribir el input con el objeto DataTransfer acumulado
             inputArchivos.files = dt.files;
             
             const totalFiles = archivosExistentes.length + archivosNuevos.length;
@@ -699,7 +700,6 @@
             badgeTotalRetIsr.textContent = `Ret ISR: ${fmt.format(retIsr)}`;
             
             // Actualizar Inputs del formulario (Para que se guarden los totales correctos en el Movimiento)
-            // Solo si son mayores a 0 para no sobrescribir correcciones manuales si el usuario está borrando todo
             inputIva.value = iva.toFixed(2);
             inputRetIva.value = retIva.toFixed(2);
             inputRetIsr.value = retIsr.toFixed(2);
