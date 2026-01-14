@@ -431,21 +431,17 @@ def crear_movimiento(request):
         if form.is_valid():
             try:
                 with transaction.atomic():
-                    # 1. Guardar Movimiento Base
+                    # 1. Guardar Movimiento Base 
+                    # Al hacer form.save(), YA SE GUARDAN el iva, ret_iva y ret_isr 
+                    # que calculó tu JavaScript en el frontend.
                     movimiento = form.save()
 
-                    # 2. Procesar Archivos
+                    # 2. Procesar Archivos (Para guardarlos y asignarlos como hijos)
                     archivos = request.FILES.getlist('archivos_comprobantes')
                     
-                    # Acumuladores
-                    suma_iva = Decimal('0.00')
-                    suma_ret_iva = Decimal('0.00')
-                    suma_ret_isr = Decimal('0.00')
-
                     if archivos:
                         for archivo in archivos:
-                            # --- PASO CRUCIAL 1: LEER A MEMORIA UNA SOLA VEZ ---
-                            # Leemos todo el archivo a una variable. Esto evita que se "cierre" el archivo.
+                            # LEER A MEMORIA UNA SOLA VEZ
                             contenido_archivo = archivo.read() 
                             
                             ext = os.path.splitext(archivo.name)[1].lower()
@@ -456,34 +452,24 @@ def crear_movimiento(request):
                             nuevo_comp = ComprobanteFiscal(movimiento=movimiento)
 
                             if ext == '.xml':
-                                # --- PASO CRUCIAL 2: PROCESAR DATOS DESDE MEMORIA ---
+                                # PROCESAR DATOS DESDE MEMORIA (Solo para llenar el objeto ComprobanteFiscal)
                                 datos_xml = procesar_datos_xml_desde_bytes(contenido_archivo)
                                 
-                                # Asignar datos al objeto (¡AQUÍ SE GUARDAN LOS DATOS!)
                                 nuevo_comp.uuid = datos_xml['uuid']
                                 nuevo_comp.monto_iva = datos_xml['iva']
                                 nuevo_comp.monto_ret_iva = datos_xml['ret_iva']
                                 nuevo_comp.monto_ret_isr = datos_xml['ret_isr']
-                                
-                                # Sumar a acumuladores
-                                suma_iva += datos_xml['iva']
-                                suma_ret_iva += datos_xml['ret_iva']
-                                suma_ret_isr += datos_xml['ret_isr']
 
-                            # --- PASO CRUCIAL 3: GUARDAR ARCHIVO (LOCAL O S3) DESDE MEMORIA ---
-                            # Reconstruimos un archivo en memoria para guardarlo
+                            # GUARDAR ARCHIVO (LOCAL O S3) DESDE MEMORIA
                             archivo_memoria = BytesIO(contenido_archivo)
                             
                             if settings.DEBUG:
-                                # MODO LOCAL: Usamos ContentFile de Django o dejamos que FileField lo maneje
-                                # Truco: Asignamos el contenido directamente al FileField
                                 from django.core.files.base import ContentFile
                                 if ext == '.xml':
                                     nuevo_comp.archivo_xml.save(archivo.name, ContentFile(contenido_archivo), save=False)
                                 else:
                                     nuevo_comp.archivo_pdf.save(archivo.name, ContentFile(contenido_archivo), save=False)
                             else:
-                                # MODO S3: Usamos nuestra función con el BytesIO
                                 ruta_s3 = _subir_archivo_a_s3(archivo_memoria, s3_path)
                                 if ruta_s3:
                                     if ext == '.xml':
@@ -491,26 +477,26 @@ def crear_movimiento(request):
                                     else:
                                         nuevo_comp.archivo_pdf.name = ruta_s3
                             
-                            # Finalmente guardamos el objeto completo
+                            # Guardamos el comprobante individual
                             nuevo_comp.save()
 
-                        # 3. Actualizar Movimiento con la SUMA TOTAL
-                        movimiento.iva = suma_iva
-                        movimiento.ret_iva = suma_ret_iva
-                        movimiento.ret_isr = suma_ret_isr
-                        
-                        # Recalcular saldo banco
-                        if movimiento.saldo_banco == 0 and movimiento.cuenta:
-                             monto_operacion = movimiento.abono if movimiento.abono > 0 else -movimiento.cargo
-                             movimiento.saldo_banco = movimiento.cuenta.saldo_actual + monto_operacion
+                    # --- CORRECCIÓN IMPORTANTE ---
+                    # Eliminamos el bloque que sumaba y sobrescribía los impuestos del movimiento padre.
+                    # Ahora confiamos en los datos que envió el formulario (form.save() del paso 1).
 
-                        movimiento.save()
+                    # 3. Recalcular saldo banco (Esto sí se mantiene por lógica de negocio)
+                    if movimiento.saldo_banco == 0 and movimiento.cuenta:
+                         monto_operacion = movimiento.abono if movimiento.abono > 0 else -movimiento.cargo
+                         movimiento.saldo_banco = movimiento.cuenta.saldo_actual + monto_operacion
+                         # Guardamos de nuevo solo para actualizar el saldo bancario
+                         movimiento.save()
 
-                    messages.success(request, f"Movimiento guardado. Datos fiscales extraídos y archivos subidos correctamente.")
+                    messages.success(request, f"Movimiento guardado correctamente.")
                     return redirect('detalle_movimiento', pk=movimiento.pk)
 
             except Exception as e:
-                # import traceback; traceback.print_exc()
+                # Es útil imprimir el error en consola para depurar
+                print(f"Error al guardar movimiento: {e}")
                 messages.error(request, f"Error al procesar: {e}")
                 return render(request, 'flujo_bancos/crear_movimiento.html', {'form': form})
     else:
