@@ -39,6 +39,8 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.clickjacking import xframe_options_exempt
 # === IMPORTS ADICIONALES PARA CARGA MANUAL A S3 ===
 import boto3
+from django.db.models.functions import Abs
+from django.db.models import Case, When, Value, FloatField
 from botocore.exceptions import BotoCoreError, NoCredentialsError
 from django.conf import settings
 # ===================================================
@@ -214,12 +216,71 @@ def home_portal_view(request):
 # --- VISTAS DE ENTRADA MAQUILA ---
 @method_decorator(login_required, name='dispatch')
 class EntradaMaquilaListView(PermissionRequiredMixin, ListView):
-    permission_required = 'ternium.view_ternium_module' 
+    permission_required = 'ternium.view_ternium_module'
     model = EntradaMaquila
     template_name = 'ternium/lista_entradas.html'
     context_object_name = 'entradas'
     paginate_by = 10
-    ordering = ['-fecha_ingreso', '-creado_en']
+    
+    def get_queryset(self):
+        # 1. Obtener QuerySet base
+        queryset = super().get_queryset()
+        
+        # 2. Capturar parámetros de la URL
+        q = self.request.GET.get('q')
+        transporte = self.request.GET.get('transporte')
+        calidad = self.request.GET.get('calidad')
+        status = self.request.GET.get('status')
+        fecha_inicio = self.request.GET.get('fecha_inicio')
+        fecha_fin = self.request.GET.get('fecha_fin')
+        alerta = self.request.GET.get('alerta')
+
+        # 3. Aplicar Filtros Dinámicos
+        
+        # Búsqueda general (ID Remito o Boleta)
+        if q:
+            queryset = queryset.filter(
+                Q(c_id_remito__icontains=q) | 
+                Q(num_boleta_remision__icontains=q)
+            )
+
+        # Filtro por Transporte
+        if transporte:
+            queryset = queryset.filter(transporte__icontains=transporte)
+
+        # Filtro por Calidad (Match exacto)
+        if calidad:
+            queryset = queryset.filter(calidad=calidad)
+
+        # Filtro por Estatus
+        if status:
+            queryset = queryset.filter(status=status)
+
+        # Filtro por Rango de Fechas
+        if fecha_inicio:
+            queryset = queryset.filter(fecha_ingreso__gte=fecha_inicio)
+        if fecha_fin:
+            queryset = queryset.filter(fecha_ingreso__lte=fecha_fin)
+
+        # Filtro por Alerta de Discrepancia
+        if alerta == 'SI':
+            queryset = queryset.filter(alerta=True)
+        elif alerta == 'NO':
+            queryset = queryset.filter(alerta=False)
+
+        # 4. Ordenamiento por defecto
+        return queryset.order_by('-fecha_ingreso', '-creado_en')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Pasamos los parámetros actuales para mantener los filtros en el HTML
+        context['filtros'] = self.request.GET
+        
+        # Obtenemos lista única de calidades para el dropdown
+        context['calidades_list'] = EntradaMaquila.objects.exclude(calidad__isnull=True).exclude(calidad='').values_list('calidad', flat=True).distinct().order_by('calidad')
+        
+        return context
 
 
 @login_required
@@ -979,24 +1040,68 @@ class RemisionDeleteView(DeleteView):
 
 @method_decorator(login_required, name='dispatch')
 class RegistroLogisticoListView(ListView):
-    model = RegistroLogistico  # <--- Nota el espacio aquí
+    model = RegistroLogistico
     template_name = 'ternium/lista_logistica_ternium.html'
     context_object_name = 'registros'
     paginate_by = 20
 
     def get_queryset(self):
-        # Quitamos 'tractor' de select_related, solo dejamos FKs válidas
+        # 1. Queryset base
         queryset = super().get_queryset().select_related('transportista', 'material').order_by('-fecha_carga')
         
-        q_remision = self.request.GET.get('q_remision')
-        q_transportista = self.request.GET.get('q_transportista')
-        
-        if q_remision:
-            queryset = queryset.filter(Q(remision__icontains=q_remision) | Q(boleta_bascula__icontains=q_remision))
-        if q_transportista:
-            queryset = queryset.filter(transportista__nombre__icontains=q_transportista)
+        # 2. Capturar parámetros
+        q = self.request.GET.get('q')
+        transportista = self.request.GET.get('transportista')
+        material_id = self.request.GET.get('material')
+        status = self.request.GET.get('status')
+        fecha_inicio = self.request.GET.get('fecha_inicio')
+        fecha_fin = self.request.GET.get('fecha_fin')
+        merma = self.request.GET.get('merma') # <--- NUEVO FILTRO
+
+        # 3. Aplicar Filtros Básicos
+        if q:
+            queryset = queryset.filter(Q(remision__icontains=q) | Q(boleta_bascula__icontains=q))
+        if transportista:
+            queryset = queryset.filter(transportista__nombre__icontains=transportista)
+        if material_id:
+            queryset = queryset.filter(material__id=material_id)
+        if status:
+            queryset = queryset.filter(status=status)
+        if fecha_inicio:
+            queryset = queryset.filter(fecha_carga__gte=fecha_inicio)
+        if fecha_fin:
+            queryset = queryset.filter(fecha_carga__lte=fecha_fin)
+
+        # 4. Lógica de Filtro de Merma (Cálculo en DB)
+        if merma:
+            # Anotamos el cálculo del porcentaje absoluto para poder filtrar
+            queryset = queryset.annotate(
+                abs_diff=Abs(F('toneladas_remisionadas') - F('toneladas_recibidas')),
+                pct_calc=Case(
+                    When(toneladas_remisionadas__gt=0, then=F('abs_diff') / F('toneladas_remisionadas') * 100),
+                    default=Value(0.0),
+                    output_field=FloatField()
+                )
+            )
+            
+            if merma == 'SI':
+                # Filtrar donde la diferencia sea mayor a 1%
+                queryset = queryset.filter(pct_calc__gt=1.0)
+            elif merma == 'NO':
+                # Filtrar donde la diferencia sea menor o igual a 1%
+                queryset = queryset.filter(pct_calc__lte=1.0)
             
         return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filtros'] = self.request.GET
+        try:
+            ternium = Empresa.objects.get(nombre__iexact="TERNIUM")
+            context['materiales_list'] = Material.objects.filter(empresas=ternium).order_by('nombre')
+        except Empresa.DoesNotExist:
+            context['materiales_list'] = Material.objects.all().order_by('nombre')
+        return context
 
 @method_decorator(login_required, name='dispatch')
 class RegistroLogisticoDetailView(DetailView):

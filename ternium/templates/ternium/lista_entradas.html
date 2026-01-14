@@ -116,31 +116,70 @@
 
     <div class="filter-card">
         <form method="get" action="{% url 'lista_entradas' %}">
-            <div class="row g-3 align-items-center">
+            <div class="row g-3">
                 <div class="col-md-3">
+                    <label class="form-label small text-muted">Búsqueda General</label>
                     <div class="input-group">
                         <span class="input-group-text bg-white text-muted"><i class="fas fa-barcode"></i></span>
-                        <input type="text" name="q" class="form-control border-start-0 ps-0" placeholder="Buscar ID Remito..." value="{{ request.GET.q }}">
+                        <input type="text" name="q" class="form-control border-start-0 ps-0" 
+                               placeholder="ID Remito o Boleta..." value="{{ filtros.q|default:'' }}">
                     </div>
                 </div>
+                
                 <div class="col-md-3">
+                    <label class="form-label small text-muted">Fecha Desde</label>
+                    <input type="date" name="fecha_inicio" class="form-control" value="{{ filtros.fecha_inicio|default:'' }}">
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Fecha Hasta</label>
+                    <input type="date" name="fecha_fin" class="form-control" value="{{ filtros.fecha_fin|default:'' }}">
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Transporte</label>
                     <div class="input-group">
                         <span class="input-group-text bg-white text-muted"><i class="fas fa-truck"></i></span>
-                        <input type="text" name="transporte" class="form-control border-start-0 ps-0" placeholder="Línea de Transporte..." value="{{ request.GET.transporte }}">
+                        <input type="text" name="transporte" class="form-control border-start-0 ps-0" 
+                               placeholder="Buscar transporte..." value="{{ filtros.transporte|default:'' }}">
                     </div>
                 </div>
-                <div class="col-md-2">
-                    <select name="status" class="form-select">
-                        <option value="">Estatus: Todos</option>
-                        <option value="PENDIENTE" {% if request.GET.status == 'PENDIENTE' %}selected{% endif %}>Pendiente</option>
-                        <option value="TERMINADO" {% if request.GET.status == 'TERMINADO' %}selected{% endif %}>Terminado</option>
-                        <option value="AUDITADO" {% if request.GET.status == 'AUDITADO' %}selected{% endif %}>Auditado</option>
-                        <option value="CANCELADO" {% if request.GET.status == 'CANCELADO' %}selected{% endif %}>Cancelado</option>
+
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Calidad</label>
+                    <select name="calidad" class="form-select">
+                        <option value="">Todas las Calidades</option>
+                        {% for c in calidades_list %}
+                            <option value="{{ c }}" {% if filtros.calidad == c %}selected{% endif %}>{{ c }}</option>
+                        {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-4 text-end">
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-filter me-1"></i> Filtrar</button>
-                    <a href="{% url 'lista_entradas' %}" class="btn btn-light border ms-1" title="Limpiar"><i class="fas fa-sync-alt"></i></a>
+
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Estatus</label>
+                    <select name="status" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="PENDIENTE" {% if filtros.status == 'PENDIENTE' %}selected{% endif %}>Pendiente</option>
+                        <option value="TERMINADO" {% if filtros.status == 'TERMINADO' %}selected{% endif %}>Terminado</option>
+                        <option value="AUDITADO" {% if filtros.status == 'AUDITADO' %}selected{% endif %}>Auditado</option>
+                        <option value="CANCELADO" {% if filtros.status == 'CANCELADO' %}selected{% endif %}>Cancelado</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Discrepancia</label>
+                    <select name="alerta" class="form-select">
+                        <option value="">Todas</option>
+                        <option value="SI" {% if filtros.alerta == 'SI' %}selected{% endif %}>Con Alerta (>1%)</option>
+                        <option value="NO" {% if filtros.alerta == 'NO' %}selected{% endif %}>Sin Alerta (OK)</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3 d-flex align-items-end">
+                    <div class="d-grid gap-2 d-md-flex w-100">
+                        <button type="submit" class="btn btn-primary flex-grow-1"><i class="fas fa-filter me-1"></i> Filtrar</button>
+                        <a href="{% url 'lista_entradas' %}" class="btn btn-light border" title="Limpiar"><i class="fas fa-sync-alt"></i></a>
+                    </div>
                 </div>
             </div>
         </form>

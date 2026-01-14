@@ -26,61 +26,131 @@
                 </div>
             </div>
         </div>
+        
         <div class="card-body">
-            <div class="search-card mb-4">
-                <form method="get">
-                    <div class="row g-2">
-                        <div class="col-md-5">
+            
+            <div class="search-card mb-4" style="background-color: #f8f9fa; border: 1px solid #eef2f7; border-radius: 8px; padding: 1.25rem;">
+                <form method="get" action="{% url 'lista_registros_logistica' %}">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Búsqueda General</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-white">
-                                    <i class="fas fa-search text-muted"></i>
-                                </span>
-                                <input type="text" name="q_remision" class="form-control" 
-                                       placeholder="Buscar por Remisión o Boleta..." 
-                                       value="{{ request.GET.q_remision }}">
+                                <span class="input-group-text bg-white text-muted"><i class="fas fa-search"></i></span>
+                                <input type="text" name="q" class="form-control border-start-0 ps-0" 
+                                       placeholder="Remisión o Boleta..." value="{{ filtros.q|default:'' }}">
                             </div>
                         </div>
-                        <div class="col-md-5">
+
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Fecha Carga (Desde)</label>
+                            <input type="date" name="fecha_inicio" class="form-control" value="{{ filtros.fecha_inicio|default:'' }}">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Fecha Carga (Hasta)</label>
+                            <input type="date" name="fecha_fin" class="form-control" value="{{ filtros.fecha_fin|default:'' }}">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Transportista</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-white">
-                                    <i class="fas fa-truck text-muted"></i>
-                                </span>
-                                <input type="text" name="q_transportista" class="form-control" 
-                                       placeholder="Buscar por Transportista..." 
-                                       value="{{ request.GET.q_transportista }}">
+                                <span class="input-group-text bg-white text-muted"><i class="fas fa-truck"></i></span>
+                                <input type="text" name="transportista" class="form-control border-start-0 ps-0" 
+                                       placeholder="Buscar nombre..." value="{{ filtros.transportista|default:'' }}">
                             </div>
                         </div>
-                        <div class="col-md-2">
-                            <button class="btn btn-primary-gradient w-100" type="submit">
-                                <i class="fas fa-search me-1"></i> Buscar
-                            </button>
+
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Material</label>
+                            <select name="material" class="form-select">
+                                <option value="">Todos los Materiales</option>
+                                {% for mat in materiales_list %}
+                                    <option value="{{ mat.id }}" {% if filtros.material|add:"0" == mat.id %}selected{% endif %}>{{ mat.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Merma / Discrepancia</label>
+                            <select name="merma" class="form-select">
+                                <option value="">Todas</option>
+                                <option value="SI" {% if filtros.merma == 'SI' %}selected{% endif %}>Con Alerta (>1%)</option>
+                                <option value="NO" {% if filtros.merma == 'NO' %}selected{% endif %}>Sin Alerta (OK)</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Estatus</label>
+                            <select name="status" class="form-select">
+                                <option value="">Todos</option>
+                                <option value="PENDIENTE" {% if filtros.status == 'PENDIENTE' %}selected{% endif %}>Pendiente</option>
+                                <option value="TERMINADO" {% if filtros.status == 'TERMINADO' %}selected{% endif %}>Terminado</option>
+                                <option value="AUDITADO" {% if filtros.status == 'AUDITADO' %}selected{% endif %}>Auditado</option>
+                                <option value="CANCELADO" {% if filtros.status == 'CANCELADO' %}selected{% endif %}>Cancelado</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3 d-flex align-items-end">
+                            <div class="d-grid gap-2 d-md-flex w-100">
+                                <button class="btn btn-primary-gradient flex-grow-1" type="submit">
+                                    <i class="fas fa-filter me-1"></i> Filtrar
+                                </button>
+                                <a href="{% url 'lista_registros_logistica' %}" class="btn btn-light border" title="Limpiar">
+                                    <i class="fas fa-sync-alt"></i>
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </form>
             </div>
-
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
                     <thead class="table-primary">
                         <tr>
                             <th class="ps-4">Remisión</th>
-                            <th>Fecha de Carga</th>
+                            <th>Fecha</th>
                             <th>Transportista</th>
-                            <th>Estatus</th>
-                            <th>Estado Docs.</th>
+                            <th>Material</th>
+                            <th>Merma (Dif)</th> <th>Estatus</th>
+                            <th>Docs</th>
                             <th class="text-end pe-4">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for registro in registros %}
                         <tr class="table-row">
-                            <td class="ps-4 fw-bold text-primary">{{ registro.remision }}</td>
+                            <td class="ps-4">
+                                <div class="fw-bold text-primary">{{ registro.remision }}</div>
+                                <small class="text-muted">Bol: {{ registro.boleta_bascula }}</small>
+                            </td>
                             <td>
                                 <span class="badge bg-light text-dark">
                                     {{ registro.fecha_carga|date:"d/m/Y" }}
                                 </span>
                             </td>
                             <td>{{ registro.transportista.nombre|default:"N/A" }}</td>
+                            <td>{{ registro.material.nombre|truncatechars:15|default:"-" }}</td>
+                            
+                            <td>
+                                {% if registro.merma_absoluta is not None %}
+                                    {% with pct=registro.merma_porcentaje|default:0 %}
+                                        {% if pct > 1.0 or pct < -1.0 %}
+                                            <span class="badge badge-soft-danger text-danger border border-danger">
+                                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                                {{ registro.merma_absoluta|floatformat:3 }} Ton ({{ pct|floatformat:2 }}%)
+                                            </span>
+                                        {% else %}
+                                            <span class="badge badge-soft-success text-success border border-success">
+                                                <i class="fas fa-check me-1"></i>
+                                                {{ registro.merma_absoluta|floatformat:3 }} Ton ({{ pct|floatformat:2 }}%)
+                                            </span>
+                                        {% endif %}
+                                    {% endwith %}
+                                {% else %}
+                                    <span class="text-muted small">-</span>
+                                {% endif %}
+                            </td>
+
                             <td>
                                 {% if registro.status == 'PENDIENTE' %}
                                     <span class="badge bg-warning text-dark">{{ registro.get_status_display }}</span>
@@ -89,20 +159,14 @@
                                 {% elif registro.status == 'AUDITADO' %}
                                     <span class="badge bg-success">{{ registro.get_status_display }}</span>
                                 {% elif registro.status == 'CANCELADO' %}
-                                    <span class="badge bg-danger">
-                                        <i class="fas fa-ban me-1"></i> Cancelado
-                                    </span>
+                                    <span class="badge bg-danger"><i class="fas fa-ban me-1"></i> Cancelado</span>
                                 {% endif %}
                             </td>
                             <td>
                                 {% if registro.documentos_completos %}
-                                    <span class="badge bg-success rounded-pill">
-                                        <i class="fas fa-check-circle me-1"></i> Completos
-                                    </span>
+                                    <i class="fas fa-check-circle text-success" title="Documentos Completos"></i>
                                 {% else %}
-                                    <span class="badge bg-warning text-dark rounded-pill">
-                                        <i class="fas fa-exclamation-circle me-1"></i> Incompletos
-                                    </span>
+                                    <i class="fas fa-exclamation-circle text-warning" title="Documentos Incompletos"></i>
                                 {% endif %}
                             </td>
                             <td class="text-end pe-4">
@@ -140,7 +204,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center py-5">
+                            <td colspan="8" class="text-center py-5">
                                 <div class="empty-state">
                                     <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
                                     <h5 class="text-muted">No se encontraron registros</h5>
@@ -230,6 +294,7 @@
     box-shadow: 0 4px 8px rgba(0, 86, 179, 0.3);
   }
   
+  /* Ajuste para que el input group se vea bien en el formulario */
   .search-card {
     background-color: white;
     padding: 15px;
@@ -270,6 +335,16 @@
   .badge.rounded-pill {
     padding: 5px 10px;
     font-weight: 500;
+  }
+
+  /* Estilos Badges Suaves para Merma */
+  .badge-soft-danger {
+      background-color: rgba(220, 53, 69, 0.1);
+      color: #dc3545;
+  }
+  .badge-soft-success {
+      background-color: rgba(25, 135, 84, 0.1);
+      color: #198754;
   }
   
   .btn-group .btn {
@@ -347,7 +422,7 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Inicializar tooltips
+    // Inicializar tooltips de Bootstrap
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
