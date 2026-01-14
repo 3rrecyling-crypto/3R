@@ -47,37 +47,31 @@ from .forms import (
 # ---------------------------------------------------------
 # UTILIDADES S3 (No requieren decorador, son internas)
 # ---------------------------------------------------------
-def _subir_archivo_a_s3(archivo_obj, s3_ruta_relativa):
+def _subir_archivo_a_s3(archivo_bytes_io, s3_ruta_relativa):
     """
-    Sube un archivo a S3 manualmente.
+    Sube un archivo a S3. Recibe un BytesIO (archivo en memoria).
     """
     try:
+        # Nos aseguramos que el puntero esté al inicio antes de subir
+        archivo_bytes_io.seek(0)
+        
         s3_client = boto3.client(
             's3',
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
             region_name=settings.AWS_S3_REGION_NAME
         )
-        
         full_s3_path = f"{settings.AWS_MEDIA_LOCATION}/{s3_ruta_relativa}"
-
-        s3_client.upload_fileobj(
-            archivo_obj,
-            settings.AWS_STORAGE_BUCKET_NAME,
-            full_s3_path
-        )
-        return s3_ruta_relativa
         
-    except (BotoCoreError, NoCredentialsError, Exception) as e:
-        print(f"Error al subir el archivo a S3: {e}")
+        # upload_fileobj funciona perfecto con BytesIO
+        s3_client.upload_fileobj(archivo_bytes_io, settings.AWS_STORAGE_BUCKET_NAME, full_s3_path)
+        return s3_ruta_relativa
+    except Exception as e:
+        print(f"Error crítico subiendo a S3: {e}")
         return None
 
 def _eliminar_archivo_de_s3(ruta_relativa):
-    """
-    Elimina un archivo de S3 usando la ruta relativa almacenada en BD.
-    """
-    if not ruta_relativa:
-        return
+    if not ruta_relativa: return
     try:
         s3_client = boto3.client(
             's3',
@@ -86,18 +80,14 @@ def _eliminar_archivo_de_s3(ruta_relativa):
             region_name=settings.AWS_S3_REGION_NAME
         )
         full_s3_path = f"{settings.AWS_MEDIA_LOCATION}/{ruta_relativa}"
-        
-        s3_client.delete_object(
-            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
-            Key=full_s3_path
-        )
-    except (BotoCoreError, NoCredentialsError, Exception) as e:
-        print(f"Error al eliminar archivo de S3: {e}")
+        s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=full_s3_path)
+    except Exception as e:
+        print(f"Error eliminando de S3: {e}")
         
 def procesar_datos_xml(archivo_obj):
     """
-    Lee un archivo en memoria, extrae UUID, IVA y Retenciones.
-    Maneja CFDI 3.3 y 4.0. Reinicia el puntero del archivo al final.
+    Lee un archivo, crea una copia en memoria (BytesIO) para no cerrar el original,
+    extrae UUID, IVA y Retenciones.
     """
     datos = {
         'uuid': None, 
@@ -107,63 +97,61 @@ def procesar_datos_xml(archivo_obj):
     }
     
     try:
-        # 1. Reiniciar puntero para leer desde el inicio
+        # 1. Asegurar lectura desde inicio
         archivo_obj.seek(0)
         
-        tree = ET.parse(archivo_obj)
+        # 2. COPIA SEGURA EN MEMORIA
+        contenido = archivo_obj.read()
+        archivo_obj.seek(0) # Resetear archivo original para que Django/S3 lo pueda leer después
+        
+        # Stream en memoria independiente
+        xml_buffer = BytesIO(contenido)
+        
+        # 3. Parsear
+        tree = ET.parse(xml_buffer)
         root = tree.getroot()
         
-        # 2. Definir Namespaces (Soporte CFDI 3.3 y 4.0)
+        # 4. Namespaces
         ns = {'cfdi': 'http://www.sat.gob.mx/cfd/4', 'tfd': 'http://www.sat.gob.mx/TimbreFiscalDigital'}
-        if 'cfdi' not in root.tag: # Fallback a 3.3
+        if 'cfdi' not in root.tag:
             ns['cfdi'] = 'http://www.sat.gob.mx/cfd/3'
 
-        # 3. Extraer UUID
+        # 5. UUID
         tfd = root.find('.//tfd:TimbreFiscalDigital', ns)
         if tfd is not None:
             datos['uuid'] = tfd.get('UUID')
 
-        # 4. ESTRATEGIA DE IMPUESTOS
-        # Prioridad 1: Nodo Global "Impuestos" (Común en CFDI 4.0 y Resumen 3.3)
+        # 6. Impuestos
         impuestos_node = root.find('cfdi:Impuestos', ns)
         encontrado_global = False
         
         if impuestos_node is not None:
-            # IVA Trasladado
             total_traslados = impuestos_node.get('TotalImpuestosTrasladados')
             if total_traslados:
                 datos['iva'] = Decimal(total_traslados)
                 encontrado_global = True
             
-            # Retenciones Globales
             retenciones = impuestos_node.findall('cfdi:Retenciones/cfdi:Retencion', ns)
             if retenciones:
                 for ret in retenciones:
                     imp = ret.get('Impuesto')
                     importe = Decimal(ret.get('Importe') or 0)
-                    if imp == '002': datos['ret_iva'] += importe # 002 = IVA
-                    if imp == '001': datos['ret_isr'] += importe # 001 = ISR
+                    if imp == '002': datos['ret_iva'] += importe
+                    if imp == '001': datos['ret_isr'] += importe
                 encontrado_global = True
 
-        # Prioridad 2: Si no hubo globales, sumar Concepto por Concepto
-        if not encontrado_global or (datos['iva'] == 0 and datos['ret_iva'] == 0 and datos['ret_isr'] == 0):
+        if not encontrado_global or (datos['iva'] == 0 and datos['ret_iva'] == 0):
             conceptos = root.findall('cfdi:Conceptos/cfdi:Concepto', ns)
             for c in conceptos:
-                # Traslados (IVA 002)
                 for t in c.findall('.//cfdi:Traslado', ns):
                     if t.get('Impuesto') == '002':
                         datos['iva'] += Decimal(t.get('Importe') or 0)
-                
-                # Retenciones (IVA 002, ISR 001)
                 for r in c.findall('.//cfdi:Retencion', ns):
                     imp = r.get('Impuesto')
                     val = Decimal(r.get('Importe') or 0)
                     if imp == '002': datos['ret_iva'] += val
                     if imp == '001': datos['ret_isr'] += val
 
-        # 5. Reiniciar puntero para que S3 pueda leer el archivo después
-        archivo_obj.seek(0)
-                    
     except Exception as e:
         print(f"Error procesando estructura XML: {e}")
     
@@ -443,77 +431,90 @@ def crear_movimiento(request):
         if form.is_valid():
             try:
                 with transaction.atomic():
-                    # 1. Guardar Movimiento Base (Sin totales definitivos aún)
+                    # 1. Guardar Movimiento Base
                     movimiento = form.save()
 
-                    # 2. Procesar Archivos (Pueden ser 89 o más)
+                    # 2. Procesar Archivos
                     archivos = request.FILES.getlist('archivos_comprobantes')
                     
-                    # Acumuladores para sumar al Movimiento
+                    # Acumuladores
                     suma_iva = Decimal('0.00')
                     suma_ret_iva = Decimal('0.00')
                     suma_ret_isr = Decimal('0.00')
 
                     if archivos:
                         for archivo in archivos:
+                            # --- PASO CRUCIAL 1: LEER A MEMORIA UNA SOLA VEZ ---
+                            # Leemos todo el archivo a una variable. Esto evita que se "cierre" el archivo.
+                            contenido_archivo = archivo.read() 
+                            
                             ext = os.path.splitext(archivo.name)[1].lower()
                             fecha_hoy = timezone.now()
                             tipo_carpeta = 'xmls' if ext == '.xml' else 'pdfs'
                             s3_path = f"{tipo_carpeta}/{fecha_hoy.year}/{fecha_hoy.month}/{archivo.name}"
                             
-                            # A. Subir a S3
-                            ruta_s3 = _subir_archivo_a_s3(archivo, s3_path)
+                            nuevo_comp = ComprobanteFiscal(movimiento=movimiento)
+
+                            if ext == '.xml':
+                                # --- PASO CRUCIAL 2: PROCESAR DATOS DESDE MEMORIA ---
+                                datos_xml = procesar_datos_xml_desde_bytes(contenido_archivo)
+                                
+                                # Asignar datos al objeto (¡AQUÍ SE GUARDAN LOS DATOS!)
+                                nuevo_comp.uuid = datos_xml['uuid']
+                                nuevo_comp.monto_iva = datos_xml['iva']
+                                nuevo_comp.monto_ret_iva = datos_xml['ret_iva']
+                                nuevo_comp.monto_ret_isr = datos_xml['ret_isr']
+                                
+                                # Sumar a acumuladores
+                                suma_iva += datos_xml['iva']
+                                suma_ret_iva += datos_xml['ret_iva']
+                                suma_ret_isr += datos_xml['ret_isr']
+
+                            # --- PASO CRUCIAL 3: GUARDAR ARCHIVO (LOCAL O S3) DESDE MEMORIA ---
+                            # Reconstruimos un archivo en memoria para guardarlo
+                            archivo_memoria = BytesIO(contenido_archivo)
                             
-                            if ruta_s3:
-                                nuevo_comp = ComprobanteFiscal(movimiento=movimiento)
-                                
+                            if settings.DEBUG:
+                                # MODO LOCAL: Usamos ContentFile de Django o dejamos que FileField lo maneje
+                                # Truco: Asignamos el contenido directamente al FileField
+                                from django.core.files.base import ContentFile
                                 if ext == '.xml':
-                                    nuevo_comp.archivo_xml.name = ruta_s3
-                                    
-                                    # B. Extraer datos y guardar en el Comprobante
-                                    datos_xml = procesar_datos_xml(archivo)
-                                    
-                                    nuevo_comp.uuid = datos_xml['uuid']
-                                    nuevo_comp.monto_iva = datos_xml['iva']
-                                    nuevo_comp.monto_ret_iva = datos_xml['ret_iva']
-                                    nuevo_comp.monto_ret_isr = datos_xml['ret_isr']
-                                    
-                                    # C. Sumar a los acumuladores globales
-                                    suma_iva += datos_xml['iva']
-                                    suma_ret_iva += datos_xml['ret_iva']
-                                    suma_ret_isr += datos_xml['ret_isr']
+                                    nuevo_comp.archivo_xml.save(archivo.name, ContentFile(contenido_archivo), save=False)
+                                else:
+                                    nuevo_comp.archivo_pdf.save(archivo.name, ContentFile(contenido_archivo), save=False)
+                            else:
+                                # MODO S3: Usamos nuestra función con el BytesIO
+                                ruta_s3 = _subir_archivo_a_s3(archivo_memoria, s3_path)
+                                if ruta_s3:
+                                    if ext == '.xml':
+                                        nuevo_comp.archivo_xml.name = ruta_s3
+                                    else:
+                                        nuevo_comp.archivo_pdf.name = ruta_s3
+                            
+                            # Finalmente guardamos el objeto completo
+                            nuevo_comp.save()
 
-                                elif ext == '.pdf':
-                                    nuevo_comp.archivo_pdf.name = ruta_s3
-                                
-                                nuevo_comp.save()
-
-                        # 3. Actualizar el Movimiento Padre con la SUMA TOTAL de los XMLs
-                        # Nota: Si el usuario metió datos manuales en el form, decidimos si
-                        # sobrescribirlos con lo del XML o sumarlos.
-                        # Aquí, sobrescribimos los impuestos con lo REAL de los XMLs para exactitud.
+                        # 3. Actualizar Movimiento con la SUMA TOTAL
                         movimiento.iva = suma_iva
                         movimiento.ret_iva = suma_ret_iva
                         movimiento.ret_isr = suma_ret_isr
-                        movimiento.iva_total_xml = suma_iva # Campo espejo informativo
                         
-                        # Recalculamos saldo banco si es nuevo
-                        if not movimiento.id or movimiento.saldo_banco == 0:
-                             # Lógica de saldo inicial + abono - cargo...
-                             pass 
+                        # Recalcular saldo banco
+                        if movimiento.saldo_banco == 0 and movimiento.cuenta:
+                             monto_operacion = movimiento.abono if movimiento.abono > 0 else -movimiento.cargo
+                             movimiento.saldo_banco = movimiento.cuenta.saldo_actual + monto_operacion
 
                         movimiento.save()
 
-                    messages.success(request, f"Movimiento guardado con {len(archivos)} archivos procesados.")
+                    messages.success(request, f"Movimiento guardado. Datos fiscales extraídos y archivos subidos correctamente.")
                     return redirect('detalle_movimiento', pk=movimiento.pk)
 
             except Exception as e:
-                import traceback
-                traceback.print_exc()
+                # import traceback; traceback.print_exc()
                 messages.error(request, f"Error al procesar: {e}")
                 return render(request, 'flujo_bancos/crear_movimiento.html', {'form': form})
     else:
-        form = MovimientoForm(initial={'fecha': datetime.now().date()})
+        form = MovimientoForm(initial={'fecha': timezone.now().date()})
 
     return render(request, 'flujo_bancos/crear_movimiento.html', {'form': form})
 @permission_required('flujo_bancos.acceso_flujo_bancos', raise_exception=True)
@@ -539,77 +540,83 @@ def editar_movimiento(request, pk):
     if request.method == 'POST':
         form = MovimientoForm(request.POST, request.FILES, instance=movimiento_original)
         if form.is_valid():
-            # Usamos atomic para asegurar integridad
-            with transaction.atomic():
-                movimiento = form.save(commit=False)
-                movimiento.save() 
+            try:
+                with transaction.atomic():
+                    movimiento = form.save(commit=False)
+                    movimiento.save() 
 
-                # 1. ELIMINAR ARCHIVOS MARCADOS (Si el usuario borró alguno en la interfaz)
-                ids_eliminar = request.POST.get('ids_eliminar', '')
-                if ids_eliminar:
-                    lista_ids = ids_eliminar.split(',')
-                    for comp_id in lista_ids:
-                        if comp_id:
-                            comp = ComprobanteFiscal.objects.filter(id=comp_id, movimiento=movimiento).first()
-                            if comp:
-                                if comp.archivo_xml: _eliminar_archivo_de_s3(comp.archivo_xml.name)
-                                if comp.archivo_pdf: _eliminar_archivo_de_s3(comp.archivo_pdf.name)
-                                comp.delete()
+                    # 1. ELIMINAR ARCHIVOS
+                    ids_eliminar = request.POST.get('ids_eliminar', '')
+                    if ids_eliminar:
+                        lista_ids = ids_eliminar.split(',')
+                        for comp_id in lista_ids:
+                            if comp_id:
+                                comp = ComprobanteFiscal.objects.filter(id=comp_id, movimiento=movimiento).first()
+                                if comp:
+                                    if not settings.DEBUG:
+                                        if comp.archivo_xml: _eliminar_archivo_de_s3(comp.archivo_xml.name)
+                                        if comp.archivo_pdf: _eliminar_archivo_de_s3(comp.archivo_pdf.name)
+                                    comp.delete()
 
-                # 2. SUBIR NUEVOS ARCHIVOS (Bucle Masivo)
-                # getlist toma TODOS los archivos seleccionados (ej. los 89 archivos)
-                archivos = request.FILES.getlist('archivos_comprobantes')
-                
-                if archivos:
-                    for archivo in archivos:
-                        ext = os.path.splitext(archivo.name)[1].lower()
-                        fecha_hoy = timezone.now()
-                        tipo_carpeta = 'xmls' if ext == '.xml' else 'pdfs'
-                        s3_path = f"{tipo_carpeta}/{fecha_hoy.year}/{fecha_hoy.month}/{archivo.name}"
-                        
-                        # Subir a S3
-                        ruta_s3 = _subir_archivo_a_s3(archivo, s3_path)
-                        
-                        if ruta_s3:
-                            nuevo_comp = ComprobanteFiscal(movimiento=movimiento)
+                    # 2. SUBIR NUEVOS ARCHIVOS (MISMA LÓGICA BLINDADA)
+                    archivos = request.FILES.getlist('archivos_comprobantes')
+                    if archivos:
+                        for archivo in archivos:
+                            # LEER A MEMORIA
+                            contenido_archivo = archivo.read()
                             
+                            ext = os.path.splitext(archivo.name)[1].lower()
+                            fecha_hoy = timezone.now()
+                            s3_path = f"{'xmls' if ext == '.xml' else 'pdfs'}/{fecha_hoy.year}/{fecha_hoy.month}/{archivo.name}"
+                            
+                            nuevo_comp = ComprobanteFiscal(movimiento=movimiento)
+
                             if ext == '.xml':
-                                nuevo_comp.archivo_xml.name = ruta_s3
+                                # PROCESAR DESDE MEMORIA
+                                datos_xml = procesar_datos_xml_desde_bytes(contenido_archivo)
                                 
-                                # PROCESAMIENTO: Extraer datos del XML
-                                datos_xml = procesar_datos_xml(archivo)
-                                
-                                # GUARDAR datos individuales en el Comprobante
                                 nuevo_comp.uuid = datos_xml['uuid']
                                 nuevo_comp.monto_iva = datos_xml['iva']
                                 nuevo_comp.monto_ret_iva = datos_xml['ret_iva']
                                 nuevo_comp.monto_ret_isr = datos_xml['ret_isr']
-                                
-                            elif ext == '.pdf':
-                                nuevo_comp.archivo_pdf.name = ruta_s3
-                            
+
+                            # GUARDAR ARCHIVO
+                            archivo_memoria = BytesIO(contenido_archivo)
+                            from django.core.files.base import ContentFile
+
+                            if settings.DEBUG:
+                                if ext == '.xml':
+                                    nuevo_comp.archivo_xml.save(archivo.name, ContentFile(contenido_archivo), save=False)
+                                else:
+                                    nuevo_comp.archivo_pdf.save(archivo.name, ContentFile(contenido_archivo), save=False)
+                            else:
+                                ruta_s3 = _subir_archivo_a_s3(archivo_memoria, s3_path)
+                                if ruta_s3:
+                                    if ext == '.xml':
+                                        nuevo_comp.archivo_xml.name = ruta_s3
+                                    else:
+                                        nuevo_comp.archivo_pdf.name = ruta_s3
+                                        
                             nuevo_comp.save()
 
-                # 3. RECALCULAR TOTALES DEL MOVIMIENTO
-                # Sumamos impuestos de TODOS los comprobantes (viejos + nuevos)
-                todos_comprobantes = movimiento.comprobantes.all()
-                
-                total_iva = sum(c.monto_iva for c in todos_comprobantes)
-                total_ret_iva = sum(c.monto_ret_iva for c in todos_comprobantes)
-                total_ret_isr = sum(c.monto_ret_isr for c in todos_comprobantes)
+                    # 3. RECALCULAR TOTALES
+                    todos_comprobantes = movimiento.comprobantes.all()
+                    
+                    movimiento.iva = sum(c.monto_iva for c in todos_comprobantes)
+                    movimiento.ret_iva = sum(c.monto_ret_iva for c in todos_comprobantes)
+                    movimiento.ret_isr = sum(c.monto_ret_isr for c in todos_comprobantes)
+                    movimiento.iva_total_xml = movimiento.iva
+                    
+                    movimiento.save()
 
-                # Actualizamos el movimiento padre con la suma total
-                movimiento.iva = total_iva
-                movimiento.ret_iva = total_ret_iva
-                movimiento.ret_isr = total_ret_isr
-                
-                # Campo opcional si lo usas
-                movimiento.iva_total_xml = total_iva
-                
-                movimiento.save()
+                messages.success(request, 'Movimiento actualizado correctamente con todos los datos.')
+                return redirect('detalle_movimiento', pk=movimiento.pk)
 
-            messages.success(request, 'Movimiento actualizado correctamente y totales recalculados.')
-            return redirect('detalle_movimiento', pk=movimiento.pk)
+            except Exception as e:
+                messages.error(request, f"Error al editar: {e}")
+                return render(request, 'flujo_bancos/crear_movimiento.html', {
+                    'form': form, 'movimiento': movimiento_original
+                })
     else:
         form = MovimientoForm(instance=movimiento_original)
 
@@ -619,7 +626,6 @@ def editar_movimiento(request, pk):
         'lista_conceptos': Movimiento.objects.values_list('concepto', flat=True).distinct()
     }
     return render(request, 'flujo_bancos/crear_movimiento.html', context)
-
 # ---------------------------------------------------------
 # CREAR TRANSFERENCIA
 # ---------------------------------------------------------
@@ -1260,3 +1266,71 @@ def eliminar_comprobante(request, comprobante_id):
     messages.success(request, "Comprobante eliminado.")
     return redirect('detalle_movimiento', pk=mov_id)
 
+
+def procesar_datos_xml_desde_bytes(contenido_bytes):
+    """
+    Recibe el contenido RAW (bytes) del archivo.
+    No depende de punteros de archivo, por lo que es infalible.
+    """
+    datos = {
+        'uuid': None, 
+        'iva': Decimal('0.00'), 
+        'ret_iva': Decimal('0.00'), 
+        'ret_isr': Decimal('0.00')
+    }
+    
+    try:
+        # Crear un stream en memoria exclusivo para el parser XML
+        xml_buffer = BytesIO(contenido_bytes)
+        
+        tree = ET.parse(xml_buffer)
+        root = tree.getroot()
+        
+        # Namespaces
+        ns = {'cfdi': 'http://www.sat.gob.mx/cfd/4', 'tfd': 'http://www.sat.gob.mx/TimbreFiscalDigital'}
+        if 'cfdi' not in root.tag:
+            ns['cfdi'] = 'http://www.sat.gob.mx/cfd/3'
+
+        # 1. UUID
+        tfd = root.find('.//tfd:TimbreFiscalDigital', ns)
+        if tfd is not None:
+            datos['uuid'] = tfd.get('UUID')
+
+        # 2. Impuestos (Estrategia Global primero)
+        impuestos_node = root.find('cfdi:Impuestos', ns)
+        encontrado_global = False
+        
+        if impuestos_node is not None:
+            total_traslados = impuestos_node.get('TotalImpuestosTrasladados')
+            if total_traslados:
+                datos['iva'] = Decimal(total_traslados)
+                encontrado_global = True
+            
+            retenciones = impuestos_node.findall('cfdi:Retenciones/cfdi:Retencion', ns)
+            if retenciones:
+                for ret in retenciones:
+                    imp = ret.get('Impuesto')
+                    importe = Decimal(ret.get('Importe') or 0)
+                    if imp == '002': datos['ret_iva'] += importe
+                    if imp == '001': datos['ret_isr'] += importe
+                encontrado_global = True
+
+        # 3. Impuestos (Estrategia Concepto a Concepto - Fallback)
+        if not encontrado_global or (datos['iva'] == 0 and datos['ret_iva'] == 0):
+            conceptos = root.findall('cfdi:Conceptos/cfdi:Concepto', ns)
+            for c in conceptos:
+                # Traslados
+                for t in c.findall('.//cfdi:Traslado', ns):
+                    if t.get('Impuesto') == '002':
+                        datos['iva'] += Decimal(t.get('Importe') or 0)
+                # Retenciones
+                for r in c.findall('.//cfdi:Retencion', ns):
+                    imp = r.get('Impuesto')
+                    val = Decimal(r.get('Importe') or 0)
+                    if imp == '002': datos['ret_iva'] += val
+                    if imp == '001': datos['ret_isr'] += val
+
+    except Exception as e:
+        print(f"Error procesando XML bytes: {e}")
+    
+    return datos
