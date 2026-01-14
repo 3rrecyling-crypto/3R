@@ -973,21 +973,24 @@ class RemisionDeleteView(DeleteView):
 
 @method_decorator(login_required, name='dispatch')
 class RegistroLogisticoListView(ListView):
-    model = RegistroLogistico
+    model = RegistroLogistico  # <--- Nota el espacio aquí
     template_name = 'ternium/lista_logistica_ternium.html'
     context_object_name = 'registros'
     paginate_by = 20
 
     def get_queryset(self):
-        queryset = super().get_queryset().select_related('transportista', 'tractor', 'material').order_by('-fecha_carga')
+        # Quitamos 'tractor' de select_related, solo dejamos FKs válidas
+        queryset = super().get_queryset().select_related('transportista', 'material').order_by('-fecha_carga')
+        
         q_remision = self.request.GET.get('q_remision')
         q_transportista = self.request.GET.get('q_transportista')
+        
         if q_remision:
             queryset = queryset.filter(Q(remision__icontains=q_remision) | Q(boleta_bascula__icontains=q_remision))
         if q_transportista:
             queryset = queryset.filter(transportista__nombre__icontains=q_transportista)
+            
         return queryset
-
 
 @method_decorator(login_required, name='dispatch')
 class RegistroLogisticoDetailView(DetailView):
@@ -1188,27 +1191,39 @@ def export_logistica_to_excel(request):
     ws.append(columns)
     ws.freeze_panes = 'A2'
 
+    # CORRECCIÓN 1: Quitamos tractor, tolva y chofer de select_related
     registros = RegistroLogistico.objects.select_related(
-        'transportista', 'tractor', 'tolva', 'chofer', 'material'
+        'transportista', 'material'
     ).order_by('-fecha_carga')
 
     for registro in registros:
         row_data = [
-            registro.id, registro.fecha_carga, registro.boleta_bascula, registro.remision,
+            registro.id, 
+            registro.fecha_carga, 
+            registro.boleta_bascula, 
+            registro.remision,
             registro.transportista.nombre if registro.transportista else 'N/A',
-            registro.tractor.placas if registro.tractor else 'N/A',
-            registro.tolva.placas if registro.tolva else 'N/A',
-            registro.tractor.nombre if registro.tractor else 'N/A',
-            registro.tolva.nombre if registro.tolva else 'N/A',
-            registro.chofer.nombre if registro.chofer else 'N/A',
-            registro.toneladas_remisionadas, registro.fecha_envio, registro.toneladas_recibidas,
+            
+            # CORRECCIÓN 2: Acceso directo al texto (ya no son objetos)
+            registro.tractor or 'N/A',  # PLACA TRACTOR
+            registro.tolva or 'N/A',    # PLACA TOLVA
+            registro.tractor or 'N/A',  # No. TRACTOR (Se repite el dato)
+            registro.tolva or 'N/A',    # No. TOLVA (Se repite el dato)
+            registro.chofer or 'N/A',   # CHOFER
+            
+            registro.toneladas_remisionadas, 
+            registro.fecha_envio, 
+            registro.toneladas_recibidas,
             registro.merma_absoluta,
             registro.material.id if registro.material else 'N/A',
             registro.material.nombre if registro.material else 'N/A',
             '', '', '', '',
             registro.merma_porcentaje if registro.merma_porcentaje is not None else 0,
         ]
+        
         ws.append(row_data)
+        
+        # Colorear filas con merma > 1%
         if registro.merma_porcentaje is not None and abs(registro.merma_porcentaje) > 1:
             for cell in ws[ws.max_row]:
                 cell.fill = yellow_fill

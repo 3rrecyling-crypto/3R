@@ -692,14 +692,23 @@ class RegistroLogistico(models.Model):
     transportista = models.ForeignKey(
         LineaTransporte, on_delete=models.SET_NULL, verbose_name="Transportista", null=True, blank=True
     )
-    chofer = models.ForeignKey(
-        Operador, on_delete=models.SET_NULL, verbose_name="Nombre del Chofer", null=True, blank=True
+    chofer = models.CharField(
+        max_length=200, 
+        verbose_name="Nombre del Chofer", 
+        null=True, 
+        blank=True
     )
-    tractor = models.ForeignKey(
-        Unidad, on_delete=models.SET_NULL, verbose_name="Tractor", related_name="registros_como_tractor", null=True, blank=True
+    tractor = models.CharField(
+        max_length=100, 
+        verbose_name="Tractor (Eco/Placas)", 
+        null=True, 
+        blank=True
     )
-    tolva = models.ForeignKey(
-        Contenedor, on_delete=models.SET_NULL, verbose_name="Tolva/Caja", related_name="registros_como_tolva", null=True, blank=True
+    tolva = models.CharField(
+        max_length=100, 
+        verbose_name="Tolva/Caja (Eco/Placas)", 
+        null=True, 
+        blank=True
     )
     
     material = models.ForeignKey(

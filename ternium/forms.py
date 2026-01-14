@@ -467,18 +467,27 @@ class RegistroLogisticoForm(forms.ModelForm):
             'foto_superior_llena', 'foto_trasera'
         ]
         widgets = {
+            # ... (campos de fecha y numeros siguen igual) ...
             'fecha_carga': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'fecha_envio': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'toneladas_remisionadas': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}),
             'toneladas_recibidas': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}),
             'remision': forms.TextInput(attrs={'class': 'form-control'}),
             'boleta_bascula': forms.TextInput(attrs={'class': 'form-control'}),
-            'transportista': forms.Select(attrs={'class': 'form-select'}),
-            'chofer': forms.Select(attrs={'class': 'form-select'}),
-            'tractor': forms.Select(attrs={'class': 'form-select'}),
-            'tolva': forms.Select(attrs={'class': 'form-select'}),
+
+            # --- CAMBIOS AQUÍ ---
+            # Transportista se queda como Select
+            'transportista': forms.Select(attrs={'class': 'form-select select2'}), 
+            
+            # Estos ahora son TextInput (Texto libre)
+            'chofer': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre completo del chofer'}), 
+            'tractor': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej. T-04 o Placas'}), 
+            'tolva': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej. C-10 o Placas'}), 
+            # --------------------
+
             'material': forms.Select(attrs={'class': 'form-select'}),
 
+            # ... (widgets de archivos siguen igual) ...
             'pdf_registro_camion_remision': forms.FileInput(attrs={'class': 'form-control', 'accept': 'application/pdf'}),
             'pdf_remision_permiso': forms.FileInput(attrs={'class': 'form-control', 'accept': 'application/pdf'}),
             'foto_superior_vacia': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
@@ -489,23 +498,23 @@ class RegistroLogisticoForm(forms.ModelForm):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+        # Filtramos solo Transportista y Material (Listas desplegables)
         try:
             ternium_empresa = Empresa.objects.get(nombre__iexact="TERNIUM")
             self.fields['transportista'].queryset = LineaTransporte.objects.filter(empresas=ternium_empresa).order_by('nombre')
-            self.fields['tractor'].queryset = Unidad.objects.filter(empresas=ternium_empresa).order_by('internal_id')
-            self.fields['tolva'].queryset = Contenedor.objects.filter(empresas=ternium_empresa).order_by('nombre')
             self.fields['material'].queryset = Material.objects.filter(empresas=ternium_empresa).order_by('nombre')
         except Empresa.DoesNotExist:
             self.fields['transportista'].queryset = LineaTransporte.objects.none()
-            self.fields['tractor'].queryset = Unidad.objects.none()
-            self.fields['tolva'].queryset = Contenedor.objects.none()
             self.fields['material'].queryset = Material.objects.none()
 
-        self.fields['chofer'].queryset = Operador.objects.all().order_by('nombre')
+        # Labels vacíos para los select
+        self.fields['transportista'].empty_label = "Seleccione Transportista"
+        self.fields['material'].empty_label = "Seleccione Material"
         
-        for field_name in ['transportista', 'chofer', 'tractor', 'tolva', 'material']:
-            self.fields[field_name].empty_label = "Seleccione una opción"
+        # NOTA: Ya no configuramos querysets para chofer, tractor ni tolva porque son texto libre.
             
+        # Si está auditado, deshabilitar todo
         if self.instance and self.instance.pk and self.instance.status == 'AUDITADO':
             for field in self.fields:
                 self.fields[field].disabled = True

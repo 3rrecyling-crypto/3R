@@ -238,6 +238,17 @@
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content bg-transparent border-0 shadow-none">
+      <div class="modal-body text-center position-relative">
+        <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close" style="z-index: 1056; background-color: white; opacity: 1;"></button>
+        <img src="" id="modalImageSrc" class="img-fluid rounded shadow-lg" alt="Vista Previa">
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock content %}
 
 {% block extra_css %}
@@ -356,6 +367,12 @@
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
+    transition: transform 0.2s ease;
+  }
+  
+  /* Efecto hover para indicar que es clickeable */
+  .image-preview img:hover {
+    transform: scale(1.05);
   }
   
   .preview-btn {
@@ -411,7 +428,7 @@ document.addEventListener('DOMContentLoaded', function() {
             span.textContent = remisionValue;
         });
         
-        // Esta parte ahora también actualiza el nombre de los PDF dinámicamente
+        // Actualizar nombres de PDF dinámicamente
         document.querySelectorAll('.file-preview-name').forEach(el => {
             if (el.innerHTML.includes('-4.pdf')) {
                 el.innerHTML = `<span class="remision-placeholder">${remisionValue}</span>-4.pdf`;
@@ -442,53 +459,83 @@ document.addEventListener('DOMContentLoaded', function() {
         form.classList.add('was-validated');
     }, false);
     
-    // Previsualización de imágenes NUEVAS
-    function handleImagePreview(input, previewId) {
-        const preview = document.getElementById(previewId);
-        preview.innerHTML = ''; 
-        
-        if (!input.files || !input.files[0]) {
-            preview.innerHTML = '<div class="text-muted"><i class="far fa-image fa-2x"></i></div>';
-            return;
-        }
-        
-        const file = input.files[0];
-        if (file && file.type.match('image.*')) {
-            const reader = new FileReader();
-            
-            reader.onload = function(e) {
-                const img = document.createElement('img');
-                img.src = e.target.result;
-                preview.appendChild(img);
-            }
-            reader.readAsDataURL(file);
-        } else {
-            preview.innerHTML = '<div class="text-muted"><i class="far fa-image fa-2x"></i></div>';
-        }
+    // --- LÓGICA DE VISTA PREVIA CON POPUP (MODAL) ---
+    
+    const modalElement = document.getElementById('imagePreviewModal');
+    const modalImage = document.getElementById('modalImageSrc');
+    const imageModal = new bootstrap.Modal(modalElement);
+
+    // Función para abrir el modal
+    function openModal(src) {
+        modalImage.src = src;
+        imageModal.show();
     }
-    
-    document.getElementById('id_foto_superior_vacia').addEventListener('change', function() { handleImagePreview(this, 'preview_foto_0'); });
-    document.getElementById('id_foto_frontal').addEventListener('change', function() { handleImagePreview(this, 'preview_foto_1'); });
-    document.getElementById('id_foto_superior_llena').addEventListener('change', function() { handleImagePreview(this, 'preview_foto_2'); });
-    document.getElementById('id_foto_trasera').addEventListener('change', function() { handleImagePreview(this, 'preview_foto_3'); });
-    
-    // INICIALIZAR VISTAS PREVIAS CON IMÁGENES EXISTENTES
+
+    // Función para manejar la previsualización y el clic
+    function setupPreview(input, previewId) {
+        const previewContainer = document.getElementById(previewId);
+        
+        input.addEventListener('change', function() {
+            previewContainer.innerHTML = ''; // Limpiar previo
+            
+            if (this.files && this.files[0]) {
+                const file = this.files[0];
+                if (file.type.match('image.*')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        // Estilo y evento click para el modal
+                        img.style.cursor = 'zoom-in'; 
+                        img.onclick = function() { openModal(e.target.result); };
+                        previewContainer.appendChild(img);
+                    }
+                    reader.readAsDataURL(file);
+                } else {
+                    previewContainer.innerHTML = '<div class="text-muted small">Archivo no es imagen</div>';
+                }
+            } else {
+                // Restaurar imagen si existía o poner icono
+                const existingUrl = previewContainer.dataset.existingImageUrl;
+                if(existingUrl) {
+                    renderExistingImage(previewContainer, existingUrl);
+                } else {
+                    previewContainer.innerHTML = '<div class="text-muted"><i class="far fa-image fa-2x"></i></div>';
+                }
+            }
+        });
+    }
+
+    // Función para renderizar imágenes que ya venían de la base de datos
+    function renderExistingImage(container, url) {
+        container.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = url;
+        img.style.cursor = 'zoom-in';
+        img.onclick = function() { openModal(url); }; // Clic para Popup
+        container.appendChild(img);
+    }
+
+    // Inicializar previsualizaciones existentes al cargar
     function initializePreviews() {
         const previewContainers = document.querySelectorAll('.image-preview');
         previewContainers.forEach(container => {
             const existingImageUrl = container.dataset.existingImageUrl;
-            
-            if (existingImageUrl) {
-                container.innerHTML = '';
-                const img = document.createElement('img');
-                img.src = existingImageUrl;
-                container.appendChild(img);
+            if (existingImageUrl && existingImageUrl !== "") {
+                renderExistingImage(container, existingImageUrl);
             } else {
                 container.innerHTML = '<div class="text-muted"><i class="far fa-image fa-2x"></i></div>';
             }
         });
     }
-    
+
+    // Configurar listeners para cada input de archivo
+    setupPreview(document.getElementById('id_foto_superior_vacia'), 'preview_foto_0');
+    setupPreview(document.getElementById('id_foto_frontal'), 'preview_foto_1');
+    setupPreview(document.getElementById('id_foto_superior_llena'), 'preview_foto_2');
+    setupPreview(document.getElementById('id_foto_trasera'), 'preview_foto_3');
+
+    // Cargar imágenes iniciales
     initializePreviews();
 
     // Cálculo de merma

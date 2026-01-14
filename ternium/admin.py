@@ -113,9 +113,17 @@ class DescargaAdmin(admin.ModelAdmin):
 class RegistroLogisticoAdmin(admin.ModelAdmin):
     list_display = ('remision', 'fecha_carga', 'status', 'transportista', 'toneladas_remisionadas', 'toneladas_recibidas')
     list_filter = ('status', 'fecha_carga', 'transportista')
-    search_fields = ('remision', 'boleta_bascula', 'chofer__nombre')
+    
+    # CAMBIO 1: Actualizamos search_fields
+    # Cambiamos 'chofer__nombre' por 'chofer' y agregamos tractor y tolva para poder buscarlos
+    search_fields = ('remision', 'boleta_bascula', 'chofer', 'tractor', 'tolva')
+    
     date_hierarchy = 'fecha_carga'
-    autocomplete_fields = ['transportista', 'chofer', 'tractor', 'tolva', 'material']
+    
+    # CAMBIO 2: Eliminamos chofer, tractor y tolva de aquí
+    # Solo dejamos transportista y material porque siguen siendo ForeignKeys
+    autocomplete_fields = ['transportista', 'material']
+    
     # OPTIMIZACIÓN
     list_per_page = 50
 
