@@ -206,7 +206,9 @@ class RemisionForm(forms.ModelForm):
         widgets = {
             'empresa': forms.Select(attrs={'class': 'form-select select2'}),
             'remision': forms.TextInput(attrs={'class': 'form-control'}),
-            'fecha': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            
+            # --- CORRECCIÓN FECHA: Agregamos format='%Y-%m-%d' ---
+            'fecha': forms.DateInput(format='%Y-%m-%d', attrs={'class': 'form-control', 'type': 'date'}),
             
             'linea_transporte': forms.Select(attrs={'class': 'form-select select2'}),
             'operador': forms.Select(attrs={'class': 'form-select select2'}),
@@ -216,13 +218,14 @@ class RemisionForm(forms.ModelForm):
             'destino': forms.Select(attrs={'class': 'form-select select2'}),
             'cliente': forms.Select(attrs={'class': 'form-select select2'}),
             
-            'inicia_ld': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
-            'termina_ld': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'inicia_ld': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'termina_ld': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'folio_ld': forms.TextInput(attrs={'class': 'form-control'}),
             'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
             
-            'inicia_dlv': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
-            'termina_dlv': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            # --- CORRECCIÓN HORAS: Agregamos format='%Y-%m-%dT%H:%M' ---
+            'inicia_dlv': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'termina_dlv': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'folio_dlv': forms.TextInput(attrs={'class': 'form-control'}),
             
             'comentario': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),

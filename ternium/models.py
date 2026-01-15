@@ -957,4 +957,19 @@ def save_user_profile(sender, instance, **kwargs):
     if hasattr(instance, 'ternium_profile'):
         instance.ternium_profile.save()
         
+class HistorialRemision(models.Model):
+    remision = models.ForeignKey(Remision, on_delete=models.CASCADE, related_name='historial')
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    fecha = models.DateTimeField(auto_now_add=True)
+    # Cambiamos accion/descripcion por un solo campo 'cambio' para coincidir con tu HTML
+    cambio = models.TextField(verbose_name="Descripción del cambio") 
+
+    class Meta:
+        ordering = ['-fecha']
+        verbose_name = "Historial de Remisión"
+        verbose_name_plural = "Historial de Remisiones"
+
+    def __str__(self):
+        return f"{self.remision} - {self.fecha}"
+        
     

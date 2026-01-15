@@ -13,6 +13,7 @@
         --light-color: #ecf0f1;
         --success-color: #27ae60;
         --danger-color: #e74c3c;
+        --info-color: #17a2b8;
         --border-radius: 8px;
         --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     }
@@ -118,6 +119,12 @@
         text-transform: uppercase; 
         background-color: #fff8e1; /* Color crema para indicar manual */
         border-color: #ffc107;
+    }
+    
+    /* Estilos tabla Historial */
+    .table-historial th {
+        background-color: #e9ecef;
+        color: #495057;
     }
 </style>
 {% endblock %}
@@ -265,12 +272,26 @@
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5><i class="fas fa-balance-scale me-2"></i>Materiales y Pesos</h5>
-                <button type="button" id="add-form" class="btn btn-success btn-sm"><i class="fas fa-plus me-1"></i> Añadir Material</button>
+                
+                <div class="d-flex align-items-center gap-3">
+                    <div class="form-check form-switch text-white">
+                        <input class="form-check-input" type="checkbox" id="check_unidad_peso" name="check_unidad_peso">
+                        <label class="form-check-label" for="check_unidad_peso">Ingresar en KG</label>
+                    </div>
+                    
+                    <button type="button" id="add-form" class="btn btn-success btn-sm"><i class="fas fa-plus me-1"></i> Añadir Material</button>
+                </div>
             </div>
+            
             <div class="card-body p-0">
                 {{ formset.management_form }}
                 <div class="row g-3 formset-header align-items-center d-none d-md-flex">
-                    <div class="col-md-3">MATERIAL</div><div class="col-md-2 text-end">CARGA (Ton)</div><div class="col-md-3">CLIENTE (Destino)</div><div class="col-md-2 text-end">DESCARGA (Ton)</div><div class="col-md-1 text-center">+/-</div><div class="col-md-1"></div>
+                    <div class="col-md-3">MATERIAL</div>
+                    <div class="col-md-2 text-end" id="header-peso-ld">CARGA (Ton)</div>
+                    <div class="col-md-3">CLIENTE (Destino)</div>
+                    <div class="col-md-2 text-end" id="header-peso-dlv">DESCARGA (Ton)</div>
+                    <div class="col-md-1 text-center">+/-</div>
+                    <div class="col-md-1"></div>
                 </div>
                 <div id="form-container">
                     {% for form in formset %}<div class="detalle-form-row"><div class="row g-3 align-items-center">
@@ -327,6 +348,44 @@
                 </div>
             </div>
         </div>
+
+        {% if is_editing %}
+        <div class="card mb-4 border-info">
+            <div class="card-header bg-info text-white">
+                <h5><i class="fas fa-history me-2"></i>Historial de Movimientos</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover mb-0 table-historial">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 20%;">Fecha y Hora</th>
+                                <th style="width: 20%;">Usuario</th>
+                                <th>Descripción del Cambio</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for h in remision.historial.all %}
+                            <tr>
+                                <td class="small">{{ h.fecha|date:"d/m/Y H:i" }}</td>
+                                <td class="fw-bold text-primary">
+                                    <i class="fas fa-user-circle me-1"></i>{{ h.usuario.username|default:"Sistema" }}
+                                </td>
+                                <td class="small">{{ h.cambio }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-3">
+                                    No hay historial registrado para esta remisión.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
         
         <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
             <a href="{% url 'remision_lista' %}" class="btn btn-secondary me-md-2">Cancelar</a>
@@ -403,7 +462,6 @@ $(document).ready(function() {
     const formContainer = $('#form-container');
     const addButton = $('#add-form');
     const totalFormsInput = $('#id_detalles-TOTAL_FORMS');
-    // NOTA: Gracias al cambio del HTML, esto ahora encuentra el input hidden en edición
     const empresaSelect = $('#id_empresa'); 
     const remisionInput = $('#id_remision_display');
     const destinoSelect = $('#id_destino'); 
@@ -417,6 +475,11 @@ $(document).ready(function() {
     const operadorInput = $('#id_operador_texto');
     const unidadInput = $('#id_unidad_texto');
     const contenedorInput = $('#id_contenedor_texto');
+
+    // --- VARIABLES PARA EL SWITCH DE UNIDADES ---
+    const checkUnidad = $('#check_unidad_peso');
+    const headerCarga = $('#header-peso-ld');
+    const headerDescarga = $('#header-peso-dlv');
 
     function initializeSelect2(context) {
         $(context).find('select:not([data-select2-id])').select2({
@@ -524,10 +587,7 @@ $(document).ready(function() {
                 cachedCatalogData.lugares = data.lugares_destino || []; 
 
                 populateSelect($('#id_linea_transporte'), data.lineas_transporte);
-                
-                // CORRECCIÓN: Llenar el Select de Operadores
                 populateSelect($('#id_operador'), data.operadores);
-                
                 populateSelect($('#id_unidad'), data.unidades);
                 populateSelect($('#id_contenedor'), data.contenedores);
                 populateSelect($('#id_origen'), data.lugares_origen);
@@ -600,6 +660,42 @@ $(document).ready(function() {
         $(this).closest('.detalle-form-row').find('input[type="checkbox"][name$="-DELETE"]').prop('checked', true).end().hide(); 
     });
 
+    // =========================================================================
+    // LÓGICA DE CÁLCULO DE PESOS Y SWITCH KG/TON
+    // =========================================================================
+    
+    // Función que se dispara al cambiar el switch de unidades
+    checkUnidad.on('change', function() {
+        const esKG = $(this).is(':checked');
+        
+        // 1. Cambiar etiquetas visuales en la cabecera de la tabla
+        if (esKG) {
+            headerCarga.text('CARGA (KG)');
+            headerDescarga.text('DESCARGA (KG)');
+        } else {
+            headerCarga.text('CARGA (Ton)');
+            headerDescarga.text('DESCARGA (Ton)');
+        }
+
+        // 2. Convertir valores en inputs (Solo conversión visual)
+        $('.peso-carga, .peso-descarga').each(function() {
+            let valor = parseFloat($(this).val());
+            if (!isNaN(valor)) {
+                if (esKG) {
+                    // De Ton a KG (visual) - Multiplicar por 1000
+                    $(this).val((valor * 1000).toFixed(0));
+                } else {
+                    // De KG a Ton (visual) - Dividir entre 1000
+                    $(this).val((valor / 1000).toFixed(3));
+                }
+            }
+        });
+        
+        // 3. Recalcular las diferencias disparando el evento input
+        $('.peso-carga').trigger('input');
+    });
+
+    // Función de cálculo al escribir en los campos de peso
     formContainer.on('input', '.peso-carga, .peso-descarga', function() { 
         const row = $(this).closest('.row');
         const carga = parseFloat(row.find('.peso-carga').val()) || 0;
@@ -608,7 +704,16 @@ $(document).ready(function() {
         const labelSpan = row.find('.perdida-calculada-label');
         const valorSpan = row.find('.perdida-calculada-valor');
 
-        valorSpan.text(diferencia.toFixed(3));
+        // Mostrar etiqueta correcta según la unidad seleccionada
+        let displayDiff = diferencia;
+        if (checkUnidad.is(':checked')) {
+             displayDiff = diferencia.toFixed(0) + " Kg";
+        } else {
+             displayDiff = diferencia.toFixed(3) + " Ton";
+        }
+
+        valorSpan.text(displayDiff);
+        
         if (diferencia >= 0) {
             labelSpan.text('GANANCIA').removeClass('text-danger').addClass('text-success');
             valorSpan.removeClass('text-danger').addClass('text-success');
@@ -618,6 +723,7 @@ $(document).ready(function() {
         }
     });
     
+    // Inicializar cálculos al cargar la página
     $('.detalle-form-row').each(function() {
         $(this).find('.peso-carga').trigger('input');
     });
