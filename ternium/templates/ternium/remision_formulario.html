@@ -91,33 +91,22 @@
     .preview-container:hover {
         transform: scale(1.02);
     }
-    .preview-overlay {
-        position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0,0,0,0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        opacity: 0;
-        transition: opacity 0.2s;
-        border-radius: 8px;
-    }
-    .preview-container:hover .preview-overlay {
-        opacity: 1;
-    }
     
+    /* --- CORRECCIÓN CRÍTICA DE Z-INDEX PARA EL POPUP --- */
     .modal-backdrop {
-        z-index: 10050 !important;
+        z-index: 20000 !important; /* Fondo oscuro muy alto */
     }
     .modal {
-        z-index: 10060 !important;
+        z-index: 20010 !important; /* Modal más alto que el fondo */
+    }
+    .modal-dialog {
+        z-index: 20020 !important;
     }
     
     /* Clase para input de texto alternativo */
     .campo-texto-alternativo {
         text-transform: uppercase; 
-        background-color: #fff8e1; /* Color crema para indicar manual */
+        background-color: #fff8e1;
         border-color: #ffc107;
     }
     
@@ -274,11 +263,6 @@
                 <h5><i class="fas fa-balance-scale me-2"></i>Materiales y Pesos</h5>
                 
                 <div class="d-flex align-items-center gap-3">
-                    <div class="form-check form-switch text-white">
-                        <input class="form-check-input" type="checkbox" id="check_unidad_peso" name="check_unidad_peso">
-                        <label class="form-check-label" for="check_unidad_peso">Ingresar en KG</label>
-                    </div>
-                    
                     <button type="button" id="add-form" class="btn btn-success btn-sm"><i class="fas fa-plus me-1"></i> Añadir Material</button>
                 </div>
             </div>
@@ -287,31 +271,49 @@
                 {{ formset.management_form }}
                 <div class="row g-3 formset-header align-items-center d-none d-md-flex">
                     <div class="col-md-3">MATERIAL</div>
-                    <div class="col-md-2 text-end" id="header-peso-ld">CARGA (Ton)</div>
-                    <div class="col-md-3">CLIENTE (Destino)</div>
-                    <div class="col-md-2 text-end" id="header-peso-dlv">DESCARGA (Ton)</div>
+                    <div class="col-md-1">UNIDAD</div> <div class="col-md-2 text-end">CARGA</div>
+                    <div class="col-md-2">CLIENTE (Destino)</div>
+                    <div class="col-md-2 text-end">DESCARGA</div>
                     <div class="col-md-1 text-center">+/-</div>
                     <div class="col-md-1"></div>
                 </div>
                 <div id="form-container">
-                    {% for form in formset %}<div class="detalle-form-row"><div class="row g-3 align-items-center">
-                        <div class="col-12 col-md-3">{{ form.material }}<div class="form-error">{{ form.material.errors }}</div></div>
-                        <div class="col-6 col-md-2">{{ form.peso_ld }}<div class="form-error">{{ form.peso_ld.errors }}</div></div>
-                        <div class="col-12 col-md-3">{{ form.cliente }}<div class="form-error">{{ form.cliente.errors }}</div></div>
-                        <div class="col-6 col-md-2">{{ form.peso_dlv }}<div class="form-error">{{ form.peso_dlv.errors }}</div></div>
-                        <div class="col-6 col-md-1 text-center"><span class="perdida-calculada-label">PÉRDIDA</span><span class="perdida-calculada-valor text-danger">0.000</span></div>
-                        
-                        <div class="col-12 col-md-1 text-center delete-widget-cell">
-                            {{ form.DELETE }} <button type="button" class="btn btn-danger btn-sm btn-delete-row w-100"><i class="fas fa-trash"></i></button>
+                    {% for form in formset %}
+                    <div class="detalle-form-row">
+                        <div class="row g-3 align-items-center">
+                            <div class="col-12 col-md-3">{{ form.material }}<div class="form-error">{{ form.material.errors }}</div></div>
+                            
+                            <div class="col-6 col-md-1">{{ form.unidad_medida }}</div>
+
+                            <div class="col-6 col-md-2">{{ form.peso_ld }}<div class="form-error">{{ form.peso_ld.errors }}</div></div>
+                            
+                            <div class="col-12 col-md-2">{{ form.cliente }}<div class="form-error">{{ form.cliente.errors }}</div></div>
+                            
+                            <div class="col-6 col-md-2">{{ form.peso_dlv }}<div class="form-error">{{ form.peso_dlv.errors }}</div></div>
+                            
+                            <div class="col-6 col-md-1 text-center"><span class="perdida-calculada-label">PÉRDIDA</span><span class="perdida-calculada-valor text-danger">0.000</span></div>
+                            
+                            <div class="col-12 col-md-1 text-center delete-widget-cell">
+                                {{ form.DELETE }} <button type="button" class="btn btn-danger btn-sm btn-delete-row w-100"><i class="fas fa-trash"></i></button>
+                            </div>
+                            {{ form.id }}
                         </div>
-                        {{ form.id }}
-                    </div></div>{% endfor %}
+                    </div>
+                    {% endfor %}
                 </div>
-                <div id="empty-form-template" style="display: none;"><div class="detalle-form-row"><div class="row g-3 align-items-center">
-                    <div class="col-12 col-md-3">{{ formset.empty_form.material }}</div><div class="col-6 col-md-2">{{ formset.empty_form.peso_ld }}</div><div class="col-12 col-md-3">{{ formset.empty_form.cliente }}</div><div class="col-6 col-md-2">{{ formset.empty_form.peso_dlv }}</div>
-                    <div class="col-6 col-md-1 text-center"><span class="perdida-calculada-label">PÉRDIDA</span><span class="perdida-calculada-valor text-danger">0.000</span></div>
-                    <div class="col-12 col-md-1 text-center delete-widget-cell">{{ formset.empty_form.DELETE }}<button type="button" class="btn btn-danger btn-sm btn-delete-row w-100"><i class="fas fa-trash"></i></button></div>
-                </div></div></div>
+                
+                <div id="empty-form-template" style="display: none;">
+                    <div class="detalle-form-row">
+                        <div class="row g-3 align-items-center">
+                            <div class="col-12 col-md-3">{{ formset.empty_form.material }}</div>
+                            <div class="col-6 col-md-1">{{ formset.empty_form.unidad_medida }}</div> <div class="col-6 col-md-2">{{ formset.empty_form.peso_ld }}</div>
+                            <div class="col-12 col-md-2">{{ formset.empty_form.cliente }}</div>
+                            <div class="col-6 col-md-2">{{ formset.empty_form.peso_dlv }}</div>
+                            <div class="col-6 col-md-1 text-center"><span class="perdida-calculada-label">PÉRDIDA</span><span class="perdida-calculada-valor text-danger">0.000</span></div>
+                            <div class="col-12 col-md-1 text-center delete-widget-cell">{{ formset.empty_form.DELETE }}<button type="button" class="btn btn-danger btn-sm btn-delete-row w-100"><i class="fas fa-trash"></i></button></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -330,20 +332,58 @@
                             
                             {{ form.evidencia_documento }}
                             
-                            <div class="form-text mt-2 text-muted">Seleccione un archivo (PDF o Imagen). Si ya existe uno, se mostrará arriba.</div>
-                            
-                            <div id="preview-container" class="mt-3 text-center" style="display:none;">
-                                <h6 class="text-primary mb-2">Vista Previa de archivo nuevo:</h6>
-                                <div class="preview-container d-inline-block rounded shadow-sm border p-1" onclick="openPreviewModalFromInput()">
-                                    <div id="preview-content"></div>
-                                    <div class="preview-overlay">
-                                        <i class="fas fa-search-plus fa-2x"></i>
-                                    </div>
-                                </div>
+                            <div class="form-text mt-2 text-muted">
+                                Puede seleccionar <strong>múltiples archivos</strong> manteniendo presionada la tecla Ctrl.
                             </div>
+                            
+                            <div id="preview-container" class="mt-3" style="display:none;">
+                                <h6 class="text-primary w-100 mb-2 small fw-bold text-uppercase">Archivos seleccionados para subir:</h6>
+                                <div id="preview-gallery" class="d-flex flex-wrap gap-2">
+                                    </div>
+                            </div>
+
+                            {% if remision and remision.evidencias.all %}
+                                <hr class="my-3">
+                                <h6 class="text-dark mb-2 small fw-bold text-uppercase"><i class="fas fa-folder-open me-2"></i>Archivos Guardados:</h6>
+                                <div class="row g-2">
+                                    {% for ev in remision.evidencias.all %}
+                                    <div class="col-6 col-md-4 col-lg-3">
+                                        <div class="card h-100 border shadow-sm position-relative overflow-hidden bg-white">
+                                            {% if is_editing and remision.status != 'AUDITADO' %}
+                                            <form action="{% url 'eliminar_evidencia_individual' ev.id %}" method="POST" 
+                                                  class="position-absolute top-0 end-0 z-index-2" style="z-index: 10;">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-danger btn-sm p-0 d-flex align-items-center justify-content-center shadow-sm" 
+                                                        style="width: 24px; height: 24px; border-radius: 0 0 0 4px;" 
+                                                        title="Eliminar archivo"
+                                                        onclick="return confirm('¿Eliminar este archivo permanentemente?');">
+                                                    <i class="fas fa-times" style="font-size: 0.7rem;"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+
+                                            <div class="card-body p-2 text-center d-flex flex-column align-items-center justify-content-center" 
+                                                 style="cursor: pointer; height: 100px;"
+                                                 onclick="openPreviewModal('{{ ev.archivo.url }}', '{% if ev.es_imagen %}image{% else %}pdf{% endif %}')">
+                                                
+                                                {% if ev.es_imagen %}
+                                                    <img src="{{ ev.archivo.url }}" class="img-fluid rounded" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+                                                {% else %}
+                                                    <i class="fas fa-file-pdf fa-3x text-danger"></i>
+                                                {% endif %}
+                                            </div>
+                                            <div class="card-footer p-1 bg-light text-center border-top-0">
+                                                <small class="d-block text-truncate text-muted" style="font-size: 0.7rem;" title="{{ ev.nombre_corto }}">
+                                                    {{ ev.nombre_corto }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
-
                     <div class="col-12 mt-3"><label for="{{ form.comentario.id_for_label }}" class="form-label">{{ form.comentario.label }}</label>{{ form.comentario }}</div>
                 </div>
             </div>
@@ -416,9 +456,7 @@
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     var modalEl = document.getElementById('universalModal');
-    if(modalEl) {
-        document.body.appendChild(modalEl);
-    }
+    if(modalEl) { document.body.appendChild(modalEl); }
 });
 
 let currentPreviewData = null;
@@ -427,31 +465,17 @@ let currentPreviewType = null;
 function openPreviewModal(src, type) {
     const container = document.getElementById('modal-content-area');
     container.innerHTML = ''; 
-    
     if (type === 'pdf') {
         const iframe = document.createElement('iframe');
-        iframe.src = src;
-        iframe.style.width = '100%';
-        iframe.style.height = '100%';
-        iframe.style.border = 'none';
+        iframe.src = src; iframe.style.width = '100%'; iframe.style.height = '100%'; iframe.style.border = 'none';
         container.appendChild(iframe);
     } else {
         const img = document.createElement('img');
-        img.src = src;
-        img.style.maxWidth = '100%';
-        img.style.maxHeight = '100%';
-        img.style.objectFit = 'contain';
+        img.src = src; img.style.maxWidth = '100%'; img.style.maxHeight = '100%'; img.style.objectFit = 'contain';
         container.appendChild(img);
     }
-    
     const myModal = new bootstrap.Modal(document.getElementById('universalModal'));
     myModal.show();
-}
-
-function openPreviewModalFromInput() {
-    if (currentPreviewData && currentPreviewType) {
-        openPreviewModal(currentPreviewData, currentPreviewType);
-    }
 }
 
 $(document).ready(function() {
@@ -476,11 +500,6 @@ $(document).ready(function() {
     const unidadInput = $('#id_unidad_texto');
     const contenedorInput = $('#id_contenedor_texto');
 
-    // --- VARIABLES PARA EL SWITCH DE UNIDADES ---
-    const checkUnidad = $('#check_unidad_peso');
-    const headerCarga = $('#header-peso-ld');
-    const headerDescarga = $('#header-peso-dlv');
-
     function initializeSelect2(context) {
         $(context).find('select:not([data-select2-id])').select2({
             theme: 'bootstrap-5', width: '100%', placeholder: 'Seleccione una opción', allowClear: true
@@ -494,9 +513,7 @@ $(document).ready(function() {
         if (options) {
             options.forEach(i => $(selectElement).append(new Option(i.nombre || i.placas, i.id)));
         }
-        if(currentVal) {
-            $(selectElement).val(currentVal).trigger('change');
-        }
+        if(currentVal) { $(selectElement).val(currentVal).trigger('change'); }
     }
 
     function toggleTransportFields() {
@@ -506,69 +523,58 @@ $(document).ready(function() {
         }
 
         if (selectedText.includes("3R")) {
-            // MODO 3R
-            operadorSelect.parent().show();
-            operadorSelect.next('.select2-container').show();
-            operadorInput.hide(); 
-            
-            unidadSelect.parent().hide();
-            unidadSelect.next('.select2-container').hide();
-            unidadInput.show();
-            
-            contenedorSelect.parent().hide();
-            contenedorSelect.next('.select2-container').hide();
-            contenedorInput.show();
-            
+            operadorSelect.parent().show(); operadorSelect.next('.select2-container').show(); operadorInput.hide(); 
+            unidadSelect.parent().hide(); unidadSelect.next('.select2-container').hide(); unidadInput.show();
+            contenedorSelect.parent().hide(); contenedorSelect.next('.select2-container').hide(); contenedorInput.show();
         } else {
-            // MODO TERCEROS
-            operadorSelect.parent().hide();
-            operadorSelect.next('.select2-container').hide();
-            operadorInput.show();
-            
-            unidadSelect.parent().hide();
-            unidadSelect.next('.select2-container').hide();
-            unidadInput.show();
-            
-            contenedorSelect.parent().hide();
-            contenedorSelect.next('.select2-container').hide();
-            contenedorInput.show();
+            operadorSelect.parent().hide(); operadorSelect.next('.select2-container').hide(); operadorInput.show();
+            unidadSelect.parent().hide(); unidadSelect.next('.select2-container').hide(); unidadInput.show();
+            contenedorSelect.parent().hide(); contenedorSelect.next('.select2-container').hide(); contenedorInput.show();
         }
     }
 
     initializeSelect2(document);
-
-    lineaTransporteSelect.on('change', function() {
-        toggleTransportFields();
-    });
+    lineaTransporteSelect.on('change', function() { toggleTransportFields(); });
 
     $('#id_evidencia_documento').change(function(){
-        const file = this.files[0];
+        const files = this.files;
         const previewContainer = $('#preview-container');
-        const contentDiv = $('#preview-content');
+        const gallery = $('#preview-gallery');
+        gallery.empty();
         
-        if (file){
+        if (files.length > 0){
             previewContainer.show();
-            const reader = new FileReader();
-            
-            reader.onload = function(e) {
-                currentPreviewData = e.target.result;
-                contentDiv.empty();
+            Array.from(files).forEach((file) => {
+                const reader = new FileReader();
+                const itemDiv = $('<div class="border rounded p-1 bg-white text-center position-relative" style="width: 80px; height: 80px; cursor: pointer;"></div>');
+                
+                reader.onload = function(e) {
+                    let content = '';
+                    const result = e.target.result;
+                    let fileType = 'unknown';
 
-                if (file.type === 'application/pdf') {
-                    currentPreviewType = 'pdf';
-                    contentDiv.html('<div class="p-3 bg-white"><i class="fas fa-file-pdf fa-4x text-danger"></i><div class="mt-2 fw-bold text-dark">PDF Seleccionado</div></div>');
-                } else if (file.type.startsWith('image/')) {
-                    currentPreviewType = 'image';
-                    contentDiv.html(`<img src="${e.target.result}" style="max-height: 200px; display: block;" class="img-fluid rounded">`);
-                } else {
-                    currentPreviewType = null;
-                    contentDiv.html('<div class="p-3 text-muted">Vista previa no disponible</div>');
+                    if (file.type === 'application/pdf') {
+                        content = '<i class="fas fa-file-pdf fa-2x text-danger mt-2"></i>'; fileType = 'pdf';
+                    } else if (file.type.startsWith('image/')) {
+                        content = `<img src="${result}" class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;">`; fileType = 'image';
+                    } else {
+                        content = '<i class="fas fa-file fa-2x text-secondary mt-2"></i>';
+                    }
+                    
+                    if (!file.type.startsWith('image/')) {
+                        itemDiv.append(content);
+                        itemDiv.append(`<div class="text-truncate mt-1" style="font-size: 8px;">${file.name}</div>`);
+                    } else {
+                        itemDiv.html(content);
+                    }
+                    
+                    itemDiv.on('click', function() { openPreviewModal(result, fileType); });
+                    gallery.append(itemDiv);
                 }
-            }
-            reader.readAsDataURL(file);
+                reader.readAsDataURL(file);
+            });
         } else {
             previewContainer.hide();
-            currentPreviewData = null;
         }
     });
 
@@ -597,7 +603,6 @@ $(document).ready(function() {
                     populateSelect($(this).find('select[name$="-material"]'), cachedCatalogData.materiales);
                     populateSelect($(this).find('select[name$="-cliente"]'), cachedCatalogData.lugares);
                 });
-                
                 toggleTransportFields();
             })
             .catch(error => console.error("Error catálogos:", error))
@@ -627,7 +632,6 @@ $(document).ready(function() {
         }
     });
 
-    // Si hay un valor seleccionado (por ejemplo, al editar), disparamos el change
     if (empresaSelect.val()) { 
         empresaSelect.trigger('change');
     } else {
@@ -654,6 +658,9 @@ $(document).ready(function() {
 
         initializeSelect2(newRow); 
         totalFormsInput.val(formIndex + 1);
+        
+        // Calcular valores iniciales
+        calcularFila(newRow);
     });
     
     formContainer.on('click', '.btn-delete-row', function() { 
@@ -661,59 +668,29 @@ $(document).ready(function() {
     });
 
     // =========================================================================
-    // LÓGICA DE CÁLCULO DE PESOS Y SWITCH KG/TON
+    // LÓGICA DE CÁLCULO DE PESOS INDIVIDUAL POR FILA (REEMPLAZANDO GLOBAL)
     // =========================================================================
-    
-    // Función que se dispara al cambiar el switch de unidades
-    checkUnidad.on('change', function() {
-        const esKG = $(this).is(':checked');
-        
-        // 1. Cambiar etiquetas visuales en la cabecera de la tabla
-        if (esKG) {
-            headerCarga.text('CARGA (KG)');
-            headerDescarga.text('DESCARGA (KG)');
-        } else {
-            headerCarga.text('CARGA (Ton)');
-            headerDescarga.text('DESCARGA (Ton)');
-        }
 
-        // 2. Convertir valores en inputs (Solo conversión visual)
-        $('.peso-carga, .peso-descarga').each(function() {
-            let valor = parseFloat($(this).val());
-            if (!isNaN(valor)) {
-                if (esKG) {
-                    // De Ton a KG (visual) - Multiplicar por 1000
-                    $(this).val((valor * 1000).toFixed(0));
-                } else {
-                    // De KG a Ton (visual) - Dividir entre 1000
-                    $(this).val((valor / 1000).toFixed(3));
-                }
-            }
-        });
-        
-        // 3. Recalcular las diferencias disparando el evento input
-        $('.peso-carga').trigger('input');
-    });
-
-    // Función de cálculo al escribir en los campos de peso
-    formContainer.on('input', '.peso-carga, .peso-descarga', function() { 
-        const row = $(this).closest('.row');
+    function calcularFila(row) {
+        const unidad = row.find('.unidad-select').val(); // 'TON' o 'KG'
         const carga = parseFloat(row.find('.peso-carga').val()) || 0;
         const descarga = parseFloat(row.find('.peso-descarga').val()) || 0;
-        const diferencia = descarga - carga; 
+        
+        const diferencia = descarga - carga;
+        
         const labelSpan = row.find('.perdida-calculada-label');
         const valorSpan = row.find('.perdida-calculada-valor');
-
-        // Mostrar etiqueta correcta según la unidad seleccionada
-        let displayDiff = diferencia;
-        if (checkUnidad.is(':checked')) {
-             displayDiff = diferencia.toFixed(0) + " Kg";
-        } else {
-             displayDiff = diferencia.toFixed(3) + " Ton";
-        }
-
-        valorSpan.text(displayDiff);
         
+        // Formateo visual
+        let textoDiferencia = "";
+        if (unidad === 'KG') {
+            textoDiferencia = diferencia.toFixed(0) + " Kg";
+        } else {
+            textoDiferencia = diferencia.toFixed(3) + " Ton";
+        }
+        
+        valorSpan.text(textoDiferencia);
+
         if (diferencia >= 0) {
             labelSpan.text('GANANCIA').removeClass('text-danger').addClass('text-success');
             valorSpan.removeClass('text-danger').addClass('text-success');
@@ -721,11 +698,17 @@ $(document).ready(function() {
             labelSpan.text('PÉRDIDA').removeClass('text-success').addClass('text-danger');
             valorSpan.removeClass('text-success').addClass('text-danger');
         }
+    }
+
+    // 1. Escuchar cambios en los inputs de peso Y en el selector de unidad
+    formContainer.on('input change', '.peso-carga, .peso-descarga, .unidad-select', function() { 
+        const row = $(this).closest('.detalle-form-row');
+        calcularFila(row);
     });
-    
-    // Inicializar cálculos al cargar la página
+
+    // 2. Inicializar cálculos al cargar la página (para edición)
     $('.detalle-form-row').each(function() {
-        $(this).find('.peso-carga').trigger('input');
+        calcularFila($(this));
     });
 
 });

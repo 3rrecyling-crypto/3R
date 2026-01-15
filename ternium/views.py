@@ -50,7 +50,7 @@ from django.conf import settings
 from .models import (
     Empresa, Lugar, Remision, EntradaMaquila, LineaTransporte,
     Operador, Material, Unidad, Contenedor, DetalleRemision,
-    InventarioPatio, Descarga, RegistroLogistico
+    InventarioPatio, Descarga, RegistroLogistico,EvidenciaRemision
 )
 from .forms import (
     EmpresaForm, LugarForm, RemisionForm, DetalleRemisionForm,
@@ -768,7 +768,8 @@ def crear_remision(request):
         valores_manuales['unidad'] = request.POST.get('unidad_texto', '').strip().upper()
         valores_manuales['contenedor'] = request.POST.get('contenedor_texto', '').strip().upper()
         
-        usaron_kg = request.POST.get('check_unidad_peso') == 'on'
+        # NOTA: Eliminamos la variable usaron_kg global, ahora es por fila.
+        
         empresa_id = request.POST.get('empresa')
         if empresa_id:
             try:
@@ -792,7 +793,7 @@ def crear_remision(request):
                 with transaction.atomic(): 
                     remision = form.save(commit=False)
 
-                    # Lógica Manuales
+                    # --- Lógica Manuales ---
                     if valores_manuales['operador']:
                         remision.operador_manual = valores_manuales['operador']; remision.operador = None 
                     else: remision.operador_manual = None
@@ -805,43 +806,56 @@ def crear_remision(request):
                         remision.contenedor_manual = valores_manuales['contenedor']; remision.contenedor = None
                     else: remision.contenedor_manual = None
                     
-                    # Seguridad y Folio
+                    # --- Seguridad ---
                     if not request.user.is_superuser and remision.empresa:
                         perfil = getattr(request.user, 'ternium_profile', None)
                         if not perfil or not perfil.empresas_autorizadas.filter(pk=remision.empresa.pk).exists():
                             raise PermissionDenied("No tienes permiso para esta empresa.")
 
+                    # --- Generación de Folio ---
                     if empresa_seleccionada and empresa_seleccionada.prefijo:
                         remision.remision = calcular_siguiente_folio(empresa_seleccionada.prefijo)
                     
-                    # Archivo
-                    if 'evidencia_documento' in request.FILES:
-                        archivo = request.FILES['evidencia_documento']
-                        s3_path = f"remisiones/{remision.remision}/evidencia_{archivo.name}"
-                        ruta_s3 = _subir_archivo_a_s3(archivo, s3_path)
-                        if ruta_s3: remision.evidencia_documento = ruta_s3
-
+                    # GUARDAMOS PRIMERO LA REMISIÓN
                     remision.save() 
                     
-                    # --- NUEVO: GUARDAR HISTORIAL DE CREACIÓN ---
+                    # --- Archivos Múltiples ---
+                    if request.FILES.getlist('evidencia_documento'):
+                        archivos = request.FILES.getlist('evidencia_documento')
+                        for i, archivo in enumerate(archivos):
+                            nombre_limpio = archivo.name.replace(" ", "_")
+                            s3_path = f"remisiones/{remision.remision}/evidencia_{i}_{nombre_limpio}"
+                            ruta_s3 = _subir_archivo_a_s3(archivo, s3_path)
+                            if ruta_s3:
+                                EvidenciaRemision.objects.create(remision=remision, archivo=ruta_s3)
+                    
+                    # --- Historial ---
                     HistorialRemision.objects.create(
                         remision=remision,
                         usuario=request.user,
                         cambio="Creación de la remisión"
                     )
-                    # -------------------------------------------
                     
-                    # Formset
+                    # --- Formset (Detalles) ---
                     detalles = formset.save(commit=False)
                     for detalle in detalles:
                         detalle.remision = remision
-                        if usaron_kg:
-                            if detalle.peso_ld: detalle.peso_ld = detalle.peso_ld / decimal.Decimal(1000)
-                            if detalle.peso_dlv: detalle.peso_dlv = detalle.peso_dlv / decimal.Decimal(1000)
+                        
+                        # --- CONVERSIÓN INDIVIDUAL POR FILA ---
+                        # Si el usuario eligió 'KG', dividimos entre 1000 para guardar Toneladas
+                        if detalle.unidad_medida == 'KG':
+                            if detalle.peso_ld: 
+                                detalle.peso_ld = detalle.peso_ld / decimal.Decimal(1000)
+                            if detalle.peso_dlv: 
+                                detalle.peso_dlv = detalle.peso_dlv / decimal.Decimal(1000)
+                        # --------------------------------------
+                        
                         detalle.save()
                     for obj in formset.deleted_objects: obj.delete()
 
+                    # --- Inventarios ---
                     _update_inventory_from_remision(remision, revert=False)
+                    
                     messages.success(request, f'Remisión {remision.remision} creada exitosamente.')
                     return redirect('remision_lista')
                 
@@ -853,7 +867,6 @@ def crear_remision(request):
 
     context = {'form': form, 'formset': formset, 'titulo': 'Nueva Remisión', 'is_editing': False, 'valores_manuales': valores_manuales, 'remision': None}
     return render(request, 'ternium/remision_formulario.html', context)
-
 
 
 @login_required
@@ -887,7 +900,7 @@ def editar_remision(request, pk):
         nuevo_op_manual = request.POST.get('operador_texto', '').strip().upper()
         nuevo_uni_manual = request.POST.get('unidad_texto', '').strip().upper()
         nuevo_cont_manual = request.POST.get('contenedor_texto', '').strip().upper()
-        usaron_kg = request.POST.get('check_unidad_peso') == 'on'
+        # NOTA: Eliminamos usaron_kg
 
         form = RemisionForm(request.POST, request.FILES, instance=remision_original, empresa=empresa_para_form, user=request.user)
         
@@ -902,9 +915,7 @@ def editar_remision(request, pk):
         if form.is_valid() and formset.is_valid():
             try:
                 with transaction.atomic():
-                    # =======================================================
-                    # DETECCIÓN DE CAMBIOS
-                    # =======================================================
+                    remision_db = Remision.objects.get(pk=pk)
                     cambios_log = []
 
                     def get_val(manual, catalogo):
@@ -912,102 +923,54 @@ def editar_remision(request, pk):
                         if catalogo: return f"{catalogo}" 
                         return "Vacío"
 
-                    # 1. Comparar Operador/Unidad/Contenedor
-                    val_ant = get_val(remision_original.operador_manual, remision_original.operador)
+                    # --- Comparaciones de Campos Manuales ---
+                    val_ant = get_val(remision_db.operador_manual, remision_db.operador)
                     val_nue = get_val(nuevo_op_manual, form.cleaned_data.get('operador'))
-                    if val_ant != val_nue and "Manual" not in val_nue: 
-                        cambios_log.append(f"Operador: '{val_ant}' ➝ '{val_nue}'")
+                    if val_ant != val_nue: cambios_log.append(f"Operador: '{val_ant}' ➝ '{val_nue}'")
 
-                    val_ant = get_val(remision_original.unidad_manual, remision_original.unidad)
+                    val_ant = get_val(remision_db.unidad_manual, remision_db.unidad)
                     val_nue = get_val(nuevo_uni_manual, form.cleaned_data.get('unidad'))
-                    if val_ant != val_nue and "Manual" not in val_nue:
-                        cambios_log.append(f"Unidad: '{val_ant}' ➝ '{val_nue}'")
+                    if val_ant != val_nue: cambios_log.append(f"Unidad: '{val_ant}' ➝ '{val_nue}'")
 
-                    val_ant = get_val(remision_original.contenedor_manual, remision_original.contenedor)
+                    val_ant = get_val(remision_db.contenedor_manual, remision_db.contenedor)
                     val_nue = get_val(nuevo_cont_manual, form.cleaned_data.get('contenedor'))
-                    if val_ant != val_nue and "Manual" not in val_nue:
-                        cambios_log.append(f"Contenedor: '{val_ant}' ➝ '{val_nue}'")
+                    if val_ant != val_nue: cambios_log.append(f"Contenedor: '{val_ant}' ➝ '{val_nue}'")
 
-                    # 2. Comparar Campos Simples
-                    campos_excluidos = [
-                        'operador', 'unidad', 'contenedor', 'evidencia_documento',
-                        'operador_manual', 'unidad_manual', 'contenedor_manual'
-                    ]
-                    
+                    # --- Comparaciones Campos Simples ---
+                    campos_excluidos = ['operador', 'unidad', 'contenedor', 'evidencia_documento', 'operador_manual', 'unidad_manual', 'contenedor_manual', 'empresa']
                     if form.has_changed():
                         for field_name in form.changed_data:
                             if field_name not in campos_excluidos:
                                 label = form.fields[field_name].label or field_name
                                 val_nue = form.cleaned_data.get(field_name)
-                                
-                                if hasattr(remision_original, field_name):
-                                    val_ant = getattr(remision_original, field_name)
-                                else:
-                                    val_ant = form.initial.get(field_name)
-
+                                val_ant = getattr(remision_db, field_name)
                                 s_ant = str(val_ant) if val_ant not in [None, ''] else "Vacío"
                                 s_nue = str(val_nue) if val_nue not in [None, ''] else "Vacío"
-                                cambios_log.append(f"{label}: '{s_ant}' ➝ '{s_nue}'")
+                                if s_ant != s_nue: cambios_log.append(f"{label}: '{s_ant}' ➝ '{s_nue}'")
 
-                    # 3. Comparar Materiales (CORREGIDO: CONSULTA A BD)
+                    # --- Comparaciones Formset (Materiales) ---
+                    # Nota: Aquí solo registramos qué cambió. La lógica de conversión está en el guardado.
                     if formset.has_changed():
                         for f in formset:
-                            # a) Nuevo registro
                             if not f.instance.pk and f.has_changed() and not f.cleaned_data.get('DELETE'):
                                 mat = f.cleaned_data.get('material')
                                 peso = f.cleaned_data.get('peso_ld')
-                                cambios_log.append(f"Material AGREGADO: {mat} ({peso} Ton)")
+                                unidad = f.cleaned_data.get('unidad_medida') # Info extra para el log
+                                cambios_log.append(f"Material AGREGADO: {mat} ({peso} {unidad})")
                             
-                            # b) Registro eliminado
                             elif f.cleaned_data.get('DELETE') and f.instance.pk:
-                                # Aquí f.instance sigue siendo válido porque no se ha borrado de BD aun
                                 mat = f.instance.material
                                 cambios_log.append(f"Material ELIMINADO: {mat}")
                             
-                            # c) Registro modificado
                             elif f.instance.pk and f.has_changed():
-                                # === CLAVE: Traer el objeto original de la BD para tener el dato viejo ===
-                                try:
-                                    detalle_db = DetalleRemision.objects.get(pk=f.instance.pk)
-                                except DetalleRemision.DoesNotExist:
-                                    continue # Seguridad
-
                                 for campo in f.changed_data:
-                                    if campo in ['peso_ld', 'peso_dlv', 'material', 'cliente']:
-                                        val_nue = f.cleaned_data.get(campo)
-                                        
-                                        # Sacamos el valor anterior del objeto de BD, no del formulario
-                                        if campo == 'material':
-                                            val_ant = detalle_db.material
-                                            lbl = "Material (Item)"
-                                        elif campo == 'cliente':
-                                            val_ant = detalle_db.cliente
-                                            lbl = "Cliente (Item)"
-                                        elif campo == 'peso_ld':
-                                            val_ant = detalle_db.peso_ld
-                                            lbl = "Carga (Item)"
-                                        elif campo == 'peso_dlv':
-                                            val_ant = detalle_db.peso_dlv
-                                            lbl = "Descarga (Item)"
-                                        
-                                        s_ant = str(val_ant) if val_ant is not None else "Vacío"
-                                        s_nue = str(val_nue) if val_nue is not None else "Vacío"
-                                        
-                                        # Solo agregamos si visualmente son distintos
-                                        if s_ant != s_nue:
-                                            cambios_log.append(f"{lbl}: {s_ant} ➝ {s_nue}")
+                                    if campo in ['peso_ld', 'peso_dlv', 'material', 'cliente', 'unidad_medida']:
+                                        cambios_log.append(f"Detalle modificado: {campo}")
 
-                    # 4. Archivos
-                    if 'evidencia_documento' in request.FILES:
-                        cambios_log.append("Archivo de evidencia actualizado")
-
-                    # =======================================================
-                    # GUARDADO
-                    # =======================================================
-                    _update_inventory_from_remision(remision_original, revert=True)
+                    # --- Guardado ---
+                    _update_inventory_from_remision(remision_db, revert=True)
                     remision = form.save(commit=False)
 
-                    # Asignar Manuales
                     if nuevo_op_manual: remision.operador_manual = nuevo_op_manual; remision.operador = None 
                     else: remision.operador_manual = None
                     if nuevo_uni_manual: remision.unidad_manual = nuevo_uni_manual; remision.unidad = None
@@ -1015,33 +978,40 @@ def editar_remision(request, pk):
                     if nuevo_cont_manual: remision.contenedor_manual = nuevo_cont_manual; remision.contenedor = None
                     else: remision.contenedor_manual = None
 
-                    # Archivo
-                    if 'evidencia_documento' in request.FILES:
-                        if remision_original.evidencia_documento and hasattr(remision_original.evidencia_documento, 'name'):
-                            _eliminar_archivo_de_s3(remision_original.evidencia_documento.name)
-                        archivo = request.FILES['evidencia_documento']
-                        s3_path = f"remisiones/{remision.remision}/evidencia_{archivo.name}"
-                        ruta_s3 = _subir_archivo_a_s3(archivo, s3_path)
-                        if ruta_s3: remision.evidencia_documento = ruta_s3
-
                     remision.save()
-                    
-                    # Guardar Historial
-                    if cambios_log:
-                        texto_historial = " | ".join(cambios_log)
-                        HistorialRemision.objects.create(
-                            remision=remision,
-                            usuario=request.user,
-                            cambio=texto_historial
-                        )
 
-                    # Guardar Formset
+                    # Archivos
+                    if request.FILES.getlist('evidencia_documento'):
+                        archivos = request.FILES.getlist('evidencia_documento')
+                        conteo_existente = remision.evidencias.count()
+                        for i, archivo in enumerate(archivos):
+                            nombre_limpio = archivo.name.replace(" ", "_")
+                            idx = conteo_existente + i + 1 
+                            s3_path = f"remisiones/{remision.remision}/evidencia_{idx}_{nombre_limpio}"
+                            ruta_s3 = _subir_archivo_a_s3(archivo, s3_path)
+                            if ruta_s3:
+                                EvidenciaRemision.objects.create(remision=remision, archivo=ruta_s3)
+                        cambios_log.append(f"Se agregaron {len(archivos)} archivos de evidencia")
+                    
+                    # Historial
+                    if cambios_log:
+                        cambios_unicos = list(dict.fromkeys(cambios_log))
+                        texto_historial = " | ".join(cambios_unicos)
+                        HistorialRemision.objects.create(remision=remision, usuario=request.user, cambio=texto_historial)
+
+                    # --- Guardado Formset (CONVERSIÓN) ---
                     detalles = formset.save(commit=False)
                     for detalle in detalles:
                         detalle.remision = remision
-                        if usaron_kg:
-                            if detalle.peso_ld: detalle.peso_ld = detalle.peso_ld / decimal.Decimal(1000)
-                            if detalle.peso_dlv: detalle.peso_dlv = detalle.peso_dlv / decimal.Decimal(1000)
+                        
+                        # CONVERSIÓN INDIVIDUAL
+                        if detalle.unidad_medida == 'KG':
+                            # Si es KG, dividimos entre 1000 para guardar en TON
+                            if detalle.peso_ld:
+                                detalle.peso_ld = detalle.peso_ld / decimal.Decimal(1000)
+                            if detalle.peso_dlv:
+                                detalle.peso_dlv = detalle.peso_dlv / decimal.Decimal(1000)
+                        
                         detalle.save()
                     
                     for obj in formset.deleted_objects:
@@ -1071,7 +1041,6 @@ def editar_remision(request, pk):
         'is_editing': True, 'valores_manuales': valores_manuales
     }
     return render(request, 'ternium/remision_formulario.html', context)
-
 @login_required
 @require_POST
 @permission_required('ternium.can_audit_remision', raise_exception=True)
@@ -3389,3 +3358,23 @@ def registrar_historial(remision, usuario, accion, descripcion=""):
         )
     except Exception as e:
         print(f"Error guardando historial: {e}")
+        
+@login_required
+@require_POST
+def eliminar_evidencia_individual(request, pk):
+    evidencia = get_object_or_404(EvidenciaRemision, pk=pk)
+    remision_id = evidencia.remision.pk
+    
+    # Seguridad
+    if evidencia.remision.status == 'AUDITADO':
+        messages.error(request, "No se puede eliminar evidencia de una remisión auditada.")
+    else:
+        # Borrar de S3
+        if evidencia.archivo and hasattr(evidencia.archivo, 'name'):
+            _eliminar_archivo_de_s3(evidencia.archivo.name)
+        
+        # Borrar de BD
+        evidencia.delete()
+        messages.success(request, "Archivo eliminado correctamente.")
+        
+    return redirect('editar_remision', pk=remision_id)

@@ -593,7 +593,16 @@ class Cliente(models.Model):
 
 class DetalleRemision(models.Model):
     remision = models.ForeignKey(Remision, on_delete=models.CASCADE, related_name='detalles')
-    
+    UNIDAD_CHOICES = [
+        ('TON', 'Ton'),
+        ('KG', 'Kg'),
+    ]
+    unidad_medida = models.CharField(
+        max_length=3, 
+        choices=UNIDAD_CHOICES, 
+        default='TON',
+        verbose_name="Unidad"
+    )
     # --- CAMBIO: Agregamos null=True y blank=True ---
     material = models.ForeignKey(
         Material, 
@@ -972,4 +981,25 @@ class HistorialRemision(models.Model):
     def __str__(self):
         return f"{self.remision} - {self.fecha}"
         
+        
+class EvidenciaRemision(models.Model):
+    """
+    Modelo para soportar múltiples archivos por remisión.
+    """
+    remision = models.ForeignKey(Remision, on_delete=models.CASCADE, related_name='evidencias')
+    archivo = models.FileField(
+        upload_to='remisiones/evidencias/', # Django requiere esto, aunque usaremos S3 manual
+        verbose_name="Archivo de Evidencia"
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Evidencia {self.id} - {self.remision.remision}"
+
+    def nombre_corto(self):
+        return os.path.basename(self.archivo.name)
+        
+    def es_imagen(self):
+        ext = os.path.splitext(self.archivo.name)[1].lower()
+        return ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']
     

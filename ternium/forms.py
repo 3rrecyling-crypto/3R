@@ -41,7 +41,7 @@ class CustomImageWidget(forms.ClearableFileInput):
         return mark_safe(''.join(output))
 
 
-class MultipleFileInput(ClearableFileInput):
+class MultipleFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True
 
 
@@ -184,23 +184,26 @@ class LugarForm(forms.ModelForm):
 
 
 class RemisionForm(forms.ModelForm):
-    # --- 2. APLICAMOS EL WIDGET AQUI ---
+    # Modificamos el campo para permitir múltiples archivos
     evidencia_documento = forms.FileField(
         required=False,
-        label="Evidencia (PDF o Foto)",
-        widget=CustomImageWidget(attrs={ # Usamos el widget personalizado
+        label="Evidencias (Seleccione uno o varios archivos)",
+        widget=MultipleFileInput(attrs={  # <--- AQUÍ USAMOS EL WIDGET PERSONALIZADO
             'class': 'form-control',
-            'accept': 'image/*,application/pdf'
+            'accept': 'image/*,application/pdf',
+            'multiple': True 
         })
     )
 
     class Meta:
         model = Remision
+        # Excluimos evidencia_documento del modelo porque lo manejaremos manual
         exclude = [
             'status', 'auditado_por', 'auditado_en', 
             'evidencia_carga', 'evidencia_descarga', 
             'creado_en', 'actualizado_en',
-            'archivos_evidencia' 
+            'archivos_evidencia',
+            'evidencia_documento' # Lo excluimos del Meta porque lo definimos arriba manual
         ]
         
         widgets = {
@@ -287,15 +290,18 @@ class RemisionForm(forms.ModelForm):
 class DetalleRemisionForm(forms.ModelForm):
     class Meta:
         model = DetalleRemision
-        fields = ['material', 'cliente', 'peso_ld', 'peso_dlv']
+        # Agregamos 'unidad_medida' a los campos
+        fields = ['material', 'unidad_medida', 'cliente', 'peso_ld', 'peso_dlv']
         widgets = {
             'material': forms.Select(attrs={'class': 'form-select material-select'}),
+            # Widget para el selector de unidad (pequeño y centrado)
+            'unidad_medida': forms.Select(attrs={'class': 'form-select unidad-select text-center', 'style': 'padding-right: 20px;'}),
             'cliente': forms.Select(attrs={'class': 'form-select cliente-select'}),
             'peso_ld': forms.NumberInput(attrs={'class': 'form-control peso-carga text-end', 'step': '0.001', 'placeholder': '0.000'}),
             'peso_dlv': forms.NumberInput(attrs={'class': 'form-control peso-descarga text-end', 'step': '0.001', 'placeholder': '0.000'}),
         }
         labels = {
-            'material': '', 'cliente': '', 'peso_ld': '', 'peso_dlv': ''
+            'material': '', 'unidad_medida': '', 'cliente': '', 'peso_ld': '', 'peso_dlv': ''
         }
 
     def __init__(self, *args, **kwargs):
@@ -303,13 +309,13 @@ class DetalleRemisionForm(forms.ModelForm):
         lugar_queryset = kwargs.pop('lugar_queryset', None)
         super().__init__(*args, **kwargs)
         
-        # --- CAMBIO: Hacer el Material opcional en el formulario ---
+        # --- Configuración de campos opcionales/requeridos ---
         self.fields['material'].required = False
         self.fields['cliente'].required = False
         self.fields['peso_ld'].required = False
         self.fields['peso_dlv'].required = False
-        # -----------------------------------------------------------
         
+        # --- Querysets ---
         if material_queryset is not None:
             self.fields['material'].queryset = material_queryset
         else:
@@ -319,6 +325,15 @@ class DetalleRemisionForm(forms.ModelForm):
             self.fields['cliente'].queryset = lugar_queryset
         else:
             self.fields['cliente'].queryset = Lugar.objects.none()
+
+        # --- LÓGICA DE VISUALIZACIÓN (Edición) ---
+        # Si el registro ya existe y fue guardado en KG, multiplicamos por 1000 
+        # para mostrárselo al usuario en KG (aunque en BD esté en Toneladas).
+        if self.instance.pk and self.instance.unidad_medida == 'KG':
+            if self.instance.peso_ld:
+                self.initial['peso_ld'] = self.instance.peso_ld * 1000
+            if self.instance.peso_dlv:
+                self.initial['peso_dlv'] = self.instance.peso_dlv * 1000
 
 
 class DescargaForm(forms.ModelForm):
