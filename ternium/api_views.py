@@ -191,18 +191,68 @@ def asignar_folio_medline(remision):
     month = f"{fecha_base.month:02d}"
     prefix = f"3R-{year}-{month}-"
 
-    last_rem = Remision.objects.filter(folio_medline__startswith=prefix).order_by('folio_medline').last()
-    if last_rem and last_rem.folio_medline:
-        try:
-            last_num = int(last_rem.folio_medline.split('-')[-1])
-            next_num = last_num + 1
-        except ValueError:
+    with transaction.atomic():
+        last_rem = (
+            Remision.objects
+            .select_for_update()
+            .filter(folio_medline__startswith=prefix)
+            .order_by('folio_medline')
+            .last()
+        )
+        if last_rem and last_rem.folio_medline:
+            try:
+                last_num = int(last_rem.folio_medline.split('-')[-1])
+                next_num = last_num + 1
+            except ValueError:
+                next_num = 1
+        else:
             next_num = 1
-    else:
-        next_num = 1
 
-    remision.folio_medline = f"{prefix}{next_num:03d}"
-    remision.save(update_fields=['folio_medline'])
+        remision.folio_medline = f"{prefix}{next_num:03d}"
+        remision.save(update_fields=['folio_medline'])
+
+
+def _renumerar_folios_medline(folio_cancelado):
+    """
+    Dado el folio_medline que acaba de liberarse, renumera hacia abajo
+    todos los folios del mismo mes que tengan número mayor, llenando el hueco.
+    Debe llamarse DENTRO de un transaction.atomic() existente.
+    Ejemplo: si se cancela 3R-2026-04-003 y existen 004 y 005,
+             quedan renumerados a 003 y 004.
+    """
+    if not folio_cancelado:
+        return
+    parts = folio_cancelado.split('-')  # ['3R', '2026', '04', '003']
+    if len(parts) != 4:
+        return
+    try:
+        num_cancelado = int(parts[-1])
+    except ValueError:
+        return
+    prefix = f"{parts[0]}-{parts[1]}-{parts[2]}-"
+
+    # Obtener todos los folios del mismo mes, ordenar numéricamente en Python
+    todos_mes = list(
+        Remision.objects
+        .select_for_update()
+        .filter(folio_medline__startswith=prefix)
+    )
+
+    def _folio_num(r):
+        try:
+            return int(r.folio_medline.split('-')[-1])
+        except (ValueError, IndexError, AttributeError):
+            return 0
+
+    para_renumerar = sorted(
+        [r for r in todos_mes if _folio_num(r) > num_cancelado],
+        key=_folio_num,
+    )
+
+    for i, rem in enumerate(para_renumerar):
+        nuevo_num = num_cancelado + i
+        rem.folio_medline = f"{prefix}{nuevo_num:03d}"
+        rem.save(update_fields=['folio_medline'])
 
 
 # =========================================================================
@@ -1118,106 +1168,94 @@ def export_remisiones_to_excel(request):
     yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
     # =========================================================================
-    # LÓGICA REPORTE MEDLINE
+    # LÓGICA REPORTE MEDLINE — dos pestañas: Cartón y Archivo Muerto
     # =========================================================================
     if tipo_reporte == 'medline':
-        ws.title = "Reporte Medline"
-        headers = [
-            "Remisión", "Origen", "Material", "Peso Carga (Kg)",
-            "Folio Carga", "Inicia Carga", "PRECIO", "VENTA", "BULTOS", "FOLIO"
-        ]
-        ws.append(headers)
-
         pink_fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
         header_pink = PatternFill(start_color="FF66B2", end_color="FF66B2", fill_type="solid")
         yellow_header = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
         green_header = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
 
-        for col_idx, cell in enumerate(ws[1], start=1):
-            cell.alignment = center_style
-            cell.font = Font(bold=True, color="FFFFFF" if col_idx <= 6 else "000000")
-            if col_idx <= 6: cell.fill = header_pink
-            elif col_idx in [7, 8]: cell.fill = yellow_header
-            elif col_idx in [9, 10]: cell.fill = green_header
+        medline_headers = [
+            "Remisión", "Origen", "Material", "Peso Carga (Kg)",
+            "Folio Carga", "Inicia Carga", "PRECIO", "VENTA", "BULTOS", "FOLIO"
+        ]
 
-        total_peso = 0
-        total_venta = 0
+        def _estilo_encabezados_medline(sheet):
+            for col_idx, cell in enumerate(sheet[1], start=1):
+                cell.alignment = center_style
+                cell.font = Font(bold=True, color="FFFFFF" if col_idx <= 6 else "000000")
+                if col_idx <= 6: cell.fill = header_pink
+                elif col_idx in [7, 8]: cell.fill = yellow_header
+                elif col_idx in [9, 10]: cell.fill = green_header
 
-        for remision in queryset:
-            val_inicia = timezone.localtime(remision.inicia_ld).date() if remision.inicia_ld else remision.fecha
-            fecha_str = val_inicia.strftime("%d/%m/%Y") if val_inicia else ""
+        def _poblar_hoja_medline(sheet, tipo_mat):
+            """
+            tipo_mat: 'carton' | 'archivo'
+            Rellena la hoja con las remisiones que correspondan al material indicado.
+            Devuelve (total_peso, total_venta).
+            """
+            total_peso = 0.0
+            total_venta = 0.0
+            for remision in queryset:
+                val_inicia = timezone.localtime(remision.inicia_ld).date() if remision.inicia_ld else remision.fecha
+                fecha_str = val_inicia.strftime("%d/%m/%Y") if val_inicia else ""
+                for d in remision.detalles.all():
+                    mat_nom = d.material.nombre.upper() if d.material else "CARTON"
+                    es_archivo = "ARCHIVO" in mat_nom
+                    es_carton = "CARTON" in mat_nom or "CARTÓN" in mat_nom
+                    if tipo_mat == 'archivo' and not es_archivo:
+                        continue
+                    if tipo_mat == 'carton' and not es_carton:
+                        continue
+                    bultos = int(d.bultos or 0)
+                    peso_ld = float(d.peso_ld or 0)
+                    precio_mostrado = precio_archivo_val if es_archivo else precio_carton_val
+                    venta_calculada = peso_ld * precio_mostrado
+                    total_peso += peso_ld
+                    total_venta += venta_calculada
+                    folio_generado = remision.folio_medline or "N/A"
+                    row_data = [
+                        remision.remision,
+                        remision.origen.nombre if remision.origen else 'MEDLINE',
+                        mat_nom,
+                        peso_ld,
+                        remision.folio_ld or '',
+                        fecha_str,
+                        precio_mostrado,
+                        venta_calculada,
+                        bultos,
+                        folio_generado
+                    ]
+                    sheet.append(row_data)
+                    current_row = sheet.max_row
+                    for col_idx in range(1, 11):
+                        cell = sheet.cell(row=current_row, column=col_idx)
+                        cell.alignment = center_style
+                        if col_idx <= 6: cell.fill = pink_fill
+                        if col_idx == 4: cell.number_format = '#,##0.000'
+                        if col_idx == 7: cell.number_format = '"$"#,##0.00'
+                        if col_idx == 8: cell.number_format = '"$"#,##0.00'
+            # Fila de totales
+            sheet.append(["", "", "", total_peso, "", "", "", total_venta, "", ""])
+            last = sheet.max_row
+            sheet.cell(row=last, column=4).font = Font(bold=True)
+            sheet.cell(row=last, column=4).number_format = '#,##0.000'
+            sheet.cell(row=last, column=8).font = Font(bold=True)
+            sheet.cell(row=last, column=8).number_format = '"$"#,##0.00'
+            return total_peso, total_venta
 
-            if val_inicia:
-                row_year = val_inicia.year
-                row_month = f"{val_inicia.month:02d}"
-            else:
-                row_year = datetime.date.today().year
-                row_month = f"{datetime.date.today().month:02d}"
+        # --- Pestaña 1: Cartón ---
+        ws.title = "Cartón"
+        ws.append(medline_headers)
+        _estilo_encabezados_medline(ws)
+        _poblar_hoja_medline(ws, 'carton')
 
-            # Iteramos por cada MATERIAL (detalle) dentro de la remisión
-            for d in remision.detalles.all():
-                mat_nom = d.material.nombre.upper() if d.material else "CARTON"
-
-                # ==========================================================
-                # NUEVA LÓGICA DE FILTRADO: Saltar lo que no corresponde
-                # ==========================================================
-                if material_medline == 'archivo' and "ARCHIVO" not in mat_nom:
-                    continue  # Si el usuario pidió ARCHIVO MUERTO, saltamos el Cartón
-
-                if material_medline == 'carton' and "CARTON" not in mat_nom and "CARTÓN" not in mat_nom:
-                    continue  # Si pidió CARTÓN, saltamos todo lo que NO sea cartón (como Basura)
-                # ==========================================================
-
-                bultos = int(d.bultos or 0)
-                peso_ld = float(d.peso_ld or 0)
-
-                # Asignar precio exacto dependiendo de si es Archivo o Cartón
-                if "ARCHIVO" in mat_nom:
-                    precio_mostrado = precio_archivo_val
-                else:
-                    precio_mostrado = precio_carton_val
-
-                venta_calculada = peso_ld * precio_mostrado
-
-                total_peso += peso_ld
-                total_venta += venta_calculada
-
-                # NUEVO: Usamos el folio oficial persistente de la Base de Datos
-                folio_generado = remision.folio_medline or "N/A"
-
-                row_data = [
-                    remision.remision,
-                    remision.origen.nombre if remision.origen else 'MEDLINE',
-                    mat_nom,
-                    peso_ld,
-                    remision.folio_ld or '',
-                    fecha_str,
-                    precio_mostrado,
-                    venta_calculada,
-                    bultos,
-                    folio_generado
-                ]
-                ws.append(row_data)
-                current_row = ws.max_row
-
-                for col_idx in range(1, 11):
-                    cell = ws.cell(row=current_row, column=col_idx)
-                    cell.alignment = center_style
-                    if col_idx <= 6: cell.fill = pink_fill
-                    if col_idx == 4: cell.number_format = '#,##0.000'
-                    if col_idx == 7: cell.number_format = '"$"#,##0.00'
-                    if col_idx == 8: cell.number_format = '"$"#,##0.00'
-
-        ws.append(["", "", "", total_peso, "", "", "", total_venta, "", ""])
-        last_row = ws.max_row
-
-        peso_total_cell = ws.cell(row=last_row, column=4)
-        peso_total_cell.font = Font(bold=True)
-        peso_total_cell.number_format = '#,##0.000'
-
-        venta_total_cell = ws.cell(row=last_row, column=8)
-        venta_total_cell.font = Font(bold=True)
-        venta_total_cell.number_format = '"$"#,##0.00'
+        # --- Pestaña 2: Archivo Muerto ---
+        ws_archivo = wb.create_sheet(title="Archivo Muerto")
+        ws_archivo.append(medline_headers)
+        _estilo_encabezados_medline(ws_archivo)
+        _poblar_hoja_medline(ws_archivo, 'archivo')
 
     # =========================================================================
     # LÓGICA REPORTE CONCENTRADO
@@ -1473,13 +1511,18 @@ def export_remisiones_to_excel(request):
         tab.tableStyleInfo = style
         ws.add_table(tab)
 
-    for col in ws.columns:
-        max_length = 0; column_letter = col[0].column_letter
-        for cell in col:
-            try:
-                if cell.value and len(str(cell.value)) > max_length: max_length = len(str(cell.value))
-            except: pass
-        ws.column_dimensions[column_letter].width = min(max_length + 3, 60)
+    def _auto_ancho(sheet):
+        for col in sheet.columns:
+            max_length = 0; column_letter = col[0].column_letter
+            for cell in col:
+                try:
+                    if cell.value and len(str(cell.value)) > max_length: max_length = len(str(cell.value))
+                except: pass
+            sheet.column_dimensions[column_letter].width = min(max_length + 3, 60)
+
+    _auto_ancho(ws)
+    if tipo_reporte == 'medline':
+        _auto_ancho(ws_archivo)
 
     nombre_base = f"Remisiones_{tipo_reporte.capitalize()}"
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
@@ -1718,50 +1761,20 @@ def export_reportes_especificos(request):
 def exportar_zip_medline(request):
     """
     Exporta en un archivo ZIP todas las Boletas de Salida de remisiones
-    cuyo origen sea MEDLINE, filtradas por fecha o rango de folios.
+    cuyo origen sea MEDLINE. Busca en toda la base de datos sin filtros de fecha/folio.
+    El nombre de cada archivo usa: {remision}_{folio_ld}_{folio_dlv}
     """
-    fecha_inicio = request.POST.get('fecha_inicio')
-    fecha_fin = request.POST.get('fecha_fin')
-    folio_inicio = request.POST.get('folio_inicio')
-    folio_fin = request.POST.get('folio_fin')
-
-    # 1. Filtro base: Origen MEDLINE y que tengan archivo físico registrado
+    # 1. Filtro base: Origen MEDLINE y que tengan archivo físico registrado (toda la BD)
     queryset = Remision.objects.filter(
         origen__nombre__icontains='MEDLINE'
     ).exclude(boleta_salida_medline__exact='').exclude(boleta_salida_medline__isnull=True)
 
-    # 2. Aplicar filtros de Fecha o Folio
-    if fecha_inicio and fecha_fin:
-        queryset = queryset.filter(fecha__range=[fecha_inicio, fecha_fin])
-
-    elif folio_inicio and folio_fin:
-        remisiones_validas_ids = []
-        try:
-            inicio_num = int(folio_inicio)
-            fin_num = int(folio_fin)
-
-            for rem in queryset:
-                if rem.folio_medline:
-                    # Extraer la parte numérica final (ej: 3R-2026-04-001 -> 001)
-                    try:
-                        partes = rem.folio_medline.split('-')
-                        numero_folio = int(partes[-1])
-                        if inicio_num <= numero_folio <= fin_num:
-                            remisiones_validas_ids.append(rem.id)
-                    except (ValueError, IndexError):
-                        continue
-
-            queryset = Remision.objects.filter(id__in=remisiones_validas_ids)
-        except ValueError:
-            messages.error(request, "Los rangos de folio deben ser números válidos.")
-            return redirect('remision_lista')
-
     # Validar si la consulta regresó resultados antes de procesar
     if not queryset.exists():
-        messages.warning(request, "No se encontraron documentos para los filtros seleccionados.")
+        messages.warning(request, "No se encontraron boletas de salida MEDLINE en la base de datos.")
         return redirect('remision_lista')
 
-    # 3. Creación del ZIP en memoria
+    # 2. Creación del ZIP en memoria
     buffer = BytesIO()
     archivos_agregados = 0
 
@@ -1771,10 +1784,12 @@ def exportar_zip_medline(request):
 
             if archivo and hasattr(archivo, 'name') and archivo.name:
                 try:
-                    # Definir nombre del archivo dentro del ZIP
+                    # Nombre del archivo: {remision}_{folio_ld}_{folio_dlv}
                     ext = archivo.name.split('.')[-1]
-                    folio_display = remision.folio_medline if remision.folio_medline else remision.remision
-                    nuevo_nombre = f"Boleta_Salida_MEDLINE_{folio_display}.{ext}"
+                    folio_ld_part = remision.folio_ld or 'SinFolioCarga'
+                    folio_dlv_part = remision.folio_dlv or 'SinFolioDescarga'
+                    remision_part = remision.remision or remision.folio_medline or str(remision.pk)
+                    nuevo_nombre = f"{remision_part}_{folio_ld_part}_{folio_dlv_part}.{ext}"
 
                     file_data = None
 
@@ -1792,7 +1807,7 @@ def exportar_zip_medline(request):
                             with urllib.request.urlopen(req) as response:
                                 file_data = response.read()
                         except Exception as e_url:
-                            print(f"Error crítico leyendo archivo {folio_display}: {e_url}")
+                            print(f"Error crítico leyendo archivo {nuevo_nombre}: {e_url}")
 
                     # Si obtuvimos datos, agregamos al ZIP
                     if file_data:
@@ -1955,7 +1970,11 @@ def cancelar_remision(request, pk):
             # 1. Revertir inventario
             _update_inventory_from_remision(remision, revert=True)
 
-            # 2. Actualizar estatus
+            # 2. Guardar folio Medline antes de liberarlo
+            folio_liberado = remision.folio_medline
+            remision.folio_medline = None
+
+            # 3. Actualizar estatus
             remision.status = 'CANCELADO'
 
             usuario_nombre = request.user.username
@@ -1963,6 +1982,9 @@ def cancelar_remision(request, pk):
             remision.descripcion += f" [CANCELADA por {usuario_nombre} el {fecha_str}]"
 
             remision.save()
+
+            # 4. Renumerar folios Medline posteriores para cerrar el hueco
+            _renumerar_folios_medline(folio_liberado)
 
             # --- HISTORIAL: REGISTRAR CANCELACIÓN ---
             HistorialRemision.objects.create(
