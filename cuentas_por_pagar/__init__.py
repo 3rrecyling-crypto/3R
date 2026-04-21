@@ -1,0 +1,1 @@
+default_app_config = 'cuentas_por_pagar.apps.CuentasPorPagarConfig'

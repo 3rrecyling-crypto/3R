@@ -1,0 +1,96 @@
+{% extends 'ternium/base.html' %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            
+            {% if emisor_actual %}
+            <div class="card shadow border-success mb-4">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-check-circle me-2"></i> Emisor Configurado Actualmente
+                    </h5>
+                    <span class="badge bg-white text-success">ACTIVO</span>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <h3 class="fw-bold text-dark mb-1">{{ emisor_actual.razon_social }}</h3>
+                            <div class="text-muted mb-3">
+                                <strong>RFC:</strong> {{ emisor_actual.rfc }} | 
+                                <strong>Régimen:</strong> {{ emisor_actual.regimen_fiscal }}
+                            </div>
+                            
+                            <div class="alert alert-light border-start border-4 border-success">
+                                <h6 class="text-success fw-bold"><i class="fas fa-map-marker-alt me-2"></i>Dirección Fiscal Registrada:</h6>
+                                <p class="mb-0 text-dark" style="font-size: 1.1rem;">
+                                    {{ emisor_actual.direccion }}
+                                    <br>
+                                    <strong>C.P. {{ emisor_actual.codigo_postal }}</strong>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-warning shadow-sm mb-4 border-start border-4 border-warning">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+                    <div>
+                        <h5 class="alert-heading fw-bold mb-1">Sin Configuración</h5>
+                        <p class="mb-0">No se han detectado datos de emisor. No podrás facturar hasta seleccionar un lugar abajo.</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="card shadow border-0">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-sync-alt me-2"></i> Actualizar/Cambiar Emisor</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="alert alert-info border-0 bg-info-subtle text-info-emphasis mb-4">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Selecciona uno de tus <strong>Lugares/Sucursales</strong> registrados en el sistema. 
+                        El sistema copiará automáticamente el RFC, Razón Social y Dirección Fiscal de ese lugar.
+                    </div>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        {% if form.errors %}
+                            <div class="alert alert-danger">
+                                {{ form.errors }}
+                            </div>
+                        {% endif %}
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-dark">
+                                Selecciona el Lugar de Origen:
+                            </label>
+                            
+                            {{ form.lugar_origen }}
+                            
+                            <div class="form-text mt-2 text-muted">
+                                * Si tu lugar no aparece, asegúrate de haberle capturado el RFC en el catálogo de Lugares.
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg shadow-sm">
+                                <i class="fas fa-save me-2"></i> Guardar como Emisor
+                            </button>
+                            <a href="{% url 'dashboard_facturacion' %}" class="btn btn-outline-secondary">
+                                Regresar al Dashboard
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

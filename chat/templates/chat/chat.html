@@ -1,0 +1,231 @@
+{% extends "ternium/base.html" %}
+{% load static %}
+
+{% block title %}Salas de Chat - Ternium{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    .chat-container {
+        background-color: #f8f9fa;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+    }
+    
+    .chat-header {
+        background: linear-gradient(135deg, #3f51b5, #2196f3);
+        color: white;
+        padding: 20px 25px;
+        border-radius: 12px 12px 0 0;
+    }
+    
+    .chat-header h2 {
+        margin: 0;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .chat-header h2 i {
+        font-size: 1.8rem;
+    }
+    
+    .room-list {
+        padding: 20px;
+    }
+    
+    .room-item {
+        display: flex;
+        align-items: center;
+        padding: 16px 20px;
+        margin-bottom: 12px;
+        border-radius: 10px;
+        background-color: white;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+        border-left: 4px solid #3f51b5;
+    }
+    
+    .room-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border-left: 4px solid #2196f3;
+        text-decoration: none;
+    }
+    
+    .room-icon {
+        background-color: #e8f4fd;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 16px;
+        color: #2196f3;
+        font-size: 1.2rem;
+    }
+    
+    .room-content {
+        flex: 1;
+    }
+    
+    .room-name {
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 4px;
+        font-size: 1.1rem;
+    }
+    
+    .room-meta {
+        color: #7f8c8d;
+        font-size: 0.85rem;
+        display: flex;
+        gap: 15px;
+    }
+    
+    .room-actions {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .btn-join {
+        background-color: #4CAF50;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    
+    .btn-join:hover {
+        background-color: #3d8b40;
+        color: white;
+        text-decoration: none;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #7f8c8d;
+    }
+    
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 15px;
+        color: #bdc3c7;
+    }
+    
+    .empty-state h3 {
+        color: #95a5a6;
+        margin-bottom: 10px;
+    }
+    
+    .search-box {
+        padding: 0 20px 20px;
+    }
+    
+    .search-container {
+        position: relative;
+    }
+    
+    .search-container i {
+        position: absolute;
+        left: 15px;
+        top: 12px;
+        color: #7f8c8d;
+    }
+    
+    .search-input {
+        padding-left: 45px;
+        border-radius: 30px;
+        border: 1px solid #e0e0e0;
+        height: 46px;
+    }
+    
+    @media (max-width: 768px) {
+        .room-item {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .room-icon {
+            margin-bottom: 12px;
+        }
+        
+        .room-actions {
+            width: 100%;
+            margin-top: 12px;
+            justify-content: flex-end;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="chat-container">
+        <div class="chat-header">
+            <h2><i class="fas fa-comments"></i> Salas de Chat Disponibles</h2>
+        </div>
+        
+        <div class="search-box">
+            <div class="search-container">
+                <i class="fas fa-search"></i>
+                <input type="text" class="form-control search-input" placeholder="Buscar sala de chat...">
+            </div>
+        </div>
+        
+        <div class="room-list">
+            {% for room in rooms %}
+                <a href="{% url 'chat_room' room.name %}" class="room-item">
+                    <div class="room-icon">
+                        <i class="fas fa-comment-dots"></i>
+                    </div>
+                    <div class="room-content">
+                        <div class="room-name">{{ room.name }}</div>
+                        <div class="room-meta">
+                            <span><i class="fas fa-users"></i> 12 participantes</span>
+                            <span><i class="far fa-comment"></i> 45 mensajes</span>
+                        </div>
+                    </div>
+                    <div class="room-actions">
+                        <span class="btn-join">Unirse <i class="fas fa-arrow-right"></i></span>
+                    </div>
+                </a>
+            {% empty %}
+                <div class="empty-state">
+                    <i class="fas fa-comment-slash"></i>
+                    <h3>No hay salas de chat disponibles</h3>
+                    <p>Actualmente no estás unido a ninguna sala de chat.</p>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Funcionalidad de búsqueda
+        const searchInput = document.querySelector('.search-input');
+        const roomItems = document.querySelectorAll('.room-item');
+        
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            
+            roomItems.forEach(function(item) {
+                const roomName = item.querySelector('.room-name').textContent.toLowerCase();
+                if (roomName.includes(searchTerm)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends 'ternium/base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0"><i class="fas fa-file-excel me-2"></i>Importar Movimientos (Excel)</h4>
+                </div>
+                <div class="card-body">
+                    {% if form.errors %}
+                        <div class="alert alert-danger">
+                            <strong>Error:</strong> Por favor corrige los siguientes problemas:
+                            {{ form.errors }}
+                        </div>
+                    {% endif %}
+
+                    <div class="alert alert-info border small">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Asegúrate que tu archivo Excel tenga las columnas en este orden:
+                        <br><strong>Fecha | Concepto | Cargo | Abono</strong>
+                    </div>
+
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Cuenta Destino</label>
+                            {{ form.cuenta_destino }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Archivo Excel (.xlsx)</label>
+                            {{ form.archivo_excel }}
+                        </div>
+
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-upload me-2"></i> Importar Archivo
+                            </button>
+                            <a href="{% url 'lista_movimientos' %}" class="btn btn-outline-secondary">Cancelar</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

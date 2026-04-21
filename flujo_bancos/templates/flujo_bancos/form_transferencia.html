@@ -1,0 +1,329 @@
+{% extends 'ternium/base.html' %}
+{% load static humanize %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+
+<style>
+    /* Ajustes visuales para el Dashboard de Transferencias */
+    .step-card {
+        border-left: 5px solid #0d6efd;
+        transition: all 0.3s ease;
+    }
+    .step-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    }
+    .arrow-divider {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        color: #6c757d;
+    }
+    .conversion-box {
+        background: linear-gradient(to right, #f8f9fa, #e9ecef);
+        border: 1px solid #dee2e6;
+        border-radius: 10px;
+    }
+    .result-display {
+        font-family: 'Roboto', sans-serif;
+        color: #198754;
+    }
+    
+    /* Spinner para carga de TC */
+    .spinner-tc {
+        display: none; /* Oculto por defecto */
+        font-size: 0.8rem;
+        color: #0d6efd;
+        margin-top: 5px;
+    }
+
+    /* Ajuste para que el Select2 se vea igual de alto que los inputs */
+    .select2-container .select2-selection--single {
+        height: 38px !important;
+        padding-top: 5px;
+    }
+    
+    @media (max-width: 768px) {
+        .arrow-divider { transform: rotate(90deg); margin: 10px 0; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            
+            <form method="post" id="transferForm" class="needs-validation" novalidate>
+                {% csrf_token %}
+
+                <div class="card shadow-lg border-0">
+                    <div class="card-header bg-primary text-white py-3 d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0"><i class="fas fa-exchange-alt me-2"></i> Transferencia de Fondos</h4>
+                        
+                        <a href="{% url 'exportar_transferencias_excel' %}" class="btn btn-sm btn-light text-primary fw-bold">
+                            <i class="fas fa-file-excel me-1"></i> Historial
+                        </a>
+                    </div>
+                    
+                    <div class="card-body p-4">
+                        
+                        <div class="row align-items-center mb-4">
+                            <div class="col-md-5">
+                                <div class="card step-card h-100 shadow-sm">
+                                    <div class="card-body bg-light">
+                                        <label class="form-label fw-bold text-primary text-uppercase small">
+                                            <i class="fas fa-sign-out-alt me-1"></i> Desde (Salida)
+                                        </label>
+                                        {{ form.cuenta_origen }}
+                                        <div class="mt-2 text-muted small" id="info-origen">Selecciona cuenta origen</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-2 text-center arrow-divider">
+                                <i class="fas fa-arrow-circle-right text-primary"></i>
+                            </div>
+
+                            <div class="col-md-5">
+                                <div class="card step-card h-100 shadow-sm" style="border-left-color: #198754;">
+                                    <div class="card-body bg-light">
+                                        <label class="form-label fw-bold text-success text-uppercase small">
+                                            <i class="fas fa-sign-in-alt me-1"></i> Hacia (Entrada)
+                                        </label>
+                                        {{ form.cuenta_destino }}
+                                        <div class="mt-2 text-muted small" id="info-destino">Selecciona cuenta destino</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="row">
+                            <div class="col-md-5">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Monto a Enviar</label>
+                                    <div class="input-group input-group-lg">
+                                        <span class="input-group-text">$</span>
+                                        {{ form.monto }}
+                                    </div>
+                                    <div class="form-text">Moneda de la cuenta origen</div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Fecha de Operación</label>
+                                    {{ form.fecha }}
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Concepto / Referencia</label>
+                                    {{ form.concepto }}
+                                </div>
+                            </div>
+
+                            <div class="col-md-7">
+                                <div class="conversion-box p-4 h-100">
+                                    <h6 class="text-uppercase fw-bold text-muted mb-3">
+                                        <i class="fas fa-calculator me-1"></i> Conversión y Tipo de Cambio
+                                    </h6>
+
+                                    <div class="row g-3 align-items-end">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Tipo de Cambio (TC)</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text bg-white"><i class="fas fa-coins"></i></span>
+                                                {{ form.tipo_cambio }}
+                                            </div>
+                                            <div id="loading-tc" class="spinner-tc">
+                                                <i class="fas fa-spinner fa-spin"></i> Consultando Banxico...
+                                            </div>
+                                            
+                                            <div id="tc-help" class="form-text text-danger" style="display:none;">
+                                                <i class="fas fa-exclamation-circle"></i> Ajusta el TC si es necesario (3 decimales).
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-6 text-end">
+                                            <div class="badge bg-secondary mb-2" id="badge-monedas">Moneda: ---</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-4 p-3 bg-white rounded border text-center">
+                                        <p class="mb-1 text-muted small text-uppercase">Monto Final a Recibir</p>
+                                        <h2 class="mb-0 fw-bold result-display">
+                                            <span id="resultado-calculado">$0.00</span> 
+                                            <span id="moneda-destino-lbl" class="fs-6 text-muted">MXN</span>
+                                        </h2>
+                                        <div class="small text-muted mt-1">
+                                            <span id="formula-display">( 0.00 * 1.000 )</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if form.errors %}
+                            <div class="alert alert-danger mt-3 fade show">
+                                <i class="fas fa-exclamation-triangle me-2"></i> <strong>Atención:</strong>
+                                <ul class="mb-0 ps-3">
+                                    {% for field in form %}
+                                        {% for error in field.errors %}
+                                            <li>{{ field.label }}: {{ error }}</li>
+                                        {% endfor %}
+                                    {% endfor %}
+                                    {% for error in form.non_field_errors %}
+                                        <li>{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+
+                    </div>
+                    
+                    <div class="card-footer bg-light py-3 text-end">
+                        <a href="{% url 'dashboard_bancos' %}" class="btn btn-outline-secondary me-2">Cancelar</a>
+                        <button type="submit" class="btn btn-success px-4 py-2 fw-bold">
+                            <i class="fas fa-check-circle me-1"></i> Confirmar Transferencia
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+        // 1. INICIALIZAR COMBOBOXES (SELECT2)
+        $('#id_cuenta_origen, #id_cuenta_destino').select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            placeholder: 'Buscar cuenta...',
+            allowClear: true,
+            language: { noResults: () => "No se encontraron cuentas" }
+        });
+
+        // 2. REFERENCIAS Y VARIABLES
+        const $selectOrigen = $('#id_cuenta_origen');
+        const $selectDestino = $('#id_cuenta_destino');
+        const $inputMonto = $('[name="monto"]');
+        const $inputTC = $('[name="tipo_cambio"]');
+        
+        const $resultDisplay = $('#resultado-calculado');
+        const $formulaDisplay = $('#formula-display');
+        const $monedaDestinoLbl = $('#moneda-destino-lbl');
+        const $badgeMonedas = $('#badge-monedas');
+        const $tcHelp = $('#tc-help');
+        const $infoOrigen = $('#info-origen');
+        const $infoDestino = $('#info-destino');
+        const $loadingTC = $('#loading-tc');
+
+        const moneyFmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
+        
+        let ultimaCombinacion = ""; 
+
+        // 3. FUNCIONES AUXILIARES
+        function getMoneda($select) {
+            const data = $select.select2('data');
+            if (!data || data.length === 0) return '';
+            const text = data[0].text;
+            
+            if (text.includes('USD') || text.includes('Dólares')) return 'USD';
+            if (text.includes('MXN') || text.includes('Pesos')) return 'MXN';
+            return 'MXN';
+        }
+
+        function consultarBanxico() {
+            $loadingTC.show();
+            $inputTC.prop('readonly', true);
+
+            $.ajax({
+                url: "{% url 'ajax_obtener_tc' %}",
+                type: "GET",
+                success: function(data) {
+                    if(data.tc) {
+                        // AQUÍ APLICAMOS LOS 3 DECIMALES AL VALOR QUE VIENE DE BANXICO
+                        let tcBanxico = parseFloat(data.tc).toFixed(3);
+                        $inputTC.val(tcBanxico);
+                        
+                        $inputTC.prop('readonly', false);
+                        recalcular();
+                    }
+                },
+                error: function() {
+                    console.error("Error consultando Banxico");
+                    $inputTC.val(1.000);
+                    $inputTC.prop('readonly', false);
+                },
+                complete: function() {
+                    $loadingTC.hide();
+                }
+            });
+        }
+
+        function recalcular() {
+            const monedaOrigen = getMoneda($selectOrigen);
+            const monedaDestino = getMoneda($selectDestino);
+            const monto = parseFloat($inputMonto.val()) || 0;
+            let tc = parseFloat($inputTC.val()) || 1;
+
+            if (monedaOrigen) $infoOrigen.text(`Salida en ${monedaOrigen}`);
+            if (monedaDestino) {
+                $infoDestino.text(`Entrada en ${monedaDestino}`);
+                $monedaDestinoLbl.text(monedaDestino);
+            }
+
+            if (monedaOrigen && monedaDestino) {
+                const currentComb = monedaOrigen + "-" + monedaDestino;
+
+                if (monedaOrigen === monedaDestino) {
+                    $inputTC.val(1.000);
+                    $inputTC.prop('readonly', true).addClass('bg-light');
+                    $badgeMonedas.attr('class', 'badge bg-secondary mb-2').text("Misma Divisa (1:1)");
+                    $tcHelp.hide();
+                    tc = 1;
+                } else {
+                    $badgeMonedas.attr('class', 'badge bg-warning text-dark mb-2')
+                                 .text(`Conversión: ${monedaOrigen} a ${monedaDestino}`);
+                    $tcHelp.show();
+
+                    if (monedaOrigen === 'USD' && monedaDestino === 'MXN') {
+                        if (ultimaCombinacion !== currentComb) {
+                            consultarBanxico();
+                        } else {
+                             $inputTC.prop('readonly', false).removeClass('bg-light');
+                        }
+                    } else {
+                        if(ultimaCombinacion !== currentComb) {
+                            $inputTC.prop('readonly', false).removeClass('bg-light');
+                        }
+                    }
+                }
+                ultimaCombinacion = currentComb;
+            }
+
+            const totalFinal = monto * tc;
+
+            $resultDisplay.text(moneyFmt.format(totalFinal));
+            // MOSTRAR 3 DECIMALES EN LA FÓRMULA DE TEXTO
+            $formulaDisplay.text(`( ${moneyFmt.format(monto)} x ${tc.toFixed(3)} )`);
+        }
+
+        $selectOrigen.on('select2:select', function(){ recalcular(); });
+        $selectDestino.on('select2:select', function(){ recalcular(); });
+        $inputMonto.on('input', recalcular);
+        $inputTC.on('input', recalcular);
+
+        recalcular();
+    });
+</script>
+{% endblock %}

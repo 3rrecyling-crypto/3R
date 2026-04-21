@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Generar Nota de Crédito</h2>
+    <div class="alert alert-info">
+        Relacionada a Factura: <strong>{{ factura_origen.folio }}</strong> <br>
+        Cliente: {{ factura_origen.receptor.razon_social }}
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="card p-4">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    {{ form.uso_cfdi.label_tag }}
+                    {{ form.uso_cfdi }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    {{ form.metodo_pago.label_tag }}
+                    {{ form.metodo_pago }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    {{ form.forma_pago.label_tag }}
+                    {{ form.forma_pago }}
+                </div>
+            </div>
+            
+            <hr>
+            <h4>Detalle del Descuento</h4>
+            <div class="row">
+                <div class="col-md-8 mb-3">
+                    {{ form.concepto_descripcion.label_tag }}
+                    {{ form.concepto_descripcion }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    {{ form.monto_descuento.label_tag }}
+                    {{ form.monto_descuento }}
+                    <small class="text-muted">Monto antes de IVA. El sistema calculará el 16% automáticamente.</small>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-danger">Timbrar Nota de Crédito</button>
+            <a href="{% url 'detalle_factura_cliente' factura_origen.pk %}" class="btn btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,408 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Prefactura (Validación){% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<style>
+    .modal-backdrop { z-index: 10550 !important; }
+    .modal { z-index: 10560 !important; }
+    .select2-container--bootstrap-5 .select2-selection { border-color: #dee2e6; min-height: 31px; padding-top: 2px; font-size: 0.85rem; }
+    .input-edit-qty { background-color: #fff8dc; border: 1px solid #f0ad4e; font-weight: bold; }
+    .select2-container { width: 100% !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<form action="{% url 'generar_factura_accion' %}" method="POST" id="invoiceForm">
+    {% csrf_token %}
+    
+    <input type="hidden" name="receptor" value="{{ cliente.pk }}"> 
+
+    <div class="container-fluid px-4 mt-4 pb-5">
+        
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h4 class="fw-bold mb-0"><i class="fas fa-tasks me-2 text-primary"></i>Validación de Prefactura</h4>
+                <p class="text-muted small mb-0">Revisa los datos antes de timbrar. Cliente: <strong>{{ cliente.nombre }}</strong></p>
+            </div>
+            <a href="{% url 'remisiones_por_facturar' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-times me-1"></i> Cancelar
+            </a>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-3">
+                
+                <div class="card shadow-sm border-0 mb-3">
+                    <div class="card-header bg-white border-bottom fw-bold py-2">
+                        Receptor (Cliente)
+                    </div>
+                    <div class="card-body bg-light">
+                        
+                        <div id="alert-faltan-datos" class="alert alert-warning border-start border-warning border-4 shadow-sm p-2 mb-3" {% if not faltan_datos_fiscales %}style="display:none;"{% endif %}>
+                            <div class="d-flex align-items-start">
+                                <i class="fas fa-exclamation-triangle mt-1 me-2 text-warning"></i>
+                                <div>
+                                    <strong class="d-block small text-dark">¡Atención!</strong>
+                                    <p class="mb-1 small lh-sm">Faltan datos fiscales (Dirección, CP o RFC).</p>
+                                    <button type="button" class="btn btn-warning btn-sm w-100 fw-bold py-0" style="font-size: 0.8rem;" data-bs-toggle="modal" data-bs-target="#modalConfigurarFiscal">
+                                        <i class="fas fa-edit me-1"></i> Completar Datos
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="small text-muted fw-bold">Razón Social</label>
+                            <div id="txt-razon" class="text-dark small text-uppercase">{{ receptor.razon_social|default:"-" }}</div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="small text-muted fw-bold">RFC</label>
+                            <div id="txt-rfc" class="text-dark small fw-bold">{{ receptor.rfc|default:"-" }}</div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="small text-muted fw-bold">CP / Regimen</label>
+                            <div id="txt-regimen" class="text-dark small">{{ receptor.codigo_postal }} - {{ receptor.regimen_fiscal }}</div>
+                        </div>
+                        <div class="mb-0">
+                            <label class="small text-muted fw-bold">Dirección</label>
+                            <div id="txt-direccion" class="text-dark small text-truncate" title="{{ receptor.direccion }}">{{ receptor.direccion|default:"-" }}</div>
+                        </div>
+                        
+                        <button type="button" id="btn-editar-datos" class="btn btn-outline-primary btn-sm w-100 mt-2" data-bs-toggle="modal" data-bs-target="#modalConfigurarFiscal" {% if faltan_datos_fiscales %}style="display:none;"{% endif %}>
+                            <i class="fas fa-pen me-1"></i> Editar Datos
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white border-bottom fw-bold py-2">
+                        Opciones de Factura
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">Serie</label>
+                            {{ form.serie_personalizada }}
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">Uso CFDI</label>
+                            {{ form.uso_cfdi }}
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">Método Pago</label>
+                            {{ form.metodo_pago }}
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">Forma Pago</label>
+                            {{ form.forma_pago }}
+                        </div>
+                        <div class="row g-1">
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Moneda</label>
+                                {{ form.moneda }}
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">T. Cambio</label>
+                                {{ form.tipo_cambio }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-9">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 fw-bold text-primary">Conceptos (Remisiones)</h6>
+                        <span class="badge bg-light text-dark border">{{ remisiones.count }} items</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="overflow-x: visible;">
+                            <table class="table table-hover align-middle mb-0 text-sm" style="font-size: 0.9rem;">
+                                <thead class="bg-light text-secondary text-uppercase">
+                                    <tr>
+                                        <th>Folio</th>
+                                        <th width="25%">Descripción (Factura)</th>
+                                        <th width="20%">Claves SAT</th>
+                                        <th width="8%" class="text-center">Cant.</th>
+                                        <th width="10%">Precio U.</th>
+                                        <th width="12%">Traslado</th>
+                                        <th width="12%">Retención</th>
+                                        <th width="10%" class="text-end">Importe</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for r in remisiones %}
+                                    <tr id="row-{{ r.id }}">
+                                        <input type="hidden" name="remision_id[]" value="{{ r.id }}">
+                                        <td class="fw-bold text-primary small">{{ r.remision }}</td>
+                                        <td><input type="text" name="descripcion[]" class="form-control form-control-sm" value="Remisión {{ r.remision }} - {{ r.detalles.first.material.nombre }}"></td>
+                                        <td>
+                                            <div class="mb-1">
+                                                <select name="clave_prod_serv[]" class="form-select form-select-sm select-sat-prod">
+                                                    {% with clave=r.detalles.first.material.clave_sat|default:'01010101' %}
+                                                    <option value="{{ clave }}" selected>{{ clave }}</option>
+                                                    {% endwith %}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <select name="clave_unidad[]" class="form-select form-select-sm select-sat-unidad">
+                                                    <option value="E48" selected>E48 - Unidad de servicio</option>
+                                                </select>
+                                            </div>
+                                        </td>
+                                        <td><input type="number" step="0.01" name="cantidad[]" class="form-control form-control-sm text-center input-edit-qty cantidad-row" value="{{ r.total_peso_dlv|stringformat:'f' }}" data-row-id="{{ r.id }}" oninput="recalcularFila(this)"></td>
+                                        <td>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text border-0 bg-transparent">$</span>
+                                                <input type="number" step="0.01" name="valor_unitario[]" class="form-control form-control-sm precio-row" value="0.00" data-row-id="{{ r.id }}" oninput="recalcularFila(this)">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <select name="impuesto_traslado[]" class="form-select form-select-sm mb-1 text-xs select-traslado" style="font-size: 0.75rem;" onchange="recalcularTotales()">
+                                                <option value="" data-tasa="0">Sin Impuesto</option>
+                                                {% for imp in impuestos_traslado %}
+                                                <option value="{{ imp.id }}" data-tasa="{{ imp.tasa_o_cuota }}" {% if imp.tasa_o_cuota == 0.160000 %}selected{% endif %}>{{ imp.nombre }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select name="impuesto_retencion[]" class="form-select form-select-sm mb-1 text-xs select-retencion" style="font-size: 0.75rem;" onchange="recalcularTotales()">
+                                                <option value="" data-tasa="0">Sin Retención</option>
+                                                {% for imp in impuestos_retencion %}
+                                                <option value="{{ imp.id }}" data-tasa="{{ imp.tasa_o_cuota }}">{{ imp.nombre }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td class="text-end fw-bold">$<span id="importe-{{ r.id }}">0.00</span></td>
+                                        <td class="text-center"><button type="button" class="btn btn-link text-danger p-0" onclick="eliminarFila(this)"><i class="fas fa-trash"></i></button></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white">
+                        <div class="row justify-content-end">
+                            <div class="col-md-4 text-end">
+                                <table class="table table-sm table-borderless mb-0">
+                                    <tr><td class="text-muted">Subtotal:</td><td class="fw-bold">$<span id="displaySubtotal">0.00</span></td></tr>
+                                    <tr><td class="text-muted">Traslados (+):</td><td class="fw-bold text-success">$<span id="displayTraslados">0.00</span></td></tr>
+                                    <tr><td class="text-muted">Retenciones (-):</td><td class="fw-bold text-danger">$<span id="displayRetenciones">0.00</span></td></tr>
+                                    <tr class="border-top"><td class="fs-5 text-primary fw-bold">Total:</td><td class="fs-5 text-primary fw-bold">$<span id="granTotal">0.00</span></td></tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-grid justify-content-end mt-4" id="container-btn-submit">
+                    {% if faltan_datos_fiscales %}
+                        <div id="msg-bloqueo" class="alert alert-danger d-inline-block mb-0 me-2 py-2">
+                            <i class="fas fa-ban me-1"></i> Completa los datos fiscales para continuar.
+                        </div>
+                        <button id="btn-submit-factura" type="button" class="btn btn-secondary btn-lg disabled" disabled>Generar Factura</button>
+                    {% else %}
+                        <button id="btn-submit-factura" type="submit" class="btn btn-success btn-lg shadow fw-bold">
+                            <i class="fas fa-check-circle me-2"></i> Generar Factura
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<div class="modal fade" id="modalConfigurarFiscal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Configuración Fiscal: {{ cliente.nombre }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light">
+                <form id="formDatosFiscales" method="POST" action="{% url 'configurar_cliente_fiscal' cliente.pk %}">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label fw-bold small">RFC</label>{{ form_fiscal.rfc }}</div>
+                        <div class="col-md-6"><label class="form-label fw-bold small">Razón Social</label>{{ form_fiscal.razon_social }}</div>
+                        <div class="col-md-6"><label class="form-label fw-bold small">Régimen Fiscal</label>{{ form_fiscal.regimen_fiscal }}</div>
+                        <div class="col-md-6"><label class="form-label fw-bold small">Uso CFDI</label>{{ form_fiscal.uso_cfdi }}</div>
+                        <div class="col-12"><hr class="text-muted my-1"></div>
+                        <h6 class="text-primary fw-bold small mb-2">Dirección Fiscal</h6>
+                        <div class="col-md-4"><label class="form-label fw-bold small">CP</label>
+                            <div class="input-group input-group-sm">{{ form_fiscal.codigo_postal }}<button type="button" class="btn btn-secondary" onclick="buscarCP()"><i class="fas fa-search"></i></button></div>
+                        </div>
+                        <div class="col-md-4"><label class="form-label fw-bold small">Estado</label>{{ form_fiscal.estado }}</div>
+                        <div class="col-md-4"><label class="form-label fw-bold small">Municipio</label>{{ form_fiscal.municipio }}</div>
+                        <div class="col-md-6"><label class="form-label fw-bold small">Colonia</label><select name="colonia" id="id_colonia" class="form-select form-select-sm"><option value="{{ form_fiscal.initial.colonia }}">{{ form_fiscal.initial.colonia }}</option></select></div>
+                        <div class="col-md-6"><label class="form-label fw-bold small">Calle</label>{{ form_fiscal.calle }}</div>
+                        <div class="col-md-3"><label class="form-label fw-bold small">No. Ext</label>{{ form_fiscal.numero_exterior }}</div>
+                        <div class="col-md-3"><label class="form-label fw-bold small">No. Int</label>{{ form_fiscal.numero_interior }}</div>
+                    </div>
+
+                    <div class="mt-4 pt-2 border-top text-end">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary fw-bold px-4">
+                            <i class="fas fa-save me-2"></i> Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+    const urlBuscarSat = "{% url 'buscar_catalogo_sat' %}";
+
+    $(document).ready(function() {
+        $('.select2').select2({ theme: 'bootstrap-5' });
+        $('#modalConfigurarFiscal').appendTo("body");
+        
+        $('.select-sat-prod').each(function() { inicializarSelect2SAT(this, 'ClaveProdServ', 'Buscar Producto'); });
+        $('.select-sat-unidad').each(function() { inicializarSelect2SAT(this, 'ClaveUnidad', 'Buscar Unidad'); });
+
+        recalcularFila($('.cantidad-row').first()); 
+
+        // --- CORRECCIÓN 2: INTERCEPTAR GUARDADO FISCAL (AJAX) ---
+        $('#formDatosFiscales').on('submit', function(e) {
+            e.preventDefault();
+            const form = $(this);
+            const btn = form.find('button[type="submit"]');
+            
+            btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Guardando...');
+
+            $.ajax({
+                url: form.attr('action'),
+                type: 'POST',
+                data: form.serialize(),
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                success: function(response) {
+                    if (response.success) {
+                        // 1. Cerrar modal
+                        $('#modalConfigurarFiscal').modal('hide');
+                        
+                        // 2. Actualizar datos visuales
+                        $('#txt-rfc').text(response.data.rfc);
+                        $('#txt-razon').text(response.data.razon);
+                        $('#txt-direccion').text(response.data.direccion);
+                        $('#txt-regimen').text(response.data.cp + ' - ' + response.data.regimen);
+                        
+                        // 3. Desbloquear botón "Generar Factura"
+                        $('#alert-faltan-datos').hide();
+                        $('#btn-editar-datos').show();
+                        $('#msg-bloqueo').remove();
+                        $('#btn-submit-factura').removeClass('btn-secondary disabled').addClass('btn-success').prop('disabled', false);
+                        
+                        alert('Datos guardados correctamente.');
+                    } else {
+                        alert('Error: ' + JSON.stringify(response.errors));
+                    }
+                },
+                error: function() {
+                    alert('Error de conexión al guardar datos.');
+                },
+                complete: function() {
+                    btn.prop('disabled', false).html('<i class="fas fa-save me-2"></i> Guardar Cambios');
+                }
+            });
+        });
+    });
+
+    // ... (RESTO DE TUS FUNCIONES JS IGUAL QUE ANTES: inicializarSelect2SAT, recalcularFila, etc.) ...
+    
+    // Solo copia las funciones JS que ya tenías (recalcularFila, recalcularTotales, buscarCP, etc.)
+    // ...
+    function recalcularFila(input) {
+        if (!input) return;
+        let row = $(input).closest('tr');
+        let cant = parseFloat(row.find('.cantidad-row').val()) || 0;
+        let precio = parseFloat(row.find('.precio-row').val()) || 0;
+        let importe = cant * precio;
+        row.find('span[id^="importe-"]').text(importe.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+        recalcularTotales();
+    }
+
+    function recalcularTotales() {
+        let subtotal = 0;
+        let totalTraslados = 0;
+        let totalRetenciones = 0;
+
+        $('tbody tr').each(function() {
+            let row = $(this);
+            let importe = parseFloat(row.find('span[id^="importe-"]').text().replace(/,/g, '')) || 0;
+            subtotal += importe;
+
+            let selectTraslado = row.find('.select-traslado');
+            let tasaTraslado = 0;
+            if(selectTraslado.length > 0 && selectTraslado.val()){
+                let option = selectTraslado.find('option:selected');
+                tasaTraslado = parseFloat(option.data('tasa')) || 0;
+            }
+            totalTraslados += importe * tasaTraslado;
+
+            let selectRetencion = row.find('.select-retencion');
+            let tasaRetencion = 0;
+            if(selectRetencion.length > 0 && selectRetencion.val()){
+                let option = selectRetencion.find('option:selected');
+                tasaRetencion = parseFloat(option.data('tasa')) || 0;
+            }
+            totalRetenciones += importe * tasaRetencion;
+        });
+
+        let granTotal = subtotal + totalTraslados - totalRetenciones;
+
+        $('#displaySubtotal').text(subtotal.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+        $('#displayTraslados').text(totalTraslados.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+        $('#displayRetenciones').text(totalRetenciones.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+        $('#granTotal').text(granTotal.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+    }
+
+    function eliminarFila(btn) {
+        $(btn).closest('tr').remove();
+        recalcularTotales();
+    }
+
+    function inicializarSelect2SAT(elemento, tipoCatalogo, textoPlaceholder) {
+        $(elemento).select2({
+            theme: 'bootstrap-5', width: '100%', placeholder: textoPlaceholder || 'Buscar...', allowClear: true, minimumInputLength: 3,
+            ajax: {
+                url: urlBuscarSat, dataType: 'json', delay: 400,
+                data: function (params) { return { q: params.term, tipo: tipoCatalogo }; },
+                processResults: function (data) { return { results: data.results }; }
+            }
+        });
+    }
+
+    function buscarCP() {
+        const cp = $('#input_cp_fiscal').val();
+        if(cp.length < 5) { alert("Ingresa un código postal válido (5 dígitos)."); return; }
+        $('#spinner-cp').show();
+        $.ajax({
+            url: "{% url 'api_buscar_cp' %}", data: { 'cp': cp },
+            success: function(response) {
+                $('#spinner-cp').hide();
+                if(response.found) {
+                    $('input[name="municipio"]').val(response.municipio);
+                    $('input[name="estado"]').val(response.estado);
+                    const selectCol = $('#id_colonia');
+                    selectCol.empty();
+                    response.colonias.forEach(col => { selectCol.append(new Option(col.nombre, col.nombre)); });
+                } else { alert("No se encontraron datos para ese CP."); }
+            },
+            error: function() { $('#spinner-cp').hide(); alert("Error de conexión al buscar CP."); }
+        });
+    }
+</script>
+{% endblock %}

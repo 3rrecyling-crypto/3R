@@ -1,0 +1,552 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Dashboard Operativo Avanzado{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
+<style>
+    /* Estilos base del dashboard */
+    .kpi-card {
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        transition: transform 0.2s;
+        border: none;
+    }
+    .kpi-card:hover { transform: translateY(-3px); }
+    .kpi-value { font-size: 2.25rem; font-weight: 700; }
+    .kpi-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+    .chart-container { position: relative; height: 350px; }
+    .table-container { height: 300px; overflow-y: auto; }
+    
+    /* Estilo para filas clickeables */
+    .clickable-row { cursor: pointer; transition: background-color 0.2s; }
+    .clickable-row:hover { background-color: #e9ecef !important; }
+
+    /* --- CORRECCIÓN DE Z-INDEX --- */
+    .modal-backdrop { 
+        z-index: 1050 !important; 
+    }
+    .modal { 
+        z-index: 1060 !important; 
+    }
+    
+    /* --- BOTÓN DE CIERRE PERSONALIZADO (ROJO) --- */
+    .btn-close-custom {
+        width: 60px;  /* Un poco más grande para fácil click */
+        height: 60px;
+        border-radius: 50%;
+        background-color: #dc3545; /* ROJO POR DEFECTO */
+        color: white; /* X blanca */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        border: 3px solid white; /* Borde blanco para resaltar */
+        box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        cursor: pointer;
+        z-index: 2000;
+        font-size: 1.5rem; /* Icono más grande */
+    }
+    
+    .btn-close-custom:hover {
+        background-color: #b02a37; /* Rojo más oscuro al pasar el mouse */
+        transform: scale(1.1); /* Efecto de zoom */
+        box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+    }
+
+    .filter-bar {
+        background: #f8f9fa;
+        border-radius: 10px;
+        border: 1px solid #dee2e6;
+    }
+</style>
+
+<div class="container-fluid px-4 py-4">
+    
+    <div class="row align-items-center mb-4">
+        <div class="col-md-5">
+            <h2 class="fw-bold text-dark m-0">
+                <i class="fas fa-chart-line me-2 text-primary"></i>Análisis Operacional
+            </h2>
+        </div>
+        <div class="col-md-7">
+            <form method="GET" class="filter-bar p-2 d-flex align-items-center gap-2 shadow-sm">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white"><i class="fas fa-calendar-alt"></i></span>
+                    <input type="date" name="fecha_inicio" class="form-control" value="{{ request.GET.fecha_inicio }}" title="Fecha Inicio">
+                </div>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white"><i class="fas fa-calendar-check"></i></span>
+                    <input type="date" name="fecha_fin" class="form-control" value="{{ request.GET.fecha_fin }}" title="Fecha Fin">
+                </div>
+                <button type="submit" class="btn btn-sm btn-primary px-3">
+                    <i class="fas fa-filter"></i> Filtrar
+                </button>
+                <a href="{% url 'dashboard_analisis' %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-sync-alt"></i>
+                </a>
+            </form>
+        </div>
+    </div>
+    
+    <div class="row g-3 mb-4">
+        <div class="col-lg-2 col-md-4 col-sm-6">{% include 'ternium/kpi_card.html' with title='Ton Entradas' value=kpi_ent_year unit='Ton' icon='fas fa-download' color='primary' %}</div>
+        <div class="col-lg-2 col-md-4 col-sm-6">{% include 'ternium/kpi_card.html' with title='Ton Salidas' value=kpi_sal_year unit='Ton' icon='fas fa-upload' color='success' %}</div>
+        <div class="col-lg-3 col-md-4 col-sm-6">{% include 'ternium/kpi_card.html' with title='Inventario Patios' value=kpi_inv_act unit='Ton' icon='fas fa-cubes' color='info' %}</div>
+        <div class="col-lg-2 col-md-4 col-sm-6">{% include 'ternium/kpi_card.html' with title='Merma Global' value=kpi_merma_perc unit='%' icon='fas fa-balance-scale-right' color='danger' %}</div>
+        <div class="col-lg-3 col-md-4 col-sm-6">{% include 'ternium/kpi_card.html' with title='Movimientos Totales' value=kpi_movs_total unit='Viajes' icon='fas fa-exchange-alt' color='secondary' %}</div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card kpi-card bg-white">
+                <div class="card-header bg-transparent fw-bold py-2 border-bottom">
+                    <i class="fas fa-tasks me-2 text-secondary"></i>Resumen de Estatus Operativo
+                </div>
+                <div class="card-body py-3">
+                    <div class="row text-center">
+                        {% for status, data in status_summary.items %}
+                        <div class="col px-1 border-end last-no-border">
+                            <h6 class="text-uppercase text-muted small fw-bold mb-3">
+                                <i class="fas {{ data.icon }} me-1 text-{{ data.color }}"></i>{{ status }}
+                            </h6>
+                            <div class="d-flex justify-content-center align-items-center gap-3">
+                                <div class="text-center">
+                                    <div class="h5 fw-bold text-dark mb-0">{{ data.ent }}</div>
+                                    <span class="badge rounded-pill bg-light text-secondary border" style="font-size: 0.65rem;">ENT</span>
+                                </div>
+                                <div class="vr opacity-25"></div>
+                                <div class="text-center">
+                                    <div class="h5 fw-bold text-dark mb-0">{{ data.sal }}</div>
+                                    <span class="badge rounded-pill bg-light text-secondary border" style="font-size: 0.65rem;">SAL</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row g-4 mb-4">
+        <div class="col-lg-8">
+            <div class="card kpi-card h-100">
+                <div class="card-header bg-white fw-bold py-3">
+                    <i class="fas fa-chart-area me-2"></i>Volumen Mensual: Entradas vs Salidas (Ton)
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="chartVolumen"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card kpi-card h-100">
+                <div class="card-header bg-white fw-bold py-3 text-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Pérdidas (Merma Promedio Mensual)
+                </div>
+                <div class="card-body">
+                    <div class="chart-container" style="height: 300px;">
+                        <canvas id="chartMerma"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card kpi-card h-100">
+                <div class="card-header bg-white fw-bold py-3">
+                    <i class="fas fa-boxes me-2"></i>Flujo por Material (Top 10)
+                </div>
+                <div class="card-body table-container p-0">
+                    <table class="table table-striped table-hover small mb-0">
+                        <thead class="sticky-top bg-light text-uppercase">
+                            <tr>
+                                <th class="ps-3">Material</th>
+                                <th class="text-end text-primary">Entrada</th>
+                                <th class="text-end text-success">Salida</th>
+                                <th class="text-end text-info">Stock</th>
+                                <th class="text-center">Alertas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for material, data in material_analysis %}
+                            <tr>
+                                <td class="fw-bold ps-3">{{ material }}</td>
+                                <td class="text-end">{{ data.entrada|floatformat:1|intcomma }}</td>
+                                <td class="text-end">{{ data.salida|floatformat:1|intcomma }}</td>
+                                <td class="text-end fw-bold">{{ data.stock|floatformat:1|intcomma }}</td>
+                                <td class="text-center">
+                                    {% if data.merma_incidencias > 0 %}
+                                        <span class="badge bg-danger rounded-pill">{{ data.merma_incidencias }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="5" class="text-center py-3">No hay datos para este periodo</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3">
+            <div class="card kpi-card h-100">
+                <div class="card-header bg-white fw-bold py-3 text-primary">
+                    <i class="fas fa-truck-loading me-2"></i>Transportes (Entradas)
+                </div>
+                <div class="card-body table-container p-0">
+                    <table class="table table-hover table-sm mb-0 small">
+                        <thead class="bg-light sticky-top">
+                            <tr>
+                                <th class="ps-3">Transporte</th>
+                                <th class="text-center">Viajes</th>
+                                <th class="text-end">Ton</th>
+                                <th class="text-center">Merma</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in top_transportes_entradas %}
+                            <tr>
+                                <td class="ps-3 fw-bold text-truncate" style="max-width: 100px;" title="{{ p.transporte }}">
+                                    {{ p.transporte|default:"S/N" }}
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-secondary">{{ p.viajes|default:"0" }}</span>
+                                </td>
+                                <td class="text-end">{{ p.toneladas|floatformat:0|intcomma }}</td>
+                                <td class="text-center">
+                                    <span class="badge bg-{% if p.avg_merma_perc > 3 %}danger{% else %}success{% endif %}">
+                                        {{ p.avg_merma_perc|floatformat:1 }}%
+                                    </span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-center py-3">Sin datos</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3">
+            <div class="card kpi-card h-100">
+                <div class="card-header bg-white fw-bold py-3 text-success">
+                    <i class="fas fa-truck-moving me-2"></i>Transportes (Salidas)
+                </div>
+                <div class="card-body table-container p-0">
+                    <table class="table table-hover table-sm mb-0 small">
+                        <thead class="bg-light sticky-top">
+                            <tr>
+                                <th class="ps-3">Transporte</th>
+                                <th class="text-center">Viajes</th>
+                                <th class="text-end">Ton</th>
+                                <th class="text-center">Merma</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in top_transportes_salidas %}
+                            <tr>
+                                <td class="ps-3 fw-bold text-truncate" style="max-width: 100px;" title="{{ c.transportista__nombre }}">
+                                    {{ c.transportista__nombre|default:"Sin Nombre" }}
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-secondary">{{ c.viajes|default:"0" }}</span>
+                                </td>
+                                <td class="text-end">{{ c.toneladas|floatformat:0|intcomma }}</td>
+                                <td class="text-center">
+                                    <span class="badge bg-{% if c.avg_merma_perc < -1 or c.avg_merma_perc > 1 %}danger{% else %}success{% endif %}">
+                                        {{ c.avg_merma_perc|floatformat:1 }}%
+                                    </span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-center py-3">Sin datos</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-12">
+            <h5 class="fw-bold mb-3 text-secondary"><i class="fas fa-history me-2"></i>Bitácora Reciente</h5>
+            <div class="row g-4">
+                
+                <div class="col-md-6">
+                    <div class="card kpi-card">
+                        <div class="card-header bg-light fw-bold text-primary border-bottom border-primary border-2">
+                            Entradas Recientes (Maquila)
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-sm mb-0 small table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th class="ps-3">Folio</th>
+                                        <th>Material</th>
+                                        <th>Peso</th>
+                                        <th>Estatus</th>
+                                        <th class="text-center">% Ganancia</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for entrada in ultimas_entradas %}
+                                    <tr class="clickable-row" onclick="abrirDetalle('{% url 'detalle_entrada' entrada.id %}')">
+                                        <td class="ps-3 fw-bold text-primary">{{ entrada.folio }}</td>
+                                        <td>{{ entrada.calidad_mat|default:"-" }}</td>
+                                        <td>{{ entrada.peso|floatformat:2 }} T</td>
+                                        <td>
+                                            <span class="badge bg-{% if entrada.status == 'TERMINADO' %}success{% elif entrada.status == 'PENDIENTE' %}warning{% elif entrada.status == 'CANCELADO' %}danger{% else %}secondary{% endif %}">
+                                                {{ entrada.status|slice:":1" }}
+                                            </span>
+                                        </td>
+                                        <td class="text-center fw-bold">
+                                            {% if entrada.status == 'TERMINADO' %}
+                                                {% if entrada.ganancia_pct is not None %}
+                                                    <span class="text-{% if entrada.ganancia_pct >= 0 %}success{% else %}danger{% endif %}">
+                                                        {% if entrada.ganancia_pct >= 0 %}+{% endif %}{{ entrada.ganancia_pct|floatformat:1 }}%
+                                                    </span>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-muted small">N/A</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="5" class="text-center text-muted py-2">Sin actividad reciente</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card kpi-card">
+                        <div class="card-header bg-light fw-bold text-success border-bottom border-success border-2">
+                            Salidas Recientes (Logística)
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-sm mb-0 small table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th class="ps-3">Remisión</th>
+                                        <th>Material</th>
+                                        <th>Peso</th>
+                                        <th>Estatus</th>
+                                        <th class="text-center">% Ganancia</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for salida in ultimas_salidas %}
+                                    <tr class="clickable-row" onclick="abrirDetalle('{% url 'detalle_registro_logistica' salida.id %}')">
+                                        <td class="ps-3 fw-bold text-success">{{ salida.remision }}</td>
+                                        <td>{{ salida.material__nombre|default:"-" }}</td>
+                                        <td>{{ salida.toneladas_remisionadas|floatformat:2 }} T</td>
+                                        <td>
+                                            <span class="badge bg-{% if salida.status == 'TERMINADO' %}success{% elif salida.status == 'PENDIENTE' %}warning{% elif salida.status == 'RECHAZADO' %}dark{% elif salida.status == 'CANCELADO' %}danger{% else %}secondary{% endif %}">
+                                                {{ salida.status|slice:":1" }}
+                                            </span>
+                                        </td>
+                                        <td class="text-center fw-bold">
+                                            {% if salida.status == 'TERMINADO' %}
+                                                {% if salida.ganancia_pct is not None %}
+                                                    <span class="text-{% if salida.ganancia_pct >= 0 %}success{% else %}danger{% endif %}">
+                                                        {% if salida.ganancia_pct >= 0 %}+{% endif %}{{ salida.ganancia_pct|floatformat:1 }}%
+                                                    </span>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-muted small">N/A</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="5" class="text-center text-muted py-2">Sin actividad reciente</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="detalleModal" tabindex="-1" aria-labelledby="detalleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0" style="height: 90vh; background-color: #f8f9fa;">
+            
+            <div class="modal-header bg-dark text-white py-2">
+                <h5 class="modal-title fs-6" id="detalleModalLabel">
+                    <i class="fas fa-info-circle me-2"></i>Detalle del Registro
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <div class="modal-body p-0 position-relative bg-white text-center rounded-bottom">
+                <div id="modalLoader" class="position-absolute w-100 h-100 d-flex justify-content-center align-items-center bg-white" style="z-index: 10;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                </div>
+                <iframe id="detalleIframe" src="" width="100%" height="100%" frameborder="0" onload="document.getElementById('modalLoader').classList.add('d-none');" style="display: block;"></iframe>
+            </div>
+
+            <div class="modal-footer justify-content-center bg-transparent border-0 position-absolute w-100" style="bottom: -80px; pointer-events: none;">
+                <button type="button" class="btn btn-close-custom" data-bs-dismiss="modal" title="Cerrar Ventana" style="pointer-events: auto;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- SOLUCIÓN NUCLEAR PARA EL MODAL BLOQUEADO ---
+    document.addEventListener("DOMContentLoaded", function() {
+        var modalElement = document.getElementById('detalleModal');
+        document.body.appendChild(modalElement);
+    });
+
+    const plugins = [{
+        id: 'datalabels',
+        afterDatasetsDraw(chart, args, options) {
+            const { ctx, data } = chart;
+            ctx.save();
+            data.datasets.forEach((dataset, i) => {
+                const meta = chart.getDatasetMeta(i);
+                if (meta.hidden) return;
+                meta.data.forEach((element, index) => {
+                    const dataValue = dataset.data[index];
+                    if (dataValue > 0) { 
+                        const x = element.x;
+                        const y = element.y - 10; 
+                        ctx.fillStyle = dataset.borderColor || dataset.backgroundColor; 
+                        ctx.font = 'bold 10px Segoe UI';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(dataValue.toLocaleString('es-MX', { maximumFractionDigits: 1 }), x, y);
+                    }
+                });
+            });
+            ctx.restore();
+        }
+    }];
+
+    // GRÁFICAS (Se alimentan de variables que deben venir del backend)
+    const ctxVolumen = document.getElementById('chartVolumen').getContext('2d');
+    new Chart(ctxVolumen, {
+        type: 'line',
+        data: {
+            labels: {{ chart_tl_labels|safe }},
+            datasets: [{
+                label: 'Entradas (Ton)',
+                data: {{ chart_tl_entrada|safe }},
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3,
+                pointRadius: 4,
+                pointBackgroundColor: '#fff'
+            }, {
+                label: 'Salidas (Ton)',
+                data: {{ chart_tl_salida|safe }},
+                borderColor: '#198754',
+                backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3,
+                pointRadius: 4,
+                pointBackgroundColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: { 
+                legend: { position: 'top' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' + context.parsed.y.toLocaleString('es-MX') + ' Ton';
+                        }
+                    }
+                }
+            },
+            scales: { y: { beginAtZero: true, grid: { borderDash: [2, 2] } }, x: { grid: { display: false } } }
+        },
+        plugins: [plugins[0]] 
+    });
+
+    const ctxMerma = document.getElementById('chartMerma').getContext('2d');
+    new Chart(ctxMerma, {
+        type: 'bar',
+        data: {
+            labels: {{ chart_merma_labels|safe }},
+            datasets: [{
+                label: 'Merma Promedio (%)',
+                data: {{ chart_merma_data|safe }},
+                backgroundColor: 'rgba(220, 53, 69, 0.8)',
+                borderColor: '#dc3545',
+                borderWidth: 1,
+                borderRadius: 4,
+                maxBarThickness: 40
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Merma: ' + context.parsed.y.toFixed(2) + '%';
+                        }
+                    }
+                }
+            },
+            scales: { y: { beginAtZero: true, grid: { borderDash: [2, 2] } }, x: { grid: { display: false } } }
+        },
+        plugins: [plugins[0]] 
+    });
+
+    function abrirDetalle(url) {
+        document.getElementById('modalLoader').classList.remove('d-none');
+        document.getElementById('detalleIframe').src = url;
+        
+        var modalElement = document.getElementById('detalleModal');
+        var modal = new bootstrap.Modal(modalElement, {
+            backdrop: 'static', 
+            keyboard: true
+        });
+        modal.show();
+    }
+    
+    document.getElementById('detalleModal').addEventListener('hidden.bs.modal', function () {
+        document.getElementById('detalleIframe').src = "";
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,1363 @@
+{% extends 'ternium/base.html' %}
+{% load math_filters %}
+{% load humanize %} 
+
+{% block title %}Gestión de Remisiones{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<style>
+    :root {
+        --primary-color: #2c3e50;
+        --secondary-color: #3498db;
+        --accent-color: #e74c3c;
+        --gain-color: #2980b9;
+        --light-color: #f8f9fa;
+        --text-color: #34495e;
+        --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        --hover-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        --success-color: #2ecc71;
+        --border-radius: 10px;
+    }
+    
+    .bg-primary-gradient {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    }
+    
+    .btn-primary-gradient {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        border: none;
+        color: white;
+    }
+    
+    .btn-primary-gradient:hover {
+        background: linear-gradient(135deg, var(--primary-color), #2980b9);
+        color: white;
+        box-shadow: var(--hover-shadow);
+        transform: translateY(-1px);
+    }
+
+    .btn-solid-primary {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    .btn-solid-primary:hover {
+        background-color: #1a252f; 
+        color: white;
+        box-shadow: var(--hover-shadow);
+        transform: translateY(-1px);
+    }
+
+    .btn-solid-secondary {
+        background-color: var(--secondary-color);
+        color: white;
+        border: none;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    .btn-solid-secondary:hover {
+        background-color: #2980b9; 
+        color: white;
+        box-shadow: var(--hover-shadow);
+        transform: translateY(-1px);
+    }
+    
+    /* BOTÓN PARA NEXT.JS - NUEVO DISEÑO ELEGANTE Y LLAMATIVO */
+    .btn-dashboard-elite {
+        background: linear-gradient(135deg, #1a252f 0%, #2c3e50 100%);
+        color: #00d2ff; /* Cyan brillante elegante */
+        border: 2px solid #00d2ff;
+        border-radius: 6px; /* Más cuadrado y corporativo */
+        font-weight: 800;
+        letter-spacing: 1.5px;
+        padding: 0.6rem 2.5rem;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        box-shadow: 0 4px 15px rgba(0, 210, 255, 0.15);
+        display: inline-flex;
+        align-items: center;
+        text-decoration: none;
+        text-transform: uppercase;
+    }
+    .btn-dashboard-elite:hover {
+        background: #00d2ff;
+        color: #1a252f;
+        box-shadow: 0 8px 25px rgba(0, 210, 255, 0.4);
+        transform: translateY(-2px);
+    }
+    
+    .section-title {
+        color: var(--primary-color);
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+    }
+
+    /* BADGES DE ESTATUS */
+    .status-badge {
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: .5em .9em;
+        border-radius: 50rem;
+        text-transform: uppercase;
+        display: inline-block;
+        min-width: 90px;
+        text-align: center;
+    }
+    .status-PENDIENTE { background-color: #f39c1233; color: #f39c12; }
+    .status-TERMINADO { background-color: #3498db33; color: #3498db; }
+    .status-AUDITADO { background-color: #27ae6033; color: #27ae60; }
+    
+    .status-CANCELADO { 
+        background-color: #e9ecef; 
+        color: #6c757d; 
+        border: 1px solid #dee2e6;
+        text-decoration: line-through; 
+    }
+
+    .text-loss { color: var(--accent-color); font-weight: bold; }
+    .text-gain { color: var(--gain-color); font-weight: bold; }
+
+    .select2-container--bootstrap-5 .select2-selection {
+        font-size: 0.875rem;
+        min-height: calc(1.5em + 0.5rem + 2px);
+        padding: 0.25rem 0.5rem;
+    }
+
+    /* --- ESTILOS DEL LOADING OVERLAY --- */
+    #loadingOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.85);
+        z-index: 9999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        backdrop-filter: blur(5px);
+    }
+    
+    .loader-content {
+        text-align: center;
+        background: white;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        border: 1px solid #e9ecef;
+    }
+
+    .spinner-excel {
+        width: 3rem;
+        height: 3rem;
+        color: #198754; 
+    }
+
+    /* --- AJUSTE DE TABLA --- */
+    .table th {
+        vertical-align: middle;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .col-equitativa { width: 8%; min-width: 100px; }
+    .col-corta { width: 5%; min-width: 80px; }
+    .col-texto { min-width: 120px; }
+
+    /* --- CORRECCIÓN DE Z-INDEX PARA MODALES --- */
+    .modal-backdrop { 
+        z-index: 1050 !important; 
+    }
+    .modal { 
+        z-index: 1055 !important; 
+    }
+    
+    .table-pending {
+        background-color: #fff3cd !important;
+    }
+    .table-pending:hover {
+        background-color: #ffe69c !important;
+    }
+    .text-na {
+        color: #adb5bd;
+        font-style: italic;
+        font-weight: normal;
+    }
+
+    /* --- ESTILOS DEL VISOR (ZOOM Y ROTACIÓN) --- */
+    .carousel-item {
+        height: 80vh; 
+        background-color: #222;
+        text-align: center;
+        overflow: hidden; 
+        position: relative;
+    }
+    .carousel-caption {
+        background: rgba(0,0,0,0.5);
+        border-radius: 10px;
+        padding: 5px 10px;
+        bottom: 80px; 
+        pointer-events: none;
+    }
+    
+    /* Clase para la imagen que se transformará */
+    .transformable-image {
+        transition: transform 0.1s linear;
+        max-height: 100%;
+        max-width: 100%;
+        object-fit: contain;
+        cursor: grab; 
+        transform-origin: center center;
+        user-select: none; 
+        -webkit-user-drag: none;
+    }
+    .transformable-image:active {
+        cursor: grabbing; 
+    }
+
+    /* ESTILOS PARA CONVERTIR BADGES EN BOTONES FILTRABLES */
+    .badge-filter {
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        user-select: none;
+    }
+    .badge-filter:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15) !important;
+        filter: brightness(0.95);
+    }
+
+    /* Barra de Herramientas Flotante */
+    .viewer-toolbar {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        padding: 10px 20px;
+        border-radius: 50px;
+        display: flex;
+        gap: 15px;
+        z-index: 1060;
+        border: 1px solid rgba(255,255,255,0.3);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+    .viewer-btn {
+        background: rgba(0,0,0,0.5);
+        border: 1px solid rgba(255,255,255,0.5);
+        color: white;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        font-size: 1.2rem;
+    }
+    .viewer-btn:hover {
+        background: white;
+        color: #222;
+        transform: scale(1.1);
+    }
+    .viewer-btn-close {
+        background: #e74c3c !important; 
+        border-color: #e74c3c !important;
+    }
+    .viewer-btn-close:hover {
+        background: #c0392b !important;
+        color: white !important;
+    }
+
+    /* ESTILOS PARA LAS TARJETAS DE EXCEL */
+    .excel-card-option {
+        border: 2px solid #e9ecef;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    .excel-card-option:hover {
+        border-color: #198754;
+        background-color: #f8fff9;
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(25, 135, 84, 0.15);
+    }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="loadingOverlay" class="d-none">
+    <div class="loader-content">
+        <div class="spinner-border spinner-excel mb-3" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+        <h5 class="fw-bold text-dark mb-1">Generando Documento...</h5>
+        <p class="text-muted mb-0">Preparando reporte solicitado...</p>
+    </div>
+</div>
+
+<div class="container-fluid px-4 mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div>
+            <h1 class="section-title mb-1"><i class="fas fa-file me-2"></i>Gestión de Remisiones</h1>
+            <p class="mb-0 text-muted">Listado completo de remisiones registradas en el sistema</p>
+        </div>
+        
+        <div class="d-flex flex-wrap gap-2">
+            
+            <a href="https://app.3recycling.com.mx/diesel/dashboard_Operacion" target="_blank" class="btn-dashboard-elite shadow-sm py-2 px-3">
+                <i class="fas fa-chart-pie me-2"></i>DASHBOARD OPERACIONES
+            </a>
+            
+            {% if perms.ternium.add_remision %}
+            <button type="button" class="btn btn-solid-primary shadow-sm py-2 px-3 rounded-pill text-white fw-bold" data-bs-toggle="modal" data-bs-target="#modalImportarTrane">
+                <i class="fas fa-file-import me-2"></i>IMPORTAR TRANE
+            </button>
+            {% endif %}
+
+            {% if perms.ternium.view_plastico %}
+            <a href="{% url 'lista_plastico' %}" class="btn btn-solid-secondary shadow-sm py-2 px-3 rounded-pill">
+                <i class="fas fa-recycle me-2"></i>GESTIÓN DE PLÁSTICO
+            </a>
+            {% endif %}
+            
+            {% if perms.ternium.view_controltarima %}
+            <a href="{% url 'lista_tarimas' %}" class="btn btn-solid-primary shadow-sm py-2 px-3 rounded-pill">
+                <i class="fas fa-pallet me-2"></i>GESTIÓN TARIMAS
+            </a>
+            {% endif %}
+            
+            {% if perms.ternium.add_remision %}
+            <a href="{% url 'crear_remision' %}" class="btn btn-primary-gradient shadow-sm py-2 px-3 rounded-pill">
+                <i class="fas fa-plus-circle me-2"></i>NUEVA REMISION
+            </a>
+            {% endif %}
+            
+        </div>
+    </div>
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center bg-primary-gradient text-white">
+            <h6 class="m-0 font-weight-bold"><i class="fas fa-filter me-2"></i>Filtros Avanzados</h6>
+            <button class="btn btn-link p-0 text-white" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse"><i class="fas fa-chevron-down"></i></button>
+        </div>
+        <div class="card-body collapse show" id="filterCollapse" style="background-color: #f8f9fa;">
+            <form method="get" action="" class="needs-validation" novalidate id="filterForm">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label for="q_remision" class="form-label small fw-bold">N° Remisión</label>
+                        <input type="text" name="q_remision" id="q_remision" class="form-control form-control-sm" placeholder="Buscar por número exacto..." value="{{ search_params.q_remision|default:'' }}" list="remision-list">
+                        <datalist id="remision-list">
+                            {% for num in all_remision_numbers %}
+                            <option value="{{ num }}">
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="q_prefijo" class="form-label small fw-bold">Operación</label>
+                        <select name="q_prefijo" id="q_prefijo" class="form-select form-select-sm searchable-select">
+                            <option value="" {% if not search_params.q_prefijo %}selected{% endif %}>Todas</option>
+                            {% for prefijo in prefijos %}
+                                <option value="{{ prefijo }}" {% if search_params.q_prefijo == prefijo %}selected{% endif %}>{{ prefijo }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="q_material" class="form-label small fw-bold">Material</label>
+                        <select name="q_material" id="q_material" class="form-select form-select-sm searchable-select">
+                            <option value="">Todos</option>
+                            {% for material in materiales %}
+                                <option value="{{ material.id }}" {% if search_params.q_material == material.id|stringformat:"s" %}selected{% endif %}>{{ material.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-3">
+                        <label for="q_status" class="form-label small fw-bold">Estatus</label>
+                        <select name="q_status" id="q_status" class="form-select form-select-sm searchable-select">
+                            <option value="">Todos</option>
+                            {% for value, display in estatus_choices %}
+                                <option value="{{ value }}" {% if search_params.q_status == value %}selected{% endif %}>{{ display }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="q_origen" class="form-label small fw-bold">Origen</label>
+                        <select name="q_origen" id="q_origen" class="form-select form-select-sm searchable-select">
+                            <option value="">Todos</option>
+                            {% for origen in origenes %}
+                                <option value="{{ origen.id }}" {% if search_params.q_origen == origen.id|stringformat:"s" %}selected{% endif %}>{{ origen.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="q_destino" class="form-label small fw-bold">Destino</label>
+                        <select name="q_destino" id="q_destino" class="form-select form-select-sm searchable-select">
+                            <option value="">Todos</option>
+                            {% for destino in destinos %}
+                                <option value="{{ destino.id }}" {% if search_params.q_destino == destino.id|stringformat:"s" %}selected{% endif %}>{{ destino.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="q_operador" class="form-label small fw-bold">Operador</label>
+                        <input type="text" name="q_operador" id="q_operador" class="form-control form-control-sm" placeholder="Buscar por nombre..." value="{{ search_params.q_operador|default:'' }}">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label for="q_fecha_desde" class="form-label small fw-bold">Fecha desde</label>
+                        <input type="date" name="q_fecha_desde" id="q_fecha_desde" class="form-control form-control-sm" value="{{ search_params.q_fecha_desde|default:'' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="q_fecha_hasta" class="form-label small fw-bold">Fecha hasta</label>
+                        <input type="date" name="q_fecha_hasta" id="q_fecha_hasta" class="form-control form-control-sm" value="{{ search_params.q_fecha_hasta|default:'' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="q_folio_ld" class="form-label small fw-bold text-primary">Folio Carga</label>
+                        <input type="text" name="q_folio_ld" id="q_folio_ld" class="form-control form-control-sm" placeholder="" value="{{ search_params.q_folio_ld|default:'' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="q_folio_dlv" class="form-label small fw-bold text-primary">Folio Descarga</label>
+                        <input type="text" name="q_folio_dlv" id="q_folio_dlv" class="form-control form-control-sm" placeholder="" value="{{ search_params.q_folio_dlv|default:'' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="q_destruccion" class="form-label small fw-bold text-black"></i> Destrucción Fiscal</label>
+                        <select name="q_destruccion" id="q_destruccion" class="form-select form-select-sm searchable-select border-danger">
+                            <option value="">Todos</option>
+                            <option value="COMPLETO" {% if search_params.q_destruccion == 'COMPLETO' %}selected{% endif %}> Formato Completo</option>
+                            <option value="PENDIENTE" {% if search_params.q_destruccion == 'PENDIENTE' %}selected{% endif %}> Formato Incompleto</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="row mt-4">
+                    <div class="col-12 d-flex justify-content-end align-items-center">
+                        
+                        <button type="button" class="btn btn-outline-info btn-sm me-2 rounded-pill py-2 px-3 fw-bold" data-bs-toggle="modal" data-bs-target="#modalExportarMedline">
+                            <i class="fas fa-file-archive me-2"></i>Docs Medline (ZIP)
+                        </button>
+
+                        <button type="button" class="btn btn-outline-success btn-sm me-2 rounded-pill py-2 px-3 fw-bold" data-bs-toggle="modal" data-bs-target="#exportExcelModal">
+                            <i class="fas fa-file-excel me-2"></i>Exportar a Excel
+                        </button>
+                        
+                        <a href="{% url 'remision_lista' %}" class="btn btn-outline-secondary btn-sm me-2 rounded-pill py-2 px-3">
+                            <i class="fas fa-broom me-2"></i>Limpiar Filtros
+                        </a>
+                        <button type="submit" class="btn btn-primary-gradient btn-sm shadow-sm rounded-pill py-2 px-3">
+                            <i class="fas fa-search me-2"></i>Aplicar Filtros
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow border-0">
+        <div class="card-header py-3 bg-primary-gradient text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold"><i class="fas fa-list-ol me-2"></i>Resultados</h6>
+                <div>
+                    <a onclick="filtrarPorEstatus('')" title="Mostrar Todos" class="badge rounded-pill py-2 px-3 shadow-sm text-decoration-none badge-filter" style="background-color: var(--light-color); color: var(--primary-color); border: 1px solid var(--primary-color);">
+                        {{ page_obj.paginator.count|default:"0" }} registros encontrados
+                    </a>
+                    <a onclick="filtrarPorEstatus('PENDIENTE')" title="Ver solo Pendientes" class="badge rounded-pill py-2 px-3 shadow-sm ms-2 text-decoration-none badge-filter" style="background-color: var(--secondary-color); color: white;">
+                        <i class="fas fa-clock me-1"></i> {{ total_pendientes|default:"0" }} pendientes
+                    </a>
+                    <a onclick="filtrarPorEstatus('CANCELADO')" title="Ver solo Cancelados" class="badge rounded-pill py-2 px-3 shadow-sm ms-2 text-decoration-none badge-filter" style="background-color: var(--primary-color); color: white; border: 1px solid rgba(255,255,255,0.2);">
+                        <i class="fas fa-ban me-1"></i> {{ total_cancelados|default:"0" }} cancelados
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0">
+                    <thead style="background-color: #f0f7fc;">
+                        <tr>
+                            <th class="py-3 px-2 col-corta">Remisión</th>
+                            <th class="py-3 px-2 col-corta">Fecha</th>
+                            <th class="py-3 px-2 col-corta">Estatus</th>
+                            <th class="py-3 px-2 col-corta text-center">Factura</th>
+                            
+                            <th class="py-3 px-3 col-texto">Origen</th>
+                            <th class="py-3 px-3 col-texto">Destino</th>
+                            <th class="py-3 px-3 col-texto">Material</th> 
+
+                            <th class="py-3 px-2 col-corta text-center">Bultos</th>
+                            
+                            <th class="text-end py-3 px-2 col-equitativa" style="border-left: 2px solid #dee2e6;">Peso Carga (Kg)</th>
+                            <th class="py-3 px-2 text-primary col-equitativa text-center">Folio Carga</th> 
+                            <th class="text-end py-3 px-2 col-equitativa" style="border-left: 1px solid #dee2e6;">Peso Descarga (Kg)</th>
+                            <th class="py-3 px-2 text-primary col-equitativa text-center">Folio Descarga</th> 
+                            <th class="text-end py-3 px-2 col-corta">Dif. (Kg)</th>
+                            <th class="text-end py-3 px-2 col-corta text-center">MERMA/A FAVOR</th>
+                            <th class="text-center py-3 px-2 col-corta">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for remision in remisiones %}
+                        <tr class="align-middle 
+                            {% if remision.porcentaje_merma > 1.0 and remision.status == 'TERMINADO' %}
+                                table-danger border-danger
+                            {% elif remision.status == 'PENDIENTE' %}
+                                table-pending
+                            {% endif %}">
+                            
+                            <td class="fw-bold py-3 px-2">{{ remision.remision }}</td>
+                            <td class="text-nowrap py-3 px-2 small">{{ remision.fecha|date:"d/m/Y" }}</td>
+                            <td class="text-nowrap py-3 px-2"><span class="status-badge status-{{ remision.status }}" style="transform: scale(0.9);">{{ remision.get_status_display }}</span></td>
+                            
+                            <td class="py-3 px-2 text-center">
+                                {% if remision.facturas.exists %}
+                                    {% for factura in remision.facturas.all %}
+                                        <a href="{% url 'detalle_factura_cliente' factura.id %}" class="badge bg-success text-decoration-none border border-light shadow-sm" data-bs-toggle="tooltip" title="Ver Factura">
+                                            <i class="fas fa-file-invoice"></i>
+                                        </a>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-muted small">-</span>
+                                {% endif %}
+                            </td>
+
+                            <td class="py-3 px-3 small">{{ remision.origen.nombre|default:"-"|truncatechars:20 }}</td>
+                            <td class="py-3 px-3 small">{{ remision.destino.nombre|default:"-"|truncatechars:20 }}</td>
+                            
+                            <td class="py-3 px-3 small">
+                                {% for detalle in remision.detalles.all %}
+                                    {{ detalle.material.nombre|truncatechars:25 }}{% if not forloop.last %}<br>{% endif %}
+                                {% empty %}
+                                    <span class="text-muted small">-</span>
+                                {% endfor %}
+                            </td>
+                            
+                            <td class="py-3 px-2 text-center font-mono">
+                                {% for detalle in remision.detalles.all %}
+                                    {% if detalle.bultos %}
+                                        <span class="badge bg-secondary">{{ detalle.bultos }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                    {% if not forloop.last %}<br>{% endif %}
+                                {% empty %}
+                                    <span class="text-muted">-</span>
+                                {% endfor %}
+                            </td>
+
+                            <td class="text-end py-3 px-2" style="border-left: 2px solid #dee2e6;">
+                                {% for detalle in remision.detalles.all %}
+                                    {{ detalle.peso_ld|floatformat:2|intcomma }}{% if not forloop.last %}<br>{% endif %}
+                                {% empty %}
+                                    0.00
+                                {% endfor %}
+                            </td>
+                            
+                            <td class="py-3 px-2 fw-bold text-secondary text-center align-middle">
+                                {{ remision.folio_ld|default:"-" }}
+                            </td>
+
+                            <td class="text-end py-3 px-2" style="border-left: 1px solid #dee2e6;">
+                                {% for detalle in remision.detalles.all %}
+                                    {{ detalle.peso_dlv|floatformat:2|intcomma }}{% if not forloop.last %}<br>{% endif %}
+                                {% empty %}
+                                    0.00
+                                {% endfor %}
+                            </td>
+                            
+                            <td class="py-3 px-2 fw-bold text-secondary text-center align-middle">
+                                {{ remision.folio_dlv|default:"-" }}
+                            </td>
+
+                            <td class="text-end py-3 px-2">
+                                {% if remision.status == 'PENDIENTE' %}
+                                    <span class="text-muted small">-</span>
+                                {% else %}
+                                    {% with diff=remision.total_peso_dlv|sub:remision.total_peso_ld %}
+                                        <span class="{% if diff < 0 %}text-loss{% elif diff > 0 %}text-gain{% endif %}">
+                                            {{ diff|floatformat:2|intcomma }}
+                                        </span>
+                                    {% endwith %}
+                                {% endif %}
+                            </td>
+                            
+                            <td class="text-end py-3 px-2 text-center fw-bold">
+                                {% if remision.status == 'PENDIENTE' %}
+                                    <span class="text-na small">N/A</span>
+                                {% else %}
+                                    {% with pct=remision.porcentaje_merma %}
+                                        {% if pct > 1.0 %}
+                                            <span class="badge bg-danger text-white shadow-sm" style="font-size: 0.7rem;" data-bs-toggle="tooltip" title="Merma Alta">
+                                                {{ pct|floatformat:1 }}%
+                                            </span>
+                                        {% elif pct > 0 %}
+                                            <span class="text-warning small">{{ pct|floatformat:1 }}%</span>
+                                        {% elif pct < 0 %}
+                                            <span class="text-success small">{{ pct|floatformat:1 }}%</span>
+                                        {% else %}
+                                            <span class="text-muted small">0%</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                {% endif %}
+                            </td>
+
+                            <td class="text-center py-3 px-2">
+                                <div class="btn-group btn-group-sm" role="group">
+                                    
+                                    {% with evidencias_multiples=remision.evidencias.all %}
+                                        {% if remision.evidencia_documento or evidencias_multiples or remision.boleta_salida_medline or remision.manifiesto or remision.foto_destruccion %}
+                                            <button type="button" 
+                                                    class="btn btn-info text-white p-1 shadow-sm me-1" 
+                                                    data-bs-toggle="tooltip" 
+                                                    title="Ver Evidencias y Documentos"
+                                                    onclick="abrirGaleria([
+                                                        {% if remision.evidencia_documento %}'{{ remision.evidencia_documento.url|escapejs }}',{% endif %}
+                                                        {% if remision.boleta_salida_medline %}'{{ remision.boleta_salida_medline.url|escapejs }}',{% endif %}
+                                                        {% if remision.manifiesto %}'{{ remision.manifiesto.url|escapejs }}',{% endif %}
+                                                        {% if remision.foto_ingreso %}'{{ remision.foto_ingreso.url|escapejs }}',{% endif %}
+                                                        {% if remision.foto_ingreso_2 %}'{{ remision.foto_ingreso_2.url|escapejs }}',{% endif %}
+                                                        {% if remision.foto_vertido %}'{{ remision.foto_vertido.url|escapejs }}',{% endif %}
+                                                        {% if remision.foto_vertido_2 %}'{{ remision.foto_vertido_2.url|escapejs }}',{% endif %}
+                                                        {% if remision.foto_destruccion %}'{{ remision.foto_destruccion.url|escapejs }}',{% endif %}
+                                                        {% if remision.foto_destruccion_2 %}'{{ remision.foto_destruccion_2.url|escapejs }}',{% endif %}
+                                                        {% for ev in evidencias_multiples %}
+                                                            {% if ev.archivo %}'{{ ev.archivo.url|escapejs }}',{% endif %}
+                                                        {% endfor %}
+                                                    ])">
+                                                <i class="fas fa-file-image"></i>
+                                            </button>
+                                        {% else %}
+                                            <button class="btn btn-light text-muted p-1 me-1 border" disabled style="opacity: 0.5;">
+                                                <i class="fas fa-file-image"></i>
+                                            </button>
+                                        {% endif %}
+                                    {% endwith %}
+
+                                    {% if remision.permite_manifiesto_destruccion %}
+                                        {% if remision.destruccion_fiscal_completa %}
+                                            <a href="{% url 'descargar_reporte_destruccion' remision.id %}" class="btn btn-primary p-1 me-1 text-white shadow-sm" data-bs-toggle="tooltip" title="Generar Reporte Word">
+                                                <i class="fas fa-file-word"></i>
+                                            </a>
+                                        {% else %}
+                                            <button type="button" class="btn btn-danger p-1 me-1 text-white shadow-sm opacity-75" data-bs-toggle="tooltip" title="Faltan capturar datos y fotos de Destrucción Fiscal" disabled>
+                                                <i class="fas fa-file-word"></i>
+                                            </button>
+                                        {% endif %}
+                                    {% endif %}
+
+                                    <a href="{% url 'detalle_remision' pk=remision.pk %}" class="btn btn-outline-primary p-1" data-bs-toggle="tooltip" title="Ver Detalle"><i class="fas fa-eye"></i></a>
+                                    
+                                    {% if remision.status != 'AUDITADO' and remision.status != 'CANCELADO' %}
+                                        
+                                        {% if perms.ternium.change_remision %}
+                                        <a href="{% url 'editar_remision' pk=remision.pk %}" class="btn btn-outline-primary p-1" data-bs-toggle="tooltip" title="Editar"><i class="fas fa-edit"></i></a>
+                                        
+                                        <form action="{% url 'cancelar_remision' pk=remision.pk %}" method="POST" class="d-inline" onsubmit="return confirm('¿Cancelar remisión {{ remision.remision }}?');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-outline-warning p-1" data-bs-toggle="tooltip" title="Cancelar">
+                                                <i class="fas fa-ban"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="15" class="text-center py-5"> <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                <h5 class="text-muted">No se encontraron remisiones</h5>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        {% if is_paginated %}
+        <div class="card-footer bg-white py-3">
+            <nav aria-label="Navegación de páginas">
+                <ul class="pagination pagination-sm justify-content-center mb-0 flex-wrap">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item"><a class="page-link" href="?page=1{% for key, value in search_params.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">&laquo;&laquo;</a></li>
+                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in search_params.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">&laquo;</a></li>
+                    {% endif %}
+                    <li class="page-item active"><span class="page-link">{{ page_obj.number }}</span></li>
+                    {% if page_obj.has_next %}
+                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in search_params.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">&raquo;</a></li>
+                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in search_params.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">&raquo;&raquo;</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal fade" id="modalImportarTrane" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title fw-bold"><i class="fas fa-list-ul me-2"></i>Operaciones TRANE Pendientes</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+          <div class="table-responsive" style="max-height: 60vh;">
+              <table class="table table-hover align-middle mb-0">
+                  <thead class="table-dark position-sticky top-0">
+                      <tr>
+                          <th>Folio TRANE</th>
+                          <th>Fecha</th>
+                          <th>Transporte</th>
+                          <th>Destino</th>
+                          <th>Material</th>
+                          <th class="text-center" style="min-width: 250px;">Asignar Empresa (3Recycling)</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {% for trane in trane_pendientes %}
+                      <tr>
+                          <td class="fw-bold text-primary">{{ trane.folio|default:trane.id }}</td>
+                          <td>{{ trane.fecha_captura|date:"d/m/Y" }}</td>
+                          <td>
+                              <span class="d-block small fw-bold">{{ trane.linea_transporte.nombre|default:"-" }}</span>
+                              <span class="text-muted small">{{ trane.operador.nombre|default:trane.operador_manual|default:"-" }}</span>
+                          </td>
+                          <td>{{ trane.destino.nombre|default:"-" }}</td>
+                          <td>{{ trane.material.nombre|default:"-" }}</td>
+                          <td class="text-center bg-light">
+                              <form action="{% url 'importar_trane_a_remision' %}" method="POST" class="d-flex align-items-center justify-content-center m-0">
+                                  {% csrf_token %}
+                                  <input type="hidden" name="trane_id" value="{{ trane.id }}">
+                                  
+                                  <select name="empresa_id" class="form-select form-select-sm me-2 shadow-sm border-warning" required style="width: 180px;">
+                                      <option value="">Seleccione Empresa...</option>
+                                      {% for emp in empresas_disponibles %}
+                                      <option value="{{ emp.id }}">{{ emp.nombre }}</option>
+                                      {% endfor %}
+                                  </select>
+                                  
+                                  <button type="submit" class="btn btn-sm btn-success shadow-sm fw-bold" onclick="return confirm('¿Crear Remisión copiando estos datos? Se asignará el folio de la empresa elegida.');">
+                                      Generar Info <i class="fas fa-arrow-right ms-1"></i>
+                                  </button>
+                              </form>
+                          </td>
+                      </tr>
+                      {% empty %}
+                      <tr>
+                          <td colspan="6" class="text-center py-5 text-muted">
+                              <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
+                              <h5>Todo al día</h5>
+                              <p>No hay operaciones de TRANE pendientes por documentar.</p>
+                          </td>
+                      </tr>
+                      {% endfor %}
+                  </tbody>
+              </table>
+          </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="exportExcelModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title"><i class="fas fa-file-excel me-2"></i>Opciones de Descarga</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4 bg-light">
+          <p class="text-muted text-center mb-4">Selecciona el formato en el que deseas exportar los datos filtrados:</p>
+          
+          <div class="row g-3">
+              <div class="col-md-3">
+                  <div class="card excel-card-option h-100" onclick="descargarExcel('normal')">
+                      <div class="card-body text-center">
+                          <i class="fas fa-file-excel fa-3x text-secondary mb-3"></i>
+                          <h5 class="fw-bold text-dark">Versión Normal</h5>
+                          <p class="small text-muted mb-0">1 fila por remisión. Agrupa todos los materiales y suma los kilos totales sin desgloses.</p>
+                      </div>
+                  </div>
+              </div>
+              
+              <div class="col-md-3">
+                  <div class="card excel-card-option h-100" onclick="descargarExcel('concentrado')">
+                      <div class="card-body text-center">
+                          <i class="fas fa-layer-group fa-3x text-primary mb-3"></i>
+                          <h5 class="fw-bold text-dark">Resumen Concentrado</h5>
+                          <p class="small text-muted mb-0">1 fila por remisión. Muestra el total de la carga y el desglose separado por ( | ).</p>
+                      </div>
+                  </div>
+              </div>
+
+              <div class="col-md-3">
+                  <div class="card excel-card-option h-100" onclick="descargarExcel('detallado')">
+                      <div class="card-body text-center">
+                          <i class="fas fa-list-ul fa-3x text-success mb-3"></i>
+                          <h5 class="fw-bold text-dark">Remisiones a Detalle</h5>
+                          <p class="small text-muted mb-0">1 fila por cada material individual. Ideal para análisis profundo.</p>
+                      </div>
+                  </div>
+              </div>
+
+              <div class="col-md-3">
+                  <div class="card excel-card-option h-100" onclick="mostrarOpcionesMedline()">
+                      <div class="card-body text-center">
+                          <i class="fas fa-file-medical fa-3x text-danger mb-3"></i>
+                          <h5 class="fw-bold text-dark">Reportes Medline</h5>
+                          <p class="small text-muted mb-0">Generar reporte de Cartón o Archivo Muerto por separado.</p>
+                      </div>
+                  </div>
+              </div>
+          </div>
+
+          <div id="opcionesMedline" class="row mt-4 d-none">
+              <div class="col-12">
+                  <div class="card border-danger shadow-sm">
+                      <div class="card-header bg-danger text-white py-2">
+                          <h6 class="fw-bold mb-0"><i class="fas fa-cog me-2"></i>Reportes Medline Segregados</h6>
+                      </div>
+                      <div class="card-body">
+                          
+                          <div class="row g-2 align-items-end mb-3 border-bottom pb-3">
+                              <div class="col-md-3">
+                                  <h6 class="fw-bold text-dark mb-0"><i class="fas fa-box-open text-muted me-1"></i> CARTÓN</h6>
+                              </div>
+                              <div class="col-md-3">
+                                  <label class="small fw-bold text-muted">Mes a Reportar</label>
+                                  <input type="month" id="mesMedlineCarton" class="form-control form-control-sm">
+                              </div>
+                              <div class="col-md-3">
+                                  <label class="small fw-bold text-muted">Precio ($)</label>
+                                  <input type="number" step="0.001" id="precioCarton" class="form-control form-control-sm" placeholder="Ej. 0.45">
+                              </div>
+                              <div class="col-md-3">
+                                  <button type="button" class="btn btn-outline-danger btn-sm w-100 fw-bold mb-1" onclick="descargarMedline('carton')">
+                                      <i class="fas fa-download me-2"></i>Descargar Excel
+                                  </button>
+                              </div>
+                          </div>
+
+                          <div class="row g-2 align-items-end">
+                              <div class="col-md-3">
+                                  <h6 class="fw-bold text-dark mb-0"><i class="fas fa-archive text-muted me-1"></i> ARCHIVO MUERTO</h6>
+                              </div>
+                              <div class="col-md-3">
+                                  <label class="small fw-bold text-muted">Mes a Reportar</label>
+                                  <input type="month" id="mesMedlineArchivo" class="form-control form-control-sm">
+                              </div>
+                              <div class="col-md-3">
+                                  <label class="small fw-bold text-muted">Precio ($)</label>
+                                  <input type="number" step="0.001" id="precioArchivo" class="form-control form-control-sm" placeholder="Ej. 0.50">
+                              </div>
+                              <div class="col-md-3">
+                                  <button type="button" class="btn btn-outline-danger btn-sm w-100 fw-bold mb-1" onclick="descargarMedline('archivo')">
+                                      <i class="fas fa-download me-2"></i>Descargar Excel
+                                  </button>
+                              </div>
+                          </div>
+
+                      </div>
+                  </div>
+              </div>
+          </div>
+
+          <hr class="my-4">
+          <h6 class="fw-bold text-dark mb-3"><i class=""></i>Reportes Específicos por Origen</h6>
+          
+          <div class="row g-3">
+              <div class="col-md-3">
+                  <div class="card excel-card-option h-100" onclick="abrirMenuEspecifico('huaxing', 'HUAXING')">
+                      <div class="card-body text-center">
+                          <img src="https://3rrecycling.s3.amazonaws.com/static/Fotos_Reportes/HUAXING.jpg" alt="Logo HUAXING" style="height: 60px; width: auto; object-fit: contain;" class="mb-3">
+                          <h5 class="fw-bold text-dark">HUAXING</h5>
+                          <p class="small text-muted mb-0">Reporte de cargas y descargas.</p>
+                      </div>
+                  </div>
+              </div>
+              
+              <div class="col-md-3">
+                  <div class="card excel-card-option h-100" onclick="abrirMenuEspecifico('bachoco', 'BACHOCO')">
+                      <div class="card-body text-center">
+                          <img src="https://3rrecycling.s3.amazonaws.com/static/Fotos_Reportes/BACHOCO.png" alt="Logo BACHOCO" style="height: 60px; width: auto; object-fit: contain;" class="mb-3">
+                          <h5 class="fw-bold text-dark">BACHOCO</h5>
+                          <p class="small text-muted mb-0">Reporte de cargas y descargas.</p>
+                      </div>
+                  </div>
+              </div>
+              
+              <div class="col-md-3">
+                  <div class="card excel-card-option h-100" onclick="abrirMenuEspecifico('trane', 'TRANE')">
+                      <div class="card-body text-center">
+                          <img src="https://3rrecycling.s3.amazonaws.com/static/Fotos_Reportes/TRANE.png" alt="Logo TRANE" style="height: 60px; width: auto; object-fit: contain;" class="mb-3">
+                          <h5 class="fw-bold text-dark">TRANE</h5>
+                          <p class="small text-muted mb-0">Reporte de cargas y descargas.</p>
+                      </div>
+                  </div>
+              </div>
+              
+              <div class="col-md-3">
+                  <div class="card excel-card-option h-100" onclick="abrirMenuEspecifico('hudson', 'HUDSON')">
+                      <div class="card-body text-center">
+                          <img src="https://3rrecycling.s3.amazonaws.com/static/Fotos_Reportes/HUDSON.png" alt="Logo HUDSON" style="height: 60px; width: auto; object-fit: contain;" class="mb-3">
+                          <h5 class="fw-bold text-dark">HUDSON</h5>
+                          <p class="small text-muted mb-0">Reporte con precios y ventas.</p>
+                      </div>
+                  </div>
+              </div>
+          </div>
+
+          <div id="opcionesEspecificas" class="row mt-4 d-none">
+              <div class="col-12">
+                  <div class="card border-primary shadow-sm">
+                      <div class="card-header bg-primary text-white py-2">
+                          <h6 class="fw-bold mb-0" id="tituloReporteEspecifico"><i class="fas fa-cog me-2"></i>Opciones del Reporte</h6>
+                      </div>
+                      <div class="card-body">
+                          <input type="hidden" id="reporteSeleccionado">
+                          
+                          <div class="row g-3 align-items-end">
+                              <div class="col-md-3">
+                                  <label class="small fw-bold text-muted d-block mb-1">Filtrar fechas por:</label>
+                                  <div class="form-check form-check-inline">
+                                      <input class="form-check-input" type="radio" name="tipoFiltroEspecifico" id="filtroMes" value="mes" checked onchange="toggleFiltroEspecifico()">
+                                      <label class="form-check-label" for="filtroMes">Un Mes</label>
+                                  </div>
+                                  <div class="form-check form-check-inline">
+                                      <input class="form-check-input" type="radio" name="tipoFiltroEspecifico" id="filtroRango" value="rango" onchange="toggleFiltroEspecifico()">
+                                      <label class="form-check-label" for="filtroRango">Rango</label>
+                                  </div>
+                              </div>
+                              
+                              <div class="col-md-3" id="divMesEspecifico">
+                                  <label class="small fw-bold text-muted">Mes a Reportar</label>
+                                  <input type="month" id="mesEspecifico" class="form-control form-control-sm">
+                              </div>
+                              
+                              <div class="col-md-4 d-none" id="divRangoEspecifico">
+                                  <div class="row g-2">
+                                      <div class="col-6">
+                                          <label class="small fw-bold text-muted">Desde</label>
+                                          <input type="date" id="fechaInicioEspecifica" class="form-control form-control-sm">
+                                      </div>
+                                      <div class="col-6">
+                                          <label class="small fw-bold text-muted">Hasta</label>
+                                          <input type="date" id="fechaFinEspecifica" class="form-control form-control-sm">
+                                      </div>
+                                  </div>
+                              </div>
+
+                              <div class="col-md-2 d-none" id="divPrecioHudson">
+                                  <label class="small fw-bold text-muted">Precio ($)</label>
+                                  <input type="number" step="0.001" id="precioHudsonEsp" class="form-control form-control-sm" placeholder="Ej. 0.50">
+                              </div>
+
+                              <div class="col-md-2">
+                                  <button type="button" class="btn btn-outline-primary btn-sm w-100 fw-bold mb-1" onclick="ejecutarDescargaEspecifica()">
+                                      <i class="fas fa-download me-2"></i>Descargar
+                                  </button>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalExportarMedline" tabindex="-1" aria-labelledby="modalMedlineLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content border-0 shadow">
+      <form action="{% url 'exportar_zip_medline' %}" method="POST">
+        {% csrf_token %}
+        <div class="modal-header bg-info text-white">
+          <h5 class="modal-title fw-bold" id="modalMedlineLabel"><i class="fas fa-box-open me-2"></i>Exportar Documentos MEDLINE</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          
+          <ul class="nav nav-pills nav-justified mb-3" id="medlineTab" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active fw-bold" id="fecha-tab" data-bs-toggle="pill" data-bs-target="#fecha-pane" type="button" role="tab">Por Fecha</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link fw-bold" id="folio-tab" data-bs-toggle="pill" data-bs-target="#folio-pane" type="button" role="tab">Por Rango de Folios</button>
+            </li>
+          </ul>
+
+          <div class="tab-content border rounded p-3 bg-light" id="medlineTabContent">
+            <div class="tab-pane fade show active" id="fecha-pane" role="tabpanel" tabindex="0">
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-muted small">Fecha de Inicio</label>
+                    <input type="date" name="fecha_inicio" class="form-control">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-muted small">Fecha de Fin</label>
+                    <input type="date" name="fecha_fin" class="form-control">
+                </div>
+            </div>
+            
+            <div class="tab-pane fade" id="folio-pane" role="tabpanel" tabindex="0">
+                <div class="alert alert-info small pb-0">
+                    <p><i class="fas fa-info-circle"></i> Ingresa solo los números. <br>Ej. Para descargar de <b>NLD-100</b> a <b>NLD-200</b>, ingresa <b>100</b> y <b>200</b>.</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-muted small">Folio Inicio</label>
+                    <input type="number" name="folio_inicio" class="form-control" placeholder="Ej. 100">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-muted small">Folio Fin</label>
+                    <input type="number" name="folio_fin" class="form-control" placeholder="Ej. 200">
+                </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-secondary rounded-pill fw-bold" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-info rounded-pill fw-bold text-white shadow-sm" onclick="$('#loadingOverlay').removeClass('d-none'); setTimeout(function(){$('#loadingOverlay').addClass('d-none'); $('#modalExportarMedline').modal('hide');}, 5000);"><i class="fas fa-download me-2"></i>Descargar ZIP</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="visualizarModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered"> 
+    <div class="modal-content" style="height: 90vh; background-color: #111;">
+      <div class="modal-header border-bottom border-secondary bg-dark text-white py-2">
+        <h5 class="modal-title fs-6" id="visualizarModalLabel"><i class="fas fa-images me-2"></i>Visor de Evidencias</h5>
+      </div>
+      
+      <div class="modal-body p-0 position-relative d-flex align-items-center justify-content-center overflow-hidden" id="modalContent">
+          </div>
+
+      <div class="viewer-toolbar">
+          <button class="viewer-btn" onclick="rotateLeft()" title="Girar Izquierda"><i class="fas fa-undo"></i></button>
+          <button class="viewer-btn" onclick="zoomOut()" title="Alejar"><i class="fas fa-minus"></i></button>
+          
+          <button class="viewer-btn viewer-btn-close" data-bs-dismiss="modal" title="Cerrar Visor">
+            <i class="fas fa-times"></i>
+          </button>
+          
+          <button class="viewer-btn" onclick="zoomIn()" title="Acercar"><i class="fas fa-plus"></i></button>
+          <button class="viewer-btn" onclick="rotateRight()" title="Girar Derecha"><i class="fas fa-redo"></i></button>
+          <button class="viewer-btn" onclick="resetView()" title="Resetear"><i class="fas fa-compress"></i></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+// --- VARIABLES GLOBALES PARA ZOOM, ROTACIÓN Y DRAG ---
+let currentScale = 1;
+let currentRotation = 0;
+let currentX = 0;
+let currentY = 0;
+let isDragging = false;
+let startX = 0;
+let startY = 0;
+
+$(document).ready(function() {
+    $('#visualizarModal').appendTo("body");
+    $('#exportExcelModal').appendTo("body");
+    $('#modalImportarTrane').appendTo("body"); 
+    $('#modalExportarMedline').appendTo("body"); // Añadido modal medline zip
+
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    $('.searchable-select').select2({
+        theme: 'bootstrap-5',
+        width: $(this).data('width') ? $(this).data('width') : $(this).hasClass('w-100') ? '100%' : 'style'
+    });
+
+    $('#visualizarModal').on('hidden.bs.modal', function () {
+        resetView();
+    });
+
+    // --- LOGICA DE ARRASTRE (DRAG) ---
+    const container = $('#modalContent');
+
+    container.on('mousedown', '.transformable-image', function(e) {
+        if (e.which !== 1) return; // Solo click izquierdo
+        e.preventDefault();
+        isDragging = true;
+        startX = e.clientX - currentX;
+        startY = e.clientY - currentY;
+        $(this).css('cursor', 'grabbing');
+    });
+
+    $(document).on('mousemove', function(e) {
+        if (!isDragging) return;
+        e.preventDefault();
+        currentX = e.clientX - startX;
+        currentY = e.clientY - startY;
+        updateTransform();
+    });
+
+    $(document).on('mouseup', function() {
+        if (isDragging) {
+            isDragging = false;
+            $('.transformable-image').css('cursor', 'grab');
+        }
+    });
+
+    // --- BÚSQUEDA DE PRECIO EN MEDLINE ---
+    $('#mesMedlineCarton').on('change', function() {
+        const mesSeleccionado = $(this).val(); 
+        if (mesSeleccionado) {
+            $('#precioCarton').attr('placeholder', 'Buscando...');
+            $.ajax({
+                url: "{% url 'obtener_precio_medline' %}",
+                data: { 'mes': mesSeleccionado },
+                success: function(response) {
+                    if (response.success && response.precio_carton > 0) {
+                        $('#precioCarton').val(response.precio_carton);
+                    } else {
+                        $('#precioCarton').val('');
+                        $('#precioCarton').attr('placeholder', 'Ej. 0.45');
+                    }
+                },
+                error: function() { $('#precioCarton').attr('placeholder', 'Ej. 0.45'); }
+            });
+        }
+    });
+
+    $('#mesMedlineArchivo').on('change', function() {
+        const mesSeleccionado = $(this).val(); 
+        if (mesSeleccionado) {
+            $('#precioArchivo').attr('placeholder', 'Buscando...');
+            $.ajax({
+                url: "{% url 'obtener_precio_medline' %}",
+                data: { 'mes': mesSeleccionado },
+                success: function(response) {
+                    if (response.success && response.precio_archivo > 0) {
+                        $('#precioArchivo').val(response.precio_archivo);
+                    } else {
+                        $('#precioArchivo').val('');
+                        $('#precioArchivo').attr('placeholder', 'Ej. 0.50');
+                    }
+                },
+                error: function() { $('#precioArchivo').attr('placeholder', 'Ej. 0.50'); }
+            });
+        }
+    });
+});
+
+// --- DESCARGA DE REPORTES NORMALES ---
+function descargarExcel(tipoReporte) {
+    $('#exportExcelModal').modal('hide');
+    const formParams = $('#filterForm').serialize();
+    const baseUrl = "{% url 'export_remisiones_to_excel' %}";
+    const finalUrl = `${baseUrl}?${formParams}&tipo_reporte=${tipoReporte}`;
+    
+    $('#loadingOverlay').removeClass('d-none');
+    window.location.href = finalUrl;
+    setTimeout(function(){ $('#loadingOverlay').addClass('d-none'); }, 4000); 
+}
+
+// --- MOSTRAR MENÚ MEDLINE ---
+function mostrarOpcionesMedline() {
+    $('#opcionesMedline').removeClass('d-none');
+    $('#opcionesEspecificas').addClass('d-none'); // Esconder el otro menú si está abierto
+}
+
+// --- DESCARGA DE REPORTES MEDLINE SEGREGADOS ---
+function descargarMedline(tipoMaterial) {
+    let mes = '';
+    let precioCarton = '0';
+    let precioArchivo = '0';
+
+    if (tipoMaterial === 'carton') {
+        mes = $('#mesMedlineCarton').val();
+        precioCarton = $('#precioCarton').val();
+        if (!precioCarton) {
+            alert("Por favor, ingresa el precio de CARTÓN para generar el reporte.");
+            return;
+        }
+    } else if (tipoMaterial === 'archivo') {
+        mes = $('#mesMedlineArchivo').val();
+        precioArchivo = $('#precioArchivo').val();
+        if (!precioArchivo) {
+            alert("Por favor, ingresa el precio de ARCHIVO MUERTO para generar el reporte.");
+            return;
+        }
+    }
+
+    $('#exportExcelModal').modal('hide');
+    $('#loadingOverlay').removeClass('d-none');
+    
+    const formParams = $('#filterForm').serialize();
+    const baseUrl = "{% url 'export_remisiones_to_excel' %}";
+    const finalUrl = `${baseUrl}?${formParams}&tipo_reporte=medline&material_medline=${tipoMaterial}&precio_carton=${precioCarton}&precio_archivo=${precioArchivo}&mes=${mes}`;
+    
+    window.location.href = finalUrl;
+    setTimeout(function(){ $('#loadingOverlay').addClass('d-none'); }, 4000); 
+}
+
+// ========================================================
+// NUEVAS FUNCIONES PARA REPORTES ESPECÍFICOS Y HUDSON
+// ========================================================
+
+function abrirMenuEspecifico(idReporte, nombreMostrar) {
+    $('#opcionesMedline').addClass('d-none'); // Esconde Medline si estaba abierto
+    $('#opcionesEspecificas').removeClass('d-none'); // Muestra este menú
+    
+    // Configura el título y el valor oculto
+    $('#tituloReporteEspecifico').html(`<i class="fas fa-cog me-2"></i>Opciones Reporte: ${nombreMostrar}`);
+    $('#reporteSeleccionado').val(idReporte);
+    
+    // Si es hudson, mostramos el cuadro de precio, si no, lo ocultamos
+    if(idReporte === 'hudson') {
+        $('#divPrecioHudson').removeClass('d-none');
+    } else {
+        $('#divPrecioHudson').addClass('d-none');
+    }
+}
+
+function toggleFiltroEspecifico() {
+    let seleccion = $('input[name="tipoFiltroEspecifico"]:checked').val();
+    if (seleccion === 'mes') {
+        $('#divMesEspecifico').removeClass('d-none');
+        $('#divRangoEspecifico').addClass('d-none');
+    } else {
+        $('#divMesEspecifico').addClass('d-none');
+        $('#divRangoEspecifico').removeClass('d-none');
+    }
+}
+
+function ejecutarDescargaEspecifica() {
+    let tipoReporte = $('#reporteSeleccionado').val();
+    let tipoFiltro = $('input[name="tipoFiltroEspecifico"]:checked').val();
+    let mes = $('#mesEspecifico').val();
+    let fechaInicio = $('#fechaInicioEspecifica').val();
+    let fechaFin = $('#fechaFinEspecifica').val();
+    let precio = $('#precioHudsonEsp').val();
+
+    // Validaciones
+    if (tipoReporte === 'hudson' && !precio) {
+        alert("Por favor, ingresa el precio para generar el reporte HUDSON.");
+        return;
+    }
+
+    $('#exportExcelModal').modal('hide');
+    $('#loadingOverlay').removeClass('d-none');
+    
+    // Mantenemos filtros de la vista principal si los hay
+    const formParams = $('#filterForm').serialize();
+    const baseUrl = "{% url 'export_reportes_especificos' %}";
+    
+    // Armamos la URL con los nuevos parámetros
+    const finalUrl = `${baseUrl}?${formParams}&tipo_reporte=${tipoReporte}&tipo_filtro=${tipoFiltro}&mes=${mes}&fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}&precio_hudson=${precio}`;
+    
+    window.location.href = finalUrl;
+    setTimeout(function(){ $('#loadingOverlay').addClass('d-none'); }, 4000); 
+}
+// ========================================================
+
+// --- FUNCIÓN PARA FILTRAR AL HACER CLIC EN LOS BADGES ---
+function filtrarPorEstatus(estatus) {
+    $('#q_status').val(estatus);
+    $('#q_status').trigger('change');
+    $('#filterForm').submit();
+}
+
+// --- FUNCIONES DE CONTROL DE IMAGEN ---
+function updateTransform() {
+    let activeImg;
+    const carouselItem = document.querySelector('.carousel-item.active .transformable-image');
+    const singleImg = document.querySelector('#modalContent > .transformable-image');
+    if (carouselItem) activeImg = carouselItem;
+    else if (singleImg) activeImg = singleImg;
+
+    if (activeImg) {
+        activeImg.style.transform = `translate(${currentX}px, ${currentY}px) rotate(${currentRotation}deg) scale(${currentScale})`;
+    }
+}
+function zoomIn() { currentScale += 0.2; updateTransform(); }
+function zoomOut() { if (currentScale > 0.4) { currentScale -= 0.2; updateTransform(); } }
+function rotateLeft() { currentRotation -= 90; updateTransform(); }
+function rotateRight() { currentRotation += 90; updateTransform(); }
+function resetView() { currentScale = 1; currentRotation = 0; currentX = 0; currentY = 0; updateTransform(); }
+
+function toggleToolbar(url) {
+    if (!url) return;
+    const cleanUrl = url.split('?')[0].split('#')[0];
+    const ext = cleanUrl.split('.').pop().toLowerCase();
+    if (ext === 'pdf') { $('.viewer-btn').not('.viewer-btn-close').hide(); } 
+    else { $('.viewer-btn').show(); }
+}
+
+function abrirGaleria(listaArchivos) {
+    let archivosValidos = listaArchivos.filter(url => url && url.trim() !== '' && url !== ',');
+    const modalBody = document.getElementById('modalContent');
+    const modalTitle = document.getElementById('visualizarModalLabel');
+    modalBody.innerHTML = ''; 
+    resetView(); 
+
+    if (archivosValidos.length === 0) { alert("No hay archivos para mostrar."); return; }
+
+    if (archivosValidos.length === 1) {
+        const url = archivosValidos[0];
+        modalTitle.innerText = "Evidencia (1 archivo)";
+        modalBody.innerHTML = generarHTMLArchivo(url, true);
+        toggleToolbar(url);
+    } 
+    else {
+        modalTitle.innerText = `Evidencias (${archivosValidos.length} archivos)`;
+        let indicators = ''; let items = '';
+        archivosValidos.forEach((url, index) => {
+            const activeClass = (index === 0) ? 'active' : '';
+            indicators += `<button type="button" data-bs-target="#carruselEvidencias" data-bs-slide-to="${index}" class="${activeClass}" aria-current="true" aria-label="Slide ${index+1}"></button>`;
+            const contenido = generarHTMLArchivo(url, false);
+            items += `<div class="carousel-item ${activeClass}"><div class="d-flex justify-content-center align-items-center" style="height: 100%; width: 100%;">${contenido}</div><div class="carousel-caption"><h5>Archivo ${index + 1} de ${archivosValidos.length}</h5></div></div>`;
+        });
+        const carouselHTML = `<div id="carruselEvidencias" class="carousel slide w-100 h-100" data-bs-interval="false"><div class="carousel-indicators">${indicators}</div><div class="carousel-inner h-100">${items}</div><button class="carousel-control-prev" type="button" data-bs-target="#carruselEvidencias" data-bs-slide="prev" style="width: 5%; z-index: 1060;" onclick="resetView()"><span class="carousel-control-prev-icon" aria-hidden="true" style="background-color: black; border-radius: 50%;"></span><span class="visually-hidden">Anterior</span></button><button class="carousel-control-next" type="button" data-bs-target="#carruselEvidencias" data-bs-slide="next" style="width: 5%; z-index: 1060;" onclick="resetView()"><span class="carousel-control-next-icon" aria-hidden="true" style="background-color: black; border-radius: 50%;"></span><span class="visually-hidden">Siguiente</span></button></div>`;
+        modalBody.innerHTML = carouselHTML;
+        toggleToolbar(archivosValidos[0]);
+        const myCarousel = document.getElementById('carruselEvidencias');
+        myCarousel.addEventListener('slide.bs.carousel', function (e) {
+            resetView(); toggleToolbar(archivosValidos[e.to]);
+        });
+    }
+    var myModal = new bootstrap.Modal(document.getElementById('visualizarModal'));
+    myModal.show();
+}
+
+function generarHTMLArchivo(url, esUnico) {
+    let secureUrl = url;
+    if (secureUrl.startsWith('http://')) { secureUrl = secureUrl.replace('http://', 'https://'); }
+    const cleanUrl = secureUrl.split('?')[0].split('#')[0];
+    const ext = cleanUrl.split('.').pop().toLowerCase();
+    
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) {
+        return `<img src="${secureUrl}" class="transformable-image" alt="Evidencia">`;
+    } else if (ext === 'pdf') {
+        const googleViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(secureUrl)}&embedded=true`;
+        return `<div class="w-100 h-100 d-flex flex-column" style="background-color: #333; min-height: 80vh;"><iframe src="${googleViewerUrl}" width="100%" height="100%" style="flex-grow: 1; border: none; background-color: white;"></iframe></div>`;
+    } else {
+        return `<div class="text-center text-white d-flex flex-column align-items-center justify-content-center h-100"><i class="fas fa-file-download fa-4x mb-3 text-warning"></i><br><p>Archivo <strong>.${ext}</strong> no previsualizable.</p><a href="${secureUrl}" class="btn btn-primary mt-2 rounded-pill" download><i class="fas fa-download me-2"></i>Descargar Archivo</a></div>`;
+    }
+}
+</script>
+{% endblock %}

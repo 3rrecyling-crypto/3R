@@ -1,0 +1,208 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Nueva Cuenta por Pagar{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 text-gray-800">Nueva Cuenta por Pagar <span class="badge bg-secondary text-white" style="font-size: 0.6em;">Manual</span></h1>
+            <p class="text-muted mb-0">El folio interno (CXP-XXXXX) se generará automáticamente al guardar.</p>
+        </div>
+        <a href="{% url 'dashboard_cuentas_por_pagar' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-times me-2"></i>Cancelar
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-5">
+            <div class="card shadow mb-4 border-left-primary">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Datos del Documento</h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data" id="cxpForm">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Proveedor *</label>
+                            {{ form.proveedor }}
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Folio Factura (Proveedor) *</label>
+                                {{ form.numero_factura }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Fecha Emisión *</label>
+                                {{ form.fecha_emision }}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold text-success">Monto Total *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    {{ form.monto }}
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold text-info">Plazos (Pagos) *</label>
+                                {{ form.cantidad_plazos }}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Archivo PDF/XML</label>
+                            {{ form.archivo_factura }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Notas</label>
+                            {{ form.notas }}
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save me-2"></i>Guardar Cuenta por Pagar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center bg-gray-100">
+                    <h6 class="m-0 font-weight-bold text-dark">
+                        <i class="fas fa-calendar-alt me-2 text-info"></i>Proyección de Pagos
+                    </h6>
+                    <small class="text-muted">Calculado automáticamente</small>
+                </div>
+                <div class="card-body">
+                    
+                    <div id="empty-state" class="text-center py-5">
+                        <i class="fas fa-calculator text-gray-300 fa-4x mb-3"></i>
+                        <p class="text-muted">Ingresa el Monto, Fecha y Plazos para ver la proyección.</p>
+                    </div>
+
+                    <div id="schedule-container" style="display: none;">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th class="text-center" style="width: 10%">#</th>
+                                        <th class="text-center">Fecha Programada</th>
+                                        <th class="text-center">Días Crédito</th>
+                                        <th class="text-end">Monto a Pagar</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="payments-body">
+                                    </tbody>
+                                <tfoot class="table-light fw-bold">
+                                    <tr>
+                                        <td colspan="3" class="text-end">TOTAL:</td>
+                                        <td class="text-end text-success" id="total-preview">$0.00</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <div class="alert alert-info small mt-2">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Las fechas se calculan sumando 30 días por cada plazo a partir de la fecha de emisión.
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Referencias a inputs
+    const inputMonto = document.getElementById('{{ form.monto.id_for_label }}');
+    const inputPlazos = document.getElementById('{{ form.cantidad_plazos.id_for_label }}');
+    const inputFecha = document.getElementById('{{ form.fecha_emision.id_for_label }}');
+    
+    // Contenedores visuales
+    const emptyState = document.getElementById('empty-state');
+    const scheduleContainer = document.getElementById('schedule-container');
+    const tableBody = document.getElementById('payments-body');
+    const totalPreview = document.getElementById('total-preview');
+
+    function calcularProyeccion() {
+        const montoTotal = parseFloat(inputMonto.value);
+        const plazos = parseInt(inputPlazos.value);
+        const fechaStr = inputFecha.value;
+
+        // Validar que tengamos todos los datos necesarios
+        if (!montoTotal || !plazos || !fechaStr) {
+            emptyState.style.display = 'block';
+            scheduleContainer.style.display = 'none';
+            return;
+        }
+
+        // Mostrar tabla, ocultar mensaje vacío
+        emptyState.style.display = 'none';
+        scheduleContainer.style.display = 'block';
+
+        // Limpiar tabla
+        tableBody.innerHTML = '';
+
+        // Cálculos base
+        const fechaEmision = new Date(fechaStr + 'T00:00:00'); // T00... para evitar problemas de zona horaria local
+        const montoPorPlazo = montoTotal / plazos;
+        let acumulado = 0;
+
+        for (let i = 1; i <= plazos; i++) {
+            // Calcular fecha: Emisión + (30 días * numero de plazo)
+            let fechaPago = new Date(fechaEmision);
+            fechaPago.setDate(fechaEmision.getDate() + (30 * i));
+            
+            // Formato de fecha legible (DD/MM/YYYY)
+            const fechaLegible = fechaPago.toLocaleDateString('es-MX', { 
+                year: 'numeric', month: 'long', day: 'numeric' 
+            });
+            
+            // Días de crédito acumulados
+            const diasCredito = 30 * i;
+
+            // Manejo de centavos para que el total cuadre exacto en el último pago
+            let montoEstePlazo = montoPorPlazo;
+            if (i === plazos) {
+                montoEstePlazo = montoTotal - acumulado;
+            }
+            acumulado += montoEstePlazo;
+
+            // Crear fila HTML
+            const row = `
+                <tr>
+                    <td class="text-center fw-bold">${i}</td>
+                    <td class="text-center">${fechaLegible}</td>
+                    <td class="text-center"><span class="badge bg-secondary">${diasCredito} días</span></td>
+                    <td class="text-end fw-bold text-dark">$${montoEstePlazo.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                </tr>
+            `;
+            tableBody.insertAdjacentHTML('beforeend', row);
+        }
+
+        // Actualizar total footer
+        totalPreview.textContent = '$' + montoTotal.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
+    // Escuchar cambios en los inputs
+    inputMonto.addEventListener('input', calcularProyeccion);
+    inputPlazos.addEventListener('input', calcularProyeccion);
+    inputFecha.addEventListener('change', calcularProyeccion);
+});
+</script>
+{% endblock %} 

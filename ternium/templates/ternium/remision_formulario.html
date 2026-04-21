@@ -1,0 +1,1336 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<style>
+    :root {
+        --primary-color: #2c3e50;
+        --secondary-color: #34495e;
+        --accent-color: #3498db;
+        --light-color: #ecf0f1;
+        --success-color: #27ae60;
+        --danger-color: #e74c3c;
+        --info-color: #17a2b8;
+        --border-radius: 8px;
+        --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+    .card {
+        border: none;
+        border-radius: var(--border-radius);
+        box-shadow: var(--box-shadow);
+    }
+    .card-header {
+        background-color: var(--primary-color);
+        color: white;
+        border-radius: var(--border-radius) var(--border-radius) 0 0 !important;
+    }
+    .form-label {
+        font-weight: 500;
+        color: var(--secondary-color);
+    }
+    .form-select, .form-control {
+        border-radius: var(--border-radius) !important;
+    }
+    .detalle-form-row {
+        padding: 0.75rem;
+        background-color: #fafafa;
+        border-bottom: 1px solid #eee;
+    }
+    .detalle-form-row:last-of-type {
+        border-bottom: none;
+    }
+    .perdida-calculada-label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: bold;
+    }
+    .perdida-calculada-valor {
+        font-weight: bold;
+        font-size: 1rem;
+    }
+    .text-success { color: var(--success-color) !important; }
+    .text-danger { color: var(--danger-color) !important; }
+    .formset-header {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #555;
+        padding: 0.5rem 0.75rem;
+        background-color: #f8f9fa;
+    }
+    .file-upload-card {
+        padding: 1.5rem;
+        border-radius: var(--border-radius);
+        background-color: #f8fafc;
+        border: 2px dashed #d1d5db;
+        transition: all 0.3s ease;
+    }
+    .file-upload-card:hover {
+        border-color: var(--accent-color);
+        background-color: #f0f4f8;
+    }
+    .form-error {
+        color: var(--danger-color);
+        font-size: 0.85rem;
+        margin-top: 0.25rem;
+        font-weight: bold;
+    }
+    .required-asterisk {
+        color: var(--danger-color);
+        margin-left: 3px;
+        font-weight: bold;
+    }
+    .preview-container {
+        cursor: pointer;
+        transition: transform 0.2s;
+        position: relative;
+    }
+    .preview-container:hover {
+        transform: scale(1.02);
+    }
+    
+    .campo-texto-alternativo {
+        text-transform: uppercase; 
+        background-color: #fff8e1;
+        border-color: #ffc107;
+    }
+    .table-historial th {
+        background-color: #e9ecef;
+        color: #495057;
+    }
+    .cliente-automatico + .select2-container .select2-selection {
+        background-color: #e9ecef;
+        pointer-events: none; 
+    }
+    .unidad-fija {
+        background-color: #e9ecef !important;
+        cursor: not-allowed;
+        font-weight: bold;
+        text-align: center;
+        color: #495057;
+    }
+    
+    /* Estilos para las tarjetas de destrucción */
+    .material-dest-card {
+        transition: all 0.3s ease;
+        border-color: #dee2e6 !important;
+    }
+    .material-dest-card.seleccionado {
+        border-color: var(--primary-color) !important;
+        background-color: #f0f4f8;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .foto-box-header {
+        background-color: #e9ecef;
+        padding: 8px 15px;
+        border-radius: 6px 6px 0 0;
+        font-size: 0.9rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ titulo }}</h2>
+        <a href="{% url 'remision_lista' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Volver a la Lista
+        </a>
+    </div>
+    
+    <form method="post" enctype="multipart/form-data" novalidate id="remisionForm">
+        {% csrf_token %}
+
+        <input type="hidden" name="destruccion_material_1" id="destruccion_material_1" value="{% if remision %}{{ remision.destruccion_material_1|default_if_none:'' }}{% endif %}">
+        <input type="hidden" name="destruccion_peso_1" id="destruccion_peso_1" value="{% if remision %}{{ remision.destruccion_peso_1|default_if_none:'' }}{% endif %}">
+        <input type="hidden" name="destruccion_material_2" id="destruccion_material_2" value="{% if remision %}{{ remision.destruccion_material_2|default_if_none:'' }}{% endif %}">
+        <input type="hidden" name="destruccion_peso_2" id="destruccion_peso_2" value="{% if remision %}{{ remision.destruccion_peso_2|default_if_none:'' }}{% endif %}">
+
+        {% if form.errors or formset.errors %}
+        <div class="alert alert-danger shadow-sm alert-dismissible fade show" role="alert">
+            <h5 class="alert-heading"><i class="fas fa-bug me-2"></i>Por favor corrige los siguientes errores:</h5>
+            {% if form.non_field_errors %}<div class="mb-2 fw-bold">{{ form.non_field_errors }}</div>{% endif %}
+            {% if form.errors %}
+            <ul class="mb-2">
+                {% for field in form %}
+                    {% for error in field.errors %}
+                        <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                    {% endfor %}
+                {% endfor %}
+            </ul>
+            {% endif %}
+            {% if formset.errors %}
+                {% for dict in formset.errors %}
+                    {% for error in dict.values %}
+                         {% if error %}<div><i class="fas fa-exclamation-circle me-1"></i> <strong>Error en materiales:</strong> {{ error }}</div>{% endif %}
+                    {% endfor %}
+                {% endfor %}
+                <div class="mt-1">{{ formset.non_form_errors }}</div>
+            {% endif %}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+
+        <div class="mb-4 d-flex justify-content-start" id="contenedor_boton_destruccion" style="display: none;">
+            <button type="button" class="btn text-white shadow fw-bold rounded-pill px-4" style="background-color: var(--primary-color);" data-bs-toggle="modal" data-bs-target="#basculaModal">
+                <i class="fas fa-file-signature me-2"></i> Destrucción Fiscal
+            </button>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header"><h5><i class="fas fa-file-alt me-2"></i>Información General</h5></div>
+            <div class="card-body"><div class="row g-3">
+                <div class="col-md">
+                    <label for="{{ form.empresa.id_for_label }}" class="form-label">{{ form.empresa.label }}</label>
+                    {% if is_editing %}
+                        <select class="form-select" disabled><option selected>{{ remision.empresa.nombre }}</option></select>
+                        <input type="hidden" name="empresa" id="id_empresa" value="{{ form.empresa.value }}">
+                    {% else %}
+                        {{ form.empresa }}
+                        <div class="form-error">{{ form.empresa.errors }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md">
+                    <label for="id_remision_display" class="form-label">Remisión</label>
+                    <input type="text" id="id_remision_display" name="remision" class="form-control" readonly value="{% if is_editing %}{{ remision.remision }}{% endif %}">
+                    <div class="form-error">{{ form.remision.errors }}</div>
+                    <div class="form-text">{% if is_editing %}El folio no puede ser modificado.{% else %}Automático al guardar.{% endif %}</div>
+                </div>
+                <div class="col-md">
+                    <label for="{{ form.fecha.id_for_label }}" class="form-label">{{ form.fecha.label }}</label>
+                    {{ form.fecha }}
+                    <div class="form-error">{{ form.fecha.errors }}</div>
+                </div>
+                
+                <div class="col-md" id="contenedor_folio_medline" style="display: none;">
+                    <label class="form-label fw-bold" style="color: #6f42c1;"><i class="fas fa-hashtag me-1"></i>Folio Medline</label>
+                    <input type="text" class="form-control fw-bold text-center" style="background-color: #f3e8ff; color: #6f42c1; border-color: #d8b4fe;" readonly value="{{ remision.folio_medline|default:'SE GENERARÁ AL GUARDAR' }}">
+                    <div class="form-text" style="color: #6f42c1;"><i class="fas fa-info-circle me-1"></i>Consecutivo automático</div>
+                </div>
+                
+            </div></div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header"><h5><i class="fas fa-truck me-2"></i>Transporte</h5></div>
+            <div class="card-body"><div class="row g-3">
+                <div class="col-md-6">
+                    <label for="{{ form.linea_transporte.id_for_label }}" class="form-label">{{ form.linea_transporte.label }}</label>
+                    {{ form.linea_transporte }}
+                    <div class="form-error">{{ form.linea_transporte.errors }}</div>
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.operador.id_for_label }}" class="form-label">{{ form.operador.label }}</label>
+                    <div class="campo-select-wrapper">{{ form.operador }}</div>
+                    <input type="text" name="operador_texto" id="id_operador_texto" class="form-control campo-texto-alternativo" style="display:none;" placeholder="NOMBRE DEL OPERADOR" value="{% if valores_manuales.operador %}{{ valores_manuales.operador }}{% elif remision %}{{ remision.operador_manual|default:'' }}{% endif %}" oninput="this.value = this.value.toUpperCase()">
+                    <div class="form-error">{{ form.operador.errors }}</div>
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="{{ form.unidad.id_for_label }}" class="form-label">{{ form.unidad.label }}</label>
+                    <div class="campo-select-wrapper">{{ form.unidad }}</div>
+                    <div id="contenedor_inputs_unidad" class="row g-2" style="display:none;">
+                        <div class="col-6">
+                            <input type="text" name="unidad_texto" id="id_unidad_texto" class="form-control campo-texto-alternativo" placeholder="ID/NÚMERO UNIDAD" value="{% if valores_manuales.unidad %}{{ valores_manuales.unidad }}{% elif remision %}{{ remision.unidad_manual|default:'' }}{% endif %}" oninput="this.value = this.value.toUpperCase()">
+                        </div>
+                        <div class="col-6">
+                            <input type="text" name="placas_unidad_texto" id="id_placas_unidad_texto" class="form-control campo-texto-alternativo border-warning" placeholder="PLACAS UNIDAD" value="{% if valores_manuales.placas_unidad %}{{ valores_manuales.placas_unidad }}{% elif remision %}{{ remision.placas_unidad_manual|default:'' }}{% endif %}" oninput="this.value = this.value.toUpperCase()">
+                        </div>
+                    </div>
+                    <div class="form-error">{{ form.unidad.errors }}</div>
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="{{ form.contenedor.id_for_label }}" class="form-label">{{ form.contenedor.label }}</label>
+                    <div class="campo-select-wrapper">{{ form.contenedor }}</div>
+                    <div id="contenedor_inputs_contenedor" class="row g-2" style="display:none;">
+                        <div class="col-6">
+                            <input type="text" name="contenedor_texto" id="id_contenedor_texto" class="form-control campo-texto-alternativo" placeholder="ID/NÚMERO CONTENEDOR" value="{% if valores_manuales.contenedor %}{{ valores_manuales.contenedor }}{% elif remision %}{{ remision.contenedor_manual|default:'' }}{% endif %}" oninput="this.value = this.value.toUpperCase()">
+                        </div>
+                        <div class="col-6">
+                            <input type="text" name="placas_contenedor_texto" id="id_placas_contenedor_texto" class="form-control campo-texto-alternativo border-warning" placeholder="PLACAS CONTENEDOR" value="{% if valores_manuales.placas_contenedor %}{{ valores_manuales.placas_contenedor }}{% elif remision %}{{ remision.placas_contenedor_manual|default:'' }}{% endif %}" oninput="this.value = this.value.toUpperCase()">
+                        </div>
+                    </div>
+                    <div class="form-error">{{ form.contenedor.errors }}</div>
+                </div>
+                </div></div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header"><h5><i class="fas fa-route me-2"></i>Ruta y Operación</h5></div>
+            <div class="card-body"><div class="row g-3">
+                <div class="col-md-6">
+                    <label for="{{ form.origen.id_for_label }}" class="form-label">{{ form.origen.label }} <span class="required-asterisk">*</span></label>
+                    {{ form.origen }}
+                    <div class="form-error">{{ form.origen.errors }}</div>
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.destino.id_for_label }}" class="form-label">{{ form.destino.label }} <span class="required-asterisk">*</span></label>
+                    {{ form.destino }}
+                    <div class="form-error">{{ form.destino.errors }}</div>
+                </div>
+                <hr class="my-3">
+                <div class="col-md-3"><label for="{{ form.inicia_ld.id_for_label }}" class="form-label">{{ form.inicia_ld.label }}</label>{{ form.inicia_ld }}<div class="form-error">{{ form.inicia_ld.errors }}</div></div>
+                <div class="col-md-3"><label for="{{ form.termina_ld.id_for_label }}" class="form-label">{{ form.termina_ld.label }}</label>{{ form.termina_ld }}<div class="form-error">{{ form.termina_ld.errors }}</div></div>
+                <div class="col-md-3"><label for="{{ form.inicia_dlv.id_for_label }}" class="form-label">{{ form.inicia_dlv.label }}</label>{{ form.inicia_dlv }}<div class="form-error">{{ form.inicia_dlv.errors }}</div></div>
+                <div class="col-md-3"><label for="{{ form.termina_dlv.id_for_label }}" class="form-label">{{ form.termina_dlv.label }}</label>{{ form.termina_dlv }}<div class="form-error">{{ form.termina_dlv.errors }}</div></div>
+            </div></div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-balance-scale me-2"></i>Materiales y Pesos</h5>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" id="btn-toggle-rechazo" class="btn btn-outline-warning btn-sm fw-bold">
+                        <i class="fas fa-exclamation-triangle me-1"></i> Habilitar Rechazo
+                    </button>
+                    <button type="button" id="add-form" class="btn btn-success btn-sm"><i class="fas fa-plus me-1"></i> Añadir Material</button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                {{ formset.management_form }}
+                
+                <div class="row g-3 formset-header align-items-center d-none d-md-flex">
+                    <div class="col-md-2">MATERIAL</div>
+                    <div class="col-md-1">UNIDAD</div> 
+                    <div class="col-md-1 text-center">BULTOS</div>
+                    <div class="col-md-2 text-end">CARGA</div>
+                    <div class="col-md-2">CLIENTE (Destino)</div>
+                    <div class="col-md-2 text-end">DESCARGA</div>
+                    <div class="col-md-1 text-center">PÉRDIDA</div>
+                    <div class="col-md-1"></div>
+                </div>
+                
+                <div id="form-container">
+                    {% for form in formset %}
+                    <div class="detalle-form-row">
+                        <div class="row g-3 align-items-center">
+                            <div class="col-12 col-md-2">{{ form.material }}<div class="form-error">{{ form.material.errors }}</div></div>
+                            <div class="col-6 col-md-1"><input type="text" name="{{ form.unidad_medida.html_name }}" value="KG" readonly class="form-control unidad-select unidad-fija"></div>
+                            
+                            <div class="col-6 col-md-1">{{ form.bultos }}<div class="form-error">{{ form.bultos.errors }}</div></div>
+                            
+                            <div class="col-6 col-md-2">{{ form.peso_ld }}<div class="form-error">{{ form.peso_ld.errors }}</div></div>
+                            <div class="col-12 col-md-2">{{ form.cliente }}<div class="form-error">{{ form.cliente.errors }}</div></div>
+                            <div class="col-6 col-md-2">{{ form.peso_dlv }}<div class="form-error">{{ form.peso_dlv.errors }}</div></div>
+                            <div class="col-6 col-md-1 text-center"><span class="perdida-calculada-label">PÉRDIDA</span><span class="perdida-calculada-valor text-danger">0.000</span></div>
+                            <div class="col-12 col-md-1 text-center delete-widget-cell">{{ form.DELETE }} <button type="button" class="btn btn-danger btn-sm btn-delete-row w-100"><i class="fas fa-trash"></i></button></div>
+                            {{ form.id }}
+                        </div>
+                        <div class="row g-2 mt-2 align-items-center rechazo-container" style="display: none; background-color: #fff3cd; padding: 8px; border-radius: 6px;">
+                            <div class="col-md-3 text-end fw-bold text-warning-emphasis"><i class="fas fa-undo me-1"></i>Material Rechazado:</div>
+                            <div class="col-md-2">{{ form.peso_rechazado }}<div class="form-error">{{ form.peso_rechazado.errors }}</div></div>
+                            <div class="col-md-4">{{ form.patio_rechazo }}<div class="form-error">{{ form.patio_rechazo.errors }}</div></div>
+                            <div class="col-md-3 small text-muted">Devolución a inventario de patio.</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <div id="empty-form-template" style="display: none;">
+                    <div class="detalle-form-row">
+                        <div class="row g-3 align-items-center">
+                            <div class="col-12 col-md-2">{{ formset.empty_form.material }}</div>
+                            <div class="col-6 col-md-1"><input type="text" name="{{ formset.empty_form.unidad_medida.html_name }}" value="KG" readonly class="form-control unidad-select unidad-fija"></div> 
+                            
+                            <div class="col-6 col-md-1">{{ formset.empty_form.bultos }}</div>
+                            
+                            <div class="col-6 col-md-2">{{ formset.empty_form.peso_ld }}</div>
+                            <div class="col-12 col-md-2">{{ formset.empty_form.cliente }}</div>
+                            <div class="col-6 col-md-2">{{ formset.empty_form.peso_dlv }}</div>
+                            <div class="col-6 col-md-1 text-center"><span class="perdida-calculada-label">PÉRDIDA</span><span class="perdida-calculada-valor text-danger">0.000</span></div>
+                            <div class="col-12 col-md-1 text-center delete-widget-cell">{{ formset.empty_form.DELETE }}<button type="button" class="btn btn-danger btn-sm btn-delete-row w-100"><i class="fas fa-trash"></i></button></div>
+                        </div>
+                        <div class="row g-2 mt-2 align-items-center rechazo-container" style="display: none; background-color: #fff3cd; padding: 8px; border-radius: 6px;">
+                            <div class="col-md-3 text-end fw-bold text-warning-emphasis"><i class="fas fa-undo me-1"></i>Material Rechazado:</div>
+                            <div class="col-md-2">{{ formset.empty_form.peso_rechazado }}</div>
+                            <div class="col-md-4">{{ formset.empty_form.patio_rechazo }}</div>
+                            <div class="col-md-3 small text-muted">Devolución a inventario de patio.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0"><i class="fas fa-folder-open me-2"></i>Documentación y Evidencias</h5>
+                <div class="d-flex gap-2">
+    <a href="{% url 'unir_pdf' %}" target="_blank" class="btn btn-sm btn-light text-primary fw-bold shadow-sm">
+        <i class="fas fa-file-pdf me-1"></i> Unir PDFs
+    </a>
+    <a href="{% url 'fotos_pdf' %}" target="_blank" class="btn btn-sm btn-light text-warning fw-bold shadow-sm">
+        <i class="fas fa-images me-1"></i> Fotos a PDF
+    </a>
+</div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6"><label for="{{ form.folio_ld.id_for_label }}" class="form-label">{{ form.folio_ld.label }}</label>{{ form.folio_ld }}<div class="form-error">{{ form.folio_ld.errors }}</div></div>
+                    <div class="col-md-6"><label for="{{ form.folio_dlv.id_for_label }}" class="form-label">{{ form.folio_dlv.label }}</label>{{ form.folio_dlv }}<div class="form-error">{{ form.folio_dlv.errors }}</div></div>
+                    
+                    <div class="col-12 mt-3" id="medline-container" style="display:none;">
+                        <div class="file-upload-card border-info bg-info-subtle">
+                            <label for="{{ form.boleta_salida_medline.id_for_label }}" class="form-label fw-bold text-dark">
+                                <i class="fas fa-ticket-alt me-2"></i>Boleta de Salida MEDLINE
+                            </label>
+                            {{ form.boleta_salida_medline }}
+                            <div class="form-error">{{ form.boleta_salida_medline.errors }}</div>
+                            <div class="form-text text-muted small">Este documento es visible porque el origen es MEDLINE.</div>
+                            
+                            {% if remision.boleta_salida_medline %}
+                                <div class="mt-2 p-2 bg-white rounded border">
+                                    <span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i> Boleta cargada</span>
+                                    <a href="{{ remision.boleta_salida_medline.url }}" target="_blank" class="btn btn-sm btn-outline-dark ms-2">
+                                        <i class="fas fa-eye me-1"></i> Ver Actual
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-12 mt-3" id="manifiesto-container" style="display:none;">
+                        <div class="file-upload-card border-warning bg-warning-subtle">
+                            <label for="{{ form.manifiesto.id_for_label }}" class="form-label fw-bold text-dark">
+                                <i class="fas fa-file-invoice me-2"></i>{{ form.manifiesto.label }}
+                            </label>
+                            {{ form.manifiesto }}
+                            <div class="form-error">{{ form.manifiesto.errors }}</div>
+                            <div class="form-text text-muted small">Este documento es visible porque el origen es TRANE.</div>
+                            
+                            {% if remision.manifiesto %}
+                                <div class="mt-2 p-2 bg-white rounded border">
+                                    <span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i> Manifiesto cargado</span>
+                                    <a href="{{ remision.manifiesto.url }}" target="_blank" class="btn btn-sm btn-outline-dark ms-2">
+                                        <i class="fas fa-eye me-1"></i> Ver Actual
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="col-12 mt-4">
+                        <div class="file-upload-card">
+                            <label for="{{ form.evidencia_documento.id_for_label }}" class="form-label fw-bold">
+                                <i class="fas fa-paperclip me-2"></i>{{ form.evidencia_documento.label }}
+                            </label>
+                            
+                            {{ form.evidencia_documento }}
+                            
+                            <div class="form-error text-danger fw-bold mt-2">{{ form.evidencia_documento.errors }}</div>
+                            <div class="form-text mt-2 text-muted">Puede seleccionar <strong>un archivo PDF</strong> o imágenes múltiples.</div>
+                            
+                            <div id="preview-container" class="mt-3" style="display:none;">
+                                <h6 class="text-primary w-100 mb-2 small fw-bold text-uppercase">Archivos seleccionados:</h6>
+                                <div id="preview-gallery" class="d-flex flex-wrap gap-2"></div>
+                            </div>
+
+                            {% if remision and remision.evidencias.all %}
+                                <hr class="my-3">
+                                <h6 class="text-dark mb-2 small fw-bold text-uppercase"><i class="fas fa-folder-open me-2"></i>Archivos Guardados:</h6>
+                                <div class="row g-2">
+                                    {% for ev in remision.evidencias.all %}
+                                    <div class="col-6 col-md-4 col-lg-3">
+                                        <div class="card h-100 border shadow-sm position-relative overflow-hidden bg-white">
+                                            {% if is_editing and remision.status != 'AUDITADO' %}
+                                            <button type="button" class="btn btn-danger btn-sm p-0 d-flex align-items-center justify-content-center shadow-sm position-absolute top-0 end-0 z-index-2"
+                                                    style="width: 24px; height: 24px; border-radius: 0 0 0 4px; z-index: 10;"
+                                                    onclick="eliminarEvidencia('{% url 'eliminar_evidencia_individual' ev.id %}')"
+                                                    title="Eliminar archivo">
+                                                <i class="fas fa-times" style="font-size: 0.7rem;"></i>
+                                            </button>
+                                            {% endif %}
+
+                                            <div class="card-body p-2 text-center d-flex flex-column align-items-center justify-content-center" 
+                                                 style="cursor: pointer; height: 100px;"
+                                                 onclick="openPreviewModal('{{ ev.archivo.url }}', '{% if ev.es_imagen %}image{% else %}pdf{% endif %}')">
+                                                {% if ev.es_imagen %}
+                                                    <img src="{{ ev.archivo.url }}" class="img-fluid rounded" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+                                                {% else %}
+                                                    <i class="fas fa-file-pdf fa-3x text-danger"></i>
+                                                {% endif %}
+                                            </div>
+                                            <div class="card-footer p-1 bg-light text-center border-top-0">
+                                                <small class="d-block text-truncate text-muted" style="font-size: 0.7rem;" title="{{ ev.nombre_corto }}">
+                                                    {{ ev.nombre_corto }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="col-12 mt-3"><label for="{{ form.comentario.id_for_label }}" class="form-label">{{ form.comentario.label }}</label>{{ form.comentario }}</div>
+                    
+                    <div class="col-12 mt-4" id="trazabilidad-container" style="display:none;">
+                        <div class="card border-info bg-info-subtle shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-title text-info fw-bold mb-3">
+                                    <i class="fas fa-project-diagram me-2"></i>Trazabilidad (Exclusivo TRANE)
+                                </h6>
+                                <p class="card-text small text-muted mb-2">Este apartado se habilita para dar seguimiento específico a la trazabilidad de los materiales.</p>
+                                {{ form.trazabilidad_notas }}
+                                <div class="text-danger small fw-bold mt-1">{{ form.trazabilidad_notas.errors }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        {% if is_editing %}
+        <div class="card mb-4 border-info">
+            <div class="card-header bg-info text-white"><h5><i class="fas fa-history me-2"></i>Historial</h5></div>
+            <div class="card-body p-0">
+                <table class="table table-striped table-hover mb-0 table-historial">
+                    <thead class="table-light"><tr><th>Fecha</th><th>Usuario</th><th>Cambio</th></tr></thead>
+                    <tbody>
+                        {% for h in remision.historial.all %}
+                        <tr><td class="small">{{ h.fecha|date:"d/m/Y H:i" }}</td><td class="fw-bold">{{ h.usuario.username|default:"Sistema" }}</td><td class="small">{{ h.cambio }}</td></tr>
+                        {% empty %}<tr><td colspan="3" class="text-center text-muted py-3">Sin historial.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+            <a href="{% url 'remision_lista' %}" class="btn btn-secondary me-md-2">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Guardar Remisión</button>
+        </div>
+
+    </form>
+</div>
+
+<div class="modal fade" id="basculaModal" tabindex="-1" aria-labelledby="basculaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold" id="basculaModalLabel"><i class="fas fa-file-signature me-2"></i>Destrucción Fiscal y Datos Extras</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body bg-light p-4">
+                <div class="alert alert-secondary py-2 small mb-4 shadow-sm text-dark">
+                    <i class="fas fa-info-circle me-2"></i> <strong>Nota:</strong> Todos los campos en esta sección son <strong>opcionales</strong> y sirven para generar documentación adicional.
+                </div>
+                
+                <h6 class="text-primary fw-bold border-bottom pb-2 mb-3"><i class="fas fa-weight me-2"></i>1. Báscula y Facturación</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <label for="{{ form.hora_entrada.id_for_label }}" class="form-label fw-bold">Hora de Entrada</label>
+                        {{ form.hora_entrada }}
+                        <div class="form-error">{{ form.hora_entrada.errors }}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="{{ form.hora_salida.id_for_label }}" class="form-label fw-bold">Hora de Salida</label>
+                        {{ form.hora_salida }}
+                        <div class="form-error">{{ form.hora_salida.errors }}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="{{ form.peso_bascula.id_for_label }}" class="form-label fw-bold">Peso Báscula (Suma Auto)</label>
+                        <div class="input-group">
+                            {{ form.peso_bascula }}
+                            <span class="input-group-text fw-bold">KG</span>
+                        </div>
+                        <div class="form-error">{{ form.peso_bascula.errors }}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="{{ form.factura_nombre.id_for_label }}" class="form-label fw-bold">Factura / Folio</label>
+                        {{ form.factura_nombre }}
+                        <div class="form-error">{{ form.factura_nombre.errors }}</div>
+                    </div>
+                </div>
+
+                <div id="seccion_destruccion" style="display: none;">
+                    
+                    <h6 class="text-danger fw-bold border-bottom pb-2 mb-3 mt-4"><i class="fas fa-file-signature me-2"></i>2. Datos Generales de Destrucción</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label for="{{ form.fecha_destruccion.id_for_label }}" class="form-label fw-bold">Fecha de Destrucción</label>
+                            {{ form.fecha_destruccion }}
+                            <div class="form-error">{{ form.fecha_destruccion.errors }}</div>
+                        </div>
+                        <div class="col-md-8">
+                            <label for="{{ form.comentarios_destruccion.id_for_label }}" class="form-label fw-bold">Comentarios Adicionales</label>
+                            {{ form.comentarios_destruccion }}
+                            <div class="form-error">{{ form.comentarios_destruccion.errors }}</div>
+                        </div>
+                    </div>
+
+                    <h6 class="text-success fw-bold border-bottom pb-2 mb-3 mt-4"><i class="fas fa-boxes me-2"></i>3. Selección de Materiales para Destrucción</h6>
+                    <div class="alert alert-success py-2 mb-3 shadow-sm border-success small">
+                        <i class="fas fa-check-square me-2"></i><strong>Seleccione hasta 2 materiales</strong> de los capturados en la pantalla principal. Puede modificar la cantidad si la destrucción es parcial.
+                    </div>
+                    
+                    <div id="lista_materiales_destruccion" class="row g-3 mb-4">
+                        </div>
+
+                    <h6 class="text-dark fw-bold border-bottom pb-2 mb-3 mt-4"><i class="fas fa-camera-retro me-2"></i>4. Evidencia Fotográfica (3 fotos por material)</h6>
+                    
+                    <div class="card border-0 bg-white shadow-sm mb-3">
+                        <div class="foto-box-header fw-bold text-primary" id="titulo_evidencia_1">
+                            <i class="fas fa-box-open me-2"></i>Evidencia Material 1 <span class="fw-normal small text-muted">(Pendiente de selección)</span>
+                        </div>
+                        <div class="card-body p-3">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold text-muted">1. Ingreso de la unidad</label>
+                                    {{ form.foto_ingreso }}
+                                    <div class="form-error">{{ form.foto_ingreso.errors }}</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold text-muted">2. Vertido del material</label>
+                                    {{ form.foto_vertido }}
+                                    <div class="form-error">{{ form.foto_vertido.errors }}</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold text-muted">3. Destrucción final</label>
+                                    {{ form.foto_destruccion }}
+                                    <div class="form-error">{{ form.foto_destruccion.errors }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 bg-white shadow-sm mb-2">
+                        <div class="foto-box-header fw-bold text-secondary" id="titulo_evidencia_2">
+                            <i class="fas fa-box me-2"></i>Evidencia Material 2 <span class="fw-normal small text-muted">(Solo si seleccionó 2 materiales)</span>
+                        </div>
+                        <div class="card-body p-3">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold text-muted">1. Ingreso de la unidad</label>
+                                    {{ form.foto_ingreso_2 }}
+                                    <div class="form-error">{{ form.foto_ingreso_2.errors }}</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold text-muted">2. Vertido del material</label>
+                                    {{ form.foto_vertido_2 }}
+                                    <div class="form-error">{{ form.foto_vertido_2.errors }}</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold text-muted">3. Destrucción final</label>
+                                    {{ form.foto_destruccion_2 }}
+                                    <div class="form-error">{{ form.foto_destruccion_2.errors }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+            <div class="modal-footer bg-white border-top shadow-sm">
+                <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-dark px-4 shadow" data-bs-dismiss="modal"><i class="fas fa-save me-2"></i> Guardar Datos Extras</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<form id="delete-evidence-form" method="POST" style="display: none;">
+    {% csrf_token %}
+</form>
+
+<div class="modal fade" id="universalModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-dark text-white py-2">
+        <h5 class="modal-title fs-6">Vista Previa</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0 bg-light" style="height: 80vh;">
+          <div id="modal-content-area" class="w-100 h-100 d-flex justify-content-center align-items-center">
+              </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+// --- FUNCIÓN PARA ABRIR HERRAMIENTAS EN POPUP ---
+function abrirHerramienta(url) {
+    window.open(url, 'Herramientas3R', 'width=1000,height=800,scrollbars=yes,resizable=yes');
+}
+
+function eliminarEvidencia(url) {
+    if (confirm('¿Eliminar este archivo permanentemente?')) {
+        const form = document.getElementById('delete-evidence-form');
+        form.action = url;
+        form.submit();
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    var modalEl = document.getElementById('universalModal');
+    if(modalEl) { document.body.appendChild(modalEl); }
+    
+    // === MAGIA PARA SOLUCIONAR EL FONDO NEGRO Y EL GUARDADO ===
+    var basculaEl = document.getElementById('basculaModal');
+    if(basculaEl) { 
+        // 1. Vinculamos todos los inputs del modal al formulario principal 'remisionForm'
+        var inputs = basculaEl.querySelectorAll('input, select, textarea');
+        inputs.forEach(function(inp) {
+            inp.setAttribute('form', 'remisionForm');
+        });
+        
+        // 2. Extraemos el modal del diseño atrapado y lo mandamos al body 
+        document.body.appendChild(basculaEl); 
+    }
+});
+
+let currentPreviewData = null;
+let currentPreviewType = null;
+
+function openPreviewModal(src, type) {
+    const container = document.getElementById('modal-content-area');
+    container.innerHTML = ''; 
+    if (type === 'pdf') {
+        const iframe = document.createElement('iframe');
+        iframe.src = src; 
+        iframe.style.width = '100%'; 
+        iframe.style.height = '100%'; 
+        iframe.style.border = 'none';
+        iframe.style.backgroundColor = '#ffffff'; 
+        container.appendChild(iframe);
+    } else {
+        const img = document.createElement('img');
+        img.src = src; img.style.maxWidth = '100%'; img.style.maxHeight = '100%'; img.style.objectFit = 'contain';
+        container.appendChild(img);
+    }
+    const myModal = new bootstrap.Modal(document.getElementById('universalModal'));
+    myModal.show();
+}
+
+$(document).ready(function() {
+
+    // --- AUTOCOMPLETAR FECHA DE INFORMACIÓN GENERAL (HOY) ---
+    const inputFechaInfo = $('#id_fecha');
+    if (inputFechaInfo.length && !inputFechaInfo.val()) {
+        const today = new Date().toISOString().split('T')[0];
+        inputFechaInfo.val(today);
+    }
+
+    // --- AUTOCOMPLETAR FECHA DE DESTRUCCIÓN HOY ---
+    const inputFechaDest = $('#id_fecha_destruccion');
+    if (inputFechaDest.length && !inputFechaDest.val()) {
+        const today = new Date().toISOString().split('T')[0];
+        inputFechaDest.val(today);
+    }
+    
+    const IS_EDITING = {{ is_editing|yesno:"true,false" }}; 
+    let cachedCatalogData = { materiales: [], lugares: [], patios: [] };
+
+    // --- HACER EL PESO BÁSCULA READONLY (Gris claro) ---
+    $('#id_peso_bascula').prop('readonly', true).css('background-color', '#e9ecef').attr('placeholder', 'Suma calculada auto.');
+    
+    const formContainer = $('#form-container');
+    const addButton = $('#add-form');
+    const totalFormsInput = $('#id_detalles-TOTAL_FORMS');
+    const empresaSelect = $('#id_empresa'); 
+    const remisionInput = $('#id_remision_display');
+    const destinoSelect = $('#id_destino'); 
+    const emptyFormTemplate = $('#empty-form-template').html();
+    
+    const lineaTransporteSelect = $('#id_linea_transporte');
+    const operadorSelect = $('#id_operador');
+    const unidadSelect = $('#id_unidad');
+    const contenedorSelect = $('#id_contenedor');
+
+    const operadorInput = $('#id_operador_texto');
+    
+    // --- VARIABLES PARA MANIFIESTO, MEDLINE Y TRAZABILIDAD ---
+    const origenSelect = $('#id_origen');
+    const manifiestoContainer = $('#manifiesto-container');
+    const trazabilidadContainer = $('#trazabilidad-container');
+
+    // --- VARIABLES DESTRUCCIÓN FISCAL ---
+    let configsDestruccion = [];
+    try {
+        const rawData = '{{ configs_destruccion|safe|escapejs }}';
+        if (rawData && rawData !== '""' && rawData !== "''") {
+            configsDestruccion = JSON.parse(rawData);
+        }
+    } catch (e) {
+        console.error("Error parseando configs_destruccion:", e);
+    }
+
+    const seccionDestruccion = $('#seccion_destruccion');
+
+    // Muestra u oculta la sección de destrucción en el modal y el Botón del Bloop Up
+    function verificarDestruccion() {
+        const origenId = parseInt(origenSelect.val());
+        let requiereDestruccion = false;
+
+        if (origenId) {
+            $('select[name$="-material"]').each(function() {
+                const materialId = parseInt($(this).val());
+                if (materialId) {
+                    const coincidencia = configsDestruccion.some(config => 
+                        config.origen_id === origenId && config.material_id === materialId
+                    );
+                    if (coincidencia) requiereDestruccion = true;
+                }
+            });
+        }
+
+        if (requiereDestruccion) {
+            seccionDestruccion.slideDown();
+            $('#contenedor_boton_destruccion').fadeIn(); // Mostrar el botón del bloop up
+        } else {
+            seccionDestruccion.slideUp();
+            $('#contenedor_boton_destruccion').fadeOut(); // Ocultar el botón del bloop up
+        }
+    }
+    // -------------------------------------
+
+    // --- NUEVA LÓGICA: MOSTRAR FOLIO MEDLINE DINÁMICAMENTE ---
+    function toggleFolioMedline() {
+        let origenTexto = "";
+        if (origenSelect.hasClass("select2-hidden-accessible")) {
+            const data = origenSelect.select2('data');
+            if (data && data.length > 0) {
+                origenTexto = data[0].text.toUpperCase();
+            }
+        } else {
+            origenTexto = origenSelect.find("option:selected").text().toUpperCase();
+        }
+
+        const isMedline = origenTexto.includes('MEDLINE');
+        let tieneCartonOArchivo = false;
+
+        $('.detalle-form-row').each(function() {
+            if ($(this).is(':hidden') || $(this).find('input[type="checkbox"][name$="-DELETE"]').prop('checked')) return;
+            
+            const materialSelect = $(this).find('select[name$="-material"]');
+            if (!materialSelect.length) return; 
+            
+            let materialTexto = "";
+            if (materialSelect.hasClass("select2-hidden-accessible")) {
+                const data = materialSelect.select2('data');
+                if (data && data.length > 0) {
+                    materialTexto = data[0].text.toUpperCase();
+                }
+            } else {
+                materialTexto = materialSelect.find("option:selected").text().toUpperCase();
+            }
+
+            if (materialTexto.includes('CARTON') || materialTexto.includes('CARTÓN') || materialTexto.includes('ARCHIVO')) {
+                tieneCartonOArchivo = true;
+            }
+        });
+
+        // Si cumple las condiciones se muestra, si no se oculta
+        if (isMedline && tieneCartonOArchivo) {
+            $('#contenedor_folio_medline').slideDown();
+        } else {
+            $('#contenedor_folio_medline').slideUp();
+        }
+    }
+    // -------------------------------------
+
+    function initializeSelect2(context) {
+        $(context).find('select:not([data-select2-id])').select2({
+            theme: 'bootstrap-5', width: '100%', placeholder: 'Seleccione una opción', allowClear: true
+        });
+        $(context).find('input[type="checkbox"][name$="-DELETE"]').hide(); 
+    }
+    
+    function populateSelect(selectElement, options) {
+        const currentVal = $(selectElement).val(); 
+        $(selectElement).empty().append('<option value=""></option>');
+        if (options) {
+            options.forEach(i => $(selectElement).append(new Option(i.nombre || i.placas, i.id)));
+        }
+        if(currentVal) { $(selectElement).val(currentVal).trigger('change'); }
+    }
+
+    function toggleTransportFields() {
+        var selectedText = "";
+        if (lineaTransporteSelect.find("option:selected").length > 0) {
+            selectedText = lineaTransporteSelect.find("option:selected").text().toUpperCase();
+        }
+
+        if (selectedText.includes("3R")) {
+            operadorSelect.prop('disabled', false).parent().show(); 
+            operadorSelect.next('.select2-container').show(); 
+            operadorInput.prop('disabled', true).hide();
+        } else {
+            operadorSelect.prop('disabled', true).parent().hide(); 
+            operadorSelect.next('.select2-container').hide(); 
+            operadorInput.prop('disabled', false).show(); 
+        }
+
+        unidadSelect.prop('disabled', true).parent().hide(); 
+        unidadSelect.next('.select2-container').hide(); 
+        $('#contenedor_inputs_unidad').show();
+        $('#id_unidad_texto, #id_placas_unidad_texto').prop('disabled', false);
+
+        contenedorSelect.prop('disabled', true).parent().hide(); 
+        contenedorSelect.next('.select2-container').hide(); 
+        $('#contenedor_inputs_contenedor').show();
+        $('#id_contenedor_texto, #id_placas_contenedor_texto').prop('disabled', false);
+    }
+    
+    function toggleOrigenDependientes() {
+        let origenTexto = "";
+        if (origenSelect.hasClass("select2-hidden-accessible")) {
+            const data = origenSelect.select2('data');
+            if (data && data.length > 0) {
+                origenTexto = data[0].text.toUpperCase();
+            }
+        } else {
+            origenTexto = origenSelect.find("option:selected").text().toUpperCase();
+        }
+
+        // Lógica TRANE
+        if (origenTexto.includes('TRANE')) {
+            manifiestoContainer.slideDown();
+            trazabilidadContainer.slideDown();
+        } else {
+            manifiestoContainer.slideUp();
+            trazabilidadContainer.slideUp();
+        }
+        
+        // Lógica MEDLINE
+        if (origenTexto.includes('MEDLINE')) {
+            $('#medline-container').slideDown();
+        } else {
+            $('#medline-container').slideUp();
+        }
+    }
+
+    // --- NUEVA FUNCIÓN PARA HABILITAR/DESHABILITAR BULTOS ---
+    function toggleBultos() {
+        let origenTexto = "";
+        if (origenSelect.hasClass("select2-hidden-accessible")) {
+            const data = origenSelect.select2('data');
+            if (data && data.length > 0) {
+                origenTexto = data[0].text.toUpperCase();
+            }
+        } else {
+            origenTexto = origenSelect.find("option:selected").text().toUpperCase();
+        }
+
+        const isMedlineOrLear = origenTexto.includes('MEDLINE') || origenTexto.includes('LEAR');
+
+        $('.detalle-form-row').each(function() {
+            const row = $(this);
+            const materialSelect = row.find('select[name$="-material"]');
+            const bultosInput = row.find('input[name$="-bultos"]');
+
+            if (!bultosInput.length) return;
+
+            let materialTexto = "";
+            if (materialSelect.hasClass("select2-hidden-accessible")) {
+                const data = materialSelect.select2('data');
+                if (data && data.length > 0) {
+                    materialTexto = data[0].text.toUpperCase();
+                }
+            } else {
+                materialTexto = materialSelect.find("option:selected").text().toUpperCase();
+            }
+
+            // Agregamos materialTexto.includes('ARCHIVO') a la validación
+            const isCartonOrPlasticoOrArchivo = materialTexto.includes('CARTON') || materialTexto.includes('CARTÓN') || 
+                                                materialTexto.includes('PLASTICO') || materialTexto.includes('PLÁSTICO') ||
+                                                materialTexto.includes('ARCHIVO');
+
+            if (isMedlineOrLear && isCartonOrPlasticoOrArchivo) {
+                bultosInput.prop('readonly', false).css('background-color', '#ffffff');
+            } else {
+                bultosInput.prop('readonly', true).css('background-color', '#e9ecef').val('');
+            }
+        });
+    }
+
+    initializeSelect2(document);
+    lineaTransporteSelect.on('change', function() { toggleTransportFields(); });
+    
+    origenSelect.on('change select2:select', function() { 
+        toggleOrigenDependientes(); 
+        verificarDestruccion();
+        toggleBultos(); 
+        toggleFolioMedline(); // <--- SE DISPARA EL FOLIO
+    });
+    toggleOrigenDependientes();
+
+    $(document).on('change select2:select', 'select[name$="-material"]', function() {
+        verificarDestruccion();
+        toggleBultos(); 
+        toggleFolioMedline(); // <--- SE DISPARA EL FOLIO
+    });
+
+    $('#id_evidencia_documento').change(function(){
+        const files = this.files;
+        const previewContainer = $('#preview-container');
+        const gallery = $('#preview-gallery');
+        gallery.empty();
+        
+        if (files.length > 0){
+            previewContainer.show();
+            Array.from(files).forEach((file) => {
+                const reader = new FileReader();
+                const itemDiv = $('<div class="border rounded p-1 bg-white text-center position-relative" style="width: 80px; height: 80px; cursor: pointer;"></div>');
+                
+                reader.onload = function(e) {
+                    let content = '';
+                    const result = e.target.result;
+                    let fileType = 'unknown';
+
+                    if (file.type === 'application/pdf') {
+                        content = '<i class=\"fas fa-file-pdf fa-2x text-danger mt-2\"></i>'; fileType = 'pdf';
+                    } else if (file.type.startsWith('image/')) {
+                        content = `<img src="${result}" class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;">`; fileType = 'image';
+                    } else {
+                        content = '<i class=\"fas fa-file fa-2x text-secondary mt-2\"></i>';
+                    }
+                    
+                    if (!file.type.startsWith('image/')) {
+                        itemDiv.append(content);
+                        itemDiv.append(`<div class="text-truncate mt-1" style="font-size: 8px;">${file.name}</div>`);
+                    } else {
+                        itemDiv.html(content);
+                    }
+                    
+                    itemDiv.on('click', function() { openPreviewModal(result, fileType); });
+                    gallery.append(itemDiv);
+                }
+                reader.readAsDataURL(file);
+            });
+        } else {
+            previewContainer.hide();
+        }
+    });
+
+    empresaSelect.on('change', function() { 
+        const empresaId = $(this).val();
+        if (!empresaId) {
+             addButton.prop('disabled', true);
+             if (!IS_EDITING) remisionInput.val(''); 
+             return;
+        }
+        
+        fetch(`/api/get-catalogos/${empresaId}/`) 
+            .then(response => response.json())
+            .then(data => {
+                cachedCatalogData.materiales = data.materiales || [];
+                cachedCatalogData.lugares = data.lugares_destino || []; 
+                cachedCatalogData.patios = data.patios || []; 
+                
+                populateSelect($('#id_linea_transporte'), data.lineas_transporte);
+                populateSelect($('#id_operador'), data.operadores);
+                populateSelect($('#id_unidad'), data.unidades);
+                populateSelect($('#id_contenedor'), data.contenedores);
+                populateSelect($('#id_origen'), data.lugares_origen);
+                populateSelect(destinoSelect, cachedCatalogData.lugares); 
+                
+                formContainer.find('.detalle-form-row').each(function() {
+                    populateSelect($(this).find('select[name$="-material"]'), cachedCatalogData.materiales);
+                    populateSelect($(this).find('select[name$="-cliente"]'), cachedCatalogData.lugares);
+                    populateSelect($(this).find('select[name$="-patio_rechazo"]'), cachedCatalogData.patios); 
+                });
+                toggleTransportFields();
+                setTimeout(toggleOrigenDependientes, 100);
+                setTimeout(verificarDestruccion, 200);
+                setTimeout(toggleBultos, 250);
+                setTimeout(toggleFolioMedline, 250); // <--- SE DISPARA EL FOLIO
+            })
+            .catch(error => console.error("Error catálogos:", error))
+            .finally(() => { addButton.prop('disabled', false); });
+            
+        if (!IS_EDITING) {
+             remisionInput.val('Generando folio...');
+             fetch(`/api/get-next-remision/${empresaId}/`)
+                 .then(response => response.json())
+                 .then(data => {
+                     if (data.next_remision) {
+                         remisionInput.val(data.next_remision).prop('readonly', true);
+                     } else if (data.is_manual) {
+                         remisionInput.val('').prop('readonly', false).attr('placeholder', 'Folio manual');
+                     } else {
+                         remisionInput.val('');
+                     }
+                 })
+                 .catch(e => { remisionInput.val('').prop('readonly', false); });
+        }
+    });
+
+    destinoSelect.on('change', function() {
+        const selectedDestinoId = $(this).val();
+        if (selectedDestinoId) {
+            const clientes = formContainer.find('select[name$="-cliente"]');
+            clientes.val(selectedDestinoId).trigger('change');
+            clientes.addClass('cliente-automatico');
+        }
+    });
+
+    if (empresaSelect.val()) { 
+        empresaSelect.trigger('change');
+    } else {
+        addButton.prop('disabled', true);
+        toggleTransportFields();
+    }
+    
+    addButton.on('click', function() { 
+        const formIndex = parseInt(totalFormsInput.val());
+        const newRowHtml = emptyFormTemplate.replace(/__prefix__/g, formIndex);
+        const newRow = $(newRowHtml);
+        formContainer.append(newRow);
+        
+        const materialSelect = newRow.find('select[name$="-material"]'); 
+        populateSelect(materialSelect, cachedCatalogData.materiales);
+        
+        const clienteSelect = newRow.find('select[name$="-cliente"]');
+        populateSelect(clienteSelect, cachedCatalogData.lugares);
+        
+        const patioSelect = newRow.find('select[name$="-patio_rechazo"]');
+        populateSelect(patioSelect, cachedCatalogData.patios); 
+
+        const currentDestino = destinoSelect.val();
+        if (currentDestino) {
+            clienteSelect.val(currentDestino);
+            clienteSelect.addClass('cliente-automatico');
+        }
+
+        initializeSelect2(newRow); 
+        totalFormsInput.val(formIndex + 1);
+        
+        calcularFila(newRow);
+        toggleBultos(); 
+        toggleFolioMedline(); // <--- SE DISPARA EL FOLIO
+    });
+    
+    formContainer.on('click', '.btn-delete-row', function() { 
+        $(this).closest('.detalle-form-row').find('input[type="checkbox"][name$="-DELETE"]').prop('checked', true).end().hide(); 
+        setTimeout(verificarDestruccion, 100);
+        setTimeout(toggleFolioMedline, 100); // <--- SE DISPARA EL FOLIO
+    });
+
+    function calcularFila(row) {
+        const unidad = row.find('.unidad-select').val(); 
+        const carga = parseFloat(row.find('.peso-carga').val()) || 0;
+        const descarga = parseFloat(row.find('.peso-descarga').val()) || 0;
+        const rechazo = parseFloat(row.find('.peso-rechazado').val()) || 0;
+        
+        const diferencia = (descarga + rechazo) - carga; 
+        
+        const labelSpan = row.find('.perdida-calculada-label');
+        const valorSpan = row.find('.perdida-calculada-valor');
+        
+        let textoDiferencia = unidad === 'KG' ? diferencia.toFixed(3) + " Kg" : diferencia.toFixed(3) + " Ton";
+        valorSpan.text(textoDiferencia);
+
+        if (diferencia >= 0) {
+            labelSpan.text('GANANCIA').removeClass('text-danger').addClass('text-success');
+            valorSpan.removeClass('text-danger').addClass('text-success');
+        } else {
+            labelSpan.text('PÉRDIDA').removeClass('text-success').addClass('text-danger');
+            valorSpan.removeClass('text-success').addClass('text-danger');
+        }
+    }
+
+    formContainer.on('input change', '.peso-carga, .peso-descarga, .peso-rechazado, .unidad-select', function() { 
+        const row = $(this).closest('.detalle-form-row');
+        calcularFila(row);
+    });
+
+    let rechazoActivo = false;
+    const btnRechazo = $('#btn-toggle-rechazo');
+    
+    function toggleRechazoUI(mostrar) {
+        rechazoActivo = mostrar;
+        if(rechazoActivo) {
+            $('.rechazo-container').slideDown();
+            btnRechazo.removeClass('btn-outline-warning').addClass('btn-warning')
+                      .html('<i class=\"fas fa-times me-1\"></i> Ocultar Rechazo');
+        } else {
+            $('.rechazo-container').slideUp();
+            btnRechazo.removeClass('btn-warning').addClass('btn-outline-warning')
+                      .html('<i class=\"fas fa-exclamation-triangle me-1\"></i> Habilitar Rechazo');
+            $('.peso-rechazado').val(''); 
+            $('.patio-select').val(null).trigger('change');
+            $('.detalle-form-row').each(function() { calcularFila($(this)); });
+        }
+    }
+
+    btnRechazo.on('click', function() {
+        toggleRechazoUI(!rechazoActivo);
+    });
+
+    setTimeout(() => {
+        let hayRechazoPrevio = false;
+        $('.peso-rechazado').each(function() {
+            if(parseFloat($(this).val()) > 0) hayRechazoPrevio = true;
+        });
+        if(hayRechazoPrevio) toggleRechazoUI(true);
+        verificarDestruccion();
+    }, 500);
+
+    $('.detalle-form-row').each(function() {
+        calcularFila($(this));
+    });
+
+
+    // ========================================================================
+    // LÓGICA: SELECCIÓN DE MATERIALES, MEMORIA Y AUTO-SUMA
+    // ========================================================================
+    function actualizarInputsOcultosDestruccion() {
+        // Limpiar valores ocultos
+        $('#destruccion_material_1, #destruccion_peso_1, #destruccion_material_2, #destruccion_peso_2').val('');
+        
+        // Reiniciar los títulos de las fotos
+        $('#titulo_evidencia_1').html('<i class=\"fas fa-box-open me-2\"></i>Evidencia Material 1 <span class=\"fw-normal small text-muted\">(Pendiente de selección)</span>');
+        $('#titulo_evidencia_2').html('<i class=\"fas fa-box me-2\"></i>Evidencia Material 2 <span class=\"fw-normal small text-muted\">(Solo si seleccionó 2 materiales)</span>');
+
+        let index = 1;
+        let sumaPesos = 0; // Para sumar en Peso Báscula
+
+        $('.dest-check:checked').each(function() {
+            if (index <= 2) {
+                const card = $(this).closest('.material-dest-card');
+                const matName = $(this).data('mat-name');
+                const pesoStr = card.find('.dest-peso-input').val() || '0';
+                
+                // Asegurarnos de que sume correctamente como decimal
+                const peso = parseFloat(pesoStr.replace(',', '.')) || 0;
+                sumaPesos += peso;
+                
+                // Guardar en inputs ocultos
+                $('#destruccion_material_' + index).val(matName);
+                $('#destruccion_peso_' + index).val(peso);
+                
+                // Actualizar interfaz
+                $('#titulo_evidencia_' + index).html('<i class=\"fas fa-check-circle text-success me-2\"></i>Fotos para: <span class=\"text-dark\">' + matName + '</span>');
+                
+                index++;
+            }
+        });
+
+        // Auto-Suma bloqueada en el input Peso Báscula
+        if (sumaPesos > 0) {
+            $('#id_peso_bascula').val(sumaPesos.toFixed(3));
+        } else {
+            $('#id_peso_bascula').val('');
+        }
+    }
+
+    // MEMORIA: Construir el modal leyendo los inputs ocultos
+    $('#basculaModal').on('show.bs.modal', function () {
+        const container = $('#lista_materiales_destruccion');
+        container.empty();
+        let count = 0;
+        
+        // RECUPERAR MEMORIA ACTUAL DE LOS HIDDEN INPUTS
+        const savedMat1 = $('#destruccion_material_1').val();
+        const savedPeso1 = $('#destruccion_peso_1').val();
+        const savedMat2 = $('#destruccion_material_2').val();
+        const savedPeso2 = $('#destruccion_peso_2').val();
+
+        $('.detalle-form-row').each(function(index) {
+            if ($(this).is(':hidden') || $(this).find('input[type="checkbox"][name$="-DELETE"]').prop('checked')) return;
+
+            const matSelect = $(this).find('select[name$="-material"]');
+            const matId = matSelect.val();
+            const matText = matSelect.find('option:selected').text();
+            
+            let pesoValue = $(this).find('input[name$="-peso_dlv"]').val() || $(this).find('input[name$="-peso_ld"]').val() || 0;
+
+            if (matId) {
+                count++;
+                
+                // Verificar si estaba preseleccionado
+                let isChecked = false;
+                let pesoFinal = pesoValue;
+                
+                if (matText === savedMat1) {
+                    isChecked = true;
+                    pesoFinal = savedPeso1;
+                } else if (matText === savedMat2) {
+                    isChecked = true;
+                    pesoFinal = savedPeso2;
+                }
+
+                const checkedAttr = isChecked ? 'checked' : '';
+                const displayStyle = isChecked ? '' : 'display:none;';
+                const cardClass = isChecked ? 'material-dest-card shadow-sm seleccionado' : 'material-dest-card shadow-sm';
+
+                const html = `
+                <div class="col-md-6">
+                    <div class="card border border-2 rounded-3 ${cardClass}" data-index="${index}">
+                        <div class="card-body p-3">
+                            <div class="form-check form-switch fs-6 mb-2">
+                                <input class="form-check-input dest-check" type="checkbox" role="switch" id="dest_check_${index}" data-mat-name="${matText}" ${checkedAttr}>
+                                <label class="form-check-label fw-bold text-dark ms-1" for="dest_check_${index}">${matText}</label>
+                            </div>
+                            <div class="dest-peso-container bg-white rounded p-2 border mt-2" style="${displayStyle}">
+                                <label class="form-label small text-muted mb-1 fw-bold">Cantidad a Reportar (Kg):</label>
+                                <input type="number" class="form-control form-control-sm border-success text-success fw-bold dest-peso-input" value="${pesoFinal}" step="0.001">
+                                <small class="text-muted" style="font-size: 0.7rem;">Puede editar esta cantidad si la destrucción es parcial.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+                container.append(html);
+            }
+        });
+
+        if (count === 0) {
+            container.append(`
+                <div class="col-12 text-center py-4 bg-white border rounded">
+                    <i class="fas fa-exclamation-circle text-muted fs-3 mb-2"></i>
+                    <p class="text-muted small mb-0">No se han capturado materiales en la pantalla principal. Agregue un material primero.</p>
+                </div>
+            `);
+        }
+
+        // Eventos para Switches y Sumas Dinámicas
+        $('.dest-check').on('change', function() {
+            const checkedCount = $('.dest-check:checked').length;
+            
+            if (checkedCount > 2) {
+                $(this).prop('checked', false);
+                alert('Atención: Solo puede seleccionar un máximo de 2 materiales para el formato de destrucción.');
+                return;
+            }
+
+            const card = $(this).closest('.material-dest-card');
+            const pesoContainer = card.find('.dest-peso-container');
+            
+            if ($(this).is(':checked')) {
+                card.addClass('seleccionado');
+                pesoContainer.slideDown('fast');
+            } else {
+                card.removeClass('seleccionado');
+                pesoContainer.slideUp('fast');
+            }
+            
+            actualizarInputsOcultosDestruccion();
+        });
+
+        $('.dest-peso-input').on('input', actualizarInputsOcultosDestruccion);
+        
+        // Ejecutar 1 vez al abrir por si hay que actualizar títulos
+        actualizarInputsOcultosDestruccion();
+    });
+
+    // Llamada inicial para bloquear/desbloquear bultos según lo que esté cargado
+    toggleBultos();
+    
+    // Llamada inicial para mostrar el folio medline si aplica desde que se edita
+    toggleFolioMedline();
+
+});
+</script>
+{% endblock %}

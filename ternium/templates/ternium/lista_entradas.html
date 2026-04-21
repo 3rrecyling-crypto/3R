@@ -1,0 +1,387 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+
+{% block title %}Entradas de Maquila | Gestión{% endblock %}
+
+{% block content %}
+<style>
+    /* --- Estilos Generales --- */
+    .page-header {
+        background: #fff;
+        padding: 1.5rem 2rem;
+        border-bottom: 1px solid #eef2f7;
+        margin-bottom: 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    }
+
+    .filter-card {
+        background: #f8f9fa;
+        border: 1px solid #eef2f7;
+        border-radius: 8px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    /* --- Tabla Profesional --- */
+    .table-card {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 0 35px 0 rgba(154,161,171,.15);
+        border: 1px solid #eef2f7;
+        overflow: hidden;
+    }
+
+    .table thead th {
+        background-color: #f5f9ff;
+        color: #0056b3;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #dee2e6;
+        padding: 1rem;
+    }
+
+    .table tbody td {
+        padding: 1rem;
+        vertical-align: middle;
+        border-bottom: 1px solid #eef2f7;
+        color: #313a46;
+        font-size: 0.9rem;
+    }
+
+    .table tbody tr:hover {
+        background-color: #f8fafc;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        transition: all 0.2s ease;
+    }
+
+    /* ID Monoespaciado */
+    .id-cell {
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        color: #727cf5;
+        font-weight: 600;
+    }
+
+    /* --- Badges --- */
+    .badge { padding: 0.4em 0.8em; font-weight: 500; }
+    .badge-soft-success { background-color: rgba(10, 207, 151, 0.18); color: #0acf97; }
+    .badge-soft-warning { background-color: rgba(255, 188, 0, 0.18); color: #ffbc00; }
+    .badge-soft-danger { background-color: rgba(250, 92, 124, 0.18); color: #fa5c7c; }
+    .badge-soft-info { background-color: rgba(57, 175, 209, 0.18); color: #39afd1; }
+
+    /* --- Botones --- */
+    .btn-group .btn { border-radius: 6px !important; margin-right: 5px; }
+    .btn-group .btn:last-child { margin-right: 0; }
+    
+    .btn-outline-info { color: #17a2b8; border-color: #17a2b8; }
+    .btn-outline-info:hover { background-color: #17a2b8; color: white; }
+    .btn-outline-warning { color: #ffc107; border-color: #ffc107; }
+    .btn-outline-warning:hover { background-color: #ffc107; color: #212529; }
+    .btn-outline-primary { color: #0056b3; border-color: #0056b3; }
+    .btn-outline-primary:hover { background-color: #0056b3; color: white; }
+    .btn-outline-danger { color: #dc3545; border-color: #dc3545; }
+    .btn-outline-danger:hover { background-color: #dc3545; color: white; }
+    .btn-outline-dark { color: #343a40; border-color: #343a40; }
+    .btn-outline-dark:hover { background-color: #343a40; color: white; }
+</style>
+
+<div class="container-fluid px-4">
+    
+    <div class="page-header d-flex justify-content-between align-items-center">
+        <div>
+            <h4 class="mb-1 text-primary fw-bold"><i class="fas fa-truck-loading me-2"></i>Entradas de Maquila</h4>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb m-0 p-0 bg-transparent text-muted small">
+                    <li class="breadcrumb-item">Operaciones</li>
+                    <li class="breadcrumb-item active">Registro de Entradas</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'lista_registros_logistica' %}" class="btn btn-outline-dark shadow-sm" title="Ir a módulo de Salidas">
+                <i class="fas fa-sign-out-alt me-2"></i>Salidas Ternium
+            </a>
+            
+            <a href="{% url 'export_entradas_excel' %}" class="btn btn-light border text-success fw-bold">
+                <i class="fas fa-file-excel me-2"></i>Excel
+            </a>
+            <a href="{% url 'crear_entrada' %}" class="btn btn-primary shadow-sm">
+                <i class="fas fa-plus me-2"></i>Nueva Entrada
+            </a>
+        </div>
+    </div>
+
+    <div class="filter-card">
+        <form method="get" action="{% url 'lista_entradas' %}">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Búsqueda General</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white text-muted"><i class="fas fa-barcode"></i></span>
+                        <input type="text" name="q" class="form-control border-start-0 ps-0" 
+                               placeholder="ID Remito o Boleta..." value="{{ filtros.q|default:'' }}">
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Fecha Desde</label>
+                    <input type="date" name="fecha_inicio" class="form-control" value="{{ filtros.fecha_inicio|default:'' }}">
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Fecha Hasta</label>
+                    <input type="date" name="fecha_fin" class="form-control" value="{{ filtros.fecha_fin|default:'' }}">
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Transporte</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white text-muted"><i class="fas fa-truck"></i></span>
+                        <input type="text" name="transporte" class="form-control border-start-0 ps-0" 
+                               placeholder="Buscar transporte..." value="{{ filtros.transporte|default:'' }}">
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Calidad</label>
+                    <select name="calidad" class="form-select">
+                        <option value="">Todas las Calidades</option>
+                        {% for c in calidades_list %}
+                            <option value="{{ c }}" {% if filtros.calidad == c %}selected{% endif %}>{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Estatus</label>
+                    <select name="status" class="form-select">
+                        <option value="">Todos</option>
+                        <option value="PENDIENTE" {% if filtros.status == 'PENDIENTE' %}selected{% endif %}>Pendiente</option>
+                        <option value="TERMINADO" {% if filtros.status == 'TERMINADO' %}selected{% endif %}>Terminado</option>
+                        <option value="AUDITADO" {% if filtros.status == 'AUDITADO' %}selected{% endif %}>Auditado</option>
+                        <option value="CANCELADO" {% if filtros.status == 'CANCELADO' %}selected{% endif %}>Cancelado</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small text-muted">Discrepancia</label>
+                    <select name="alerta" class="form-select">
+                        <option value="">Todas</option>
+                        <option value="SI" {% if filtros.alerta == 'SI' %}selected{% endif %}>Con Alerta (>1%)</option>
+                        <option value="NO" {% if filtros.alerta == 'NO' %}selected{% endif %}>Sin Alerta (OK)</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3 d-flex align-items-end">
+                    <div class="d-grid gap-2 d-md-flex w-100">
+                        <button type="submit" class="btn btn-primary flex-grow-1"><i class="fas fa-filter me-1"></i> Filtrar</button>
+                        <a href="{% url 'lista_entradas' %}" class="btn btn-light border" title="Limpiar"><i class="fas fa-sync-alt"></i></a>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="table mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th class="ps-4 text-center" style="width: 50px;">#</th>
+                        <th>ID Remito</th>
+                        <th>Fecha</th>
+                        <th>Transporte</th>
+                        <th>Calidad</th>
+                        <th>Peso Neto</th>
+                        <th>Discrepancia</th>
+                        <th class="text-center">Estatus</th>
+                        <th class="text-end pe-4">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entrada in entradas %}
+                    <tr>
+                        <td class="ps-4 text-center fw-bold text-secondary">
+                            {{ entrada.id }}
+                        </td>
+
+                        <td>
+                            <span class="id-cell">{{ entrada.c_id_remito }}</span>
+                            <div class="small text-muted mt-1">Bol: {{ entrada.num_boleta_remision }}</div>
+                        </td>
+                        <td>
+                            <div class="fw-bold text-dark">{{ entrada.fecha_ingreso|date:"d M, Y" }}</div>
+                            <small class="text-muted">{{ entrada.fecha_ingreso|date:"l" }}</small>
+                        </td>
+                        <td>
+                            <div class="text-truncate" style="max-width: 180px;" title="{{ entrada.transporte }}">
+                                <i class="fas fa-truck text-muted me-1"></i> {{ entrada.transporte|default:"-" }}
+                            </div>
+                        </td>
+                        <td><span class="badge bg-light text-dark border">{{ entrada.calidad|truncatechars:15 }}</span></td>
+                        <td class="fw-bold">{{ entrada.peso_neto|floatformat:3 }} Ton</td>
+                        
+                        <td>
+                            {% if entrada.peso_neto and entrada.peso_remision %}
+                                {% if entrada.peso_neto < entrada.peso_remision %}
+                                    {# CASO 1: FALTANTE (PÉRDIDA) #}
+                                    {% if entrada.alerta %}
+                                        {# Si la pérdida es mayor al 1% -> ROJO #}
+                                        <span class="badge badge-soft-danger" title="Faltante crítico">
+                                            <i class="fas fa-arrow-down me-1"></i> -{{ entrada.porcentaje_faltante|floatformat:2 }}%
+                                        </span>
+                                    {% else %}
+                                        {# Pérdida dentro de tolerancia -> OK (Verde) #}
+                                        <span class="badge badge-soft-success" title="Diferencia en tolerancia">
+                                            <i class="fas fa-check me-1"></i> -{{ entrada.porcentaje_faltante|floatformat:2 }}%
+                                        </span>
+                                    {% endif %}
+                                
+                                {% elif entrada.peso_neto > entrada.peso_remision %}
+                                    {# CASO 2: SOBRANTE (GANANCIA) -> SIEMPRE VERDE #}
+                                    <span class="badge badge-soft-success" title="Ganancia de material">
+                                        <i class="fas fa-arrow-up me-1"></i> +{{ entrada.porcentaje_faltante|floatformat:2 }}%
+                                    </span>
+                                
+                                {% else %}
+                                    {# CASO 3: EXACTO #}
+                                    <span class="badge badge-soft-success"><i class="fas fa-check me-1"></i> OK</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if entrada.status == 'PENDIENTE' %}
+                                <span class="badge badge-soft-warning">Pendiente</span>
+                            {% elif entrada.status == 'TERMINADO' %}
+                                <span class="badge badge-soft-info">Terminado</span>
+                            {% elif entrada.status == 'AUDITADO' %}
+                                <span class="badge badge-soft-success">
+                                    <i class="fas fa-lock me-1"></i> Auditado
+                                </span>
+                            {% elif entrada.status == 'CANCELADO' %}
+                                <span class="badge bg-danger">
+                                    <i class="fas fa-ban me-1"></i> Cancelado
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <td class="text-end pe-4">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a href="{% url 'detalle_entrada' pk=entrada.pk %}" 
+                                   class="btn btn-outline-primary" 
+                                   title="Ver detalles" data-bs-toggle="tooltip">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+
+                                <a href="{% url 'descargar_zip_maquila' pk=entrada.pk %}" 
+                                   class="btn btn-outline-info" 
+                                   title="Descargar Evidencias" data-bs-toggle="tooltip">
+                                    <i class="fas fa-file-archive"></i>
+                                </a>
+
+                                {% if entrada.status != 'AUDITADO' and entrada.status != 'CANCELADO' %}
+                                    <a href="{% url 'editar_entrada' pk=entrada.pk %}" 
+                                       class="btn btn-outline-warning" 
+                                       title="Editar" data-bs-toggle="tooltip">
+                                        <i class="fas fa-pencil-alt"></i>
+                                    </a>
+
+                                    <button type="button" class="btn btn-outline-dark" 
+                                            onclick="confirmarCancelacionEntrada('{{ entrada.pk }}')" 
+                                            title="Cancelar Entrada" data-bs-toggle="tooltip">
+                                        <i class="fas fa-ban"></i>
+                                    </button>
+                                {% endif %}
+                            </div>
+
+                            {% if entrada.status != 'AUDITADO' and entrada.status != 'CANCELADO' %}
+                            <form id="form-cancelar-{{ entrada.pk }}" action="{% url 'cancelar_entrada' pk=entrada.pk %}" method="POST" style="display: none;">
+                                {% csrf_token %}
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center py-5">
+                            <div class="text-muted">
+                                <i class="fas fa-folder-open fa-3x mb-3 opacity-50"></i>
+                                <h5>No se encontraron registros</h5>
+                                <p class="small">Intenta ajustar los filtros de búsqueda.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if is_paginated %}
+        <div class="d-flex justify-content-between align-items-center p-3 border-top bg-light">
+            <small class="text-muted">Mostrando página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</small>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    {# --- Botón Anterior --- #}
+                    <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                        <a class="page-link border-0" 
+                           href="#" 
+                           {% if page_obj.has_previous %}onclick="cambiarPagina({{ page_obj.previous_page_number }}); return false;"{% else %}onclick="return false;"{% endif %}>
+                           <i class="fas fa-chevron-left me-1"></i> Anterior
+                        </a>
+                    </li>
+                    
+                    {# --- Indicador de Página Actual --- #}
+                    <li class="page-item disabled">
+                        <span class="page-link border-0 text-dark fw-bold px-3">
+                            {{ page_obj.number }}
+                        </span>
+                    </li>
+
+                    {# --- Botón Siguiente --- #}
+                    <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                        <a class="page-link border-0" 
+                           href="#" 
+                           {% if page_obj.has_next %}onclick="cambiarPagina({{ page_obj.next_page_number }}); return false;"{% else %}onclick="return false;"{% endif %}>
+                           Siguiente <i class="fas fa-chevron-right ms-1"></i>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    // --- FUNCIÓN ROBUSTA PARA CAMBIAR PÁGINA ---
+    function cambiarPagina(numeroPagina) {
+        // 1. Crear objeto URL con la dirección actual completa
+        var urlActual = new URL(window.location.href);
+        
+        // 2. Establecer el parámetro 'page' (sobrescribe cualquier valor previo)
+        urlActual.searchParams.set('page', numeroPagina);
+        
+        // 3. Navegar a la nueva URL limpia
+        window.location.href = urlActual.toString();
+    }
+
+    function confirmarCancelacionEntrada(id) {
+        if (confirm('¿Estás seguro de que deseas CANCELAR esta entrada? El registro quedará bloqueado y no se podrá editar.')) {
+            document.getElementById('form-cancelar-' + id).submit();
+        }
+    }
+    
+    // Inicializar Tooltips de Bootstrap
+    document.addEventListener('DOMContentLoaded', function () {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+    });
+</script>
+{% endblock %}

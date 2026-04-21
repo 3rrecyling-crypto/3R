@@ -1,0 +1,397 @@
+{% extends 'ternium/base.html' %}
+{% load static humanize %}
+
+{% block extra_css %}
+    <style>
+        /* --- ESTILOS VISUALES GENERALES --- */
+        .sticky-card {
+            position: sticky;
+            top: 20px;
+            z-index: 90;
+        }
+        .card-saldo-despues {
+            background-color: #e8f5e9;
+            border-left: 4px solid #198754;
+        }
+        .card-saldo-despues.negativo {
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+        .list-group-item {
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+        }
+        .btn-ver-pdf {
+            cursor: pointer;
+        }
+        .badge-impuesto {
+            font-size: 0.75rem;
+            margin-left: 5px;
+        }
+        
+        /* --- COLORES DINÁMICOS --- */
+        .bg-gradient-success {
+            background: linear-gradient(135deg, #1cc88a 0%, #13855c 100%);
+        }
+        .bg-gradient-danger {
+            background: linear-gradient(135deg, #e74a3b 0%, #be2617 100%);
+        }
+
+        /* --- CORRECCIÓN CRÍTICA DEL MODAL PDF --- */
+        .modal { z-index: 1055 !important; }
+        .modal-dialog { z-index: 1060 !important; }
+        .modal-backdrop { z-index: 1050 !important; }
+        
+        /* Ajuste para el object del PDF */
+        .pdf-object-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #525659;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-3 mb-4">
+            <div class="card shadow border-0 sticky-card">
+                <div class="card-header bg-dark text-white text-center py-3">
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-wallet me-2"></i>Resumen Financiero</h5>
+                </div>
+                <div class="card-body">
+                    
+                    <div class="p-3 mb-3 rounded bg-light border-start border-4 border-secondary">
+                        <small class="text-muted text-uppercase fw-bold d-block mb-1" style="font-size: 0.7rem;">
+                            Estatus del Movimiento
+                        </small>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0 fw-bold text-dark">
+                                {% if mov.auditado %}
+                                    <span class="text-success"><i class="fas fa-lock me-1"></i>Auditado</span>
+                                {% else %}
+                                    <span class="text-warning"><i class="fas fa-lock-open me-1"></i>Abierto</span>
+                                {% endif %}
+                            </h5>
+                        </div>
+                    </div>
+
+                    <h6 class="text-primary fw-bold mb-3 mt-4">
+                        <i class="fas fa-calculator me-2"></i>Desglose
+                    </h6>
+                    <ul class="list-group list-group-flush small mb-3">
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-transparent">
+                            Monto Operación
+                            <span class="fw-bold {% if mov.abono > 0 %}text-success{% else %}text-danger{% endif %}">
+                                {% if mov.abono > 0 %}
+                                    + ${{ mov.abono|floatformat:2|intcomma }}
+                                {% else %}
+                                    - ${{ mov.cargo|floatformat:2|intcomma }}
+                                {% endif %}
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-transparent">
+                            (Info) IVA
+                            <span class="text-secondary fw-bold">${{ mov.iva|floatformat:2|intcomma }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-transparent">
+                            (Info) Retenciones
+                            <span class="text-secondary fw-bold">${{ mov.ret_iva|add:mov.ret_isr|floatformat:2|intcomma }}</span>
+                        </li>
+                    </ul>
+
+                    <div class="p-3 rounded card-saldo-despues {% if mov.saldo_banco < 0 %}negativo{% endif %}">
+                        <small class="text-muted text-uppercase fw-bold d-block mb-1" style="font-size: 0.7rem;">
+                            Saldo Resultante en Banco
+                        </small>
+                        <h3 class="fw-bold {% if mov.saldo_banco < 0 %}text-danger{% else %}text-success{% endif %} mb-0">
+                            ${{ mov.saldo_banco|floatformat:2|intcomma }}
+                        </h3>
+                    </div>
+                    
+                    <div class="mt-4 d-grid gap-2">
+                         <a href="{% url 'lista_movimientos' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Volver al Listado
+                        </a>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-9">
+            <div class="card shadow-lg border-0 mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center 
+                    {% if mov.abono > 0 %}bg-gradient-success{% else %}bg-gradient-danger{% endif %} text-white">
+                    <div>
+                        <h4 class="mb-0 fw-bold text-shadow">
+                            <i class="fas fa-receipt me-2"></i>Detalle del Movimiento #{{ mov.pk }}
+                        </h4>
+                        <small class="opacity-75">Registrado el: {{ mov.fecha|date:"d \d\e F, Y" }}</small>
+                    </div>
+                    <span class="badge bg-white {% if mov.abono > 0 %}text-success{% else %}text-danger{% endif %} fs-6 p-2 shadow-sm">
+                        {% if mov.abono > 0 %}
+                            <i class="fas fa-arrow-circle-up me-1"></i>INGRESO
+                        {% else %}
+                            <i class="fas fa-arrow-circle-down me-1"></i>EGRESO
+                        {% endif %}
+                    </span>
+                </div>
+                
+                <div class="card-body p-4">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-2">
+                            <label class="form-label small fw-bold text-muted">Fecha</label>
+                            <p class="h6 fw-bold text-dark">{{ mov.fecha|date:"d/m/Y" }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-muted">Cuenta Bancaria</label>
+                            <p class="h6 fw-bold text-primary">{{ mov.cuenta }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted">Concepto / Referencia</label>
+                            <p class="h5 fw-bold text-dark">{{ mov.concepto }}</p>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4 bg-light p-3 rounded mx-0">
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-muted">Unidad de Negocio</label>
+                            <div class="fw-bold">{{ mov.unidad_negocio|default:"--" }}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-muted">Operación</label>
+                            <div class="fw-bold text-primary">{{ mov.operacion|default:"--" }}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-muted">Categoría</label>
+                            <div class="fw-bold">{{ mov.categoria|default:"--" }}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-muted">Subcategoría</label>
+                            <div class="fw-bold">{{ mov.subcategoria|default:"--" }}</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted">
+                                {% if mov.abono > 0 %}Recibido de (Cliente){% else %}Pagado a (Proveedor){% endif %}
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="fas fa-user-tie"></i></span>
+                                <input type="text" class="form-control bg-white" value="{{ mov.tercero|default:'No especificado' }}" disabled>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted">Comentarios / Observaciones</label>
+                            <textarea class="form-control bg-white" rows="1" disabled>{{ mov.comentarios|default:"" }}</textarea>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <div class="card border-0 shadow-sm mb-4 bg-white">
+                        <div class="card-header bg-secondary text-white fw-bold d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-folder-open me-2"></i>Repositorio de Comprobantes</span>
+                            <span class="badge bg-light text-dark">{{ lista_xmls|length }} archivos</span>
+                        </div>
+                        <div class="card-body">
+                            
+                            <div class="row">
+                                <div class="col-md-7 border-end">
+                                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2 flex-wrap">
+                                        <h6 class="text-primary mb-0 fw-bold">XMLs (Datos Fiscales)</h6>
+                                        <div class="text-end">
+                                            <span class="badge bg-success badge-impuesto" title="IVA Total">IVA: ${{ totales_xml.iva|floatformat:2|intcomma }}</span>
+                                            {% if totales_xml.ret_iva > 0 %}
+                                                <span class="badge bg-warning text-dark badge-impuesto">Ret IVA: ${{ totales_xml.ret_iva|floatformat:2|intcomma }}</span>
+                                            {% endif %}
+                                            {% if totales_xml.ret_isr > 0 %}
+                                                <span class="badge bg-info text-dark badge-impuesto">Ret ISR: ${{ totales_xml.ret_isr|floatformat:2|intcomma }}</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="list-group list-group-flush small" style="max-height: 300px; overflow-y: auto;">
+                                        {% for item in lista_xmls %}
+                                            {% if item.es_xml %}
+                                            <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                                <div class="d-flex align-items-center w-100">
+                                                    <i class="fas fa-file-code text-success me-3 fa-lg"></i>
+                                                    <div class="flex-grow-1">
+                                                        <span class="fw-bold font-monospace text-dark">{{ item.uuid }}</span>
+                                                        <div class="text-muted mt-1">
+                                                            <a href="{{ item.obj.archivo_xml.url }}" target="_blank" class="text-decoration-none small btn btn-sm btn-outline-success">
+                                                                <i class="fas fa-download me-1"></i>Descargar XML
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                    <div class="text-end ms-2" style="font-size:0.75rem;">
+                                                        <div class="text-success fw-bold">IVA: ${{ item.iva|floatformat:2 }}</div>
+                                                        {% if item.ret_iva > 0 %}<div class="text-warning text-dark">Ret IVA: -${{ item.ret_iva|floatformat:2 }}</div>{% endif %}
+                                                        {% if item.ret_isr > 0 %}<div class="text-info text-dark">Ret ISR: -${{ item.ret_isr|floatformat:2 }}</div>{% endif %}
+                                                    </div>
+                                                    
+                                                    {% if not mov.auditado %}
+                                                    <a href="{% url 'eliminar_comprobante' item.obj.id %}" 
+                                                       class="btn btn-link text-danger ms-2 p-0" 
+                                                       onclick="return confirm('¿Eliminar XML? Se recalcularán los impuestos.')"
+                                                       title="Eliminar">
+                                                        <i class="fas fa-times"></i>
+                                                    </a>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                        {% empty %}
+                                            <div class="text-center text-muted py-3 fst-italic">No hay XMLs adjuntos.</div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+
+                                <div class="col-md-5 ps-md-4">
+                                    <h6 class="text-danger border-bottom pb-2 mb-2 fw-bold">PDFs (Visualización)</h6>
+                                    <div class="list-group list-group-flush small" style="max-height: 300px; overflow-y: auto;">
+                                        {% for item in lista_xmls %}
+                                            {% if item.obj.archivo_pdf %}
+                                            <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                                <div class="d-flex align-items-center w-100">
+                                                    <i class="fas fa-file-pdf text-danger me-3 fa-lg"></i>
+                                                    <div class="text-truncate flex-grow-1">
+                                                        <span class="fw-bold text-dark">PDF Comprobante</span><br>
+                                                        <small class="text-muted">Subido: {{ item.obj.fecha_subida|date:"d/m H:i" }}</small>
+                                                    </div>
+                                                    
+                                                    <button type="button" class="btn btn-sm btn-outline-danger btn-ver-pdf shadow-sm me-2" 
+                                                            data-url="{{ item.obj.archivo_pdf.url }}" 
+                                                            data-name="PDF - {{ item.uuid }}">
+                                                        <i class="fas fa-eye me-1"></i>Ver
+                                                    </button>
+                                                    
+                                                    {% if not mov.auditado %}
+                                                    <a href="{% url 'eliminar_comprobante' item.obj.id %}" 
+                                                       class="btn btn-link text-danger p-0" 
+                                                       onclick="return confirm('¿Eliminar PDF?')"
+                                                       title="Eliminar">
+                                                        <i class="fas fa-times"></i>
+                                                    </a>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                        {% if not mov.auditado %}
+                            <a href="{% url 'editar_movimiento' mov.pk %}" class="btn btn-warning text-dark fw-bold px-4 shadow-sm">
+                                <i class="fas fa-edit me-2"></i>Editar Datos
+                            </a>
+                            <a href="{% url 'eliminar_movimiento' mov.pk %}" 
+                               class="btn btn-danger fw-bold px-4 shadow-sm"
+                               onclick="return confirm('¿Estás seguro de eliminar todo el registro? Esta acción no se puede deshacer.')">
+                                <i class="fas fa-trash-alt me-2"></i>Eliminar
+                            </a>
+                            <a href="{% url 'auditar_movimiento' mov.pk %}" 
+                               class="btn btn-dark fw-bold px-4 shadow-sm"
+                               onclick="return confirm('¿Cerrar y Auditar este movimiento? Ya no se podrán hacer cambios.')">
+                                <i class="fas fa-lock me-2"></i>Cerrar / Auditar
+                            </a>
+                        {% else %}
+                            <button class="btn btn-secondary disabled px-4" title="Movimiento Auditado">
+                                <i class="fas fa-lock me-2"></i>Edición Bloqueada
+                            </button>
+                        {% endif %}
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalVerPDF" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content h-100 border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white py-2">
+                <h6 class="modal-title fw-bold" id="tituloModalPDF">
+                    <i class="fas fa-file-pdf me-2"></i>Visor de PDF
+                </h6>
+                <div class="ms-auto">
+                    <a href="#" id="btnAbrirExterno" target="_blank" class="btn btn-sm btn-light text-danger fw-bold me-2">
+                        <i class="fas fa-external-link-alt me-1"></i>Abrir en pestaña nueva
+                    </a>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+            </div>
+            <div class="modal-body p-0 bg-secondary" style="height: 85vh;">
+                <div class="pdf-object-container">
+                    <object id="objectPDF" data="" type="application/pdf" width="100%" height="100%">
+                        <div class="text-center text-white p-5">
+                            <i class="fas fa-exclamation-circle fa-3x mb-3 text-warning"></i>
+                            <p class="h5">Tu navegador no puede visualizar este PDF directamente.</p>
+                            <p class="small text-white-50 mb-4">Esto puede deberse a configuraciones de seguridad de Amazon S3.</p>
+                            <a href="#" id="linkFallback" target="_blank" class="btn btn-light fw-bold">
+                                <i class="fas fa-download me-2"></i>Descargar PDF
+                            </a>
+                        </div>
+                    </object>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Inicialización del Modal
+        var modalPDFElement = document.getElementById('modalVerPDF');
+        var modalPDF = new bootstrap.Modal(modalPDFElement);
+        
+        // Elementos internos
+        var objectPDF = document.getElementById('objectPDF');
+        var tituloModalPDF = document.getElementById('tituloModalPDF');
+        var btnAbrirExterno = document.getElementById('btnAbrirExterno');
+        var linkFallback = document.getElementById('linkFallback');
+        
+        // Botones que abren el modal
+        var btnsVerPdf = document.querySelectorAll('.btn-ver-pdf');
+        
+        btnsVerPdf.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var url = this.getAttribute('data-url');
+                var name = this.getAttribute('data-name');
+                
+                // 1. Asignar URL al objeto <object> y a los enlaces de respaldo
+                objectPDF.setAttribute('data', url);
+                btnAbrirExterno.href = url;
+                linkFallback.href = url;
+                
+                // 2. Actualizar título
+                tituloModalPDF.innerHTML = `<i class="fas fa-file-pdf me-2"></i>${name}`;
+                
+                // 3. Mostrar modal
+                modalPDF.show();
+            });
+        });
+        
+        // Limpiar data al cerrar para liberar memoria y detener procesos de red
+        modalPDFElement.addEventListener('hidden.bs.modal', function () {
+            objectPDF.setAttribute('data', '');
+            btnAbrirExterno.href = "#";
+        });
+    });
+</script>
+{% endblock %}

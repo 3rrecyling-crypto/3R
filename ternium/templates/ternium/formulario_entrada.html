@@ -1,0 +1,620 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo|default:"Nuevo Registro de Entrada" }}{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+
+<style>
+    /* ... Tus estilos existentes ... */
+    :root {
+        --primary-color: #0056b3;
+        --secondary-color: #6c757d;
+        --accent-color: #17a2b8;
+        --light-bg: #f8f9fa;
+    }
+    
+    /* --- GESTIÓN DE Z-INDEX (SOLUCIÓN FONDO NEGRO) --- */
+    
+    /* Nivel 1: Navbar (Originalmente 10000) */
+    
+    /* Nivel 2: Backdrop (Fondo oscuro) */
+    .modal-backdrop {
+        z-index: 10050 !important; 
+    }
+    
+    /* Nivel 3: Modales de Formulario */
+    .modal {
+        z-index: 10060 !important; 
+    }
+    
+    /* Nivel 4: Modal de Visualización de Archivos (Debe estar hasta arriba) */
+    #modalVerArchivo {
+        z-index: 10070 !important;
+    }
+
+    /* Ajuste para que Select2 se vea bien con Bootstrap 5 */
+    .select2-container--bootstrap-5 .select2-selection {
+        border-color: #ced4da;
+    }
+    
+    /* Estilos de previsualización clickable */
+    .image-preview { 
+        width: 100%; 
+        height: 120px; 
+        background-color: #e9ecef; 
+        border-radius: 4px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        overflow: hidden; 
+        cursor: pointer; /* Indicar que es clickeable */
+        transition: border 0.2s;
+    }
+    .image-preview:hover {
+        border: 2px solid var(--primary-color);
+    }
+    .image-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+    /* Estilos generales */
+    .card { border-radius: 12px; overflow: hidden; border: none; }
+    .card-header { border-bottom: none; }
+    .bg-gradient-primary { background: linear-gradient(135deg, #0056b3 0%, #003366 100%); }
+    .btn-primary-gradient { background: linear-gradient(135deg, #0056b3 0%, #17a2b8 100%); border: none; color: white; }
+    .section-card { border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; background-color: white; }
+    .section-header { background-color: var(--light-bg); padding: 12px 20px; border-bottom: 1px solid #e0e0e0; display: flex; align-items: center; }
+    .section-number { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background-color: var(--primary-color); color: white; border-radius: 50%; margin-right: 12px; }
+    .section-title { margin: 0; font-size: 1.1rem; color: var(--primary-color); font-weight: 600; }
+    .section-body { padding: 20px; }
+    .file-upload-card { padding: 15px; border-radius: 8px; background-color: #f8fafc; border: 1px dashed #d1d5db; }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="card shadow-lg border-0">
+        <div class="card-header bg-gradient-primary text-white py-3">
+             <h4 class="mb-0 font-weight-bold"><i class="fas fa-clipboard-check me-2"></i>{{ titulo }}</h4>
+        </div>
+        
+        <div class="card-body p-4">
+            <form method="post" enctype="multipart/form-data" id="entradaForm" class="needs-validation" novalidate>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %} <p>{{ error }}</p> {% endfor %}
+                    </div>
+                {% endif %}
+
+                <div class="section-card mb-4">
+                    <div class="section-header">
+                        <span class="section-number">1</span>
+                        <h5 class="section-title">Datos Generales</h5>
+                    </div>
+                    <div class="section-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="{{ form.c_id_remito.id_for_label }}" class="form-label fw-bold">{{ form.c_id_remito.label }}*</label>
+                                {{ form.c_id_remito }}
+                                
+                                <div id="errorRemito" class="text-danger small fw-bold mt-1" style="display: none;">
+                                    <i class="fas fa-exclamation-circle me-1"></i> Este ID de Remito ya está en uso.
+                                </div>
+                                <div class="invalid-feedback">{{ form.c_id_remito.errors.as_text }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.num_boleta_remision.id_for_label }}" class="form-label fw-bold">{{ form.num_boleta_remision.label }}*</label>
+                                {{ form.num_boleta_remision }}
+                                <div class="invalid-feedback">{{ form.num_boleta_remision.errors.as_text }}</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="{{ form.fecha_ingreso.id_for_label }}" class="form-label fw-bold">{{ form.fecha_ingreso.label }}*</label>
+                                {{ form.fecha_ingreso }}
+                                <div class="invalid-feedback">{{ form.fecha_ingreso.errors.as_text }}</div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label for="{{ form.transporte.id_for_label }}" class="form-label fw-bold">{{ form.transporte.label }}*</label>
+                                <div class="input-group">
+                                    {{ form.transporte }}
+                                    
+                                    <button class="btn btn-outline-secondary" type="button" id="btnRefreshTransporte" title="Actualizar lista">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </button>
+                                    
+                                    <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#modalCrearTransporte" title="Añadir nueva línea">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                                <div class="invalid-feedback">{{ form.transporte.errors.as_text }}</div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label for="{{ form.fecha_entrega_ternium.id_for_label }}" class="form-label fw-bold">{{ form.fecha_entrega_ternium.label }}*</label>
+                                {{ form.fecha_entrega_ternium }}
+                                <div class="invalid-feedback">{{ form.fecha_entrega_ternium.errors.as_text }}</div>
+                            </div>
+
+                            <div class="col-12">
+                                <label for="{{ form.comentario.id_for_label }}" class="form-label fw-bold">
+                                    <i class="fas fa-comment-alt me-1 text-secondary"></i> {{ form.comentario.label }}
+                                </label>
+                                {{ form.comentario }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-card mb-4">
+                     <div class="section-header">
+                        <span class="section-number">2</span>
+                        <h5 class="section-title">Información de Pesaje (en Toneladas)</h5>
+                    </div>
+                    <div class="section-body">
+                        <div class="row g-3 align-items-center">
+                            <div class="col-md-3"><label class="form-label fw-bold">{{ form.peso_remision.label }}*</label>{{ form.peso_remision }}</div>
+                            <div class="col-md-3"><label class="form-label fw-bold">{{ form.peso_bruto.label }}*</label>{{ form.peso_bruto }}</div>
+                            <div class="col-md-3"><label class="form-label fw-bold">{{ form.peso_tara.label }}*</label>{{ form.peso_tara }}</div>
+                            <div class="col-md-3">
+                                <div class="form-floating">
+                                    <input type="text" id="id_peso_neto" class="form-control fw-bold bg-white" readonly disabled>
+                                    <label>Peso Neto (Ton)</label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-12" id="container_discrepancia" style="display:none;">
+                                <div id="badge_discrepancia" class="alert d-flex align-items-center mb-0 py-2 shadow-sm">
+                                    <i id="icon_discrepancia" class="fas fa-info-circle me-3 fa-lg"></i>
+                                    <div>
+                                        <strong id="titulo_discrepancia" class="d-block">Estado de Carga</strong>
+                                        <span id="text_discrepancia"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-12"><label class="form-label fw-bold">{{ form.calidad.label }}*</label>{{ form.calidad }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-card mb-4">
+                    <div class="section-header">
+                        <span class="section-number">3</span>
+                        <h5 class="section-title me-auto">Documentación y Evidencias</h5>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-light text-primary fw-bold shadow-sm" onclick="abrirHerramienta('{% url 'unir_pdf' %}')">
+                                <i class="fas fa-file-pdf me-1"></i> Unir PDFs
+                            </button>
+                            <button type="button" class="btn btn-sm btn-light text-warning fw-bold shadow-sm" onclick="abrirHerramienta('{% url 'fotos_pdf' %}')">
+                                <i class="fas fa-images me-1"></i> Fotos a PDF
+                            </button>
+                        </div>
+                    </div>
+                    <div class="section-body">
+                        <div class="alert alert-info py-2 small"><i class="fas fa-info-circle"></i> Haga clic en las imágenes o enlaces para verlos en pantalla completa.</div>
+                        <div class="row g-4">
+                            <div class="col-md-4">
+                                <div class="file-upload-card h-100">
+                                    <label class="form-label fw-bold">{{ form.foto_frontal.label }}</label>
+                                    {{ form.foto_frontal }}
+                                    <div class="image-preview mt-2" id="preview_foto_frontal" data-existing-url="{% if object.foto_frontal %}{{ object.foto_frontal.url }}{% endif %}"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="file-upload-card h-100">
+                                    <label class="form-label fw-bold">{{ form.foto_superior_cargada.label }}</label>
+                                    {{ form.foto_superior_cargada }}
+                                    <div class="image-preview mt-2" id="preview_foto_superior_cargada" data-existing-url="{% if object.foto_superior_cargada %}{{ object.foto_superior_cargada.url }}{% endif %}"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="file-upload-card h-100">
+                                    <label class="form-label fw-bold">{{ form.foto_trasera.label }}</label>
+                                    {{ form.foto_trasera }}
+                                    <div class="image-preview mt-2" id="preview_foto_trasera" data-existing-url="{% if object.foto_trasera %}{{ object.foto_trasera.url }}{% endif %}"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="file-upload-card h-100">
+                                    <label class="form-label fw-bold">{{ form.foto_superior_vacia.label }}</label>
+                                    {{ form.foto_superior_vacia }}
+                                    <div class="image-preview mt-2" id="preview_foto_superior_vacia" data-existing-url="{% if object.foto_superior_vacia %}{{ object.foto_superior_vacia.url }}{% endif %}"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="file-upload-card h-100">
+                                    <label class="form-label fw-bold">{{ form.documento_remision_clientes.label }}</label>
+                                    {{ form.documento_remision_clientes }}
+                                    
+                                    {% if object.documento_remision_clientes %}
+                                    <div class="mt-2 text-success">
+                                        <i class="fas fa-check-circle"></i> 
+                                        <a href="#" onclick="window.verArchivo('{{ object.documento_remision_clientes.url }}', 'pdf'); return false;">
+                                            Ver Documento (PDF/Img)
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mt-4">
+                    <a href="{% url 'lista_entradas' %}" class="btn btn-outline-secondary me-3">Cancelar</a>
+                    <button type="submit" class="btn btn-primary-gradient px-4"><i class="fas fa-save me-2"></i>Guardar Registro</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalCrearTransporte" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-truck me-2"></i>Nueva Línea de Transporte</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formCrearTransporteAjax">
+                    
+                    <div class="mb-3">
+                        <label for="nombreTransporteAjax" class="form-label">Nombre de la Línea</label>
+                        <input type="text" class="form-control" id="nombreTransporteAjax" required placeholder="Ej. Transportes del Norte">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="empresaTransporteAjax" class="form-label">Vincular a Operación (Empresa)</label>
+                        <select class="form-select" id="empresaTransporteAjax" required>
+                            {% for empresa in empresas_list %}
+                                {% if "TERNIUM" in empresa.nombre|upper %}
+                                    <option value="{{ empresa.id }}" selected>{{ empresa.nombre }}</option>
+                                {% endif %}
+                            {% empty %}
+                                <option value="">No se encontró la empresa TERNIUM</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text text-muted small">
+                            Bloqueado automáticamente a TERNIUM.
+                        </div>
+                    </div>
+
+                    <div id="msgTransporteAjax" class="alert d-none"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnGuardarTransporteAjax">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalVerArchivo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content" style="height: 85vh; background-color: #212529;">
+            <div class="modal-header border-0 py-2">
+                <h6 class="modal-title text-white"><i class="fas fa-eye me-2"></i>Vista Previa</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0 d-flex justify-content-center align-items-center position-relative bg-dark text-white">
+                <div id="contenidoArchivo" class="w-100 h-100 d-flex justify-content-center align-items-center">
+                    </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> 
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+// --- FUNCIÓN GLOBAL PARA ABRIR HERRAMIENTAS EN POPUP ---
+function abrirHerramienta(url) {
+    window.open(url, 'Herramientas3R', 'width=1000,height=800,scrollbars=yes,resizable=yes');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // --- 1. MOVER MODALES AL BODY ---
+    const modalTransporte = document.getElementById('modalCrearTransporte');
+    const modalArchivos = document.getElementById('modalVerArchivo');
+    if (modalTransporte) document.body.appendChild(modalTransporte);
+    if (modalArchivos) document.body.appendChild(modalArchivos);
+
+    // --- 2. INICIALIZAR SELECT2 ---
+    $('.select2').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: 'Seleccione una opción',
+        allowClear: true
+    });
+
+    // --- 3. FUNCIÓN GLOBAL PARA ABRIR VISOR DE ARCHIVOS ---
+    window.verArchivo = function(url, tipo) {
+        const container = document.getElementById('contenidoArchivo');
+        container.innerHTML = '<div class="spinner-border text-light" role="status"></div>'; 
+        const modalInstance = bootstrap.Modal.getOrCreateInstance(modalArchivos);
+        modalInstance.show();
+        setTimeout(() => {
+            if (tipo === 'img') {
+                container.innerHTML = `<img src="${url}" style="max-width: 100%; max-height: 100%; object-fit: contain;">`;
+            } else {
+                container.innerHTML = `<iframe src="${url}" style="width: 100%; height: 100%; border: none;"></iframe>`;
+            }
+        }, 300);
+    };
+
+    // --- 4. FUNCIÓN PARA REFRESCAR TRANSPORTES ---
+    function refrescarTransportes(idSeleccionar = null) {
+        const btnRefresh = document.getElementById('btnRefreshTransporte');
+        const originalIcon = btnRefresh.innerHTML;
+        btnRefresh.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; 
+        btnRefresh.disabled = true;
+
+        fetch("{% url 'listar_transportes_ajax' %}")
+            .then(response => response.json())
+            .then(data => {
+                const select = $('#{{ form.transporte.auto_id }}');
+                select.empty(); 
+                select.append(new Option('Seleccione una línea de transporte...', '', false, false));
+                data.lineas.forEach(linea => {
+                    const isSelected = (idSeleccionar && parseInt(idSeleccionar) === linea.id);
+                    const option = new Option(linea.nombre, linea.nombre, false, isSelected); 
+                    select.append(option);
+                });
+                select.trigger('change'); 
+            })
+            .catch(error => console.error(error))
+            .finally(() => {
+                btnRefresh.innerHTML = originalIcon;
+                btnRefresh.disabled = false;
+            });
+    }
+
+    document.getElementById('btnRefreshTransporte').addEventListener('click', refrescarTransportes);
+
+    // --- 5. LOGICA GUARDAR TRANSPORTE (AJAX) ---
+    document.getElementById('btnGuardarTransporteAjax').addEventListener('click', function(e) {
+        e.preventDefault();
+        
+        const nombreInput = document.getElementById('nombreTransporteAjax');
+        const empresaSelect = document.getElementById('empresaTransporteAjax');
+        const msgDiv = document.getElementById('msgTransporteAjax');
+        
+        const nombreVal = nombreInput.value.trim();
+        const empresaVal = empresaSelect.value;
+        
+        msgDiv.classList.add('d-none');
+        msgDiv.className = 'alert d-none'; 
+
+        if(!nombreVal) {
+            mostrarError('El nombre es obligatorio.');
+            return;
+        }
+        if(!empresaVal) {
+            mostrarError('Error: No se ha detectado la empresa TERNIUM para vincular.');
+            return;
+        }
+
+        const data = { nombre: nombreVal, empresa_id: empresaVal };
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        fetch("{% url 'crear_transporte_ajax' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if(result.success) {
+                const modalInstance = bootstrap.Modal.getOrCreateInstance(modalTransporte); 
+                modalInstance.hide();
+                nombreInput.value = '';
+                refrescarTransportes(null); 
+                setTimeout(() => {
+                    const select = $('#{{ form.transporte.auto_id }}');
+                    if (select.find("option[value='" + result.nombre + "']").length > 0) {
+                        select.val(result.nombre).trigger('change');
+                    } else {
+                        const newOption = new Option(result.nombre, result.nombre, true, true);
+                        select.append(newOption).trigger('change');
+                    }
+                }, 500);
+
+            } else {
+                mostrarError(result.error || 'Error al guardar.');
+            }
+        })
+        .catch(error => mostrarError('Error de conexión.'));
+
+        function mostrarError(texto) {
+            msgDiv.textContent = texto;
+            msgDiv.className = 'alert alert-danger';
+            msgDiv.classList.remove('d-none');
+        }
+    });
+
+    // --- 6. MANEJO DE PREVIEW DE IMÁGENES ---
+    const form = document.getElementById('entradaForm');
+    form.addEventListener('submit', function(event) {
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        form.classList.add('was-validated');
+    }, false);
+
+    function handleImagePreview(input, previewId) {
+        const preview = document.getElementById(previewId);
+        if (!preview) return;
+        preview.innerHTML = '';
+        const file = input.files[0];
+        
+        if (file && file.type.match('image.*')) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.title = "Clic para ampliar";
+                preview.appendChild(img);
+                preview.onclick = function() { window.verArchivo(e.target.result, 'img'); };
+            };
+            reader.readAsDataURL(file);
+        } else {
+            preview.innerHTML = '<div class="text-muted p-3"><i class="far fa-image fa-2x"></i></div>';
+            preview.onclick = null;
+        }
+    }
+
+    const fileInputs = [
+        { inputId: 'id_foto_frontal', previewId: 'preview_foto_frontal' },
+        { inputId: 'id_foto_superior_cargada', previewId: 'preview_foto_superior_cargada' },
+        { inputId: 'id_foto_trasera', previewId: 'preview_foto_trasera' },
+        { inputId: 'id_foto_superior_vacia', previewId: 'preview_foto_superior_vacia' },
+    ];
+    fileInputs.forEach(item => {
+        const el = document.getElementById(item.inputId);
+        if(el) el.addEventListener('change', () => handleImagePreview(el, item.previewId));
+    });
+
+    document.querySelectorAll('.image-preview').forEach(preview => {
+        const url = preview.dataset.existingUrl;
+        if (url) {
+            const img = document.createElement('img');
+            img.src = url;
+            img.title = "Clic para ampliar";
+            preview.innerHTML = '';
+            preview.appendChild(img);
+            preview.onclick = function() { window.verArchivo(url, 'img'); };
+        } else {
+            preview.innerHTML = '<div class="text-muted p-3"><i class="far fa-image fa-2x"></i></div>';
+        }
+    });
+
+    // --- 7. NUEVA LÓGICA DE CÁLCULO DE PESO Y DISCREPANCIA (ACTUALIZADA) ---
+    const pb = document.getElementById('id_peso_bruto');
+    const pt = document.getElementById('id_peso_tara');
+    const pr = document.getElementById('{{ form.peso_remision.auto_id }}');
+    const pn = document.getElementById('id_peso_neto');
+
+    // Elementos de la alerta
+    const containerDisc = document.getElementById('container_discrepancia');
+    const badgeDisc = document.getElementById('badge_discrepancia');
+    const iconDisc = document.getElementById('icon_discrepancia');
+    const tituloDisc = document.getElementById('titulo_discrepancia');
+    const textDisc = document.getElementById('text_discrepancia');
+
+    function calcCalculos() {
+        const b = parseFloat(pb.value);
+        const t = parseFloat(pt.value);
+        let neto = 0;
+
+        // 1. Calcular Neto
+        if(!isNaN(b) && !isNaN(t)) {
+            neto = b - t;
+            pn.value = neto.toFixed(3);
+        } else {
+            pn.value = '';
+            containerDisc.style.display = 'none';
+            return;
+        }
+
+        // 2. Calcular Discrepancia si hay Peso Remisión
+        const r = parseFloat(pr.value);
+        if (!isNaN(r) && r > 0) {
+            // Lógica: Neto (Real) - Remisión (Documento)
+            const diff = neto - r;
+            const perc = (diff / r) * 100;
+            const absPerc = Math.abs(perc);
+            
+            containerDisc.style.display = 'block';
+            
+            // Reset clases base
+            badgeDisc.className = 'alert d-flex align-items-center mb-0 py-2 shadow-sm';
+            
+            if (diff > 0) {
+                // CASO 1: GANANCIA (SOBRANTE) -> SIEMPRE VERDE
+                badgeDisc.classList.add('alert-success');
+                iconDisc.className = 'fas fa-arrow-up me-3 fa-lg text-success';
+                tituloDisc.textContent = 'GANANCIA DE MATERIAL';
+                textDisc.innerHTML = `Se recibió <strong>+${diff.toFixed(3)} Ton</strong> adicionales (+${perc.toFixed(2)}%)`;
+            
+            } else if (diff < 0) {
+                // CASO 2: PÉRDIDA (FALTANTE)
+                if (absPerc > 1.0) {
+                    // Si pérdida > 1% -> ROJO (Alerta Crítica)
+                    badgeDisc.classList.add('alert-danger');
+                    iconDisc.className = 'fas fa-exclamation-triangle me-3 fa-lg text-danger';
+                    tituloDisc.textContent = 'ALERTA DE MERMA CRÍTICA';
+                    textDisc.innerHTML = `Faltante de <strong>${diff.toFixed(3)} Ton</strong> (${perc.toFixed(2)}%). <br><small>Supera la tolerancia permitida del 1%.</small>`;
+                } else {
+                    // Si pérdida <= 1% -> VERDE (Tolerable)
+                    badgeDisc.classList.add('alert-success');
+                    iconDisc.className = 'fas fa-check-circle me-3 fa-lg text-success';
+                    tituloDisc.textContent = 'MERMA DENTRO DE TOLERANCIA';
+                    textDisc.innerHTML = `Faltante de <strong>${diff.toFixed(3)} Ton</strong> (${perc.toFixed(2)}%). <br><small>Dentro del rango permitido.</small>`;
+                }
+            } else {
+                // CASO 3: EXACTO
+                badgeDisc.classList.add('alert-success');
+                iconDisc.className = 'fas fa-check-circle me-3 fa-lg text-success';
+                tituloDisc.textContent = 'PESO EXACTO';
+                textDisc.innerHTML = `No hay diferencia con la remisión.`;
+            }
+        } else {
+            // Si no hay remisión, ocultamos la alerta
+            containerDisc.style.display = 'none';
+        }
+    }
+
+    if(pb && pt && pr) {
+        pb.addEventListener('input', calcCalculos);
+        pt.addEventListener('input', calcCalculos);
+        pr.addEventListener('input', calcCalculos);
+        // Ejecutar al inicio por si es edición
+        calcCalculos();
+    }
+
+    // --- 8. VERIFICACIÓN DE ID REMITO EN TIEMPO REAL ---
+    const inputRemito = document.getElementById('{{ form.c_id_remito.auto_id }}');
+    const errorRemitoDiv = document.getElementById('errorRemito');
+    const pkActual = '{% if object and object.pk %}{{ object.pk }}{% else %}None{% endif %}'; 
+    let timeout = null; 
+
+    if (inputRemito && errorRemitoDiv) {
+        inputRemito.addEventListener('input', function() {
+            const valor = this.value.trim();
+            if (!valor) {
+                errorRemitoDiv.style.display = 'none';
+                inputRemito.classList.remove('is-invalid');
+                return;
+            }
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                fetch(`{% url 'verificar_remito_existente' %}?id=${encodeURIComponent(valor)}&pk_actual=${pkActual}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.existe) {
+                            errorRemitoDiv.style.display = 'block';
+                            inputRemito.classList.add('is-invalid'); 
+                        } else {
+                            errorRemitoDiv.style.display = 'none';
+                            inputRemito.classList.remove('is-invalid');
+                        }
+                    })
+                    .catch(console.error);
+            }, 500);
+        });
+    }
+});
+</script>
+{% endblock extra_js %}

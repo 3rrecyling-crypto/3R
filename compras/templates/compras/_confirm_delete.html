@@ -1,0 +1,14 @@
+{% extends 'compras/compras_base.html' %}
+
+{% block compras_content %}
+    <h3>Confirmar Eliminación</h3>
+    <hr>
+    <p>¿Estás seguro de que quieres eliminar <strong>"{{ object }}"</strong>?</p>
+    <p>Esta acción no se puede deshacer.</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+        <a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="btn btn-secondary">Cancelar</a>
+    </form>
+{% endblock %}

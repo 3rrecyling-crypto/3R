@@ -1,0 +1,331 @@
+{% extends 'ternium/base.html' %}
+{% load static humanize %}
+
+{% block title %}Bandeja de Entrada - Ternium{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    :root {
+        --primary-color: #3f51b5;
+        --secondary-color: #2196f3;
+        --light-bg: #f8f9fa;
+        --card-bg: #ffffff;
+        --text-dark: #2c3e50;
+        --text-light: #7f8c8d;
+        --border-color: #e0e0e0;
+        --unread-badge: #f44336; /* ROJO para no leídos */
+        --online-status: #4CAF50;
+        --away-status: #ffc107;
+        --offline-status: #bdc3c7;
+    }
+    
+    .inbox-container {
+        background-color: var(--card-bg);
+        border-radius: 12px;
+        box-shadow: 0 4px 25px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+        min-height: 600px;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .inbox-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+        padding: 20px 25px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .btn-new-chat {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: 1px solid rgba(255,255,255,0.3);
+        padding: 8px 16px;
+        border-radius: 20px;
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition: background 0.2s;
+    }
+    .btn-new-chat:hover {
+        background: rgba(255, 255, 255, 0.3);
+        color: white;
+    }
+
+    .search-box {
+        padding: 15px;
+        border-bottom: 1px solid var(--border-color);
+        background: #fdfdfd;
+    }
+    
+    .conversations-list {
+        flex: 1;
+        overflow-y: auto;
+    }
+    
+    .conversation-item {
+        display: flex;
+        align-items: center;
+        padding: 15px 20px;
+        border-bottom: 1px solid #f0f0f0;
+        text-decoration: none;
+        color: inherit;
+        transition: background-color 0.2s;
+        position: relative;
+    }
+    
+    .conversation-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    /* Estilo para conversaciones no leídas */
+    .conversation-item.unread {
+        background-color: #e8f0fe; /* Azul muy clarito */
+    }
+    .conversation-item.unread .preview-text {
+        font-weight: 700;
+        color: var(--text-dark);
+    }
+    .conversation-item.unread::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background-color: var(--primary-color);
+    }
+
+    .user-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        object-fit: cover;
+        margin-right: 15px;
+        border: 1px solid #eee;
+    }
+    
+    .avatar-placeholder {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background-color: var(--primary-color);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 1.2rem;
+        margin-right: 15px;
+    }
+
+    .conversation-content {
+        flex: 1;
+        min-width: 0; /* Para que funcione el truncate */
+    }
+    
+    .top-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 4px;
+    }
+    
+    .user-name {
+        font-weight: 600;
+        font-size: 1rem;
+        color: var(--text-dark);
+    }
+    
+    .timestamp {
+        font-size: 0.75rem;
+        color: var(--text-light);
+    }
+    
+    .bottom-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .preview-text {
+        font-size: 0.9rem;
+        color: var(--text-light);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 85%;
+    }
+    
+    .status-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        border: 2px solid white;
+        position: absolute;
+        bottom: 15px;
+        left: 60px; /* Ajustado según avatar + margen */
+    }
+    
+    .status-online { background-color: var(--online-status); }
+    .status-away { background-color: var(--away-status); }
+    .status-offline { background-color: var(--offline-status); }
+
+    .badge-unread {
+        background-color: var(--unread-badge);
+        color: white;
+        border-radius: 10px;
+        padding: 2px 8px;
+        font-size: 0.7rem;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="inbox-container">
+                
+                <div class="inbox-header">
+                    <h4 class="mb-0"><i class="fas fa-comments me-2"></i> Mensajes</h4>
+                    <a href="{% url 'user_list' %}" class="btn-new-chat">
+                        <i class="fas fa-plus me-1"></i> Nuevo
+                    </a>
+                </div>
+                
+                <div class="search-box">
+                    <input type="text" id="conversation-search" class="form-control rounded-pill" placeholder="Buscar conversación...">
+                </div>
+
+                <div class="conversations-list" id="conversations-list">
+                    {% for conv in conversations %}
+                        {% with other_user=conv.other_user %}
+                        {% with last_message=conv.get_last_message %}
+                            
+                            <a href="{% url 'chat_detail' conv.id %}" 
+                               class="conversation-item {% if last_message and not last_message.is_read and last_message.author != request.user %}unread{% endif %}" 
+                               data-conversation-id="{{ conv.id }}"
+                               data-username="{% if other_user %}{{ other_user.username|lower }}{% else %}unknown{% endif %}">
+                                
+                                <div style="position: relative;">
+                                    {% if other_user %}
+                                        {% if other_user.ternium_profile.avatar %}
+                                            <img src="{{ other_user.ternium_profile.avatar.url }}" class="user-avatar">
+                                        {% else %}
+                                            <div class="avatar-placeholder">{{ other_user.username|first|upper }}</div>
+                                        {% endif %}
+                                        
+                                        <div class="status-indicator status-{{ other_user.chat_profile.status|default:'offline' }}"
+                                             id="status-dot-{{ other_user.id }}"></div>
+                                    {% else %}
+                                        <div class="avatar-placeholder" style="background-color: #bdc3c7;">?</div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="conversation-content">
+                                    <div class="top-row">
+                                        <span class="user-name">
+                                            {% if other_user %}
+                                                {{ other_user.get_full_name|default:other_user.username }}
+                                            {% else %}
+                                                <span class="text-muted fst-italic">Usuario Eliminado</span>
+                                            {% endif %}
+                                        </span>
+                                        
+                                        <span class="timestamp">
+                                            {% if last_message %}
+                                                {{ last_message.timestamp|naturaltime }}
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="bottom-row">
+                                        <p class="preview-text mb-0">
+                                            {% if last_message %}
+                                                {% if last_message.author == request.user %}
+                                                    <span class="text-muted small">Tú:</span> 
+                                                {% endif %}
+                                                {% if last_message.message_type == 'text' %}
+                                                    {{ last_message.content|truncatechars:30 }}
+                                                {% else %}
+                                                    <i class="fas fa-paperclip"></i> Archivo adjunto
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="text-muted fst-italic">Sin mensajes aún</span>
+                                            {% endif %}
+                                        </p>
+                                        
+                                        {% if last_message and not last_message.is_read and last_message.author != request.user %}
+                                            <span class="badge-unread">NUEVO</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </a>
+                        {% endwith %}
+                        {% endwith %}
+                    {% empty %}
+                        <div class="text-center py-5 text-muted">
+                            <i class="far fa-paper-plane fa-3x mb-3"></i>
+                            <p>No tienes conversaciones activas.</p>
+                            <a href="{% url 'user_list' %}" class="btn btn-primary btn-sm rounded-pill mt-2">Iniciar chat</a>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        
+        // --- 1. FILTRO DE BÚSQUEDA ---
+        const searchInput = document.getElementById('conversation-search');
+        // Nota: Movemos la selección de items dentro del evento para que funcione tras el refresh
+        
+        if (searchInput) {
+            searchInput.addEventListener('keyup', function(e) {
+                const term = e.target.value.toLowerCase();
+                const listItems = document.querySelectorAll('.conversation-item');
+                
+                listItems.forEach(item => {
+                    const username = item.getAttribute('data-username');
+                    // Verificamos que username exista antes de usar includes
+                    if (username && username.includes(term)) {
+                        item.style.display = 'flex';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        // --- 2. AUTO-REFRESH PARA VER MENSAJES NUEVOS ---
+        function refreshConversationList() {
+            // Solo refrescamos si el usuario no está escribiendo en el buscador
+            if (searchInput && searchInput.value.trim() !== '') return;
+
+            fetch(window.location.href)
+                .then(response => response.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const newList = doc.getElementById('conversations-list');
+                    const currentList = document.getElementById('conversations-list');
+                    
+                    if (newList && currentList) {
+                        currentList.innerHTML = newList.innerHTML;
+                    }
+                })
+                .catch(err => console.error('Error actualizando lista:', err));
+        }
+
+        setInterval(refreshConversationList, 5000);
+
+    });
+</script>
+{% endblock %}

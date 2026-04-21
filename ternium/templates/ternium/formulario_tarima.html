@@ -1,0 +1,234 @@
+{% extends 'ternium/base.html' %}
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 1000px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="fw-bold text-dark"><i class="fas fa-edit me-2"></i>{{ titulo }}</h3>
+        <a href="{% url 'lista_tarimas' %}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left"></i> Volver a la lista</a>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" id="tarimaForm" class="needs-validation" novalidate>
+        {% csrf_token %}
+        
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-primary text-white py-2">
+                        <h6 class="mb-0"><i class="fas fa-info-circle me-1"></i> Datos del Viaje</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted">Fecha de Movimiento</label>
+                            {{ form.fecha }}
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted">Origen (Salida)</label>
+                            {{ form.origen }}
+                            <div class="form-text small text-info"><i class="fas fa-check-circle"></i> Predeterminado: Santa Rosa</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted">Destino (Opcional)</label>
+                            {{ form.destino }}
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-muted">Evidencia (PDF/Foto)</label>
+                            {{ form.evidencia }}
+                            {% if form.instance.evidencia %}
+                                <div class="mt-2 p-2 bg-light border rounded text-center">
+                                    <a href="{{ form.instance.evidencia.url }}" target="_blank" class="text-decoration-none">
+                                        <i class="fas fa-file-download"></i> Ver Archivo Actual
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-dark text-white py-2 d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0"><i class="fas fa-calculator me-1"></i> Desglose de Material</h6>
+                        <span class="badge bg-success fs-6" id="badgeTotal">$0.00</span>
+                    </div>
+                    <div class="card-body">
+                        
+                        <div class="row align-items-end mb-4 pb-4 border-bottom">
+                            <div class="col-12 mb-2">
+                                <span class="badge bg-info text-dark"><i class="fas fa-box-open"></i> Tarimas Chicas</span>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small text-muted">Cantidad</label>
+                                <div class="input-group">
+                                    {{ form.tarima_chica_cant }}
+                                    <span class="input-group-text">pzas</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small text-muted">Precio Unitario</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    {{ form.precio_chica }}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small text-muted fw-bold">Subtotal</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light">$</span>
+                                    {{ form.total_chica }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row align-items-end mb-4 pb-4 border-bottom">
+                            <div class="col-12 mb-2">
+                                <span class="badge bg-secondary text-white"><i class="fas fa-box"></i> Tarimas Medianas</span>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small text-muted">Cantidad</label>
+                                <div class="input-group">
+                                    {{ form.tarima_mediana_cant }}
+                                    <span class="input-group-text">pzas</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small text-muted">Precio Unitario</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    {{ form.precio_mediana }}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small text-muted fw-bold">Subtotal</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light">$</span>
+                                    {{ form.total_mediana }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row align-items-end mb-4">
+                            <div class="col-12 mb-2">
+                                <span class="badge bg-warning text-dark"><i class="fas fa-box"></i> Tarimas Grandes</span>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small text-muted">Cantidad</label>
+                                <div class="input-group">
+                                    {{ form.tarima_grande_cant }}
+                                    <span class="input-group-text">pzas</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small text-muted">Precio Unitario</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    {{ form.precio_grande }}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="small text-muted fw-bold">Subtotal</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light">$</span>
+                                    {{ form.total_grande }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 bg-light p-3 rounded">
+                            <div class="col-md-8">
+                                <label class="fw-bold small">Comentarios / Observaciones</label>
+                                {{ form.comentarios }}
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <label class="fw-bold text-success mb-1">IMPORTE TOTAL</label>
+                                {{ form.gran_total }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white text-end py-3">
+                        <a href="{% url 'lista_tarimas' %}" class="btn btn-light border me-2">Cancelar</a>
+                        <button type="submit" class="btn btn-primary px-4"><i class="fas fa-save me-1"></i> Guardar Registro</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Referencias a los campos del DOM
+    const inputs = {
+        // Chicas
+        c1: document.getElementById('id_tarima_chica_cant'),
+        p1: document.getElementById('id_precio_chica'),
+        t1: document.getElementById('id_total_chica'),
+        
+        // Medianas (NUEVO)
+        cm: document.getElementById('id_tarima_mediana_cant'),
+        pm: document.getElementById('id_precio_mediana'),
+        tm: document.getElementById('id_total_mediana'),
+
+        // Grandes
+        c2: document.getElementById('id_tarima_grande_cant'),
+        p2: document.getElementById('id_precio_grande'),
+        t2: document.getElementById('id_total_grande'),
+        
+        // Totales Generales
+        granTotal: document.getElementById('id_gran_total'),
+        badgeTotal: document.getElementById('badgeTotal')
+    };
+
+    function calcular() {
+        // Obtener valores (0 si está vacío o no es número)
+        const v = {
+            c1: parseFloat(inputs.c1.value) || 0,
+            p1: parseFloat(inputs.p1.value) || 0,
+            
+            cm: parseFloat(inputs.cm.value) || 0, // Nuevo
+            pm: parseFloat(inputs.pm.value) || 0, // Nuevo
+
+            c2: parseFloat(inputs.c2.value) || 0,
+            p2: parseFloat(inputs.p2.value) || 0
+        };
+
+        // Calcular subtotales individuales
+        const sub1 = v.c1 * v.p1;
+        const subM = v.cm * v.pm; // Nuevo
+        const sub2 = v.c2 * v.p2;
+        
+        // Gran Total
+        const total = sub1 + subM + sub2;
+
+        // Actualizar inputs de solo lectura (toFixed(2) para formato moneda)
+        inputs.t1.value = sub1.toFixed(2);
+        inputs.tm.value = subM.toFixed(2); // Nuevo
+        inputs.t2.value = sub2.toFixed(2);
+        
+        inputs.granTotal.value = total.toFixed(2);
+        
+        // Actualizar badge visual en la cabecera
+        if(inputs.badgeTotal) {
+            inputs.badgeTotal.textContent = '$' + total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+    }
+
+    // Agregar listeners a todos los campos editables
+    // Chicas
+    if(inputs.c1) inputs.c1.addEventListener('input', calcular);
+    if(inputs.p1) inputs.p1.addEventListener('input', calcular);
+    
+    // Medianas (NUEVO)
+    if(inputs.cm) inputs.cm.addEventListener('input', calcular);
+    if(inputs.pm) inputs.pm.addEventListener('input', calcular);
+
+    // Grandes
+    if(inputs.c2) inputs.c2.addEventListener('input', calcular);
+    if(inputs.p2) inputs.p2.addEventListener('input', calcular);
+    
+    // Cálculo inicial al cargar la página (por si es edición)
+    calcular();
+});
+</script>
+{% endblock %}

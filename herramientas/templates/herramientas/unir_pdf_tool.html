@@ -1,0 +1,406 @@
+{% extends 'ternium/base.html' %}
+
+{% block title %}{{ title }} - Herramientas{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+<script>
+    // Configurar el worker de PDF.js
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+</script>
+
+<style>
+    .drop-zone {
+        border: 2px dashed #0d6efd;
+        border-radius: 10px;
+        padding: 30px;
+        text-align: center;
+        background-color: #f8f9fa;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+        background-color: #e2e6ea;
+        border-color: #0a58ca;
+        transform: scale(1.01);
+    }
+
+    .gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 20px;
+        margin-top: 30px;
+    }
+
+    .pdf-page-card {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        cursor: grab;
+        position: relative;
+        transition: transform 0.2s;
+        display: flex;
+        flex-direction: column;
+    }
+    .pdf-page-card:active { cursor: grabbing; transform: scale(1.02); }
+
+    .page-preview {
+        height: 220px;
+        background: #525659;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        cursor: zoom-in;
+        transition: opacity 0.2s;
+    }
+    .page-preview:hover {
+        opacity: 0.9;
+    }
+    
+    .page-preview canvas {
+        max-width: 100%;
+        max-height: 100%;
+        box-shadow: 0 0 10px rgba(0,0,0,0.3);
+        pointer-events: none;
+    }
+
+    .page-info {
+        padding: 10px;
+        font-size: 0.85rem;
+        background: #fff;
+        border-top: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .page-number-badge {
+        background-color: #0d6efd;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: bold;
+        font-size: 0.8rem;
+    }
+
+    .btn-delete {
+        color: #dc3545;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 2px;
+        transition: transform 0.2s;
+    }
+    .btn-delete:hover { transform: scale(1.2); }
+
+    #loadingOverlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(255,255,255,0.8);
+        z-index: 9999;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* Estilos Modal */
+    #previewCanvasContainer {
+        overflow: auto;
+        max-height: 80vh;
+        display: flex;
+        justify-content: center;
+        background-color: #333;
+        padding: 20px;
+        border-radius: 5px;
+    }
+    /* Aseguramos que el modal tenga un Z-Index altísimo para ganar al navbar */
+    .modal {
+        z-index: 10050 !important;
+    }
+    .modal-backdrop {
+        z-index: 10040 !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="loadingOverlay">
+    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
+    <h5 class="mt-3">Procesando páginas del PDF...</h5>
+</div>
+
+<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-search-plus me-2"></i>Vista Detallada</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0 bg-dark text-center">
+                <div id="previewCanvasContainer">
+                    <div class="spinner-border text-light mt-5 mb-5" role="status"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-11">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-primary text-white py-3">
+                    <h3 class="text-center mb-0"><i class="fas fa-file-pdf me-2"></i>{{ title }}</h3>
+                </div>
+                <div class="card-body p-4">
+
+                    <form method="post" enctype="multipart/form-data" id="mainForm">
+                        {% csrf_token %}
+                        
+                        <input type="file" id="fileInput" multiple accept="application/pdf" class="d-none">
+                        <input type="file" name="archivos_pdf" id="finalFilesInput" multiple class="d-none">
+                        <input type="hidden" name="page_map" id="pageMapInput">
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Nombre del archivo final</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="fas fa-file-signature"></i></span>
+                                <input type="text" name="nombre_archivo" class="form-control" placeholder="Ej: Reporte_Final_Unido">
+                                <span class="input-group-text">.pdf</span>
+                            </div>
+                        </div>
+
+                        <div class="drop-zone" id="dropZone">
+                            <i class="fas fa-folder-open fa-3x text-primary mb-3"></i>
+                            <h5>Arrastra tus PDFs aquí para desglosarlos</h5>
+                            <p class="text-muted small">Haz clic para buscar archivos</p>
+                        </div>
+
+                        <div id="gallery" class="gallery-grid"></div>
+
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-success btn-lg py-2" id="submitBtn" disabled>
+                                <i class="fas fa-layer-group me-2"></i>{{ btn_text }}
+                            </button>
+                            <a href="{% url 'index_herramientas' %}" class="btn btn-light border">
+                                <i class="fas fa-arrow-left me-2"></i>Volver al menú
+                            </a>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const gallery = document.getElementById('gallery');
+    const submitBtn = document.getElementById('submitBtn');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    
+    // Configuración del Modal
+    const previewModalEl = document.getElementById('previewModal');
+    
+    // --- SOLUCIÓN AL PROBLEMA DEL FONDO NEGRO ---
+    // Movemos el modal fuera del contenedor principal y lo pegamos al body
+    // Esto evita que herede problemas de Z-Index del contenedor.
+    document.body.appendChild(previewModalEl);
+    
+    const previewModal = new bootstrap.Modal(previewModalEl);
+    const previewContainer = document.getElementById('previewCanvasContainer');
+
+    let storedPdfFiles = []; 
+
+    // Inicializar Sortable
+    new Sortable(gallery, {
+        animation: 150,
+        ghostClass: 'bg-light',
+        handle: '.pdf-page-card',
+        onEnd: updateCounters,
+        filter: '.btn-delete',
+    });
+
+    // Eventos
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleFiles(e.target.files);
+        }
+    });
+
+    dropZone.addEventListener('dragover', (e) => { 
+        e.preventDefault(); 
+        dropZone.classList.add('dragover'); 
+    });
+    
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        handleFiles(e.dataTransfer.files);
+    });
+
+    async function handleFiles(files) {
+        if (!files.length) return;
+        showLoading(true);
+        const newFiles = Array.from(files).filter(f => f.type === 'application/pdf');
+
+        for (const file of newFiles) {
+            const fileIndex = storedPdfFiles.push(file) - 1;
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    await renderPageThumbnail(pdf, i, file.name, fileIndex);
+                }
+            } catch (err) {
+                console.error("Error leyendo PDF:", err);
+                alert("Error al leer " + file.name);
+            }
+        }
+        showLoading(false);
+        fileInput.value = ''; 
+        updateCounters();
+        checkButton();
+    }
+
+    async function renderPageThumbnail(pdf, pageNum, fileName, fileIndex) {
+        const page = await pdf.getPage(pageNum);
+        const scale = 0.5; 
+        const viewport = page.getViewport({scale: scale});
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        await page.render({
+            canvasContext: context,
+            viewport: viewport
+        }).promise;
+
+        const card = document.createElement('div');
+        card.className = 'pdf-page-card';
+        card.dataset.fileIndex = fileIndex; 
+        card.dataset.pageNum = pageNum; 
+
+        card.innerHTML = `
+            <div class="page-preview" title="Clic para ampliar"></div>
+            <div class="page-info">
+                <span class="text-truncate" style="max-width: 100px;" title="${fileName}">${fileName}</span>
+                <div class="d-flex align-items-center">
+                    <span class="page-number-badge me-2">#${pageNum}</span>
+                    <button type="button" class="btn-delete" title="Quitar hoja"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="position-absolute top-0 start-0 m-2 badge bg-warning text-dark final-order-badge">1</div>
+        `;
+        
+        const previewDiv = card.querySelector('.page-preview');
+        previewDiv.appendChild(canvas);
+
+        previewDiv.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openPreviewModal(fileIndex, pageNum);
+        });
+        
+        card.querySelector('.btn-delete').addEventListener('click', (e) => {
+            e.stopPropagation(); 
+            card.remove();
+            updateCounters();
+            checkButton();
+        });
+
+        gallery.appendChild(card);
+    }
+
+    async function openPreviewModal(fileIndex, pageNum) {
+        previewContainer.innerHTML = '<div class="spinner-border text-light mt-5 mb-5" role="status"></div>';
+        previewModal.show();
+
+        try {
+            const file = storedPdfFiles[fileIndex];
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+            const page = await pdf.getPage(pageNum);
+
+            // Zoom 1.5x
+            const scale = 1.5; 
+            const viewport = page.getViewport({scale: scale});
+
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            await page.render({
+                canvasContext: context,
+                viewport: viewport
+            }).promise;
+
+            previewContainer.innerHTML = '';
+            previewContainer.appendChild(canvas);
+        } catch (err) {
+            console.error(err);
+            previewContainer.innerHTML = '<p class="text-white mt-4">Error al cargar la vista previa.</p>';
+        }
+    }
+
+    function updateCounters() {
+        const cards = gallery.querySelectorAll('.pdf-page-card');
+        cards.forEach((card, idx) => {
+            card.querySelector('.final-order-badge').textContent = idx + 1;
+        });
+    }
+
+    function checkButton() {
+        submitBtn.disabled = gallery.querySelectorAll('.pdf-page-card').length === 0;
+    }
+
+    function showLoading(show) {
+        loadingOverlay.style.display = show ? 'flex' : 'none';
+    }
+
+    const form = document.getElementById('mainForm');
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const cards = gallery.querySelectorAll('.pdf-page-card');
+        const pageMap = [];
+        const dt = new DataTransfer();
+
+        storedPdfFiles.forEach(file => {
+            dt.items.add(file);
+        });
+        document.getElementById('finalFilesInput').files = dt.files;
+
+        cards.forEach(card => {
+            pageMap.push({
+                file_index: parseInt(card.dataset.fileIndex),
+                page_num: parseInt(card.dataset.pageNum) - 1
+            });
+        });
+
+        document.getElementById('pageMapInput').value = JSON.stringify(pageMap);
+        form.submit();
+    });
+});
+</script>
+{% endblock %}

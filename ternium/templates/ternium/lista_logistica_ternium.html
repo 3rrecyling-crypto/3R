@@ -1,0 +1,674 @@
+{% extends "ternium/base.html" %}
+{% load static %}
+
+{% block title %}Registros de Logística - Ternium{% endblock title %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="card shadow-lg border-0">
+        <div class="card-header bg-gradient-primary text-white py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <h4 class="mb-0 font-weight-bold">
+                    <i class="fas fa-truck me-2"></i>
+                    Registros de Salidas 
+                </h4>
+                <div>
+                    <a href="{% url 'lista_entradas' %}" class="btn btn-light btn-sm px-3 me-2" id="btn-ir-entradas" style="color: var(--primary-color); font-weight: 600;" title="Ir a módulo de Entradas">
+                        <i class="fas fa-sign-in-alt me-2"></i>Entradas a Ternium
+                    </a>
+
+                    <a href="{% url 'crear_registro_logistica' %}" class="btn btn-light btn-sm px-3 me-2" id="btn-nuevo-registro">
+                        <i class="fas fa-plus me-2"></i>Nuevo Registro
+                    </a>
+                    
+                    <button type="button" class="btn btn-success btn-sm px-3" data-bs-toggle="modal" data-bs-target="#exportModal">
+                        <i class="fas fa-file-excel me-2"></i>Exportar a Excel
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-body">
+            
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm overflow-hidden text-white" style="background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);">
+                        <div class="card-body p-3 d-flex align-items-center justify-content-between">
+                            <div>
+                                <h6 class="text-uppercase fw-bold mb-1" style="font-size: 0.8rem; opacity: 0.8;">
+                                    Ton. Remisionadas ({{ mes_actual_nombre|default:"Mes Actual" }})
+                                </h6>
+                                <h3 class="mb-0 fw-bold">{{ kpi_remisionadas_mes|floatformat:3 }}</h3>
+                            </div>
+                            <div class="bg-white bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                <i class="fas fa-truck-loading fa-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm overflow-hidden text-white" style="background: linear-gradient(135deg, #198754 0%, #146c43 100%);">
+                        <div class="card-body p-3 d-flex align-items-center justify-content-between">
+                            <div>
+                                <h6 class="text-uppercase fw-bold mb-1" style="font-size: 0.8rem; opacity: 0.8;">
+                                    Ton. Recibidas Ternium ({{ mes_actual_nombre|default:"Mes Actual" }})
+                                </h6>
+                                <h3 class="mb-0 fw-bold">{{ kpi_recibidas_mes|floatformat:3 }}</h3>
+                            </div>
+                            <div class="bg-white bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                <i class="fas fa-check-circle fa-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="search-card mb-4" style="background-color: #f8f9fa; border: 1px solid #eef2f7; border-radius: 8px; padding: 1.25rem;">
+                <form method="get" action="{% url 'lista_registros_logistica' %}" id="form-filtros-logistica">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Búsqueda General</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white text-muted"><i class="fas fa-search"></i></span>
+                                <input type="text" name="q" id="filtro-q" class="form-control border-start-0 ps-0" 
+                                       placeholder="Remisión o Boleta..." value="{{ filtros.q|default:'' }}">
+                            </div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Fecha Carga (Desde)</label>
+                            <input type="date" name="fecha_inicio" id="filtro-fecha-inicio" class="form-control" value="{{ filtros.fecha_inicio|default:'' }}">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Fecha Carga (Hasta)</label>
+                            <input type="date" name="fecha_fin" id="filtro-fecha-fin" class="form-control" value="{{ filtros.fecha_fin|default:'' }}">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Transportista</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white text-muted"><i class="fas fa-truck"></i></span>
+                                <input type="text" name="transportista" id="filtro-transportista" class="form-control border-start-0 ps-0" 
+                                       placeholder="Buscar nombre..." value="{{ filtros.transportista|default:'' }}">
+                            </div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Material</label>
+                            <select name="material" id="filtro-material" class="form-select">
+                                <option value="">Todos los Materiales</option>
+                                {% for mat in materiales_list %}
+                                    <option value="{{ mat.id }}" {% if filtros.material|add:"0" == mat.id %}selected{% endif %}>{{ mat.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Merma / Discrepancia</label>
+                            <select name="merma" id="filtro-merma" class="form-select">
+                                <option value="">Todas</option>
+                                <option value="SI" {% if filtros.merma == 'SI' %}selected{% endif %}>Con Alerta (>1%)</option>
+                                <option value="NO" {% if filtros.merma == 'NO' %}selected{% endif %}>Sin Alerta (OK)</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label small text-muted">Estatus</label>
+                            <select name="status" id="filtro-status" class="form-select">
+                                <option value="">Todos</option>
+                                <option value="PENDIENTE" {% if filtros.status == 'PENDIENTE' %}selected{% endif %}>Pendiente</option>
+                                <option value="TERMINADO" {% if filtros.status == 'TERMINADO' %}selected{% endif %}>Terminado</option>
+                                <option value="AUDITADO" {% if filtros.status == 'AUDITADO' %}selected{% endif %}>Auditado</option>
+                                <option value="CANCELADO" {% if filtros.status == 'CANCELADO' %}selected{% endif %}>Cancelado</option>
+                                <option value="RECHAZADO" {% if filtros.status == 'RECHAZADO' %}selected{% endif %}>Rechazado</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3 d-flex align-items-end">
+                            <div class="d-grid gap-2 d-md-flex w-100">
+                                <button class="btn btn-primary-gradient flex-grow-1" type="submit" id="btn-filtrar">
+                                    <i class="fas fa-filter me-1"></i> Filtrar
+                                </button>
+                                <a href="{% url 'lista_registros_logistica' %}" class="btn btn-light border" id="btn-limpiar-filtros" title="Limpiar">
+                                    <i class="fas fa-sync-alt"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle" id="tabla-registros-logistica">
+                    <thead class="table-primary">
+                        <tr>
+                            <th class="ps-4" width="5%">ID</th>
+                            <th>Remisión</th>
+                            <th>Fecha</th>
+                            <th>Transportista</th>
+                            <th>Material</th>
+                            <th>Comentario</th>
+                            <th>Merma (Dif)</th> 
+                            <th>Estatus</th>
+                            <th>Docs</th>
+                            <th class="text-end pe-4" style="min-width: 160px;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for registro in registros %}
+                        <tr class="table-row" id="registro-{{ registro.pk }}">
+                            <td class="ps-4 fw-bold text-muted">
+                                #{{ registro.pk }}
+                            </td>
+                            <td>
+                                <div class="fw-bold text-primary">{{ registro.remision }}</div>
+                                <small class="text-muted">Bol: {{ registro.boleta_bascula }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark">
+                                    {{ registro.fecha_carga|date:"d/m/Y" }}
+                                </span>
+                            </td>
+                            <td>{{ registro.transportista.nombre|default:"N/A" }}</td>
+                            <td>{{ registro.material.nombre|truncatechars:15|default:"-" }}</td>
+                            
+                            <td>
+                                <small class="text-muted fst-italic">
+                                    {{ registro.comentario|truncatechars:30|default:"-" }}
+                                </small>
+                            </td>
+
+                            <td>
+                                {% if registro.merma_absoluta is not None %}
+                                    {% with pct=registro.merma_porcentaje|default:0 %}
+                                        
+                                        {% if pct < 0 %}
+                                            <span class="badge badge-soft-danger text-danger border border-danger">
+                                                {% if pct < -1.0 %}
+                                                    <i class="fas fa-exclamation-triangle me-1"></i>
+                                                {% else %}
+                                                    <i class="fas fa-arrow-down me-1"></i>
+                                                {% endif %}
+                                                {{ registro.merma_absoluta|floatformat:3 }} Ton ({{ pct|floatformat:2 }}%)
+                                            </span>
+                                            
+                                        {% elif pct > 0 %}
+                                            <span class="badge badge-soft-success text-success border border-success">
+                                                <i class="fas fa-arrow-up me-1"></i>
+                                                +{{ registro.merma_absoluta|floatformat:3 }} Ton (+{{ pct|floatformat:2 }}%)
+                                            </span>
+                                            
+                                        {% else %}
+                                            <span class="badge bg-light text-muted border">-</span>
+                                        {% endif %}
+                                        
+                                    {% endwith %}
+                                {% else %}
+                                    <span class="text-muted small">-</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if registro.status == 'PENDIENTE' %}
+                                    <span class="badge bg-warning text-dark" id="status-{{ registro.pk }}">{{ registro.get_status_display }}</span>
+                                {% elif registro.status == 'TERMINADO' %}
+                                    <span class="badge bg-info" id="status-{{ registro.pk }}">{{ registro.get_status_display }}</span>
+                                {% elif registro.status == 'AUDITADO' %}
+                                    <span class="badge bg-success" id="status-{{ registro.pk }}">{{ registro.get_status_display }}</span>
+                                {% elif registro.status == 'CANCELADO' %}
+                                    <span class="badge bg-danger" id="status-{{ registro.pk }}"><i class="fas fa-ban me-1"></i> Cancelado</span>
+                                
+                                {# --- NUEVO ESTATUS RECHAZADO --- #}
+                                {% elif registro.status == 'RECHAZADO' %}
+                                    <span class="badge bg-white text-danger border border-danger border-2 fw-bold" id="status-{{ registro.pk }}">
+                                        <i class="fas fa-times-circle me-1"></i> RECHAZADO
+                                    </span>
+                                {% endif %}
+                            </td>
+                            
+                            <td>
+                                {% if registro.documentos_completos %}
+                                    <i class="fas fa-check-circle text-success" title="Documentos Completos"></i>
+                                {% else %}
+                                    <i class="fas fa-exclamation-circle text-warning" title="Documentos Incompletos"></i>
+                                {% endif %}
+                            </td>
+                            
+                            <td class="text-end pe-4">
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a href="{% url 'detalle_registro_logistica' registro.pk %}" 
+                                       class="btn btn-outline-primary" id="btn-ver-{{ registro.pk }}" title="Ver Detalles">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    
+                                    <a href="{% url 'descargar_paquete_zip' registro.pk %}" 
+                                       class="btn btn-outline-info" id="btn-zip-{{ registro.pk }}" title="Descargar ZIP">
+                                        <i class="fas fa-file-archive"></i>
+                                    </a>
+
+                                    {% if registro.status != 'AUDITADO' and registro.status != 'CANCELADO' %}
+                                        
+                                        {% if registro.status == 'RECHAZADO' %}
+                                            <button type="button" class="btn btn-outline-success" 
+                                                    onclick="restablecerRegistro('{{ registro.pk }}', '{{ registro.remision }}')"
+                                                    title="Restablecer (Volver a Pendiente)">
+                                                <i class="fas fa-recycle"></i>
+                                            </button>
+                                        {% else %}
+                                            <a href="{% url 'editar_registro_logistica' registro.pk %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}" 
+                                               class="btn btn-outline-warning" id="btn-editar-{{ registro.pk }}" title="Editar">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+
+                                            <button type="button" class="btn btn-outline-danger" 
+                                                    onclick="abrirModalDecision('{{ registro.pk }}', '{{ registro.remision }}')" 
+                                                    title="Cancelar o Rechazar">
+                                                <i class="fas fa-ban"></i>
+                                            </button>
+                                        {% endif %}
+
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="10" class="text-center py-5"> 
+                                <div class="empty-state">
+                                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                    <h5 class="text-muted">No se encontraron registros</h5>
+                                    <p class="text-muted">Intente ajustar sus criterios de búsqueda</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if is_paginated %}
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Anterior">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <a class="page-link" href="#">{{ num }}</a>
+                        </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Siguiente">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+                <div class="text-center text-muted mt-2">
+                    Mostrando página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                </div>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="exportModal" tabindex="-1" aria-labelledby="exportModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title" id="exportModalLabel"><i class="fas fa-file-excel me-2"></i>Opciones de Exportación</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body bg-light">
+        <div class="row g-4">
+            
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm hover-shadow">
+                    <div class="card-body text-center">
+                        <div class="text-primary mb-3">
+                            <i class="fas fa-calendar-alt fa-3x"></i>
+                        </div>
+                        <h6 class="card-title fw-bold">1. Totales Mensuales</h6>
+                        <p class="card-text small text-muted">
+                            Suma de toneladas Remisionadas y Recibidas agrupadas por mes.
+                        </p>
+                        <hr>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Seleccione Año:</label>
+                            <input type="number" id="yearOption1" class="form-control text-center" value="{% now 'Y' %}" min="2020" max="2030">
+                        </div>
+                        <button class="btn btn-outline-primary w-100" onclick="descargarReporteMensual()">
+                            <i class="fas fa-download me-1"></i> Descargar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm hover-shadow">
+                    <div class="card-body text-center">
+                        <div class="text-warning mb-3">
+                            <i class="fas fa-layer-group fa-3x"></i>
+                        </div>
+                        <h6 class="card-title fw-bold">2. Reportes Detallados</h6>
+                        <p class="card-text small text-muted">
+                            Matriz Jerárquica por Mes.
+                        </p>
+                        <hr>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Seleccione Año:</label>
+                            <input type="number" id="yearOption2" class="form-control text-center" value="{% now 'Y' %}" min="2020" max="2030">
+                        </div>
+                        
+                        <button class="btn btn-outline-success text-dark w-100 mb-2" onclick="descargarReporteProveedor()">
+                            <i class="fas fa-truck me-1"></i> Por Proveedor
+                        </button>
+                        
+                        <button class="btn btn-outline-warning text-dark w-100" onclick="descargarReporteMaterial()">
+                            <i class="fas fa-cubes me-1"></i> Por Material
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm hover-shadow">
+                    <div class="card-body text-center">
+                        <div class="text-secondary mb-3">
+                            <i class="fas fa-database fa-3x"></i>
+                        </div>
+                        <h6 class="card-title fw-bold">3. Base de Datos</h6>
+                        <p class="card-text small text-muted">
+                            Exporta el listado actual respetando los filtros aplicados en pantalla.
+                        </p>
+                        <hr>
+                        <div class="alert alert-warning py-1 px-2 mb-3" style="font-size: 0.75rem;">
+                            <i class="fas fa-exclamation-triangle"></i> Atención: Esto descargará registro por registro.
+                        </div>
+                        <button class="btn btn-outline-secondary w-100" onclick="descargarBaseDatos()">
+                            <i class="fas fa-download me-1"></i> Descargar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-12">
+                <div class="card h-100 border-0 shadow-sm hover-shadow" style="background: #fdfdfe; border: 1px solid #d1d5db;">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="text-info me-3">
+                                <i class="fas fa-balance-scale fa-3x"></i>
+                            </div>
+                            <div class="flex-grow-1 text-start">
+                                <h6 class="card-title fw-bold mb-1">4. Balanza de Pesos (Entradas vs Salidas)</h6>
+                                <p class="card-text small text-muted mb-0">
+                                    Comparativo detallado: <strong>Peso Ternium vs Peso 3R</strong>.
+                                    <br>Incluye Toneladas Ingresadas y Toneladas de Salida en un solo reporte.
+                                </p>
+                            </div>
+                            <div class="ms-3 text-end" style="min-width: 150px;">
+                                <label class="form-label small fw-bold mb-1">Año:</label>
+                                <div class="input-group">
+                                    <input type="number" id="yearOption4" class="form-control form-control-sm text-center" value="{% now 'Y' %}">
+                                    <button class="btn btn-info btn-sm text-white" onclick="descargarBalanzaPesos()">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="decisionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Acción Requerida</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center p-4">
+        <h5 class="mb-3">¿Qué acción desea realizar sobre la remisión <span id="span-remision-id" class="fw-bold"></span>?</h5>
+        <p class="text-muted mb-4">Seleccione una opción:</p>
+        
+        <div class="d-grid gap-3">
+            <button onclick="ejecutarAccion('rechazar')" class="btn btn-outline-danger btn-lg p-3">
+                <div class="d-flex align-items-center justify-content-center">
+                    <i class="fas fa-times-circle fa-2x me-3"></i> 
+                    <div class="text-start">
+                        <div class="fw-bold">RECHAZAR</div>
+                        <div class="small text-muted" style="font-size: 0.75rem;">El material no fue aceptado (Marcar en Rojo). <br><strong>Se puede restablecer después.</strong></div>
+                    </div>
+                </div>
+            </button>
+
+            <button onclick="ejecutarAccion('cancelar')" class="btn btn-outline-dark btn-lg p-3">
+                <div class="d-flex align-items-center justify-content-center">
+                    <i class="fas fa-ban fa-2x me-3"></i>
+                    <div class="text-start">
+                        <div class="fw-bold">CANCELAR</div>
+                        <div class="small text-muted" style="font-size: 0.75rem;">Error de captura o registro duplicado. <br><strong>No se puede deshacer fácilmente.</strong></div>
+                    </div>
+                </div>
+            </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<form id="form-dinamico-accion" method="POST" style="display: none;">
+    {% csrf_token %}
+</form>
+
+{% endblock content %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --primary-color: #0056b3;
+    --secondary-color: #6c757d;
+    --accent-color: #17a2b8;
+    --light-bg: #f8f9fa;
+  }
+  
+  /* Modal Overlay Fix */
+  .modal-backdrop { z-index: 1050; }
+  .modal { z-index: 1060; }
+
+  .card { border-radius: 12px; overflow: hidden; border: none; }
+  .card-header { border-bottom: none; }
+  .bg-gradient-primary { background: linear-gradient(135deg, #0056b3 0%, #003366 100%); }
+  
+  .btn-primary-gradient {
+    background: linear-gradient(135deg, #0056b3 0%, #17a2b8 100%);
+    border: none;
+    box-shadow: 0 2px 5px rgba(0, 86, 179, 0.3);
+    transition: all 0.3s ease;
+  }
+  
+  .btn-primary-gradient:hover {
+    background: linear-gradient(135deg, #004494 0%, #138496 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 86, 179, 0.3);
+  }
+  
+  .search-card {
+    background-color: white;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    margin-bottom: 20px;
+  }
+  
+  .table-primary { background-color: #f5f9ff; }
+  
+  .table-primary th {
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+    color: var(--primary-color);
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+  }
+  
+  .table-row { transition: all 0.2s ease; }
+  .table-row:hover { background-color: #f8fafc; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); }
+  
+  .empty-state { padding: 30px; background-color: #f8f9fa; border-radius: 10px; }
+  .badge.rounded-pill { padding: 5px 10px; font-weight: 500; }
+
+  .badge-soft-danger { background-color: rgba(220, 53, 69, 0.1); color: #dc3545; }
+  .badge-soft-success { background-color: rgba(25, 135, 84, 0.1); color: #198754; }
+  
+  .btn-group .btn { border-radius: 6px !important; margin-right: 5px; }
+  .btn-group .btn:last-child { margin-right: 0; }
+  
+  .btn-outline-info { color: #17a2b8; border-color: #17a2b8; }
+  .btn-outline-info:hover { background-color: #17a2b8; color: white; }
+  
+  .btn-outline-warning { color: #ffc107; border-color: #ffc107; }
+  .btn-outline-warning:hover { background-color: #ffc107; color: #212529; }
+  
+  .btn-outline-success { color: #28a745; border-color: #28a745; }
+  .btn-outline-success:hover { background-color: #28a745; color: white; }
+  
+  .btn-outline-dark { color: #343a40; border-color: #343a40; }
+  .btn-outline-dark:hover { background-color: #343a40; color: white; }
+  
+  .page-item.active .page-link { background-color: var(--primary-color); border-color: var(--primary-color); }
+  .page-link { color: var(--primary-color); }
+  
+  .hover-shadow { transition: box-shadow 0.3s ease-in-out; }
+  .hover-shadow:hover { box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important; }
+
+  @media (max-width: 768px) {
+    .search-card { padding: 10px; }
+    .table-responsive { border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden; }
+  }
+</style>
+{% endblock extra_css %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // -------------------------------------------------------------
+    // SOLUCIÓN: MOVER MODAL AL BODY PARA EVITAR QUE SE BLOQUEE
+    // -------------------------------------------------------------
+    var exportModalEl = document.getElementById('exportModal');
+    var decisionModalEl = document.getElementById('decisionModal');
+    if (exportModalEl) {
+        document.body.appendChild(exportModalEl);
+    }
+    if (decisionModalEl) {
+        document.body.appendChild(decisionModalEl);
+    }
+    // -------------------------------------------------------------
+
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+
+let currentId = null;
+
+function abrirModalDecision(id, remision) {
+    currentId = id;
+    document.getElementById('span-remision-id').innerText = remision;
+    var myModal = new bootstrap.Modal(document.getElementById('decisionModal'));
+    myModal.show();
+}
+
+function ejecutarAccion(tipo) {
+    let url = "";
+    
+    if (tipo === 'cancelar') {
+        if(!confirm("¿CONFIRMAR CANCELACIÓN?\nEl registro se bloqueará y no podrá editarse.")) return;
+        url = "{% url 'cancelar_registro_logistica' pk=0 %}".replace('0', currentId);
+    } else if (tipo === 'rechazar') {
+        // No pedimos confirmación extra porque el modal ya es explícito
+        url = "{% url 'rechazar_registro_logistica' pk=0 %}".replace('0', currentId);
+    }
+
+    const form = document.getElementById('form-dinamico-accion');
+    form.action = url;
+    form.submit();
+}
+
+function restablecerRegistro(id, remision) {
+    if(confirm("¿Desea RESTABLECER el registro " + remision + "?\nPasará a estatus 'Pendiente' y podrá ser editado nuevamente.")) {
+        const form = document.getElementById('form-dinamico-accion');
+        form.action = "{% url 'restablecer_registro_logistica' pk=0 %}".replace('0', id);
+        form.submit();
+    }
+}
+
+// --- SCRIPTS PARA LAS DESCARGAS ---
+
+function descargarReporteMensual() {
+    const year = document.getElementById('yearOption1').value;
+    if (!year) { alert("Por favor ingrese un año válido."); return; }
+    window.location.href = `{% url 'export_logistica_mensual' %}?year=${year}`;
+}
+
+// 1. REPORTE POR PROVEEDOR
+function descargarReporteProveedor() {
+    const year = document.getElementById('yearOption2').value;
+    if (!year) { alert("Por favor ingrese un año válido."); return; }
+    window.location.href = `{% url 'export_logistica_proveedor' %}?year=${year}`;
+}
+
+// 2. REPORTE POR MATERIAL
+function descargarReporteMaterial() {
+    const year = document.getElementById('yearOption2').value;
+    if (!year) { alert("Por favor ingrese un año válido."); return; }
+    window.location.href = `{% url 'export_logistica_material' %}?year=${year}`;
+}
+
+function descargarBaseDatos() {
+    // Obtener los parámetros actuales de la URL (filtros aplicados)
+    const currentParams = window.location.search;
+    const baseUrl = "{% url 'export_logistica_excel' %}";
+    
+    // Construir URL final
+    const finalUrl = baseUrl + currentParams;
+    
+    // Confirmación visual
+    if(confirm("Se descargará la base de datos con los filtros actuales. ¿Continuar?")) {
+        window.location.href = finalUrl;
+    }
+}
+
+// 4. BALANZA DE PESOS (NUEVO)
+function descargarBalanzaPesos() {
+    const year = document.getElementById('yearOption4').value;
+    if (!year) { alert("Por favor ingrese un año válido."); return; }
+    
+    const url = `{% url 'export_balanza_pesos' %}?year=${year}`;
+    window.location.href = url;
+}
+</script>
+{% endblock extra_js %}

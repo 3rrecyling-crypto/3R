@@ -1,0 +1,39 @@
+{% extends 'ternium/base.html' %}
+
+{% block title %}Confirmar Eliminación{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-lg border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Confirmar Eliminación</h4>
+                </div>
+                <div class="card-body">
+                    <p class="fs-5">¿Estás seguro de que deseas eliminar permanentemente la entrada con remito <strong>#{{ entrada.c_id_remito }}</strong>?</p>
+                    <p class="text-muted">Esta acción no se puede deshacer. Se borrarán todos los datos y documentos asociados a esta entrada.</p>
+                    
+                    <div class="alert alert-warning">
+                        <strong>Remito:</strong> {{ entrada.c_id_remito }}<br>
+                        <strong>Fecha:</strong> {{ entrada.fecha_ingreso|date:"d/m/Y" }}<br>
+                        <strong>Peso Neto:</strong> {{ entrada.peso_neto|floatformat:3 }} Ton
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'detalle_entrada' pk=entrada.pk %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-2"></i>Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash-alt me-2"></i>Sí, eliminar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

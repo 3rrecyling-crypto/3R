@@ -1,0 +1,770 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+
+{% block title %}Cuentas por Pagar{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <div class="d-flex align-items-center mb-2">
+                <i class="fas fa-money-bill-wave text-primary me-3 fs-4"></i>
+                <h1 class="h2 fw-bold text-gray-800 mb-0">Cuentas por Pagar</h1>
+            </div>
+            <p class="text-muted mb-0">Gestión de facturas y pagos pendientes</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-white border shadow-sm text-muted fw-medium" type="button" data-bs-toggle="collapse" data-bs-target="#filtrosAvanzados">
+                <i class="fas fa-sliders-h me-2"></i>Filtros
+            </button>
+            
+            <a href="{% url 'dashboard_cuentas_por_pagar' %}" class="btn btn-white border shadow-sm text-info fw-medium">
+                <i class="fas fa-chart-bar me-2"></i>Dashboard
+            </a>
+            
+            <a href="{% url 'exportar_facturas_excel' %}" class="btn btn-white border shadow-sm text-success fw-medium">
+                <i class="fas fa-file-excel me-2"></i>Exportar
+            </a>
+            
+            <a href="{% url 'nueva_cuenta_por_pagar' %}" class="btn btn-primary shadow-sm fw-medium">
+                <i class="fas fa-plus me-2"></i>Nueva Factura
+            </a>
+        </div>
+    </div>
+
+    <div class="collapse mb-4" id="filtrosAvanzados">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label small text-muted mb-1">Búsqueda General</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-light border-end-0 text-muted"><i class="fas fa-search"></i></span>
+                            <input type="text" name="q" class="form-control bg-light border-start-0" 
+                                   placeholder="Buscar por Proveedor, Folio..." value="{{ request.GET.q }}">
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-2">
+                        <label class="form-label small text-muted mb-1">Estatus</label>
+                        <select name="estatus" class="form-select form-select-sm">
+                            <option value="">Todos</option>
+                            {% for value, label in estatus_choices %}
+                            <option value="{{ value }}" {% if request.GET.estatus == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-2">
+                        <label class="form-label small text-muted mb-1">Proveedor (Lista)</label>
+                        <select name="proveedor" class="form-select form-select-sm">
+                            <option value="">Todos</option>
+                            {% for proveedor in proveedores %}
+                            <option value="{{ proveedor.id }}" {% if request.GET.proveedor == proveedor.id|stringformat:"i" %}selected{% endif %}>
+                                {{ proveedor.razon_social|truncatechars:20 }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-2">
+                        <label class="form-label small text-muted mb-1">Fecha Desde</label>
+                        <input type="date" name="fecha_desde" class="form-control form-control-sm" 
+                               value="{{ request.GET.fecha_desde }}">
+                    </div>
+                    
+                    <div class="col-md-2">
+                        <label class="form-label small text-muted mb-1">Fecha Hasta</label>
+                        <input type="date" name="fecha_hasta" class="form-control form-control-sm" 
+                               value="{{ request.GET.fecha_hasta }}">
+                    </div>
+                    
+                    <div class="col-md-1 d-flex align-items-end">
+                        <button type="submit" class="btn btn-sm btn-dark w-100">Filtrar</button>
+                    </div>
+                    
+                    {% if request.GET.q or request.GET.estatus or request.GET.proveedor or request.GET.fecha_desde %}
+                    <div class="col-12 mt-2">
+                        <a href="{% url 'lista_facturas' %}" class="btn btn-sm btn-link text-muted text-decoration-none">
+                            <i class="fas fa-times me-1"></i>Limpiar todos los filtros
+                        </a>
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100 overflow-hidden hover-lift">
+                <div class="card-body position-relative">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="avatar-sm bg-light-primary rounded-circle d-flex align-items-center justify-content-center">
+                            <i class="fas fa-file-invoice text-primary fs-5"></i>
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-link text-muted p-0 border-0" type="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item small" href="{% url 'lista_facturas' %}?estatus=PENDIENTE">Ver pendientes</a></li>
+                                <li><a class="dropdown-item small" href="{% url 'lista_facturas' %}?estatus=PAGADA">Ver pagadas</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <h3 class="fw-bold mb-1">{{ total_facturas_count|default:0|intcomma }}</h3>
+                    <p class="text-muted small mb-0">Facturas registradas</p>
+                    {% if facturas_filtradas_count != total_facturas_count %}
+                    <small class="text-muted">
+                        <i class="fas fa-filter me-1"></i>{{ facturas_filtradas_count|default:0 }} filtradas
+                    </small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100 hover-lift">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="avatar-sm bg-light-warning rounded-circle d-flex align-items-center justify-content-center">
+                            <i class="fas fa-clock text-warning fs-5"></i>
+                        </div>
+                        <span class="badge bg-warning bg-opacity-25 text-warning">Prioridad</span>
+                    </div>
+                    <h3 class="fw-bold mb-1">{{ facturas_por_vencer_count|default:0 }}</h3>
+                    <p class="text-muted small mb-0">Por vencer</p>
+                    <small class="text-warning">
+                        {% if facturas_por_vencer_count > 0 %}
+                        <i class="fas fa-exclamation-triangle me-1"></i>Requieren atención
+                        {% else %}
+                        <i class="fas fa-check-circle me-1"></i>Al día
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100 hover-lift">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="avatar-sm bg-light-danger rounded-circle d-flex align-items-center justify-content-center">
+                            <i class="fas fa-exclamation-circle text-danger fs-5"></i>
+                        </div>
+                        <span class="badge bg-danger bg-opacity-25 text-danger">Crítico</span>
+                    </div>
+                    <h3 class="fw-bold mb-1">{{ facturas_vencidas_count|default:0 }}</h3>
+                    <p class="text-muted small mb-0">Vencidas</p>
+                    <small class="text-danger">
+                        {% if facturas_vencidas_count > 0 %}
+                        <i class="fas fa-bell me-1"></i>Urgente revisión
+                        {% else %}
+                        <i class="fas fa-check-circle me-1"></i>Sin vencidas
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-0 shadow-sm h-100 bg-gradient-primary text-white hover-lift">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="avatar-sm bg-white bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center">
+                            <i class="fas fa-wallet text-white fs-5"></i>
+                        </div>
+                        <span class="badge bg-white bg-opacity-25 text-white">Deuda Total</span>
+                    </div>
+                    <h3 class="fw-bold mb-1">${{ total_deuda_general|floatformat:2|intcomma }}</h3>
+                    <p class="text-white text-opacity-75 small mb-0">Pendiente de pago</p>
+                    {% if total_deuda_general > 0 %}
+                    <small class="text-white text-opacity-90">
+                        <i class="fas fa-chart-line me-1"></i>{{ porcentaje_deuda_pagada|default:"0" }}% pagado
+                    </small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if request.GET.q or request.GET.estatus or request.GET.proveedor %}
+    <div class="alert alert-light border-0 shadow-sm mb-3 py-2">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <i class="fas fa-filter text-primary me-2"></i>
+                <small class="text-muted">Filtros activos:</small>
+                {% if request.GET.q %}
+                <span class="badge bg-light text-dark border mx-1">Búsqueda: "{{ request.GET.q }}"</span>
+                {% endif %}
+                {% if request.GET.estatus %}
+                <span class="badge bg-light text-dark border mx-1">Estatus: {{ request.GET.estatus }}</span>
+                {% endif %}
+                {% if request.GET.proveedor %}
+                <span class="badge bg-light text-dark border mx-1">Proveedor: {{ proveedor_seleccionado.razon_social }}</span>
+                {% endif %}
+            </div>
+            <a href="{% url 'lista_facturas' %}" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-times me-1"></i>Limpiar
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3 border-bottom border-light">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-0 fw-semibold">Lista de Facturas</h6>
+                    <small class="text-muted">{{ paginator.count|default:0 }} registros encontrados</small>
+                </div>
+                <div class="d-flex gap-2">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary active" id="btnVistaTabla">
+                            <i class="fas fa-table"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="btnVistaTarjetas">
+                            <i class="fas fa-th-large"></i>
+                        </button>
+                    </div>
+                    
+                    <select class="form-select form-select-sm w-auto" id="ordenarPor">
+                        <option value="folio_desc">Ordenar por: Folio Interno (Reciente)</option>
+                        <option value="folio_asc">Folio Interno (Antiguo)</option>
+                        <option value="vencimiento_asc">Vencimiento (Próximo)</option>
+                        <option value="vencimiento_desc">Vencimiento (Lejano)</option>
+                        <option value="monto_desc">Monto (Mayor a menor)</option>
+                        <option value="monto_asc">Monto (Menor a mayor)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="table-responsive" id="vistaTabla">
+            <table class="table table-hover align-middle mb-0" id="facturasTable">
+                <thead class="bg-light text-muted text-uppercase small">
+                    <tr>
+                        <th class="ps-4 border-0" style="font-weight: 600; width: 25%;">Folio / Proveedor</th>
+                        <th class="border-0" style="font-weight: 600; width: 20%;">Fechas</th>
+                        <th class="border-0" style="font-weight: 600; width: 15%;">Origen</th>
+                        <th class="border-0 text-end" style="font-weight: 600; width: 15%;">Monto</th>
+                        <th class="border-0 text-center" style="font-weight: 600; width: 15%;">Estatus</th>
+                        <th class="border-0 text-end pe-4" style="font-weight: 600; width: 10%;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="border-top-0">
+                    {% for factura in facturas %}
+                    <tr class="position-relative {% if factura.esta_vencida %}table-danger-light{% elif factura.esta_por_vencer %}table-warning-light{% endif %}">
+                        <td class="ps-4 py-3">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-initial rounded-circle me-3 d-flex align-items-center justify-content-center 
+                                            {% if factura.esta_vencida %}bg-danger text-white
+                                            {% elif factura.esta_por_vencer %}bg-warning text-dark
+                                            {% else %}bg-light-primary text-primary{% endif %}" 
+                                     style="width: 40px; height: 40px; font-size: 0.9rem;">
+                                    {{ factura.orden_compra.proveedor.razon_social|slice:":2"|upper|default:factura.proveedor.razon_social|slice:":2"|upper|default:"P" }}
+                                </div>
+                                
+                                <div class="flex-grow-1" style="min-width: 0;">
+                                    <div class="d-flex align-items-center mb-1">
+                                        <a href="{% url 'detalle_factura' factura.pk %}" class="text-dark fw-bold text-decoration-none stretched-link me-2">
+                                            {{ factura.numero_factura }}
+                                        </a>
+                                        <span class="badge bg-light text-muted border" style="font-size: 0.65rem;">
+                                            {{ factura.folio_cxp }}
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="small text-muted text-truncate mb-1">
+                                        <i class="fas fa-truck me-1"></i>
+                                        {{ factura.orden_compra.proveedor.razon_social|default:factura.proveedor.razon_social }}
+                                    </div>
+                                    
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% if factura.es_pago_plazos %}
+                                        <span class="badge bg-light text-info border border-info px-2 py-1" style="font-size: 0.7rem;">
+                                            <i class="fas fa-layer-group me-1"></i>{{ factura.cantidad_plazos }} Plazos
+                                        </span>
+                                        {% endif %}
+                                        
+                                        {% if factura.archivo_factura %}
+                                        <span class="badge bg-light-success text-success border border-success px-2 py-1" style="font-size: 0.7rem;">
+                                            <i class="fas fa-paperclip me-1"></i>PDF
+                                        </span>
+                                        {% endif %}
+                                        
+                                        {% if factura.orden_compra and factura.orden_compra.factura_subida %}
+                                        <span class="badge bg-light-primary text-primary border border-primary px-2 py-1" style="font-size: 0.7rem;">
+                                            <i class="fas fa-sync-alt me-1"></i>Sincronizada
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="d-flex flex-column">
+                                <div class="mb-2">
+                                    <span class="small text-dark d-block">
+                                        <i class="far fa-calendar-alt text-muted me-1"></i>
+                                        <strong>Vence:</strong> {{ factura.fecha_vencimiento|date:"d M, Y" }}
+                                    </span>
+                                    <span class="small text-muted">
+                                        <i class="far fa-calendar me-1"></i>
+                                        Emisión: {{ factura.fecha_emision|date:"d/m/Y" }}
+                                    </span>
+                                </div>
+                                
+                                {% if factura.dias_restantes_credito < 0 and not factura.pagada %}
+                                <div class="d-flex align-items-center mt-1">
+                                    <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill d-flex align-items-center" style="font-size: 0.75em;">
+                                        <i class="fas fa-exclamation-circle me-1"></i>
+                                        Vencida hace {{ factura.dias_restantes_credito|stringformat:"d"|slice:"1:" }} días
+                                    </span>
+                                </div>
+                                {% elif factura.esta_por_vencer %}
+                                <div class="d-flex align-items-center mt-1">
+                                    <span class="badge bg-warning bg-opacity-10 text-warning rounded-pill d-flex align-items-center" style="font-size: 0.75em;">
+                                        <i class="fas fa-clock me-1"></i>
+                                        Vence en {{ factura.dias_restantes_credito }} días
+                                    </span>
+                                </div>
+                                {% elif factura.dias_restantes_credito > 30 and not factura.pagada %}
+                                <div class="d-flex align-items-center mt-1">
+                                    <span class="badge bg-success bg-opacity-10 text-success rounded-pill d-flex align-items-center" style="font-size: 0.75em;">
+                                        <i class="fas fa-check-circle me-1"></i>
+                                        {{ factura.dias_restantes_credito }} días restantes
+                                    </span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <td>
+                            {% if factura.orden_compra %}
+                                <div class="d-flex flex-column">
+                                    <a href="#" class="text-decoration-none">
+                                        <span class="badge bg-light text-dark border mb-1">
+                                            <i class="fas fa-shopping-cart me-1"></i>
+                                            {{ factura.orden_compra.folio }}
+                                        </span>
+                                    </a>
+                                    <small class="text-muted">
+                                        {% if factura.orden_compra.empresa %}
+                                        <i class="fas fa-building me-1"></i>{{ factura.orden_compra.empresa.nombre|truncatechars:15 }}
+                                        {% else %}
+                                        <i class="fas fa-building text-muted me-1"></i>Sin empresa
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            {% else %}
+                                <div class="d-flex flex-column">
+                                    <span class="badge bg-light text-secondary border mb-1">
+                                        <i class="fas fa-user-edit me-1"></i>Manual
+                                    </span>
+                                    <small class="text-muted">
+                                        <i class="fas fa-calendar-plus me-1"></i>
+                                        {{ factura.creado_en|date:"d/m/Y" }}
+                                    </small>
+                                </div>
+                            {% endif %}
+                        </td>
+
+                        <td class="text-end">
+                            <div class="fw-bold text-dark mb-1">${{ factura.monto|floatformat:2|intcomma }}</div>
+                            
+                            {% if factura.monto_pendiente > 0 %}
+                            <div class="progress mb-1" style="height: 4px;">
+                                <div class="progress-bar {% if factura.porcentaje_pagado == 100 %}bg-success
+                                                          {% elif factura.porcentaje_pagado > 50 %}bg-warning
+                                                          {% else %}bg-danger{% endif %}" 
+                                     role="progressbar" 
+                                     style="width: {{ factura.porcentaje_pagado }}%;">
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-danger fw-semibold">
+                                    Pend: ${{ factura.monto_pendiente|floatformat:2|intcomma }}
+                                </small>
+                                <small class="text-muted">{{ factura.porcentaje_pagado|floatformat:0 }}%</small>
+                            </div>
+                            {% else %}
+                            <div class="d-flex align-items-center justify-content-end">
+                                <small class="text-success">
+                                    <i class="fas fa-check-circle me-1"></i>Pagado al 100%
+                                </small>
+                            </div>
+                            {% endif %}
+                        </td>
+
+                        <td class="text-center">
+                            {% if factura.estatus == 'PAGADA' %}
+                            <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill">
+                                <i class="fas fa-check-circle me-1"></i>Pagada
+                            </span>
+                            {% elif factura.estatus == 'VENCIDA' %}
+                            <span class="badge bg-danger bg-opacity-10 text-danger px-3 py-2 rounded-pill">
+                                <i class="fas fa-exclamation-circle me-1"></i>Vencida
+                            </span>
+                            {% elif factura.estatus == 'POR_VENCER' %}
+                            <span class="badge bg-warning bg-opacity-10 text-warning px-3 py-2 rounded-pill">
+                                <i class="fas fa-clock me-1"></i>Por Vencer
+                            </span>
+                            {% else %}
+                            <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill">
+                                <i class="fas fa-clock me-1"></i>Pendiente
+                            </span>
+                            {% endif %}
+                            
+                            <div class="mt-1">
+                                <small class="text-muted">
+                                    {% if factura.pagos.exists %}
+                                    <i class="fas fa-receipt me-1"></i>{{ factura.pagos.count }} pago{{ factura.pagos.count|pluralize }}
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </td>
+
+                        <td class="text-end pe-4">
+                            <div class="dropdown position-static">
+                                <button class="btn btn-sm btn-link text-muted no-arrow dropdown-toggle" 
+                                        type="button" 
+                                        data-bs-toggle="dropdown" 
+                                        aria-expanded="false">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                                    <li><h6 class="dropdown-header text-uppercase small">Acciones Rápidas</h6></li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'detalle_factura' factura.pk %}">
+                                            <i class="fas fa-eye text-primary me-2 w-20"></i>Ver detalle
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'editar_factura' factura.pk %}">
+                                            <i class="fas fa-edit text-warning me-2 w-20"></i>Editar factura
+                                        </a>
+                                    </li>
+                                    
+                                    {% if factura.es_pago_plazos %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'gestionar_plazos_factura' factura.pk %}">
+                                            <i class="fas fa-layer-group text-info me-2 w-20"></i>Gestionar Plazos
+                                        </a>
+                                    </li>
+                                    {% else %}
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'crear_pago' %}?factura={{ factura.pk }}">
+                                            <i class="fas fa-dollar-sign text-success me-2 w-20"></i>Registrar Pago
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    
+                                    {% if factura.archivo_factura %}
+                                    <li>
+                                        <a class="dropdown-item" href="{{ factura.archivo_factura.url }}" target="_blank">
+                                            <i class="fas fa-file-pdf text-danger me-2 w-20"></i>Ver PDF
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item text-danger" href="{% url 'eliminar_factura' factura.pk %}">
+                                            <i class="fas fa-trash-alt me-2 w-20"></i>Eliminar
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5">
+                            <div class="py-5">
+                                <img src="https://cdn-icons-png.flaticon.com/512/7486/7486747.png" alt="Empty" style="width: 80px; opacity: 0.5;">
+                                <h5 class="text-muted mt-3 mb-2">No se encontraron facturas</h5>
+                                <p class="small text-muted mb-4">
+                                    {% if request.GET.q or request.GET.estatus %}
+                                    Intenta ajustar los filtros de búsqueda
+                                    {% else %}
+                                    Crea tu primera factura haciendo clic en "Nueva Factura"
+                                    {% endif %}
+                                </p>
+                                {% if not request.GET.q and not request.GET.estatus %}
+                                <a href="{% url 'nueva_cuenta_por_pagar' %}" class="btn btn-primary">
+                                    <i class="fas fa-plus me-2"></i>Crear Primera Factura
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="d-none p-4" id="vistaTarjetas">
+            <div class="row g-3">
+                {% for factura in facturas %}
+                <div class="col-xl-4 col-lg-6 col-md-12">
+                    <div class="card border-0 shadow-sm h-100 hover-lift">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <span class="badge {% if factura.estatus == 'PAGADA' %}bg-success
+                                                       {% elif factura.estatus == 'VENCIDA' %}bg-danger
+                                                       {% elif factura.estatus == 'POR_VENCER' %}bg-warning
+                                                       {% else %}bg-primary{% endif %} mb-2">
+                                        {{ factura.get_estatus_display }}
+                                    </span>
+                                    <h6 class="mb-1">
+                                        <a href="{% url 'detalle_factura' factura.pk %}" class="text-dark text-decoration-none fw-bold">
+                                            {{ factura.numero_factura }}
+                                        </a>
+                                    </h6>
+                                    <small class="text-muted">{{ factura.folio_cxp }}</small>
+                                </div>
+                                {% if factura.archivo_factura %}
+                                <a href="{{ factura.archivo_factura.url }}" target="_blank" class="badge bg-light-success text-success border border-success" title="Ver PDF">
+                                    <i class="fas fa-paperclip"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                            
+                            <p class="small text-muted mb-3 text-truncate">
+                                <i class="fas fa-truck me-1"></i>
+                                <strong>{{ factura.orden_compra.proveedor.razon_social|default:factura.proveedor.razon_social }}</strong>
+                            </p>
+                            
+                            <div class="row g-2 mb-3 bg-light p-2 rounded">
+                                <div class="col-6">
+                                    <small class="text-muted d-block" style="font-size: 0.75rem;">Emisión</small>
+                                    <span class="fw-semibold text-dark">{{ factura.fecha_emision|date:"d/m/Y" }}</span>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted d-block" style="font-size: 0.75rem;">Vencimiento</small>
+                                    <span class="fw-semibold {% if factura.esta_vencida %}text-danger{% endif %}">
+                                        {{ factura.fecha_vencimiento|date:"d/m/Y" }}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-bold fs-5 text-dark">${{ factura.monto|floatformat:2|intcomma }}</span>
+                                    {% if factura.monto_pendiente > 0 %}
+                                    <span class="text-danger small fw-bold">Pend: ${{ factura.monto_pendiente|floatformat:2|intcomma }}</span>
+                                    {% else %}
+                                    <span class="text-success small"><i class="fas fa-check-circle"></i> Pagado</span>
+                                    {% endif %}
+                                </div>
+                                {% if factura.monto_pendiente > 0 %}
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar {% if factura.porcentaje_pagado == 100 %}bg-success
+                                                             {% elif factura.porcentaje_pagado > 50 %}bg-warning
+                                                             {% else %}bg-danger{% endif %}" 
+                                         style="width: {{ factura.porcentaje_pagado }}%;">
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between mt-1">
+                                    <small class="text-muted" style="font-size: 0.75rem;">{{ factura.porcentaje_pagado|floatformat:0 }}% pagado</small>
+                                    {% if factura.dias_restantes_credito < 0 %}
+                                    <small class="text-danger fw-bold" style="font-size: 0.75rem;">Vencida hace {{ factura.dias_restantes_credito|stringformat:"d"|slice:"1:" }} días</small>
+                                    {% else %}
+                                    <small class="text-muted" style="font-size: 0.75rem;">{{ factura.dias_restantes_credito }} días rest.</small>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                                <div>
+                                    {% if factura.es_pago_plazos %}
+                                    <span class="badge bg-light text-info border border-info" title="Factura a plazos">
+                                        <i class="fas fa-layer-group me-1"></i>{{ factura.cantidad_plazos }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'detalle_factura' factura.pk %}" class="btn btn-outline-primary" title="Ver Detalle">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if factura.es_pago_plazos %}
+                                    <a href="{% url 'gestionar_plazos_factura' factura.pk %}" class="btn btn-outline-info" title="Gestionar Plazos">
+                                        <i class="fas fa-layer-group"></i>
+                                    </a>
+                                    {% else %}
+                                    <a href="{% url 'crear_pago' %}?factura={{ factura.pk }}" class="btn btn-outline-success" title="Registrar Pago">
+                                        <i class="fas fa-dollar-sign"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                 <div class="col-12 text-center py-5">
+                    <img src="https://cdn-icons-png.flaticon.com/512/7486/7486747.png" alt="Empty" style="width: 80px; opacity: 0.5;">
+                    <h5 class="text-muted mt-3">No hay datos para mostrar en tarjetas</h5>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        {% if is_paginated %}
+        <div class="card-footer bg-white border-top border-light py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <small class="text-muted">
+                        Mostrando {{ page_obj.start_index }} - {{ page_obj.end_index }} de {{ paginator.count }} registros
+                    </small>
+                </div>
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center mb-0 pagination-sm">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link border-0 text-muted" href="?page=1{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link border-0 text-muted" href="?page={{ page_obj.previous_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for num in paginator.page_range %}
+                            {% if page_obj.number == num %}
+                            <li class="page-item active"><span class="page-link border-0">{{ num }}</span></li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link border-0 text-muted" href="?page={{ num }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                    {{ num }}
+                                </a>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link border-0 text-muted" href="?page={{ page_obj.next_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link border-0 text-muted" href="?page={{ paginator.num_pages }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                <div>
+                    <small class="text-muted">
+                        Página {{ page_obj.number }} de {{ paginator.num_pages }}
+                    </small>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .bg-gradient-primary { background: linear-gradient(135deg, #4e73df 0%, #224abe 100%); }
+    .bg-light-primary { background-color: rgba(78, 115, 223, 0.1) !important; }
+    .bg-light-warning { background-color: rgba(255, 193, 7, 0.1) !important; }
+    .bg-light-danger { background-color: rgba(220, 53, 69, 0.1) !important; }
+    .bg-light-success { background-color: rgba(40, 167, 69, 0.1) !important; }
+    .avatar-initial { font-family: var(--bs-font-sans-serif); user-select: none; font-weight: 600; }
+    .avatar-sm { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; }
+    .hover-lift { transition: all 0.2s ease; }
+    .hover-lift:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important; }
+    .table-hover tbody tr { transition: all 0.2s ease; cursor: pointer; }
+    .table-hover tbody tr:hover { background-color: rgba(78, 115, 223, 0.03) !important; }
+    .table-danger-light { background-color: rgba(220, 53, 69, 0.03) !important; }
+    .table-warning-light { background-color: rgba(255, 193, 7, 0.03) !important; }
+    .progress { border-radius: 10px; overflow: hidden; }
+    .progress-bar { border-radius: 10px; }
+    .no-arrow::after { display: none !important; }
+    .w-20 { width: 20px; display: inline-block; text-align: center; }
+    .badge.border { border-width: 1px !important; }
+    @media (max-width: 768px) { .btn-group { flex-wrap: wrap; } .table-responsive { font-size: 0.9rem; } }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Toggle entre vista tabla y tarjetas
+        const btnVistaTabla = document.getElementById('btnVistaTabla');
+        const btnVistaTarjetas = document.getElementById('btnVistaTarjetas');
+        const vistaTabla = document.getElementById('vistaTabla');
+        const vistaTarjetas = document.getElementById('vistaTarjetas');
+        
+        if (btnVistaTabla && btnVistaTarjetas) {
+            btnVistaTabla.addEventListener('click', function() {
+                btnVistaTabla.classList.add('active');
+                btnVistaTarjetas.classList.remove('active');
+                vistaTabla.classList.remove('d-none');
+                vistaTarjetas.classList.add('d-none');
+            });
+            
+            btnVistaTarjetas.addEventListener('click', function() {
+                btnVistaTarjetas.classList.add('active');
+                btnVistaTabla.classList.remove('active');
+                vistaTarjetas.classList.remove('d-none');
+                vistaTabla.classList.add('d-none');
+            });
+        }
+        
+        // Ordenamiento
+        const ordenarPor = document.getElementById('ordenarPor');
+        if (ordenarPor) {
+            ordenarPor.addEventListener('change', function() {
+                const url = new URL(window.location.href);
+                url.searchParams.set('ordenar', this.value);
+                window.location.href = url.toString();
+            });
+            
+            // Mantener seleccionado el valor actual
+            const urlParams = new URLSearchParams(window.location.search);
+            const ordenarActual = urlParams.get('ordenar') || 'folio_desc';
+            ordenarPor.value = ordenarActual;
+        }
+        
+        // Highlight de filas vencidas
+        document.querySelectorAll('.table-danger-light').forEach(row => {
+            row.addEventListener('click', function(e) {
+                if (!e.target.closest('.dropdown') && !e.target.closest('a')) {
+                    const link = this.querySelector('a.stretched-link');
+                    if(link) window.location.href = link.href;
+                }
+            });
+        });
+        
+        // Tooltips
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+        
+        // Auto-expandir filtros
+        if (window.location.search.includes('q=') || 
+            window.location.search.includes('estatus=') ||
+            window.location.search.includes('proveedor=')) {
+            const filtrosAvanzados = document.getElementById('filtrosAvanzados');
+            if (filtrosAvanzados) {
+                new bootstrap.Collapse(filtrosAvanzados, {toggle: true});
+            }
+        }
+    });
+</script>
+{% endblock %}

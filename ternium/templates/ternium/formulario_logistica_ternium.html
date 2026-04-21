@@ -1,0 +1,731 @@
+{% extends "ternium/base.html" %}
+{% load static %}
+
+{% block title %}
+  {{ titulo|default:"Nuevo Registro de Logística" }}
+{% endblock title %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+  <div class="card shadow-lg border-0">
+    <div class="card-header bg-gradient-primary text-white py-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <h4 class="mb-0 font-weight-bold">
+          <i class="fas fa-truck-loading me-2"></i>
+          {{ titulo|default:"Registro de Envío a Ternium" }}
+        </h4>
+        <span class="badge bg-white text-primary fs-6">VERSIÓN 2.8</span>
+      </div>
+    </div>
+    <div class="card-body p-4">
+      <form method="post" enctype="multipart/form-data" id="logisticaForm" class="needs-validation" novalidate>
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+              {% for error in form.non_field_errors %}
+                  <p><i class="fas fa-exclamation-triangle me-2"></i>{{ error }}</p>
+              {% endfor %}
+          </div>
+        {% endif %}
+
+        <div class="section-card mb-4">
+          <div class="section-header">
+            <span class="section-number">1</span>
+            <h5 class="section-title">Datos Generales del Envío</h5>
+          </div>
+          <div class="section-body">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label for="{{ form.remision.id_for_label }}" class="form-label fw-bold">Número de Remisión*</label>
+                {{ form.remision }}
+                <div class="invalid-feedback">{{ form.remision.errors.as_text }}</div>
+                <div class="form-text ps-2 text-muted" style="font-size: 0.8rem;">Este número nombrará los archivos.</div>
+              </div>
+              
+              <div class="col-md-4">
+                <label for="{{ form.fecha_carga.id_for_label }}" class="form-label fw-bold">Fecha de Carga*</label>
+                {{ form.fecha_carga }}
+                <div class="invalid-feedback">{{ form.fecha_carga.errors.as_text }}</div>
+              </div>
+              
+              <div class="col-md-4">
+                <label for="{{ form.boleta_bascula.id_for_label }}" class="form-label fw-bold"># Boleta Báscula*</label>
+                {{ form.boleta_bascula }}
+                <div class="invalid-feedback">{{ form.boleta_bascula.errors.as_text }}</div>
+              </div>
+              
+              <div class="col-md-4">
+                <label for="{{ form.fecha_envio.id_for_label }}" class="form-label fw-bold">{{ form.fecha_envio.label }}</label>
+                {{ form.fecha_envio }}
+                <div class="invalid-feedback">{{ form.fecha_envio.errors.as_text }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-card mb-4">
+          <div class="section-header">
+            <span class="section-number">2</span>
+            <h5 class="section-title">Información del Transporte</h5>
+          </div>
+          <div class="section-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                  <label for="{{ form.transportista.id_for_label }}" class="form-label fw-bold">Transportista*</label>
+                  {{ form.transportista }}
+                  <div class="invalid-feedback">{{ form.transportista.errors.as_text }}</div>
+              </div>
+              <div class="col-md-6">
+                  <label for="{{ form.chofer.id_for_label }}" class="form-label fw-bold">Nombre del Chofer*</label>
+                  {{ form.chofer }}
+                  <div class="invalid-feedback">{{ form.chofer.errors.as_text }}</div>
+              </div>
+              
+              <div class="col-md-3">
+                  <label for="{{ form.tractor.id_for_label }}" class="form-label fw-bold">No. Tractor*</label>
+                  {{ form.tractor }}
+                  <div class="invalid-feedback">{{ form.tractor.errors.as_text }}</div>
+              </div>
+              <div class="col-md-3">
+                  <label for="{{ form.placas_tractor.id_for_label }}" class="form-label fw-bold">Placas Tractor</label>
+                  {{ form.placas_tractor }}
+              </div>
+              
+              <div class="col-md-3">
+                  <label for="{{ form.tolva.id_for_label }}" class="form-label fw-bold">No. Tolva/Caja*</label>
+                  {{ form.tolva }}
+                  <div class="invalid-feedback">{{ form.tolva.errors.as_text }}</div>
+              </div>
+              <div class="col-md-3">
+                  <label for="{{ form.placas_tolva.id_for_label }}" class="form-label fw-bold">Placas Tolva</label>
+                  {{ form.placas_tolva }}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="section-card mb-4">
+          <div class="section-header">
+            <span class="section-number">3</span>
+            <h5 class="section-title">Detalles del Material y Pesos</h5>
+          </div>
+          <div class="section-body">
+            <div class="row g-3 align-items-end">
+              <div class="col-md-8">
+                  <label for="{{ form.material.id_for_label }}" class="form-label fw-bold">Descripción del Material*</label>
+                  {{ form.material }}
+                  <div class="invalid-feedback">{{ form.material.errors.as_text }}</div>
+              </div>
+
+              <div class="col-md-4">
+                  <label class="form-label fw-bold text-muted">Clave Material</label>
+                  <input type="text" id="clave_sat_visual" class="form-control bg-light" readonly placeholder="Seleccione material...">
+              </div>
+              
+              <div class="col-md-4">
+                <label for="{{ form.toneladas_remisionadas.id_for_label }}" class="form-label fw-bold">Toneladas Remisionadas*</label>
+                {{ form.toneladas_remisionadas }}
+                <div class="invalid-feedback">{{ form.toneladas_remisionadas.errors.as_text }}</div>
+              </div>
+              
+              <div class="col-md-4">
+                <label for="{{ form.toneladas_recibidas.id_for_label }}" class="form-label fw-bold">Toneladas Recibidas Ternium</label>
+                {{ form.toneladas_recibidas }}
+                <div class="invalid-feedback">{{ form.toneladas_recibidas.errors.as_text }}</div>
+              </div>
+              
+              <div class="col-md-4">
+                <div class="form-floating">
+                  <input type="text" id="id_merma" class="form-control bg-light" readonly disabled>
+                  <label for="id_merma" class="fw-bold">Merma (calculado)</label>
+                </div>
+              </div>
+
+              <div class="col-12 mt-4">
+                <label for="{{ form.comentario.id_for_label }}" class="form-label fw-bold">
+                    <i class="fas fa-comment-dots me-1 text-secondary"></i> {{ form.comentario.label }}
+                </label>
+                {{ form.comentario }}
+                <div class="invalid-feedback">{{ form.comentario.errors.as_text }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-card mb-4">
+          <div class="section-header">
+            <span class="section-number">4</span>
+            <h5 class="section-title">Documentación y Evidencias Fotográficas</h5>
+          </div>
+          <div class="section-body">
+            <div class="row g-4">
+              
+              <div class="col-md-6">
+                <div class="documentation-section h-100">
+                  <h6 class="section-subtitle">
+                    <i class="fas fa-file-pdf me-2 text-danger"></i>Documentos (PDF)
+                  </h6>
+                  
+                  <div class="file-upload-card mb-3 position-relative" id="container_pdf_registro_camion_remision">
+                    <label for="{{ form.pdf_registro_camion_remision.id_for_label }}" class="form-label fw-bold">{{ form.pdf_registro_camion_remision.label }}</label>
+                    
+                    {% if object.pdf_registro_camion_remision %}
+                       <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2 btn-delete-file" 
+                               onclick="markFileForDeletion('pdf_registro_camion_remision')" 
+                               title="Eliminar archivo al guardar">
+                           <i class="fas fa-trash-alt"></i>
+                       </button>
+                    {% endif %}
+
+                    {{ form.pdf_registro_camion_remision }}
+                    <input type="hidden" name="clear_pdf_registro_camion_remision" id="clear_pdf_registro_camion_remision" value="false">
+
+                    <div id="msg_deleted_pdf_registro_camion_remision" class="alert alert-warning mt-2 p-1 text-center d-none border-danger text-danger">
+                      <i class="fas fa-exclamation-circle"></i> Se eliminará al guardar.
+                      <button type="button" class="btn btn-link btn-sm p-0 text-dark fw-bold text-decoration-underline" onclick="undoDeletion('pdf_registro_camion_remision')">Deshacer</button>
+                    </div>
+
+                    <div class="file-info mt-2">
+                      <div class="existing-file-container">
+                        {% if object.pdf_registro_camion_remision %}
+                          <small class="text-muted"><i class="fas fa-check-circle text-success"></i> Archivo actual: 
+                            <a href="{{ object.pdf_registro_camion_remision.url }}?t={% now 'U' %}" target="_blank" class="fw-bold text-decoration-underline">
+                              Ver Documento
+                            </a>
+                          </small>
+                        {% endif %}
+                      </div>
+                      <small class="text-muted d-block mt-1 fst-italic">Nombre: <span class="remision-placeholder">[REM]</span>-4.pdf</small>
+                    </div>
+                  </div>
+                  
+                  <div class="file-upload-card mb-3 bg-light border-primary position-relative" id="container_pdf_hoja_circulacion">
+                    <label for="{{ form.pdf_hoja_circulacion.id_for_label }}" class="form-label fw-bold text-primary">{{ form.pdf_hoja_circulacion.label }}</label>
+                    
+                    {% if object.pdf_hoja_circulacion %}
+                       <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2 btn-delete-file" 
+                               onclick="markFileForDeletion('pdf_hoja_circulacion')" 
+                               title="Eliminar archivo al guardar">
+                           <i class="fas fa-trash-alt"></i>
+                       </button>
+                    {% endif %}
+
+                    {{ form.pdf_hoja_circulacion }}
+                    <input type="hidden" name="clear_pdf_hoja_circulacion" id="clear_pdf_hoja_circulacion" value="false">
+
+                    <div id="msg_deleted_pdf_hoja_circulacion" class="alert alert-warning mt-2 p-1 text-center d-none border-danger text-danger">
+                      <i class="fas fa-exclamation-circle"></i> Se eliminará al guardar.
+                      <button type="button" class="btn btn-link btn-sm p-0 text-dark fw-bold text-decoration-underline" onclick="undoDeletion('pdf_hoja_circulacion')">Deshacer</button>
+                    </div>
+
+                    <div class="file-info mt-2">
+                       <div class="existing-file-container">
+                         {% if object.pdf_hoja_circulacion %}
+                          <small class="text-muted"><i class="fas fa-check-circle text-success"></i> Archivo actual: 
+                            <a href="{{ object.pdf_hoja_circulacion.url }}?t={% now 'U' %}" target="_blank" class="fw-bold text-decoration-underline">
+                               Ver Documento
+                            </a>
+                          </small>
+                        {% endif %}
+                       </div>
+                      <small class="text-muted d-block mt-1 fst-italic">Nombre: <span class="remision-placeholder">[REM]</span>-5.pdf</small>
+                    </div>
+                  </div>
+
+                  <div class="mt-3 p-3 bg-white border rounded">
+                     <label for="{{ form.numero_permiso_sct.id_for_label }}" class="form-label fw-bold text-dark">
+                        <i class="fas fa-id-card me-1 text-secondary"></i> Número de Permiso SCT
+                     </label>
+                     {{ form.numero_permiso_sct }}
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <div class="documentation-section">
+                  <h6 class="section-subtitle">
+                    <i class="fas fa-camera me-2 text-info"></i>Fotografías
+                  </h6>
+                  
+                  <div class="row">
+                    <div class="col-6 mb-3">
+                      <div class="file-upload-card h-100 position-relative" id="container_foto_superior_vacia">
+                        <label class="form-label fw-bold small">{{ form.foto_superior_vacia.label }}</label>
+                        {% if object.foto_superior_vacia %}
+                           <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 btn-delete-file" 
+                                   onclick="markFileForDeletion('foto_superior_vacia')"><i class="fas fa-trash-alt"></i></button>
+                        {% endif %}
+                        
+                        {{ form.foto_superior_vacia }}
+                        <input type="hidden" name="clear_foto_superior_vacia" id="clear_foto_superior_vacia" value="false">
+
+                        <div class="image-preview mt-2" id="preview_foto_0" 
+                             data-existing-image-url="{% if object.foto_superior_vacia %}{{ object.foto_superior_vacia.url }}?t={% now 'U' %}{% endif %}">
+                        </div>
+                        
+                        <div id="msg_deleted_foto_superior_vacia" class="alert alert-warning mt-1 p-1 text-center d-none text-danger" style="font-size: 0.75rem;">
+                          <i class="fas fa-times"></i> Se borrará al guardar
+                          <br><span class="text-decoration-underline cursor-pointer" onclick="undoDeletion('foto_superior_vacia')">Deshacer</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="col-6 mb-3">
+                      <div class="file-upload-card h-100 position-relative" id="container_foto_frontal">
+                        <label class="form-label fw-bold small">{{ form.foto_frontal.label }}</label>
+                        {% if object.foto_frontal %}
+                           <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 btn-delete-file" 
+                                   onclick="markFileForDeletion('foto_frontal')"><i class="fas fa-trash-alt"></i></button>
+                        {% endif %}
+                        
+                        {{ form.foto_frontal }}
+                        <input type="hidden" name="clear_foto_frontal" id="clear_foto_frontal" value="false">
+
+                        <div class="image-preview mt-2" id="preview_foto_1" 
+                             data-existing-image-url="{% if object.foto_frontal %}{{ object.foto_frontal.url }}?t={% now 'U' %}{% endif %}">
+                        </div>
+                        
+                        <div id="msg_deleted_foto_frontal" class="alert alert-warning mt-1 p-1 text-center d-none text-danger" style="font-size: 0.75rem;">
+                           <i class="fas fa-times"></i> Se borrará al guardar
+                           <br><span class="text-decoration-underline cursor-pointer" onclick="undoDeletion('foto_frontal')">Deshacer</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="col-6 mb-3">
+                      <div class="file-upload-card h-100 position-relative" id="container_foto_superior_llena">
+                        <label class="form-label fw-bold small">{{ form.foto_superior_llena.label }}</label>
+                        {% if object.foto_superior_llena %}
+                           <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 btn-delete-file" 
+                                   onclick="markFileForDeletion('foto_superior_llena')"><i class="fas fa-trash-alt"></i></button>
+                        {% endif %}
+                        
+                        {{ form.foto_superior_llena }}
+                        <input type="hidden" name="clear_foto_superior_llena" id="clear_foto_superior_llena" value="false">
+
+                        <div class="image-preview mt-2" id="preview_foto_2" 
+                             data-existing-image-url="{% if object.foto_superior_llena %}{{ object.foto_superior_llena.url }}?t={% now 'U' %}{% endif %}">
+                        </div>
+                        
+                        <div id="msg_deleted_foto_superior_llena" class="alert alert-warning mt-1 p-1 text-center d-none text-danger" style="font-size: 0.75rem;">
+                           <i class="fas fa-times"></i> Se borrará al guardar
+                           <br><span class="text-decoration-underline cursor-pointer" onclick="undoDeletion('foto_superior_llena')">Deshacer</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="col-6 mb-3">
+                      <div class="file-upload-card h-100 position-relative" id="container_foto_trasera">
+                        <label class="form-label fw-bold small">{{ form.foto_trasera.label }}</label>
+                        {% if object.foto_trasera %}
+                           <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 btn-delete-file" 
+                                   onclick="markFileForDeletion('foto_trasera')"><i class="fas fa-trash-alt"></i></button>
+                        {% endif %}
+                        
+                        {{ form.foto_trasera }}
+                        <input type="hidden" name="clear_foto_trasera" id="clear_foto_trasera" value="false">
+
+                        <div class="image-preview mt-2" id="preview_foto_3" 
+                             data-existing-image-url="{% if object.foto_trasera %}{{ object.foto_trasera.url }}?t={% now 'U' %}{% endif %}">
+                        </div>
+                        
+                        <div id="msg_deleted_foto_trasera" class="alert alert-warning mt-1 p-1 text-center d-none text-danger" style="font-size: 0.75rem;">
+                           <i class="fas fa-times"></i> Se borrará al guardar
+                           <br><span class="text-decoration-underline cursor-pointer" onclick="undoDeletion('foto_trasera')">Deshacer</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-card mb-4">
+          <div class="section-header bg-light border-bottom">
+            <span class="section-number bg-secondary">5</span>
+            <h5 class="section-title text-secondary">Facturación y Acuses <span class="badge bg-info text-dark ms-2" style="font-size: 0.75rem;">Opcional</span></h5>
+          </div>
+          <div class="section-body">
+            <div class="row g-3">
+              
+              <div class="col-md-3">
+                <label for="{{ form.fecha_correo.id_for_label }}" class="form-label fw-bold">
+                    <i class="fas fa-envelope text-secondary me-1"></i> Fecha de Correo
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                  <input type="date" name="{{ form.fecha_correo.name }}" id="{{ form.fecha_correo.id_for_label }}" class="form-control" 
+                         {% if form.fecha_correo.value %}value="{{ form.fecha_correo.value|date:'Y-m-d' }}"{% endif %}>
+                </div>
+                <div class="invalid-feedback">{{ form.fecha_correo.errors.as_text }}</div>
+              </div>
+
+              <div class="col-md-3">
+                <label for="{{ form.pdf_factura.id_for_label }}" class="form-label fw-bold">
+                    <i class="fas fa-file-pdf text-danger me-1"></i> PDF Factura
+                </label>
+                {{ form.pdf_factura }}
+                {% if object.pdf_factura %}
+                  <div class="mt-2 text-truncate file-preview-badge">
+                    <small>
+                        <i class="fas fa-check-circle text-success me-1"></i> 
+                        <a href="{{ object.pdf_factura.url }}" target="_blank" class="text-decoration-underline fw-bold">Ver Documento</a>
+                    </small>
+                  </div>
+                {% endif %}
+                <div class="invalid-feedback">{{ form.pdf_factura.errors.as_text }}</div>
+              </div>
+
+              <div class="col-md-3">
+                <label for="{{ form.xml_factura.id_for_label }}" class="form-label fw-bold">
+                    <i class="fas fa-file-code text-success me-1"></i> XML Factura
+                </label>
+                {{ form.xml_factura }}
+                {% if object.xml_factura %}
+                  <div class="mt-2 text-truncate file-preview-badge">
+                    <small>
+                        <i class="fas fa-check-circle text-success me-1"></i> 
+                        <a href="{{ object.xml_factura.url }}" target="_blank" class="text-decoration-underline fw-bold">Ver Documento</a>
+                    </small>
+                  </div>
+                {% endif %}
+                <div class="invalid-feedback">{{ form.xml_factura.errors.as_text }}</div>
+              </div>
+
+              <div class="col-md-3">
+                <label for="{{ form.acuse_pdf.id_for_label }}" class="form-label fw-bold">
+                    <i class="fas fa-file-signature text-warning me-1"></i> Acuse (PDF)
+                </label>
+                {{ form.acuse_pdf }}
+                {% if object.acuse_pdf %}
+                  <div class="mt-2 text-truncate file-preview-badge">
+                    <small>
+                        <i class="fas fa-check-circle text-success me-1"></i> 
+                        <a href="{{ object.acuse_pdf.url }}" target="_blank" class="text-decoration-underline fw-bold">Ver Documento</a>
+                    </small>
+                  </div>
+                {% endif %}
+                <div class="invalid-feedback">{{ form.acuse_pdf.errors.as_text }}</div>
+              </div>
+              
+            </div>
+          </div>
+        </div>
+        <div class="d-flex justify-content-end mt-4 mb-5">
+          <a href="{% url 'lista_registros_logistica' %}{% if query_string %}?{{ query_string }}{% endif %}" 
+             class="btn btn-outline-secondary me-3 px-4">
+            <i class="fas fa-times-circle me-2"></i>Cancelar
+          </a>
+          
+          <button type="submit" class="btn btn-primary-gradient px-4 py-2 fw-bold">
+            <i class="fas fa-save me-2"></i>Guardar y Actualizar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content bg-transparent border-0 shadow-none">
+      <div class="modal-body text-center position-relative">
+        <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close" style="z-index: 1056; background-color: white; opacity: 1;"></button>
+        <img src="" id="modalImageSrc" class="img-fluid rounded shadow-lg" alt="Vista Previa">
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --primary-color: #0056b3;
+    --secondary-color: #6c757d;
+    --accent-color: #17a2b8;
+    --light-bg: #f8f9fa;
+  }
+  
+  .cursor-pointer { cursor: pointer; }
+  .modal-backdrop { z-index: 1050; }
+  .modal { z-index: 1060; }
+
+  .card { border-radius: 12px; overflow: hidden; border: none; }
+  .card-header { border-bottom: none; }
+  .bg-gradient-primary { background: linear-gradient(135deg, #0056b3 0%, #003366 100%); }
+  
+  .btn-primary-gradient {
+    background: linear-gradient(135deg, #0056b3 0%, #17a2b8 100%);
+    border: none;
+    box-shadow: 0 2px 5px rgba(0, 86, 179, 0.3);
+    transition: all 0.3s ease;
+  }
+  
+  .btn-primary-gradient:hover {
+    background: linear-gradient(135deg, #004494 0%, #138496 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 86, 179, 0.3);
+  }
+  
+  .section-card { border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; background-color: white; }
+  .section-header { background-color: var(--light-bg); padding: 12px 20px; border-bottom: 1px solid #e0e0e0; display: flex; align-items: center; }
+  .section-number { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background-color: var(--primary-color); color: white; border-radius: 50%; font-weight: bold; margin-right: 12px; font-size: 14px; }
+  .section-title { margin: 0; font-size: 1.1rem; color: var(--primary-color); font-weight: 600; }
+  .section-subtitle { font-size: 1rem; color: var(--secondary-color); margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px dashed #dee2e6; }
+  .section-body { padding: 20px; }
+  
+  .file-upload-card { padding: 15px; border-radius: 8px; background-color: #f8fafc; border: 1px dashed #d1d5db; transition: all 0.3s ease; }
+  .file-upload-card:hover { border-color: var(--accent-color); background-color: #f0f7ff; }
+  
+  .image-preview { width: 100%; height: 100px; background-color: #f5f5f5; border-radius: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .image-preview img { max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.2s ease; }
+  .image-preview img:hover { transform: scale(1.05); }
+  
+  .file-info { padding: 4px 8px; background-color: white; border-radius: 4px; border: 1px solid #e9ecef; }
+  .file-preview-name { color: var(--primary-color); word-break: break-all; }
+  
+  /* Nuevo estilo para los archivos opcionales */
+  .file-preview-badge {
+      background-color: #f8f9fa;
+      padding: 5px 10px;
+      border-radius: 5px;
+      border: 1px solid #dee2e6;
+  }
+  
+  @media (max-width: 768px) {
+    .section-body { padding: 15px; }
+    .file-upload-card { padding: 12px; }
+  }
+</style>
+{% endblock extra_css %}
+
+{% block extra_js %}
+<script>
+/**
+ * MARCAR PARA ELIMINACIÓN
+ * Esta función no elimina inmediatamente para prevenir pérdida de datos si el usuario cancela.
+ * Marca el input hidden 'clear_...' como 'true'.
+ * El backend leerá esto y borrará el archivo al guardar.
+ */
+function markFileForDeletion(fieldName) {
+    // 1. Marcar el input oculto como 'true'
+    const hiddenInput = document.getElementById('clear_' + fieldName);
+    if(hiddenInput) hiddenInput.value = 'true';
+    
+    // 2. Encontrar el contenedor
+    const container = document.getElementById('container_' + fieldName) || hiddenInput.closest('.file-upload-card');
+    
+    // 3. Buscar elementos dentro del contenedor
+    const preview = container.querySelector('.image-preview'); // Para fotos
+    const existingFile = container.querySelector('.existing-file-container'); // Para PDFs
+    const fileInput = container.querySelector('input[type="file"]');
+    const deleteBtn = container.querySelector('.btn-delete-file');
+    const msgDiv = document.getElementById('msg_deleted_' + fieldName);
+
+    // 4. Aplicar cambios visuales (Ocultar lo existente)
+    if(preview) preview.style.display = 'none';
+    if(existingFile) existingFile.style.display = 'none'; 
+    
+    // Limpiar input de archivo nuevo por si el usuario había seleccionado algo y luego dio borrar
+    if(fileInput) {
+        fileInput.value = ''; 
+    }
+    
+    // Ocultar botón de borrar
+    if(deleteBtn) deleteBtn.style.display = 'none';
+    
+    // Mostrar mensaje de advertencia
+    if(msgDiv) {
+        msgDiv.classList.remove('d-none');
+        msgDiv.classList.add('d-block');
+    }
+}
+
+/**
+ * DESHACER ELIMINACIÓN
+ * Restaura la vista y marca el input hidden como 'false'.
+ */
+function undoDeletion(fieldName) {
+    // 1. Revertir el input oculto
+    const hiddenInput = document.getElementById('clear_' + fieldName);
+    if(hiddenInput) hiddenInput.value = 'false';
+    
+    // 2. Encontrar el contenedor
+    const container = document.getElementById('container_' + fieldName) || hiddenInput.closest('.file-upload-card');
+
+    // 3. Buscar elementos
+    const preview = container.querySelector('.image-preview');
+    const existingFile = container.querySelector('.existing-file-container');
+    const fileInput = container.querySelector('input[type="file"]');
+    const deleteBtn = container.querySelector('.btn-delete-file');
+    const msgDiv = document.getElementById('msg_deleted_' + fieldName);
+
+    // 4. Restaurar visuales (Mostrar)
+    if(preview) preview.style.display = 'flex';
+    if(existingFile) existingFile.style.display = 'block';
+    if(deleteBtn) deleteBtn.style.display = 'block';
+    
+    // Ocultar mensaje de advertencia
+    if(msgDiv) {
+        msgDiv.classList.add('d-none');
+        msgDiv.classList.remove('d-block');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Mover el modal al body para evitar problemas de z-index
+    var modalEl = document.getElementById('imagePreviewModal');
+    if (modalEl) { document.body.appendChild(modalEl); }
+
+    const form = document.getElementById('logisticaForm');
+    if (form) {
+        form.addEventListener('submit', function(event) {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            form.classList.add('was-validated');
+        }, false);
+    }
+
+    // --- LÓGICA CLAVE SAT ---
+    const materialSelect = document.getElementById('{{ form.material.id_for_label }}');
+    const satInput = document.getElementById('clave_sat_visual');
+    const materialesData = {
+        {% for m in form.fields.material.queryset %}
+            "{{ m.id }}": "{{ m.clave_sat|default:'Sin Clave' }}",
+        {% endfor %}
+    };
+
+    function updateSatCode() {
+        const selectedId = materialSelect.value;
+        if (selectedId && materialesData[selectedId]) {
+            satInput.value = materialesData[selectedId];
+        } else {
+            satInput.value = '';
+        }
+    }
+    if (materialSelect) {
+        materialSelect.addEventListener('change', updateSatCode);
+        updateSatCode();
+    }
+
+    // --- ACTUALIZAR NOMBRES DE ARCHIVO VISUALES ---
+    const remisionInput = document.getElementById('id_remision');
+    const placeholders = document.querySelectorAll('.remision-placeholder');
+    
+    function updatePlaceholders() {
+        const remisionValue = remisionInput.value.trim().toUpperCase() || '[REMISION]';
+        placeholders.forEach(span => { span.textContent = remisionValue; });
+    }
+    
+    if (remisionInput) {
+        remisionInput.addEventListener('input', updatePlaceholders);
+        updatePlaceholders();
+    }
+    
+    // --- LÓGICA PREVIEW FOTOS ---
+    const modalImage = document.getElementById('modalImageSrc');
+    const imageModal = new bootstrap.Modal(document.getElementById('imagePreviewModal'));
+
+    function openModal(src) {
+        modalImage.src = src;
+        imageModal.show();
+    }
+
+    function setupPreview(input, previewId) {
+        const previewContainer = document.getElementById(previewId);
+        if (!input || !previewContainer) return;
+
+        input.addEventListener('change', function() {
+            previewContainer.innerHTML = ''; 
+            
+            // Si el usuario sube un archivo nuevo
+            if (this.files && this.files[0]) {
+                const file = this.files[0];
+                if (file.type.match('image.*')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.style.cursor = 'zoom-in'; 
+                        img.onclick = function() { openModal(e.target.result); };
+                        previewContainer.appendChild(img);
+                        previewContainer.style.display = 'flex'; 
+                        
+                        // Si se había marcado para borrar, al subir uno nuevo desmarcamos el borrado
+                        // (Aunque la lógica del backend "Reemplazar" maneja esto, visualmente es mejor quitar la alerta)
+                        const fieldName = input.name;
+                        undoDeletion(fieldName);
+                    }
+                    reader.readAsDataURL(file);
+                } else {
+                    previewContainer.innerHTML = '<div class="text-muted small p-2">Archivo seleccionado (No es imagen)</div>';
+                    previewContainer.style.display = 'flex';
+                }
+            }
+        });
+    }
+
+    function renderExistingImage(container, url) {
+        container.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = url;
+        img.style.cursor = 'zoom-in';
+        img.onclick = function() { openModal(url); };
+        container.appendChild(img);
+    }
+
+    // Inicializar listeners de los inputs
+    const inputsMap = [
+        { input: 'id_foto_superior_vacia', preview: 'preview_foto_0' },
+        { input: 'id_foto_frontal', preview: 'preview_foto_1' },
+        { input: 'id_foto_superior_llena', preview: 'preview_foto_2' },
+        { input: 'id_foto_trasera', preview: 'preview_foto_3' } // ID corregido
+    ];
+
+    inputsMap.forEach(item => {
+        const el = document.getElementById(item.input);
+        if(el) setupPreview(el, item.preview);
+    });
+    
+    // Inicializar imágenes existentes al cargar
+    document.querySelectorAll('.image-preview').forEach(container => {
+        const existingUrl = container.dataset.existingImageUrl;
+        if (existingUrl && existingUrl !== "") {
+            renderExistingImage(container, existingUrl);
+        } else {
+            container.innerHTML = '<div class="text-muted"><i class="far fa-image fa-2x"></i></div>';
+        }
+    });
+
+    // --- CÁLCULO MERMA ---
+    const tonRemisionadasInput = document.getElementById('id_toneladas_remisionadas');
+    const tonRecibidasInput = document.getElementById('id_toneladas_recibidas');
+    const mermaOutput = document.getElementById('id_merma');
+    
+    function calcularMerma() {
+        if (!tonRemisionadasInput || !tonRecibidasInput || !mermaOutput) return;
+        const rem = parseFloat(tonRemisionadasInput.value);
+        const rec = parseFloat(tonRecibidasInput.value);
+        
+        if (!isNaN(rem) && !isNaN(rec) && rem > 0) {
+            const abs = rec - rem;
+            const pct = (abs / rem) * 100;
+            mermaOutput.value = `${abs.toFixed(3)} Ton. (${pct.toFixed(2)}%)`;
+            mermaOutput.style.color = (abs < 0) ? '#dc3545' : '#198754'; // Rojo si pierde, verde si gana
+            mermaOutput.style.fontWeight = 'bold';
+        } else {
+            mermaOutput.value = '';
+        }
+    }
+    if (tonRemisionadasInput) tonRemisionadasInput.addEventListener('input', calcularMerma);
+    if (tonRecibidasInput) tonRecibidasInput.addEventListener('input', calcularMerma);
+    calcularMerma();
+});
+</script>
+{% endblock extra_js %}

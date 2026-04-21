@@ -1,0 +1,193 @@
+{% extends 'ternium/base.html' %}
+
+{% block title %}{% if object %}Editar Pago{% else %}Registrar Nuevo Pago{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 bg-light-subtle" style="min-height: 100vh;">
+    <div class="row mb-4 animate__animated animate__fadeIn">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mb-1 small text-muted text-uppercase fw-bold" style="letter-spacing: 0.05em;">
+                            <li class="breadcrumb-item"><a href="{% url 'lista_pagos' %}" class="text-decoration-none text-secondary">Pagos</a></li>
+                            <li class="breadcrumb-item active text-dark">{% if object %}Edición{% else %}Nuevo Registro{% endif %}</li>
+                        </ol>
+                    </nav>
+                    <h2 class="fw-bold text-dark mb-0">
+                        <i class="fas fa-wallet text-primary me-2"></i>
+                        {% if object %}Editar Pago{% else %}Registrar Nuevo Pago{% endif %}
+                    </h2>
+                </div>
+                <div>
+                    <a href="javascript:history.back()" class="btn btn-white shadow-sm rounded-pill px-4 fw-medium text-dark border">
+                        <i class="fas fa-arrow-left me-2 text-muted"></i>Volver
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row justify-content-center animate__animated animate__fadeInUp">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="card-header border-0 bg-white pt-4 pb-0 px-4">
+                    <h6 class="fw-bold text-secondary text-uppercase mb-0" style="letter-spacing: 0.05em;">
+                        Detalles de la Transacción
+                    </h6>
+                    <hr class="mb-0 mt-3 text-muted">
+                </div>
+                
+                <div class="card-body p-4 p-md-5">
+                    <form method="POST" enctype="multipart/form-data" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        {% if form.errors %}
+                        <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-3 mb-4 d-flex align-items-center">
+                            <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+                            <div>
+                                <strong>¡Atención!</strong> Revisa los campos marcados en rojo.
+                                {{ form.non_field_errors }}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <label for="{{ form.monto_pagado.id_for_label }}" class="form-label text-muted small fw-bold text-uppercase">Monto a Pagar *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0 text-success fw-bold">$</span>
+                                    {{ form.monto_pagado }}
+                                </div>
+                                {% if form.monto_pagado.errors %}
+                                    <div class="text-danger small mt-1 fw-medium"><i class="fas fa-info-circle me-1"></i>{{ form.monto_pagado.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="{{ form.fecha_pago.id_for_label }}" class="form-label text-muted small fw-bold text-uppercase">Fecha de Pago *</label>
+                                {{ form.fecha_pago }}
+                                {% if form.fecha_pago.errors %}
+                                    <div class="text-danger small mt-1 fw-medium"><i class="fas fa-info-circle me-1"></i>{{ form.fecha_pago.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="{{ form.metodo_pago.id_for_label }}" class="form-label text-muted small fw-bold text-uppercase">Método de Pago *</label>
+                                {{ form.metodo_pago }}
+                                {% if form.metodo_pago.errors %}
+                                    <div class="text-danger small mt-1 fw-medium"><i class="fas fa-info-circle me-1"></i>{{ form.metodo_pago.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="{{ form.referencia.id_for_label }}" class="form-label text-muted small fw-bold text-uppercase">Referencia / Folio</label>
+                                {{ form.referencia }}
+                                {% if form.referencia.errors %}
+                                    <div class="text-danger small mt-1 fw-medium"><i class="fas fa-info-circle me-1"></i>{{ form.referencia.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-12">
+                                <label for="{{ form.archivo_comprobante.id_for_label }}" class="form-label text-muted small fw-bold text-uppercase">Comprobante de Pago (Opcional)</label>
+                                <div class="bg-light p-2 rounded border border-light custom-file-wrapper">
+                                    {{ form.archivo_comprobante }}
+                                </div>
+                                {% if form.archivo_comprobante.errors %}
+                                    <div class="text-danger small mt-1 fw-medium"><i class="fas fa-info-circle me-1"></i>{{ form.archivo_comprobante.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-12">
+                                <label for="{{ form.notas.id_for_label }}" class="form-label text-muted small fw-bold text-uppercase">Notas Adicionales</label>
+                                {{ form.notas }}
+                                {% if form.notas.errors %}
+                                    <div class="text-danger small mt-1 fw-medium"><i class="fas fa-info-circle me-1"></i>{{ form.notas.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-3 mt-5 pt-3 border-top">
+                            <a href="javascript:history.back()" class="btn btn-light rounded-pill px-4 fw-medium border">
+                                Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm">
+                                <i class="fas fa-save me-2"></i>{% if object %}Actualizar Pago{% else %}Confirmar Pago{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .bg-light-subtle { background-color: #f8f9fc !important; }
+    
+    /* Estilos para los inputs integrados con la clase form-control que ya generas desde forms.py */
+    .form-control, .form-select {
+        border-radius: 8px;
+        padding: 0.6rem 1rem;
+        border: 1px solid #d1d3e2;
+        color: #6e707e;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #4e73df;
+        box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+    }
+    
+    .input-group-text {
+        border-top-left-radius: 8px;
+        border-bottom-left-radius: 8px;
+    }
+
+    .input-group .form-control {
+        border-top-right-radius: 8px;
+        border-bottom-right-radius: 8px;
+    }
+
+    /* Input file custom */
+    .custom-file-wrapper input[type="file"] {
+        width: 100%;
+        color: #6e707e;
+    }
+    
+    .custom-file-wrapper input[type="file"]::file-selector-button {
+        background-color: #eaecf4;
+        color: #4e73df;
+        border: none;
+        border-radius: 6px;
+        padding: 0.4rem 1rem;
+        margin-right: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .custom-file-wrapper input[type="file"]::file-selector-button:hover {
+        background-color: #4e73df;
+        color: #fff;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Validación visual en cliente al enviar el formulario
+        const form = document.querySelector('.needs-validation');
+        form.addEventListener('submit', function(event) {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            form.classList.add('was-validated');
+        }, false);
+    });
+</script>
+{% endblock %}

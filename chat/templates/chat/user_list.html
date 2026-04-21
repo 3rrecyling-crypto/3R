@@ -1,0 +1,363 @@
+{% extends "ternium/base.html" %}
+{% load static humanize %}
+
+{% block title %}Iniciar un Chat - Ternium{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    :root {
+        --primary-color: #3f51b5;
+        --secondary-color: #2196f3;
+        --light-bg: #f8f9fa;
+        --card-bg: #ffffff;
+        --text-dark: #2c3e50;
+        --text-light: #7f8c8d;
+        --border-color: #e0e0e0;
+        --online-status: #4CAF50;
+        --offline-status: #bdc3c7;
+    }
+    
+    .users-container {
+        background-color: var(--light-bg);
+        border-radius: 12px;
+        box-shadow: 0 4px 25px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+    }
+    
+    .users-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+        padding: 20px 25px;
+        border-radius: 12px 12px 0 0;
+    }
+    
+    .users-header h2 {
+        margin: 0;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .users-header h2 i {
+        font-size: 1.8rem;
+    }
+    
+    .users-tools {
+        padding: 20px;
+        background-color: white;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .search-container {
+        position: relative;
+    }
+    
+    .search-container i {
+        position: absolute;
+        left: 15px;
+        top: 12px;
+        color: var(--text-light);
+    }
+    
+    .search-input {
+        padding-left: 45px;
+        border-radius: 30px;
+        border: 1px solid var(--border-color);
+        height: 46px;
+    }
+    
+    .users-list {
+        padding: 0;
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+    
+    .user-item {
+        display: flex;
+        align-items: center;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border-color);
+        transition: all 0.2s;
+        background-color: var(--card-bg);
+    }
+    
+    .user-item:hover {
+        background-color: #f5f7ff;
+        transform: translateX(5px);
+    }
+    
+    .user-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 1.2rem;
+        margin-right: 16px;
+        flex-shrink: 0;
+    }
+    
+    .user-info {
+        flex: 1;
+    }
+    
+    .user-name, .user-name:hover {
+        font-weight: 600;
+        color: var(--text-dark);
+        margin: 0 0 4px 0;
+        text-decoration: none;
+    }
+    
+    .user-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.85rem;
+        color: var(--text-light);
+    }
+    
+    .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }
+    
+    .online {
+        background-color: var(--online-status);
+    }
+    
+    .offline {
+        background-color: var(--offline-status);
+    }
+    
+    .last-seen {
+        font-size: 0.85rem;
+        color: var(--text-light);
+        margin: 0;
+    }
+    
+    .start-chat-btn {
+        background-color: var(--primary-color);
+        color: white;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        flex-shrink: 0;
+    }
+    
+    .start-chat-btn:hover {
+        background-color: var(--secondary-color);
+        transform: scale(1.1);
+        color: white;
+    }
+    
+    .empty-users {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--text-light);
+    }
+    
+    .empty-users i {
+        font-size: 3rem;
+        margin-bottom: 15px;
+        color: #bdc3c7;
+    }
+    
+    .empty-users h3 {
+        color: #95a5a6;
+        margin-bottom: 10px;
+    }
+    
+    .filter-tabs {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+    }
+    
+    .filter-tab {
+        padding: 6px 15px;
+        border-radius: 20px;
+        background-color: var(--light-bg);
+        color: var(--text-dark);
+        font-size: 0.9rem;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+    
+    .filter-tab.active {
+        background-color: var(--primary-color);
+        color: white;
+    }
+    
+    .users-list::-webkit-scrollbar { width: 6px; }
+    .users-list::-webkit-scrollbar-track { background: transparent; }
+    .users-list::-webkit-scrollbar-thumb { background-color: rgba(0, 0, 0, 0.2); border-radius: 3px; }
+    
+    @media (max-width: 768px) {
+        .user-item { padding: 12px 15px; }
+        .user-avatar { width: 44px; height: 44px; font-size: 1rem; }
+        .filter-tabs { overflow-x: auto; padding-bottom: 5px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="users-container">
+        <div class="users-header">
+            <h2><i class="fas fa-user-plus"></i> Selecciona un usuario para chatear</h2>
+        </div>
+        
+        <div class="users-tools">
+            <div class="search-container">
+                <i class="fas fa-search"></i>
+                <input type="text" class="form-control search-input" placeholder="Buscar usuarios...">
+            </div>
+            
+            <div class="filter-tabs">
+                <div class="filter-tab active" data-filter="all">Todos</div>
+                <div class="filter-tab" data-filter="online">En línea</div>
+            </div>
+        </div>
+        
+        <div class="users-list">
+            {% for user in users %}
+            <div class="user-item" data-user-id="{{ user.id }}" data-status="{{ user.chat_profile.status|default:'offline' }}">
+                <a href="{% url 'user_profile_detail' user.id %}">
+                    {% if user.ternium_profile.avatar and user.ternium_profile.avatar.url %}
+                        <img src="{{ user.ternium_profile.avatar.url }}" alt="{{ user.username }}" class="user-avatar" style="object-fit: cover;">
+                    {% else %}
+                        <div class="user-avatar">
+                            {{ user.username|first|upper }}
+                        </div>
+                    {% endif %}
+                </a>
+                
+                <div class="user-info">
+                    <a href="{% url 'user_profile_detail' user.id %}" style="text-decoration: none;">
+                        <h5 class="user-name">{{ user.get_full_name|default:user.username }}</h5>
+                    </a>
+                    
+                    <div class="user-status">
+                        <span class="status-dot {% if user.chat_profile.status == 'online' %}online{% else %}offline{% endif %}"></span>
+                        <span class="status-text">{% if user.chat_profile.status == 'online' %}En línea{% else %}Desconectado{% endif %}</span>
+                    </div>
+                    
+                    <p class="last-seen">
+                        {% if user.chat_profile.last_seen %}
+                            Últ. vez: {{ user.chat_profile.last_seen|naturaltime }}
+                        {% else %}
+                            Nunca conectado
+                        {% endif %}
+                    </p>
+                </div>
+                
+                <a href="{% url 'start_conversation' user.id %}" class="start-chat-btn" title="Iniciar chat">
+                    <i class="fas fa-comment"></i>
+                </a>
+            </div>
+            {% empty %}
+            <div class="empty-users">
+                <i class="fas fa-user-slash"></i>
+                <h3>No hay usuarios disponibles</h3>
+                <p>No se encontraron otros usuarios en el sistema.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // --- LÓGICA DE BÚSQUEDA Y FILTRADO ---
+    const searchInput = document.querySelector('.search-input');
+    const userItems = document.querySelectorAll('.user-item');
+    
+    function filterUsers() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const activeFilter = document.querySelector('.filter-tab.active').getAttribute('data-filter');
+
+        userItems.forEach(function(item) {
+            const userName = item.querySelector('.user-name').textContent.toLowerCase();
+            const userStatus = item.getAttribute('data-status');
+
+            const matchesSearch = userName.includes(searchTerm);
+            let matchesFilter = true;
+
+            if (activeFilter === 'online') {
+                matchesFilter = userStatus === 'online';
+            }
+            
+            item.style.display = matchesSearch && matchesFilter ? 'flex' : 'none';
+        });
+    }
+
+    searchInput.addEventListener('input', filterUsers);
+
+    const filterTabs = document.querySelectorAll('.filter-tab');
+    filterTabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            filterTabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            filterUsers();
+        });
+    });
+
+    // --- LÓGICA DE PRESENCIA CON WEBSOCKETS ---
+    const presenceSocket = new WebSocket(
+        (window.location.protocol === 'https:' ? 'wss://' : 'ws://')
+        + window.location.host
+        + '/ws/status/'
+    );
+
+    presenceSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        if (data.type === 'presence') {
+            updateUserStatus(data.user_id, data.status, data.last_seen_natural);
+        }
+    };
+
+    function updateUserStatus(userId, status, lastSeenNatural) {
+        const userElement = document.querySelector(`.user-item[data-user-id="${userId}"]`);
+        
+        if (userElement) {
+            const statusDot = userElement.querySelector('.status-dot');
+            const statusText = userElement.querySelector('.status-text');
+            const lastSeenElement = userElement.querySelector('.last-seen');
+
+            // Actualizar el atributo de datos para el filtrado
+            userElement.setAttribute('data-status', status);
+            
+            if (status === 'online') {
+                statusDot.classList.add('online');
+                statusDot.classList.remove('offline');
+                statusText.textContent = 'En línea';
+                lastSeenElement.style.display = 'none'; // Ocultar "últ. vez" si está en línea
+            } else {
+                statusDot.classList.add('offline');
+                statusDot.classList.remove('online');
+                statusText.textContent = 'Desconectado';
+                lastSeenElement.style.display = 'block'; // Mostrar "últ. vez"
+                if (lastSeenNatural) {
+                    lastSeenElement.textContent = `Últ. vez: ${lastSeenNatural}`;
+                }
+            }
+            // Volver a aplicar el filtro por si el estado del usuario cambió y afecta la vista actual
+            filterUsers();
+        }
+    }
+});
+</script>
+{% endblock %}

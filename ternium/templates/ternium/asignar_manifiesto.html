@@ -1,0 +1,90 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+
+{% block title %}Asignar Manifiestos{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 mt-4">
+    <h2 class="mb-4 text-primary"><i class="fas fa-cogs me-2"></i>Asignación de Reporte de Destrucción</h2>
+    
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0"><i class="fas fa-plus-circle me-1"></i> Nueva Asignación</h6>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-3">Selecciona 1 Origen y 1 Material. Las remisiones que cumplan con esta combinación habilitarán el botón de descarga del documento Word.</p>
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="fw-bold text-secondary">{{ form.origen.label }}</label>
+                            {{ form.origen }}
+                        </div>
+                        <div class="mb-3">
+                            <label class="fw-bold text-secondary">{{ form.material.label }}</label>
+                            {{ form.material }}
+                        </div>
+                        <div class="d-grid mt-4">
+                            <button type="submit" class="btn btn-success"><i class="fas fa-save me-1"></i> Asignar y Guardar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white">
+                    <h6 class="mb-0"><i class="fas fa-list me-1"></i> Combinaciones Activas</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Origen Habilitado</th>
+                                    <th>Material Habilitado</th>
+                                    <th>Fecha Registro</th>
+                                    <th class="text-center">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for config in configuraciones %}
+                                <tr>
+                                    <td class="fw-bold text-primary">{{ config.origen.nombre }}</td>
+                                    <td class="fw-bold text-success">{{ config.material.nombre }}</td>
+                                    <td class="small">{{ config.creado_en|date:"d/m/Y" }}</td>
+                                    <td class="text-center">
+                                        <form method="post" onsubmit="return confirm('¿Seguro que deseas eliminar esta configuración?');">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="eliminar" value="1">
+                                            <input type="hidden" name="config_id" value="{{ config.id }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar regla">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center py-4 text-muted">No hay configuraciones activas.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        $('.select2').select2({ theme: 'bootstrap-5', width: '100%' });
+    });
+</script>
+{% endblock %}
+{% endblock %}

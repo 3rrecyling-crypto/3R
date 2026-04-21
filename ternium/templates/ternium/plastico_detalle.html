@@ -1,0 +1,224 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+
+{% block title %}Detalle {{ plastico.remision }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-dark mb-1">
+                Remisión: <span class="text-primary">{{ plastico.remision|default:"S/N" }}</span>
+            </h2>
+            <div class="d-flex gap-2 align-items-center mt-2">
+                {% if plastico.empresa %}
+                    <span class="badge bg-indigo text-white shadow-sm" style="background-color: #6610f2;">
+                        <i class="fas fa-industry"></i> {{ plastico.empresa.nombre }}
+                    </span>
+                {% endif %}
+
+                {% if plastico.status == 'AUDITADO' %}
+                    <span class="badge bg-success"><i class="fas fa-check-circle"></i> AUDITADO</span>
+                {% elif plastico.status == 'CANCELADO' %}
+                    <span class="badge bg-danger"><i class="fas fa-ban"></i> CANCELADO</span>
+                {% elif plastico.status == 'TERMINADO' %}
+                    <span class="badge bg-primary"><i class="fas fa-flag"></i> TERMINADO</span>
+                {% else %}
+                    <span class="badge bg-warning text-dark"><i class="fas fa-pencil-alt"></i> BORRADOR</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <a href="{% url 'lista_plastico' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+            
+            {% if plastico.status != 'AUDITADO' and plastico.status != 'CANCELADO' %}
+                <a href="{% url 'editar_plastico' plastico.id %}" class="btn btn-primary">
+                    <i class="fas fa-edit"></i> Editar
+                </a>
+            {% endif %}
+
+            {% if user.is_superuser and plastico.status == 'BORRADOR' %}
+                <form action="{% url 'auditar_plastico' plastico.id %}" method="POST" class="d-inline" onsubmit="return confirm('¿Bloquear registro?');">
+                    {% csrf_token %}
+                    <button class="btn btn-success" style="border-top-left-radius: 0; border-bottom-left-radius: 0;">
+                        <i class="fas fa-check-double"></i> Auditar
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row g-4">
+        
+        <div class="col-lg-8">
+            
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white fw-bold py-3 border-bottom">
+                    <i class="fas fa-info-circle text-muted me-2"></i> Información Operativa
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="text-muted small fw-bold">FECHA REGISTRO</label>
+                            <p class="fs-5 mb-0">{{ plastico.creado_en|date:"d/m/Y H:i" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-muted small fw-bold">FECHA ENTREGA</label>
+                            <p class="fs-5 mb-0">{{ plastico.fecha_entrega|date:"d/m/Y"|default:"--" }}</p>
+                        </div>
+
+                        <div class="col-12"><hr class="my-1 text-muted opacity-25"></div>
+
+                        <div class="col-md-6">
+                            <label class="text-muted small fw-bold">RUTA</label>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fw-bold">{{ plastico.origen|default:"--" }}</span>
+                                <i class="fas fa-arrow-right text-muted small"></i>
+                                <span class="fw-bold">{{ plastico.destino|default:"--" }}</span>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="text-muted small fw-bold">MATERIAL</label>
+                            <p class="mb-0 fw-bold text-dark">{{ plastico.descripcion|default:"--" }}</p>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="text-muted small fw-bold">UNIDAD / OPERADOR</label>
+                            <p class="mb-0">{{ plastico.unidad|default:"--" }} <span class="text-muted">|</span> {{ plastico.operador|default:"--" }}</p>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="text-muted small fw-bold">FOLIOS (LD / DLV)</label>
+                            <p class="mb-0">{{ plastico.folio_ld|default:"--" }} <span class="text-muted">/</span> {{ plastico.folio_dlv|default:"--" }}</p>
+                        </div>
+                    </div>
+
+                    {% if plastico.comentario %}
+                        <div class="alert alert-light border mt-3 mb-0">
+                            <i class="fas fa-comment text-muted me-2"></i> <strong>Nota:</strong> {{ plastico.comentario }}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white fw-bold py-3 border-bottom d-flex justify-content-between">
+                    <span><i class="fas fa-balance-scale text-muted me-2"></i> Pesos y Costos</span>
+                    {% if plastico.pagado %}
+                        <span class="badge bg-success rounded-pill">PAGADO</span>
+                    {% else %}
+                        <span class="badge bg-light text-dark border rounded-pill">PENDIENTE PAGO</span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive mb-3">
+                        <table class="table table-bordered text-center align-middle mb-0">
+                            <thead class="bg-light text-muted small">
+                                <tr>
+                                    <th>PESO BRUTO</th>
+                                    <th>TARIMAS</th>
+                                    <th class="table-success">PESO NETO</th>
+                                    <th>PRECIO</th>
+                                    <th class="table-primary">TOTAL VENTA</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="fs-5">{{ plastico.peso_bruto|default:"0" }} <small>{{ plastico.unidad_medida }}</small></td>
+                                    <td class="fs-5 text-danger">-{{ plastico.peso_tarimas|default:"0" }} <small>kg</small></td>
+                                    <td class="fs-4 fw-bold text-success">{{ plastico.peso|default:"0" }} <small>{{ plastico.unidad_medida }}</small></td>
+                                    <td class="fs-5">${{ plastico.precio|default:"0.00" }}</td>
+                                    <td class="fs-4 fw-bold text-primary">${{ plastico.venta|default:"0.00" }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white fw-bold py-3 border-bottom">
+                    <i class="fas fa-paperclip text-muted me-2"></i> Archivos Adjuntos
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-file-pdf text-danger me-2"></i> Documento Adicional
+                            </div>
+                            {% if plastico.pdf_adicional %}
+                                <a href="{{ plastico.pdf_adicional.url }}" target="_blank" class="btn btn-sm btn-outline-primary">Ver PDF</a>
+                            {% else %}
+                                <span class="badge bg-light text-muted">No adjunto</span>
+                            {% endif %}
+                        </div>
+
+                        {% for ev in plastico.evidencias.all %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div class="text-truncate" style="max-width: 70%;">
+                                <i class="fas fa-image text-info me-2"></i> {{ ev.archivo.name }}
+                            </div>
+                            <a href="{{ ev.archivo.url }}" target="_blank" class="btn btn-sm btn-outline-info">Ver</a>
+                        </div>
+                        {% empty %}
+                        <div class="list-group-item text-muted text-center small fst-italic">
+                            Sin evidencias fotográficas.
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="col-lg-4">
+            
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white fw-bold py-3 border-bottom">
+                    <i class="fas fa-history text-muted me-2"></i> Historial
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">
+                        {% for h in plastico.historial.all %}
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between small">
+                                <span class="fw-bold">{{ h.usuario.username }}</span>
+                                <span class="text-muted">{{ h.fecha|date:"d/m H:i" }}</span>
+                            </div>
+                            <div class="small text-muted mt-1">{{ h.cambio }}</div>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item text-center text-muted small py-3">Sin movimientos registrados.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2">
+                {% if plastico.status != 'CANCELADO' %}
+                <form action="{% url 'cancelar_plastico' plastico.id %}" method="POST" onsubmit="return confirm('¿Seguro que desea CANCELAR este registro?');">
+                    {% csrf_token %}
+                    <button class="btn btn-outline-danger w-100">
+                        <i class="fas fa-times me-2"></i> Cancelar Registro
+                    </button>
+                </form>
+                {% endif %}
+                <button onclick="window.print()" class="btn btn-secondary w-100">
+                    <i class="fas fa-print me-2"></i> Imprimir Pantalla
+                </button>
+            </div>
+
+            <div class="mt-4 text-center text-muted small">
+                <p class="mb-1">Última actualización: {{ plastico.actualizado_en|date:"d/m/Y H:i:s" }}</p>
+                <p>Usuario: {{ plastico.usuario.username|default:"Sistema" }}</p>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

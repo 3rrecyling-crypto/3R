@@ -1,0 +1,173 @@
+{% extends terniumbase.html %}
+{% load static %}
+
+{% block title %}TERNIUM - Portal de Entradas y Salidas{% endblock title %}
+
+{% block extra_css %}
+link rel=preconnect href=httpsfonts.googleapis.com
+link rel=preconnect href=httpsfonts.gstatic.com crossorigin
+link href=httpsfonts.googleapis.comcss2family=Poppinswght@300;400;600;700&display=swap rel=stylesheet
+
+style
+     -------------------------
+       PORTAL PAGE STYLES
+    ------------------------- 
+    body, html {
+        height 100%;
+        font-family 'Poppins', sans-serif;
+    }
+
+    .portal-container {
+        display flex;
+        flex-direction column;
+        justify-content center;
+        align-items center;
+        min-height 85vh;  Adjust to fit viewport 
+        padding 2rem;
+        background url('httpsimages.unsplash.comphoto-1554224155-82a479417859q=80&w=2070&auto=format&fit=crop') no-repeat center center;
+        background-size cover;
+        position relative;
+        color white;
+        text-align center;
+    }
+
+    .portal-containerbefore {
+        content '';
+        position absolute;
+        top 0;
+        left 0;
+        width 100%;
+        height 100%;
+        background rgba(14, 30, 47, 0.85);  Dark blue overlay 
+        backdrop-filter blur(4px);
+    }
+
+    .portal-header, .portal-cards-wrapper {
+        position relative;
+        z-index 2;
+        animation fadeIn 1s ease-in-out;
+    }
+
+    .portal-header h1 {
+        font-size 4rem;
+        font-weight 700;
+        letter-spacing 2px;
+        text-shadow 0 4px 10px rgba(0, 0, 0, 0.4);
+        margin 0;
+    }
+    
+    .portal-header h1 .highlight {
+        color #00b8ff;  A bright, techy blue 
+    }
+
+    .portal-header p {
+        font-size 1.25rem;
+        font-weight 300;
+        margin-top 0.5rem;
+        color rgba(255, 255, 255, 0.8);
+    }
+
+    .portal-cards-wrapper {
+        display flex;
+        gap 2rem;
+        margin-top 3rem;
+        flex-wrap wrap;  Allows cards to stack on smaller screens 
+        justify-content center;
+    }
+
+    .portal-card {
+        background rgba(255, 255, 255, 0.05);
+        border 1px solid rgba(255, 255, 255, 0.2);
+        border-radius 12px;
+        padding 2.5rem;
+        width 350px;
+        text-decoration none;
+        color white;
+        transition transform 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+        backdrop-filter blur(10px);
+        box-shadow 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+    }
+
+    .portal-cardhover {
+        transform translateY(-15px);
+        background rgba(255, 255, 255, 0.1);
+        border-color #00b8ff;
+        box-shadow 0 16px 40px 0 rgba(0, 184, 255, 0.2);
+    }
+
+    .portal-card .card-icon {
+        font-size 3.5rem;
+        margin-bottom 1.5rem;
+        color #00b8ff;
+    }
+
+    .portal-card h3 {
+        font-size 1.75rem;
+        font-weight 600;
+        margin-bottom 0.75rem;
+    }
+
+    .portal-card p {
+        font-size 1rem;
+        color rgba(255, 255, 255, 0.7);
+        line-height 1.6;
+        min-height 80px;  Ensures cards have same height 
+    }
+
+    .portal-card .btn-portal {
+        display inline-block;
+        margin-top 1.5rem;
+        padding 0.75rem 2rem;
+        background-color #00b8ff;
+        color #0e1e2f;
+        border-radius 50px;
+        text-decoration none;
+        font-weight 600;
+        transition background-color 0.3s ease;
+    }
+    
+    .portal-cardhover .btn-portal {
+        background-color #fff;
+    }
+
+    @keyframes fadeIn {
+        from { opacity 0; transform translateY(20px); }
+        to { opacity 1; transform translateY(0); }
+    }
+style
+{% endblock extra_css %}
+
+{% block content %}
+div class=portal-container
+    header class=portal-header
+        h1TERNIUMspan class=highlight.spanh1
+        pPortal de Operaciones Logísticasp
+    header
+
+    div class=portal-cards-wrapper
+        a href={% url 'lista_entradas' %} class=portal-card
+            div class=card-icon
+                i class=fas fa-arrow-down-to-bracketi
+            div
+            h3Entradas de Maquilah3
+            pRegistrar y gestionar el material recibido de proveedores para su procesamiento.p
+            span class=btn btn-portalGestionar Entradasspan
+        a
+
+        a href={% url 'lista_registros_logistica' %} class=portal-card
+            div class=card-icon
+                i class=fas fa-arrow-up-from-bracketi
+            div
+            h3Salidas a Terniumh3
+            pCoordinar y documentar los envíos de material procesado hacia las instalaciones de Ternium.p
+            span class=btn btn-portalGestionar Salidasspan
+        a
+    div
+div
+{% endblock content %}
+
+{% block extra_js %}
+script
+     This page has no specific JS, but you can add it here if needed.
+script
+{% endblock extra_js %}

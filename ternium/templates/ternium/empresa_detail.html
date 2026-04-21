@@ -1,0 +1,50 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">
+            <i class="fas fa-building me-2"></i>
+            Detalle de Empresa
+        </h2>
+        <div>
+            <a href="{% url 'editar_empresa' pk=object.pk %}" class="btn btn-primary me-2">
+                <i class="fas fa-edit me-2"></i>Editar Empresa
+            </a>
+            <a href="{% url 'lista_empresas' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Volver al Listado
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">{{ object.nombre }}</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-4 text-muted">Nombre Completo:</dt>
+                        <dd class="col-sm-8">{{ object.nombre }}</dd>
+
+                        <dt class="col-sm-4 text-muted">Prefijo de Remisión:</dt>
+                        <dd class="col-sm-8">
+                            <span class="badge bg-dark" style="font-size: 1rem;">{{ object.prefijo }}-XXX</span>
+                        </dd>
+                    </dl>
+                </div>
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-4 text-muted">Creado en:</dt>
+                        <dd class="col-sm-8">{{ object.creado_en|date:"d/m/Y H:i" }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</div>
+{% endblock %}

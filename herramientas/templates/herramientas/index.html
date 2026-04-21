@@ -1,0 +1,65 @@
+{% extends 'ternium/base.html' %} 
+
+{% block title %}Herramientas Digitales - 3R Recycling{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Estilos específicos para el menú de herramientas */
+    .card-tool { 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+        border: none; 
+        transition: transform 0.3s ease;
+    }
+    .card-tool:hover {
+        transform: translateY(-5px);
+    }
+    .hero-tools { 
+        background: linear-gradient(135deg, #1a73e8 0%, #0d62d1 100%); 
+        color: white; 
+        padding: 3rem 0; 
+        margin-bottom: 2rem; 
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="hero-tools text-center position-relative overflow-hidden">
+        <div class="position-relative z-1">
+            <h1><i class="fas fa-toolbox me-2"></i>Centro de Utilidades</h1>
+            <p class="lead mb-0">Selecciona una herramienta para optimizar tu trabajo</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card card-tool h-100 text-center p-4">
+                <div class="display-4 mb-3 text-danger"><i class="fas fa-file-pdf"></i></div>
+                <h3>Unir PDFs</h3>
+                <p class="text-muted">Combina múltiples documentos PDF en un solo archivo ordenado.</p>
+                <a href="{% url 'unir_pdf' %}" class="btn btn-outline-primary mt-auto stretched-link">Fusionar Documentos</a>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card card-tool h-100 text-center p-4">
+                <div class="display-4 mb-3 text-warning"><i class="fas fa-images"></i></div>
+                <h3>Fotos a PDF</h3>
+                <p class="text-muted">Convierte tus imágenes (JPG, PNG) en un documento PDF listo para enviar.</p>
+                <a href="{% url 'fotos_pdf' %}" class="btn btn-outline-warning mt-auto stretched-link">Convertir Imágenes</a>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card card-tool h-100 text-center p-4">
+                <div class="display-4 mb-3 text-info"><i class="fas fa-magic"></i></div>
+                <h3>Quitar Fondo (IA)</h3>
+                <p class="text-muted">Elimina el fondo de tus imágenes automáticamente usando Inteligencia Artificial.</p>
+                <a href="{% url 'quitar_fondo' %}" class="btn btn-outline-info mt-auto stretched-link">Procesar Imagen</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

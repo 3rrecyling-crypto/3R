@@ -1,0 +1,353 @@
+{% extends 'compras/compras_base.html' %}
+{% load widget_tweaks %}
+{% load humanize %}
+
+{% block compras_content %}
+
+{% if messages %}
+<div class="container-fluid pt-4">
+    {% for message in messages %}
+    <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-{{ message.tags }}{% endif %} alert-dismissible fade show shadow-sm rounded-lg" role="alert">
+        <div class="d-flex align-items-center">
+            <i class="{% if message.tags == 'error' %}fas fa-exclamation-circle{% elif message.tags == 'warning' %}fas fa-exclamation-triangle{% elif message.tags == 'success' %}fas fa-check-circle{% else %}fas fa-info-circle{% endif %} me-3 fs-5"></i>
+            <span class="fs-6">{{ message }}</span>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="container-fluid">
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 class="fw-bold text-primary mb-2 fs-2">{{ titulo }}</h3>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item"><a href="{% url 'detalle_solicitud' solicitud.pk %}" class="text-decoration-none text-muted">Solicitud</a></li>
+                            <li class="breadcrumb-item active text-primary fw-medium" aria-current="page">Crear Orden de Compra</li>
+                        </ol>
+                    </nav>
+                </div>
+                <div class="d-flex gap-3">
+                    <a href="{% url 'detalle_solicitud' solicitud.pk %}" class="btn btn-outline-secondary d-flex align-items-center px-4 py-2 rounded-pill">
+                        <i class="fas fa-arrow-left me-2 fs-6"></i>Volver
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if form.errors %}
+        <div class="alert alert-danger">
+            <strong>Por favor corrija los siguientes errores:</strong>
+            <ul>
+            {% for field in form %}
+                {% for error in field.errors %}
+                    <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                {% endfor %}
+            {% endfor %}
+            {% for error in form.non_field_errors %}
+                <li>{{ error }}</li>
+            {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    <form method="post" id="ordenCompraForm" class="needs-validation" novalidate>
+        {% csrf_token %}
+        <div class="row">
+            <div class="col-lg-8">
+                
+                <div class="card mb-5 shadow-sm border-0 rounded-3">
+                    <div class="card-header bg-primary text-white border-0 py-4">
+                        <h5 class="card-title mb-0 fw-bold fs-5">
+                            <i class="fas fa-file-invoice me-3"></i>Datos de la Orden de Compra
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold fs-6 mb-3">{{ form.proveedor.label }} <span class="text-danger">*</span></label>
+                                {% render_field form.proveedor class="form-select form-select-lg py-3 rounded-2" %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold fs-6 mb-3">{{ form.fecha_entrega_esperada.label }} <span class="text-danger">*</span></label>
+                                {% render_field form.fecha_entrega_esperada class="form-control form-control-lg py-3 rounded-2" type="date" min=today_str %}
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold fs-6 mb-3">{{ form.moneda.label }} <span class="text-danger">*</span></label>
+                                {% render_field form.moneda class="form-select form-select-lg py-3 rounded-2" %}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold fs-6 mb-3">{{ form.tipo_cambio.label }}</label>
+                                <div class="input-group input-group-lg">
+                                    <span class="input-group-text bg-light border-end-0 py-3 rounded-start-2"><i class="fas fa-exchange-alt text-primary fs-5"></i></span>
+                                    {% render_field form.tipo_cambio class="form-control border-start-0 py-3 rounded-end-2" type="number" step="0.0001" min="0" placeholder="0.0000" %}
+                                </div>
+                            </div>
+
+                            <div class="col-md-4" id="dias-credito-container">
+                                <label class="form-label fw-semibold fs-6 mb-3">Días de Crédito</label>
+                                <div class="input-group input-group-lg">
+                                    <input type="number" class="form-control py-3 rounded-start-2" id="dias_credito" min="0" value="{{ form.instance.proveedor.dias_credito|default:0 }}" readonly>
+                                    <span class="input-group-text bg-light py-3 rounded-end-2">días</span>
+                                </div>
+                            </div>
+
+                            <div class="col-12"><hr></div>
+                            
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold fs-6 mb-3">{{ form.modalidad_pago.label }} <span class="text-danger">*</span></label>
+                                {% render_field form.modalidad_pago class="form-select form-select-lg py-3 rounded-2" %}
+                            </div>
+                            
+                            <div class="col-md-6" id="plazos-container" style="display: none;">
+                                <label class="form-label fw-semibold fs-6 mb-3 text-primary">{{ form.cantidad_plazos.label }}</label>
+                                <div class="input-group input-group-lg">
+                                    <span class="input-group-text bg-primary text-white"><i class="fas fa-clock"></i></span>
+                                    {% render_field form.cantidad_plazos class="form-control form-control-lg py-3 rounded-2" min="1" placeholder="Ej: 3" %}
+                                </div>
+                                <div class="form-text text-primary"><small>El sistema calculará automáticamente los montos al guardar.</small></div>
+                            </div>
+
+                            <div class="col-12 mt-3">
+                                <label class="form-label fw-semibold fs-6 mb-3">{{ form.condiciones_pago.label }} <span class="text-danger">*</span></label>
+                                {% render_field form.condiciones_pago class="form-control py-3 rounded-2" rows="2" placeholder="Especificar condiciones..." %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm border-0 rounded-3">
+                    <div class="card-header bg-secondary text-white border-0 py-4">
+                        <h5 class="card-title mb-0 fw-bold fs-5">
+                            <i class="fas fa-shopping-cart me-3"></i>Artículos a Comprar
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        {{ formset.management_form }}
+                        <div id="detalle-forms-container">
+                            {% for detalle_form, articulo in zipped_forms_and_articles %}
+                            <div class="detalle-form border-bottom bg-white" data-iva="{{ articulo.lleva_iva|yesno:'true,false' }}" data-retencion-iva="{{ articulo.lleva_retencion_iva|yesno:'true,false' }}">
+                                {{ detalle_form.articulo }}{{ detalle_form.id }}
+                                <div class="p-4">
+                                    <div class="row align-items-center mb-3">
+                                        <div class="col-md-9">
+                                            <h5 class="fw-bold text-dark mb-1">{{ articulo.nombre }}</h5>
+                                            <div class="text-muted small mb-2">SKU: {{ articulo.sku|default:"N/A" }} | Cat: {{ articulo.categoria|default:"Gral" }}</div>
+                                            <div class="d-flex gap-2">
+                                                {% if articulo.lleva_iva %}<span class="badge bg-info bg-opacity-10 text-info border border-info">IVA</span>{% endif %}
+                                                {% if articulo.lleva_retencion_iva %}<span class="badge bg-warning bg-opacity-10 text-warning border border-warning">RET IVA</span>{% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row g-2 align-items-end bg-light p-3 rounded-3">
+                                        <div class="col-md-3">
+                                            <label class="small fw-bold text-muted">Cantidad</label>
+                                            {% render_field detalle_form.cantidad class="form-control fw-bold text-center cantidad-input" %}
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="small fw-bold text-muted">Precio Unit.</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text bg-white border-end-0">$</span>
+                                                {% render_field detalle_form.precio_unitario class="form-control border-start-0 precio-input" %}
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="small fw-bold text-muted">Desc %</label>
+                                            {% render_field detalle_form.descuento class="form-control text-center descuento-input" %}
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="small fw-bold text-muted">Subtotal Línea</label>
+                                            <input type="text" class="form-control subtotal-display bg-white text-end fw-bold" readonly value="$0.00">
+                                            <input type="hidden" class="iva-display"> 
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0 rounded-3 sticky-top" style="top: 30px; z-index: 100;">
+                    <div class="card-header bg-dark text-white border-0 py-4">
+                        <h5 class="card-title mb-0 fw-bold fs-5">
+                            <i class="fas fa-calculator me-3"></i>Resumen Total
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="list-group list-group-flush mb-4">
+                            <div class="list-group-item d-flex justify-content-between px-0 py-2">
+                                <span class="text-muted">Subtotal Base</span>
+                                <span id="summary-subtotal" class="fw-bold">$0.00</span>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between px-0 py-2 text-danger">
+                                <span>Descuentos</span>
+                                <span id="summary-descuentos">-$0.00</span>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between px-0 py-2 text-primary">
+                                <span>IVA (16%)</span>
+                                <span id="summary-iva">$0.00</span>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between px-0 py-2 text-warning">
+                                <span>Retenciones</span>
+                                <span id="summary-retencion-iva">-$0.00</span>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-light p-3 rounded-3 border text-center mb-4">
+                            <small class="text-muted text-uppercase fw-bold">Total a Pagar</small>
+                            <div id="summary-total" class="fs-2 fw-bold text-success">$0.00</div>
+                            <small class="text-muted">MXN</small>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="confirmacion" required>
+                            <label class="form-check-label small" for="confirmacion">
+                                He verificado precios y cantidades.
+                            </label>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg py-3 fw-bold shadow-sm">
+                                <i class="fas fa-check-circle me-2"></i>APROBAR ORDEN
+                            </button>
+                            <a href="{% url 'detalle_solicitud' solicitud.pk %}" class="btn btn-outline-danger">
+                                Cancelar
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // --- LÓGICA DE PLAZOS Y CONDICIONES ---
+    const modalidadSelect = document.getElementById('id_modalidad_pago');
+    const plazosContainer = document.getElementById('plazos-container');
+    const plazosInput = document.getElementById('id_cantidad_plazos');
+    const diasCreditoContainer = document.getElementById('dias-credito-container');
+    const condicionesInput = document.getElementById('id_condiciones_pago');
+
+    function toggleModalidad() {
+        if (modalidadSelect.value === 'A_PLAZOS') {
+            // Mostrar Plazos, Ocultar Días de crédito
+            if (plazosContainer) plazosContainer.style.display = 'block';
+            if (diasCreditoContainer) diasCreditoContainer.style.display = 'none';
+            if (plazosInput) plazosInput.required = true;
+            
+            // Bloquear condiciones para que el sistema las escriba
+            if (condicionesInput) {
+                condicionesInput.readOnly = true;
+                condicionesInput.placeholder = "Se calculará automáticamente: (Total / Plazos)";
+                
+                // --- FIX PARA VALIDACIÓN DE DJANGO ---
+                // Ponemos un valor temporal para que no falle el "Campo requerido"
+                condicionesInput.value = "A PLAZOS (Se calculará al guardar)"; 
+                
+                condicionesInput.classList.add('bg-light');
+            }
+        } else {
+            // Ocultar Plazos, Mostrar Días de crédito
+            if (plazosContainer) plazosContainer.style.display = 'none';
+            if (diasCreditoContainer) diasCreditoContainer.style.display = 'block';
+            if (plazosInput) {
+                plazosInput.required = false;
+                plazosInput.value = "";
+            }
+            
+            // Restaurar condiciones manuales
+            if (condicionesInput) {
+                condicionesInput.readOnly = false;
+                condicionesInput.placeholder = "Especificar condiciones de pago...";
+                // Limpiar si tenía el valor automático
+                if (condicionesInput.value.includes("(Se calculará al guardar)")) {
+                    condicionesInput.value = ""; 
+                }
+                condicionesInput.classList.remove('bg-light');
+            }
+        }
+    }
+
+    if (modalidadSelect) {
+        modalidadSelect.addEventListener('change', toggleModalidad);
+        toggleModalidad(); // Ejecutar al inicio
+    }
+
+    // --- LÓGICA DE CÁLCULOS (PRECIOS) ---
+    const container = document.getElementById('detalle-forms-container');
+    const ordenCompraForm = document.getElementById('ordenCompraForm');
+    const confirmacionCheckbox = document.getElementById('confirmacion');
+    
+    function formatCurrency(value) {
+        return value.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    
+    function calculateTotals() {
+        let totalSubtotal = 0, totalDescuentos = 0, totalIva = 0, totalRetencionIva = 0;
+        
+        document.querySelectorAll('.detalle-form').forEach(form => {
+            const cantidad = parseFloat(form.querySelector('.cantidad-input').value) || 0;
+            const precio = parseFloat(form.querySelector('.precio-input').value) || 0;
+            const descuento = parseFloat(form.querySelector('.descuento-input').value) || 0;
+            
+            const aplicaIva = form.dataset.iva === 'true';
+            const aplicaRetencionIva = form.dataset.retencionIva === 'true';
+            
+            // Cálculos línea
+            const subtotalBruto = cantidad * precio;
+            const montoDescuento = subtotalBruto * (descuento / 100);
+            const subtotalNeto = subtotalBruto - montoDescuento;
+            
+            let ivaLinea = aplicaIva ? subtotalNeto * 0.16 : 0;
+            let retLinea = aplicaRetencionIva ? subtotalNeto * 0.106667 : 0; // 10.67% aprox
+            
+            // Actualizar display visual de la línea
+            form.querySelector('.subtotal-display').value = `$${formatCurrency(subtotalNeto)}`;
+            
+            // Acumular globales
+            totalSubtotal += subtotalNeto;
+            totalDescuentos += montoDescuento;
+            totalIva += ivaLinea;
+            totalRetencionIva += retLinea;
+        });
+        
+        const granTotal = totalSubtotal + totalIva - totalRetencionIva;
+        
+        document.getElementById('summary-subtotal').textContent = `$${formatCurrency(totalSubtotal)}`;
+        document.getElementById('summary-descuentos').textContent = `-$${formatCurrency(totalDescuentos)}`;
+        document.getElementById('summary-iva').textContent = `$${formatCurrency(totalIva)}`;
+        document.getElementById('summary-retencion-iva').textContent = `-$${formatCurrency(totalRetencionIva)}`;
+        document.getElementById('summary-total').textContent = `$${formatCurrency(granTotal)}`;
+    }
+    
+    container.addEventListener('input', function(e) {
+        if (e.target.matches('input')) calculateTotals();
+    });
+    
+    ordenCompraForm.addEventListener('submit', function(e) {
+        if (!confirmacionCheckbox.checked) {
+            alert('Por favor confirma que has verificado los precios y cantidades.');
+            e.preventDefault();
+        }
+    });
+    
+    calculateTotals();
+});
+</script>
+{% endblock %}

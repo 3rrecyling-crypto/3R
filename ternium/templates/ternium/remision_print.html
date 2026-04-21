@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Remisión #{{ remision.remision }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { font-family: sans-serif; font-size: 12px; }
+        .header-box { border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+        .info-box { background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 15px; }
+        .table th { background-color: #333; color: white; }
+        @media print {
+            .no-print { display: none; }
+            body { padding: 0; }
+        }
+    </style>
+</head>
+<body class="p-4" onload="window.print()">
+
+    <div class="no-print mb-4">
+        <a href="javascript:window.history.back();" class="btn btn-secondary btn-sm">← Volver</a>
+        <button onclick="window.print()" class="btn btn-primary btn-sm">Imprimir / Guardar PDF</button>
+    </div>
+
+    <div class="header-box d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="fw-bold mb-0">{{ remision.empresa.nombre }}</h2>
+            <p class="text-muted mb-0">Comprobante de Remisión</p>
+        </div>
+        <div class="text-end">
+            <h3 class="fw-bold text-danger">{{ remision.remision }}</h3>
+            <p class="mb-0">Fecha: {{ remision.fecha|date:"d/m/Y" }}</p>
+            <span class="badge bg-dark border">{{ remision.get_status_display }}</span>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-6">
+            <div class="info-box h-100">
+                <h6 class="fw-bold border-bottom pb-1">ORIGEN</h6>
+                <p class="mb-1 fw-bold">{{ remision.origen.nombre }}</p>
+                <small class="d-block text-muted">Cliente Final: {{ remision.cliente|default:"--" }}</small>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="info-box h-100">
+                <h6 class="fw-bold border-bottom pb-1">DESTINO</h6>
+                <p class="mb-0 fw-bold">{{ remision.destino.nombre }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="info-box">
+                <h6 class="fw-bold border-bottom pb-1">DATOS DE TRANSPORTE</h6>
+                <div class="row">
+                    <div class="col-4"><strong>Línea:</strong> {{ remision.linea_transporte.nombre|default:"N/A" }}</div>
+                    <div class="col-4"><strong>Operador:</strong> {{ remision.operador_final }}</div>
+                    <div class="col-4"><strong>Unidad:</strong> {{ remision.unidad_final }}</div>
+                    <div class="col-4 mt-2"><strong>Caja/Contenedor:</strong> {{ remision.contenedor_final }}</div>
+                    <div class="col-4 mt-2"><strong>Folio LD:</strong> {{ remision.folio_ld }}</div>
+                    <div class="col-4 mt-2"><strong>Folio DLV:</strong> {{ remision.folio_dlv }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h6 class="fw-bold mt-4">DETALLE DE MATERIALES</h6>
+    <table class="table table-striped table-bordered table-sm">
+        <thead>
+            <tr>
+                <th>Material</th>
+                <th class="text-center">U.M.</th>
+                <th class="text-end">Peso Carga</th>
+                <th class="text-end">Peso Descarga</th>
+                <th class="text-end">Diferencia</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for d in remision.detalles.all %}
+            <tr>
+                <td>{{ d.material.nombre }}</td>
+                <td class="text-center">{{ d.unidad_medida }}</td>
+                <td class="text-end">{{ d.peso_ld }}</td>
+                <td class="text-end">{{ d.peso_dlv }}</td>
+                <td class="text-end">{{ d.diferencia }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="fw-bold">
+                <td colspan="2" class="text-end">TOTALES:</td>
+                <td class="text-end">{{ remision.total_peso_ld }}</td>
+                <td class="text-end">{{ remision.total_peso_dlv }}</td>
+                <td class="text-end">{{ remision.diff }}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div class="mt-4 border p-2">
+        <strong>Comentarios:</strong>
+        <p class="mb-0 small fst-italic">{{ remision.comentario|default:"Sin comentarios." }}</p>
+    </div>
+
+    <div class="row mt-5 text-center">
+        <div class="col-4 offset-4">
+            <div style="border-top: 1px solid #000; padding-top: 5px;">
+                Firma de Conformidad
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

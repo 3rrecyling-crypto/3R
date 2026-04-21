@@ -1,0 +1,184 @@
+{% extends 'ternium/base.html' %}
+{% block title %}Control Documental TRANE{% endblock %}
+
+{% block content %}
+<style>
+    /* ========================================================
+       ESTILOS RESPONSIVOS: TABLA A TARJETAS (CELULARES)
+       ======================================================== */
+    @media screen and (max-width: 768px) {
+        .responsive-table thead {
+            display: none; /* Ocultar cabeceras en móvil */
+        }
+        .responsive-table tbody tr {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 1.2rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            background: #fff;
+            overflow: hidden;
+        }
+        .responsive-table tbody td {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem 1.2rem !important;
+            border-bottom: 1px solid #f1f5f9;
+            text-align: right;
+            font-size: 0.95rem;
+        }
+        .responsive-table tbody td:last-child {
+            border-bottom: none;
+            background-color: #f8fafc;
+            justify-content: stretch;
+            padding: 1rem !important;
+        }
+        /* Generar etiquetas a la izquierda usando data-label */
+        .responsive-table tbody td::before {
+            content: attr(data-label);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-right: 1rem;
+            text-align: left;
+            flex-shrink: 0;
+        }
+        /* Contenedor de archivos adaptado a móvil */
+        .archivos-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.4rem;
+        }
+        /* Ocultar etiquetas en filas de acciones y vacías */
+        .responsive-table tbody td[data-label="Acciones"]::before,
+        .responsive-table tbody td[data-label="Acción"]::before,
+        .responsive-table tbody tr.empty-state td::before {
+            display: none;
+        }
+        /* Botones estirados para touch-friendly */
+        .mobile-actions {
+            display: flex;
+            width: 100%;
+            gap: 0.5rem;
+        }
+        .mobile-actions > * {
+            flex: 1;
+        }
+        .mobile-actions .btn {
+            width: 100%;
+            padding: 0.7rem;
+            font-size: 0.95rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        /* Estado vacío centrado en móvil */
+        .responsive-table tbody tr.empty-state td {
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+            padding: 2rem !important;
+        }
+    }
+</style>
+
+<div class="container-fluid mt-4 mb-5">
+    
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-4 gap-3">
+        <h2 class="h4 mb-0 text-center text-lg-start fw-bold text-dark">
+            <i class="fas fa-file-signature text-primary me-2"></i>Control de Manifiestos TRANE
+        </h2>
+        
+        <div class="d-flex flex-column flex-md-row gap-3 align-items-center">
+            <form method="get" class="d-flex bg-white p-2 rounded-pill shadow-sm border align-items-center m-0 w-100">
+                <i class="far fa-calendar-alt text-muted mx-2"></i>
+                <input type="date" name="fecha_inicio" class="form-control form-control-sm border-0 bg-transparent" value="{{ fecha_inicio|default_if_none:'' }}" onchange="this.form.submit()" title="Fecha Inicio">
+                <span class="text-muted mx-1">-</span>
+                <input type="date" name="fecha_fin" class="form-control form-control-sm border-0 bg-transparent" value="{{ fecha_fin|default_if_none:'' }}" onchange="this.form.submit()" title="Fecha Fin">
+                {% if fecha_inicio or fecha_fin %}
+                    <a href="{% url 'lista_control_trane' %}" class="btn btn-sm btn-light rounded-circle ms-2" title="Limpiar Filtro"><i class="fas fa-times text-danger"></i></a>
+                {% endif %}
+            </form>
+
+            <a href="{% url 'crear_control_trane' %}" class="btn btn-primary shadow-sm py-2 px-4 rounded-pill text-nowrap w-100 w-md-auto">
+                <i class="fas fa-plus me-2"></i>Captura Manual
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 responsive-table">
+                    <thead class="table-light text-secondary text-uppercase" style="font-size: 0.85rem;">
+                        <tr>
+                            <th class="ps-4 py-3">Folio</th>
+                            <th class="py-3">Fecha</th>
+                            <th class="py-3">Transporte</th>
+                            <th class="py-3">Destino</th>
+                            <th class="py-3">Material</th>
+                            <th class="py-3 text-end">Peso (Kg)</th>
+                            <th class="py-3 text-center">Archivos</th>
+                            <th class="pe-4 py-3 text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for reg in registros %}
+                        <tr>
+                            <td data-label="Folio" class="fw-bold text-dark ps-md-4">{{ reg.folio|default:"-" }}</td>
+                            <td data-label="Fecha" class="text-muted">{{ reg.fecha_captura|date:"d/m/Y"|default:"-" }}</td>
+                            <td data-label="Transporte">
+                                <span class="d-block small fw-bold text-dark">{{ reg.linea_transporte.nombre|default:"-" }}</span>
+                                <span class="text-muted small"><i class="fas fa-id-badge me-1"></i>{{ reg.operador.nombre|default:reg.operador_manual|default:"-" }}</span>
+                            </td>
+                            <td data-label="Destino" class="fw-semibold">{{ reg.destino.nombre|default:"-" }}</td>
+                            <td data-label="Material">{{ reg.material.nombre|default:"-" }}</td>
+                            <td data-label="Peso (Kg)" class="text-md-end fw-bold text-success">{{ reg.cantidad_kg|floatformat:4|default:"0.0000" }}</td>
+                            <td data-label="Archivos" class="text-md-center">
+                                <div class="archivos-wrapper justify-content-md-center d-md-flex flex-md-row gap-1">
+                                    {% if reg.manifiesto %}
+                                        <a href="{{ reg.manifiesto.url|escapejs }}" target="_blank" class="badge bg-primary text-decoration-none py-2 px-3 shadow-sm"><i class="fas fa-file-contract"></i> <span class="d-none d-md-inline">Manifiesto</span></a>
+                                    {% endif %}
+                                    {% if reg.documento_trane %}
+                                        <a href="{{ reg.documento_trane.url|escapejs }}" target="_blank" class="badge bg-info text-decoration-none py-2 px-3 shadow-sm"><i class="fas fa-file-pdf"></i> <span class="d-none d-md-inline">Doc Trane</span></a>
+                                    {% endif %}
+                                    {% if not reg.manifiesto and not reg.documento_trane %}
+                                        <span class="text-muted small fst-italic">Sin carga</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td data-label="Acciones" class="text-md-end pe-md-4">
+                                <div class="mobile-actions justify-content-md-end d-md-inline-block">
+                                    <a href="{% url 'editar_control_trane' reg.id %}" class="btn btn-sm btn-outline-primary mb-1 mb-md-0" title="Editar">
+                                        <i class="fas fa-edit"></i> <span class="d-inline d-md-none">Editar</span>
+                                    </a>
+                                    <form action="{% url 'eliminar_control_trane' reg.id %}" method="POST" class="d-inline" onsubmit="return confirm('¿Eliminar este registro de forma permanente?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar">
+                                            <i class="fas fa-trash"></i> <span class="d-inline d-md-none">Eliminar</span>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr class="empty-state">
+                            <td colspan="8" class="text-center text-muted py-5">
+                                <i class="fas fa-file-signature fa-3x mb-3 text-light"></i>
+                                <h5 class="text-dark">No hay registros de TRANE</h5>
+                                <p class="mb-0">Ajusta los filtros de fecha o da clic en "Captura Manual" para documentar una salida.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+document.addEventListener('DOMContentLoaded', function() {
+    // Elementos del DOM
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    const formTabs = document.getElementById('formTabs');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+    const tabButtons = formTabs.querySelectorAll('.nav-link');
+    
+    let currentTab = 0;
+
+    // Mostrar la pestaña actual
+    function showTab(index) {
+        tabPanes.forEach((pane, i) => {
+            pane.classList.toggle('show', i === index);
+            pane.classList.toggle('active', i === index);
+        });
+        
+        tabButtons.forEach((button, i) => {
+            button.classList.toggle('active', i === index);
+        });
+
+        // Actualizar estado de los botones
+        prevBtn.disabled = index === 0;
+        nextBtn.style.display = index < tabPanes.length - 1 ? 'inline-block' : 'none';
+        submitBtn.style.display = index === tabPanes.length - 1 ? 'inline-block' : 'none';
+        
+        currentTab = index;
+    }
+
+    // Evento para botón Siguiente
+    nextBtn.addEventListener('click', function() {
+        if (currentTab < tabPanes.length - 1) {
+            showTab(currentTab + 1);
+        }
+    });
+
+    // Evento para botón Anterior
+    prevBtn.addEventListener('click', function() {
+        if (currentTab > 0) {
+            showTab(currentTab - 1);
+        }
+    });
+
+    // Inicializar
+    showTab(0);
+
+    // Cambiar pestaña al hacer clic directamente en los tabs
+    tabButtons.forEach((button, index) => {
+        button.addEventListener('click', () => {
+            showTab(index);
+        });
+    });
+});

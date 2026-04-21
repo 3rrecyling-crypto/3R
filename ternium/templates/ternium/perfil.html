@@ -1,0 +1,721 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+
+{% block title %}Mi Perfil - {{ user.username }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-xxl-10 col-xl-12">
+            
+            <div class="d-flex mb-3">
+                <a href="{% url 'home' %}" class="btn btn-white bg-white border-0 shadow-sm rounded-pill px-4 py-2 fw-bold text-decoration-none btn-back">
+                    <i class="fas fa-arrow-left me-2 text-primary"></i>
+                    <span class="text-secondary">Regresar al Inicio</span>
+                </a>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4 bg-white overflow-hidden">
+                <div class="card-body p-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+                    <div>
+                        <h1 class="h2 mb-1 fw-bold gradient-text">
+                            <i class="fas fa-user-crown me-2"></i>Mi Perfil
+                        </h1>
+                        <p class="text-muted mb-0">Gestiona tu información personal y configuración de cuenta</p>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge bg-gradient-primary shadow-sm rounded-pill px-4 py-2 fs-6" style="color:#0d6efd;">
+                            <i class="fas fa-shield-check me-2"></i>
+                            {{ user.ternium_profile.role|default:"Usuario"|upper }}
+                        </span
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-lg overflow-hidden">
+                <div class="card-header bg-white border-0 pb-0 pt-4 px-4">
+                    <ul class="nav nav-pills nav-fill nav-pills-custom" id="profile-tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active d-flex align-items-center justify-content-center" id="tab-info" data-bs-toggle="pill" data-bs-target="#pills-info" type="button">
+                                <div class="icon-wrapper bg-primary-light">
+                                    <i class="fas fa-user-edit text-primary"></i>
+                                </div>
+                                <span class="ms-2">Información Personal</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link d-flex align-items-center justify-content-center" id="tab-security" data-bs-toggle="pill" data-bs-target="#pills-password" type="button">
+                                <div class="icon-wrapper bg-warning-light">
+                                    <i class="fas fa-shield-alt text-warning"></i>
+                                </div>
+                                <span class="ms-2">Seguridad</span>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="card-body p-4 p-md-5">
+                    <div class="tab-content" id="profile-tab-content">
+                        
+                        <div class="tab-pane fade show active" id="pills-info" role="tabpanel" aria-labelledby="tab-info">
+                            <form method="POST" enctype="multipart/form-data" class="needs-validation" novalidate>
+                                {% csrf_token %}
+                                <div class="row g-4">
+                                    
+                                    <div class="col-lg-4">
+                                        <div class="card border-0 shadow-sm h-100 bg-light bg-opacity-25">
+                                            <div class="card-body text-center p-4">
+                                                
+                                                <div class="avatar-container mb-4 position-relative">
+                                                    <div class="avatar-wrapper">
+                                                        {% if user.ternium_profile.avatar %}
+                                                            <img src="{{ user.ternium_profile.avatar.url }}" alt="Avatar" class="avatar-img rounded-circle border-4 border-white shadow-lg">
+                                                        {% else %}
+                                                            <img src="{% static 'r3_recycling/img/user-avatar.png' %}" alt="Avatar" class="avatar-img rounded-circle border-4 border-white shadow-lg">
+                                                        {% endif %}
+                                                        <div class="avatar-overlay">
+                                                            <i class="fas fa-camera fa-2x text-white"></i>
+                                                        </div>
+                                                    </div>
+                                                    <label for="avatar" class="btn btn-sm btn-primary rounded-pill mt-3 px-3 shadow-sm">
+                                                        <i class="fas fa-upload me-1"></i> Cambiar Foto
+                                                    </label>
+                                                    <input class="d-none" type="file" id="avatar" name="avatar" accept="image/*">
+                                                </div>
+                                                
+                                                <h5 class="fw-bold mb-1 text-dark">{{ user.get_full_name|default:user.username }}</h5>
+                                                <p class="text-muted small mb-3">{{ user.email }}</p>
+                                                
+                                                <div class="mb-4">
+                                                    <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-2">
+                                                        <i class="fas fa-circle me-1"></i> Activo
+                                                    </span>
+                                                </div>
+                                                
+                                                <hr class="my-4 opacity-10">
+
+                                                <div class="text-start mb-4">
+                                                    <h6 class="fw-bold text-primary mb-3 d-flex align-items-center">
+                                                        <i class="fas fa-users me-2"></i>Mis Grupos
+                                                    </h6>
+                                                    {% if user_groups %}
+                                                        <div class="groups-scroll" style="max-height: 150px; overflow-y: auto; padding-right: 5px;">
+                                                            <div class="d-flex flex-wrap gap-2">
+                                                                {% for group in user_groups %}
+                                                                    <span class="badge bg-white text-dark border shadow-sm rounded-pill px-3 py-2">
+                                                                        <i class="fas fa-check-circle text-primary me-1"></i>{{ group.name }}
+                                                                    </span>
+                                                                {% endfor %}
+                                                            </div>
+                                                        </div>
+                                                    {% else %}
+                                                        <div class="alert alert-light border rounded text-center py-3 shadow-sm">
+                                                            <i class="fas fa-users-slash text-muted fa-lg mb-2"></i>
+                                                            <p class="small text-muted mb-0">Sin grupos asignados</p>
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+
+                                                <div class="text-start">
+                                                    <h6 class="fw-bold text-purple mb-3 d-flex align-items-center">
+                                                        <i class="fas fa-user-shield me-2"></i>Permisos Especiales
+                                                    </h6>
+                                                    {% if permisos_detallados %}
+                                                        <div class="permisos-scroll bg-white rounded p-3 shadow-sm border" style="max-height: 200px; overflow-y: auto;">
+                                                            {% for permiso in permisos_detallados %}
+                                                                <div class="d-flex align-items-center mb-2 pb-2 border-bottom border-light last-no-border">
+                                                                    <i class="fas fa-check-circle text-success me-2 flex-shrink-0"></i>
+                                                                    <span class="small text-secondary lh-sm">{{ permiso }}</span>
+                                                                </div>
+                                                            {% endfor %}
+                                                        </div>
+                                                    {% else %}
+                                                        <div class="alert alert-light border rounded text-center py-3 shadow-sm">
+                                                            <i class="fas fa-lock text-muted fa-lg mb-2"></i>
+                                                            <p class="small text-muted mb-0">Permisos básicos de usuario</p>
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-lg-8">
+                                        <div class="card border-0 shadow-sm mb-4">
+                                            <div class="card-header bg-primary bg-opacity-10 border-0 py-3">
+                                                <h5 class="fw-bold mb-0 text-primary">
+                                                    <i class="fas fa-id-card me-2"></i>Datos Personales
+                                                </h5>
+                                            </div>
+                                            <div class="card-body p-4">
+                                                <div class="row g-3">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label fw-bold small">
+                                                            <i class="fas fa-user text-primary me-1"></i>Nombre(s)
+                                                        </label>
+                                                        <input type="text" class="form-control form-control-lg border-primary border-opacity-25" 
+                                                               id="first_name" name="first_name" value="{{ user.first_name }}"
+                                                               placeholder="Ingresa tu(s) nombre(s)">
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label fw-bold small">
+                                                            <i class="fas fa-user text-primary me-1"></i>Apellido(s)
+                                                        </label>
+                                                        <input type="text" class="form-control form-control-lg border-primary border-opacity-25" 
+                                                               id="last_name" name="last_name" value="{{ user.last_name }}"
+                                                               placeholder="Ingresa tu(s) apellido(s)">
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <label class="form-label fw-bold small">
+                                                            <i class="fas fa-envelope text-primary me-1"></i>Correo Electrónico
+                                                            <span class="text-danger">*</span>
+                                                        </label>
+                                                        <div class="input-group input-group-lg">
+                                                            <span class="input-group-text bg-primary bg-opacity-10 border-primary border-opacity-25">
+                                                                <i class="fas fa-at text-primary"></i>
+                                                            </span>
+                                                            <input type="email" class="form-control border-primary border-opacity-25" 
+                                                                   id="email" name="email" value="{{ user.email }}" required
+                                                                   placeholder="ejemplo@ternium.com">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="card border-0 shadow-sm">
+                                            <div class="card-header bg-info bg-opacity-10 border-0 py-3">
+                                                <h5 class="fw-bold mb-0 text-info">
+                                                    <i class="fas fa-building me-2"></i>Información Corporativa
+                                                </h5>
+                                            </div>
+                                            <div class="card-body p-4">
+                                                <div class="row g-3">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label fw-bold small">
+                                                            <i class="fas fa-phone text-info me-1"></i>Teléfono / Extensión
+                                                        </label>
+                                                        <div class="input-group input-group-lg">
+                                                            <span class="input-group-text bg-info bg-opacity-10 border-info border-opacity-25">
+                                                                <i class="fas fa-phone-alt text-info"></i>
+                                                            </span>
+                                                            <input type="tel" class="form-control border-info border-opacity-25" 
+                                                                   id="telefono" name="telefono" 
+                                                                   value="{{ user.ternium_profile.telefono|default_if_none:'' }}"
+                                                                   placeholder="Ej. 555-1234 ext. 567">
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label fw-bold small">
+                                                            <i class="fas fa-sitemap text-info me-1"></i>Área / Departamento
+                                                        </label>
+                                                        <input type="text" class="form-control form-control-lg border-info border-opacity-25" 
+                                                               id="area" name="area" 
+                                                               value="{{ user.ternium_profile.area|default_if_none:'' }}"
+                                                               placeholder="Ej. Recursos Humanos">
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <label class="form-label fw-bold small">
+                                                            <i class="fas fa-industry text-info me-1"></i>Empresa Asignada
+                                                        </label>
+                                                        <div class="input-group input-group-lg">
+                                                            <span class="input-group-text bg-info bg-opacity-10 border-info border-opacity-25">
+                                                                <i class="fas fa-city text-info"></i>
+                                                            </span>
+                                                            <input type="text" class="form-control border-info border-opacity-25" 
+                                                                   id="empresa" name="empresa" 
+                                                                   value="{{ user.ternium_profile.empresa|default_if_none:'' }}"
+                                                                   placeholder="Ej. TERNIUM, TRANE, MEDLINE">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex justify-content-end mt-4 pt-3 border-top">
+                                            <button type="submit" name="update_profile" 
+                                                    class="btn btn-primary btn-lg px-5 py-3 fw-bold rounded-pill shadow-sm">
+                                                <i class="fas fa-save me-2"></i>Guardar Cambios
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="tab-pane fade" id="pills-password" role="tabpanel" aria-labelledby="tab-security">
+                            <form method="POST" class="needs-validation" novalidate>
+                                {% csrf_token %}
+                                <div class="row justify-content-center">
+                                    <div class="col-lg-8 col-xl-6">
+                                        <div class="card border-0 shadow-sm">
+                                            <div class="card-header bg-warning bg-opacity-10 border-0 py-4 text-center">
+                                                <div class="security-icon mb-3">
+                                                    <i class="fas fa-lock fa-3x text-warning"></i>
+                                                </div>
+                                                <h3 class="fw-bold text-warning mb-2">Seguridad de la Cuenta</h3>
+                                                <p class="text-muted mb-0">Actualiza tu contraseña para mantener tu cuenta segura</p>
+                                            </div>
+                                            
+                                            <div class="card-body p-4 p-md-5">
+                                                {% if password_form.errors %}
+                                                    <div class="alert alert-danger border-0 rounded-3 shadow-sm mb-4">
+                                                        <div class="d-flex align-items-center">
+                                                            <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+                                                            <div>
+                                                                <h6 class="fw-bold mb-1">Error en la actualización</h6>
+                                                                <ul class="mb-0 ps-3 small">
+                                                                {% for field in password_form %}
+                                                                    {% for error in field.errors %}
+                                                                        <li>{{ error }}</li>
+                                                                    {% endfor %}
+                                                                {% endfor %}
+                                                                {% for error in password_form.non_field_errors %}
+                                                                    <li>{{ error }}</li>
+                                                                {% endfor %}
+                                                                </ul>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                {% endif %}
+
+                                                <div class="form-group mb-4">
+                                                    <label for="id_old_password" class="form-label fw-bold small text-uppercase">
+                                                        <i class="fas fa-key me-2"></i>Contraseña Actual
+                                                    </label>
+                                                    <div class="input-group input-group-lg">
+                                                        {{ password_form.old_password }}
+                                                        <button class="btn btn-outline-secondary toggle-password" type="button">
+                                                            <i class="fas fa-eye"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div class="form-group mb-4">
+                                                    <label for="id_new_password1" class="form-label fw-bold small text-uppercase">
+                                                        <i class="fas fa-lock me-2"></i>Nueva Contraseña
+                                                    </label>
+                                                    <div class="input-group input-group-lg">
+                                                        {{ password_form.new_password1 }}
+                                                        <button class="btn btn-outline-secondary toggle-password" type="button">
+                                                            <i class="fas fa-eye"></i>
+                                                        </button>
+                                                    </div>
+                                                    <div class="form-text small mt-2">
+                                                        <i class="fas fa-info-circle me-1"></i>
+                                                        Debe contener al menos 8 caracteres, incluyendo mayúsculas, minúsculas y números.
+                                                    </div>
+                                                </div>
+
+                                                <div class="form-group mb-4">
+                                                    <label for="id_new_password2" class="form-label fw-bold small text-uppercase">
+                                                        <i class="fas fa-lock me-2"></i>Confirmar Contraseña
+                                                    </label>
+                                                    <div class="input-group input-group-lg">
+                                                        {{ password_form.new_password2 }}
+                                                        <button class="btn btn-outline-secondary toggle-password" type="button">
+                                                            <i class="fas fa-eye"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div class="password-strength mb-4">
+                                                    <div class="d-flex justify-content-between mb-2">
+                                                        <span class="small fw-bold">Fortaleza de contraseña:</span>
+                                                        <span class="small" id="strength-text">Débil</span>
+                                                    </div>
+                                                    <div class="progress" style="height: 8px;">
+                                                        <div class="progress-bar bg-danger" id="strength-bar" style="width: 25%;"></div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="d-grid">
+                                                    <button type="submit" name="change_password" 
+                                                            class="btn btn-warning btn-lg fw-bold py-3 rounded-pill shadow-sm">
+                                                        <i class="fas fa-shield-alt me-2"></i>Actualizar Contraseña
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Variables de color */
+    :root {
+        --primary-gradient: linear-gradient(135deg, #4361ee, #3a0ca3);
+        --warning-gradient: linear-gradient(135deg, #f9c74f, #f8961e);
+        --success-gradient: linear-gradient(135deg, #4cc9f0, #4361ee);
+        --purple: #7209b7;
+    }
+
+    /* Estilo del botón de regresar */
+    .btn-back {
+        transition: all 0.3s ease;
+    }
+    .btn-back:hover {
+        transform: translateX(-5px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1) !important;
+        background-color: #f8f9fa !important;
+    }
+
+    /* Estilos generales */
+    .gradient-text {
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    /* Tabs personalizadas */
+    .nav-pills-custom .nav-link {
+        border: none;
+        padding: 1rem 1.5rem;
+        margin: 0 0.5rem;
+        border-radius: 15px !important;
+        transition: all 0.3s ease;
+        color: #6c757d;
+        background: transparent;
+    }
+
+    .nav-pills-custom .nav-link.active {
+        background: white;
+        color: var(--purple);
+        box-shadow: 0 5px 20px rgba(114, 9, 183, 0.15);
+        transform: translateY(-2px);
+    }
+
+    .nav-pills-custom .nav-link .icon-wrapper {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+    }
+
+    .nav-pills-custom .nav-link.active .icon-wrapper {
+        background: var(--primary-gradient) !important;
+    }
+
+    .nav-pills-custom .nav-link.active .icon-wrapper i {
+        color: white !important;
+    }
+
+    /* Avatar personalizado */
+    .avatar-container {
+        position: relative;
+        display: inline-block;
+    }
+
+    .avatar-wrapper {
+        position: relative;
+        width: 160px;
+        height: 160px;
+        margin: 0 auto;
+    }
+
+    .avatar-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: all 0.3s ease;
+    }
+
+    .avatar-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(67, 97, 238, 0.8);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        cursor: pointer;
+    }
+
+    .avatar-wrapper:hover .avatar-overlay {
+        opacity: 1;
+    }
+
+    .avatar-wrapper:hover .avatar-img {
+        transform: scale(1.05);
+    }
+
+    /* Campos de formulario */
+    .form-control-lg {
+        padding: 0.75rem 1rem;
+        border-radius: 12px;
+        border: 2px solid transparent;
+        transition: all 0.3s ease;
+    }
+
+    .form-control-lg:focus {
+        border-color: #4361ee;
+        box-shadow: 0 0 0 0.25rem rgba(67, 97, 238, 0.25);
+        transform: translateY(-1px);
+    }
+
+    .input-group-lg .input-group-text {
+        border-radius: 12px 0 0 12px;
+        border: 2px solid transparent;
+        border-right: none;
+    }
+
+    .input-group-lg .form-control {
+        border-left: none;
+        border-radius: 0 12px 12px 0;
+    }
+
+    /* Badges personalizados */
+    .badge {
+        font-weight: 500;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Last child cleaner for permissions list */
+    .last-no-border:last-child {
+        border-bottom: 0 !important;
+        margin-bottom: 0 !important;
+        padding-bottom: 0 !important;
+    }
+
+    /* Scroll personalizado para permisos y grupos */
+    .permisos-scroll, .groups-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: #4361ee #f1f1f1;
+    }
+
+    .permisos-scroll::-webkit-scrollbar, .groups-scroll::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .permisos-scroll::-webkit-scrollbar-track, .groups-scroll::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+
+    .permisos-scroll::-webkit-scrollbar-thumb, .groups-scroll::-webkit-scrollbar-thumb {
+        background: #4361ee;
+        border-radius: 10px;
+    }
+
+    /* Icono de seguridad */
+    .security-icon {
+        position: relative;
+        display: inline-block;
+    }
+
+    .security-icon:after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80px;
+        height: 80px;
+        background: rgba(248, 150, 30, 0.1);
+        border-radius: 50%;
+        z-index: -1;
+    }
+
+    /* Botones */
+    .btn-lg {
+        padding: 0.75rem 2rem;
+        font-size: 1.1rem;
+        border: none;
+        transition: all 0.3s ease;
+    }
+
+    .btn-lg:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .rounded-pill {
+        border-radius: 50rem !important;
+    }
+
+    /* Colores de fondo */
+    .bg-primary-light {
+        background-color: rgba(67, 97, 238, 0.1) !important;
+    }
+
+    .bg-warning-light {
+        background-color: rgba(248, 150, 30, 0.1) !important;
+    }
+
+    .text-purple {
+        color: var(--purple) !important;
+    }
+
+    /* Campos de contraseña */
+    #pills-password input[type="password"] {
+        border: 2px solid #e9ecef;
+        border-radius: 12px;
+        padding: 0.75rem 1rem;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+    }
+
+    #pills-password input[type="password"]:focus {
+        border-color: #f8961e;
+        box-shadow: 0 0 0 0.25rem rgba(248, 150, 30, 0.25);
+    }
+
+    .toggle-password {
+        border-radius: 0 12px 12px 0;
+        border: 2px solid #e9ecef;
+        border-left: none;
+    }
+
+    /* Progress bar de fortaleza */
+    .progress {
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        border-radius: 10px;
+        transition: width 0.5s ease;
+    }
+
+    /* Cards */
+    .card {
+        border-radius: 20px;
+        transition: transform 0.3s ease;
+    }
+
+    .card:hover {
+        transform: translateY(-5px);
+    }
+
+    .card-header {
+        border-radius: 20px 20px 0 0 !important;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Cambiar automáticamente a tab de seguridad si hay errores
+        {% if password_form.errors %}
+            const securityTab = document.querySelector('#tab-security');
+            const tabInstance = new bootstrap.Tab(securityTab);
+            tabInstance.show();
+        {% endif %}
+
+        // Toggle para mostrar/ocultar contraseña
+        document.querySelectorAll('.toggle-password').forEach(button => {
+            button.addEventListener('click', function() {
+                const input = this.parentElement.querySelector('input');
+                const icon = this.querySelector('i');
+                
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    icon.classList.remove('fa-eye');
+                    icon.classList.add('fa-eye-slash');
+                } else {
+                    input.type = 'password';
+                    icon.classList.remove('fa-eye-slash');
+                    icon.classList.add('fa-eye');
+                }
+            });
+        });
+
+        // Validación de fortaleza de contraseña en tiempo real
+        const newPasswordInput = document.getElementById('id_new_password1');
+        const strengthBar = document.getElementById('strength-bar');
+        const strengthText = document.getElementById('strength-text');
+        
+        if (newPasswordInput) {
+            newPasswordInput.addEventListener('input', function() {
+                const password = this.value;
+                let strength = 0;
+                
+                // Longitud mínima
+                if (password.length >= 8) strength += 25;
+                if (password.length >= 12) strength += 15;
+                
+                // Contiene números
+                if (/\d/.test(password)) strength += 20;
+                
+                // Contiene minúsculas y mayúsculas
+                if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength += 20;
+                
+                // Contiene caracteres especiales
+                if (/[^A-Za-z0-9]/.test(password)) strength += 20;
+                
+                // Actualizar barra y texto
+                strengthBar.style.width = strength + '%';
+                
+                if (strength < 40) {
+                    strengthBar.className = 'progress-bar bg-danger';
+                    strengthText.textContent = 'Débil';
+                } else if (strength < 70) {
+                    strengthBar.className = 'progress-bar bg-warning';
+                    strengthText.textContent = 'Moderada';
+                } else {
+                    strengthBar.className = 'progress-bar bg-success';
+                    strengthText.textContent = 'Fuerte';
+                }
+            });
+        }
+
+        // Validación de formulario
+        const forms = document.querySelectorAll('.needs-validation');
+        forms.forEach(form => {
+            form.addEventListener('submit', function(event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            }, false);
+        });
+
+        // Preview de imagen antes de subir
+        const avatarInput = document.getElementById('avatar');
+        const avatarImg = document.querySelector('.avatar-img');
+        
+        if (avatarInput) {
+            avatarInput.addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        avatarImg.src = e.target.result;
+                    }
+                    reader.readAsDataURL(this.files[0]);
+                }
+            });
+        }
+
+        // Efecto hover en cards
+        document.querySelectorAll('.card').forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-5px)';
+            });
+            
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0)';
+            });
+        });
+    });
+</script>
+{% endblock %}

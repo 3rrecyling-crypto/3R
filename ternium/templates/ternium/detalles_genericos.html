@@ -1,0 +1,113 @@
+<div class="detail-container">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="detail-item">
+                <span class="detail-label">Nombre:</span>
+                <span class="detail-value">{{ objeto.nombre }}</span>
+            </div>
+
+            {% if model_name == "empresa" %}
+            <div class="detail-item">
+                <span class="detail-label">RFC:</span>
+                <span class="detail-value">{{ objeto.rfc|default:"N/A" }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Contacto Principal:</span>
+                <span class="detail-value">{{ objeto.contacto_principal|default:"N/A" }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Teléfono:</span>
+                <span class="detail-value">
+                    {% if objeto.telefono %}
+                    <a href="tel:{{ objeto.telefono }}" class="text-decoration-none">{{ objeto.telefono }}</a>
+                    {% else %}N/A{% endif %}
+                </span>
+            </div>
+            {% endif %}
+
+            {% if model_name == "operador" %}
+            <div class="detail-item">
+                <span class="detail-label">Licencia:</span>
+                <span class="detail-value">{{ objeto.licencia|default:"N/A" }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Teléfono:</span>
+                <span class="detail-value">
+                    {% if objeto.telefono %}
+                    <a href="tel:{{ objeto.telefono }}" class="text-decoration-none">{{ objeto.telefono }}</a>
+                    {% else %}N/A{% endif %}
+                </span>
+            </div>
+            {% endif %}
+
+            {% if model_name in "unidad,contenedor" %}
+            <div class="detail-item">
+                <span class="detail-label">Placas:</span>
+                <span class="detail-value">{{ objeto.placas|default:"N/A" }}</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-6">
+            {% if model_name in "lineatransporte,material,unidad,contenedor,lugar" %}
+            <div class="detail-item">
+                <span class="detail-label">Empresa:</span>
+                <span class="detail-value">
+                    {% if objeto.empresa %}
+                    <span class="badge bg-primary">{{ objeto.empresa.nombre }}</span>
+                    {% else %}N/A{% endif %}
+                </span>
+            </div>
+            {% endif %}
+
+            {% if model_name == "empresa" %}
+            <div class="detail-item">
+                <span class="detail-label">Dirección:</span>
+                <span class="detail-value">{{ objeto.direccion|default:"N/A" }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Email:</span>
+                <span class="detail-value">
+                    {% if objeto.email %}
+                    <a href="mailto:{{ objeto.email }}" class="text-decoration-none">{{ objeto.email }}</a>
+                    {% else %}N/A{% endif %}
+                </span>
+            </div>
+            {% endif %}
+
+            {% if model_name == "material" %}
+            <div class="detail-item">
+                <span class="detail-label">Descripción:</span>
+                <span class="detail-value">{{ objeto.descripcion|default:"N/A" }}</span>
+            </div>
+            {% endif %}
+
+            <div class="detail-item">
+                <span class="detail-label">Estado:</span>
+                <span class="detail-value">
+                    {% if objeto.activo %}
+                    <span class="badge bg-success">Activo</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Inactivo</span>
+                    {% endif %}
+                </span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Fecha de Registro:</span>
+                <span class="detail-value">{{ objeto.fecha_registro|date:"d/m/Y H:i" }}</span>
+            </div>
+        </div>
+    </div>
+
+    {% if model_name == "empresa" and objeto.notas %}
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="detail-item">
+                <span class="detail-label">Notas Adicionales:</span>
+                <span class="detail-value">{{ objeto.notas }}</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>

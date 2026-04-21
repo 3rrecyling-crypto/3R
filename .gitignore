@@ -1,0 +1,51 @@
+# ── Node / Next.js ──────────────────────────────────────────
+node_modules/
+.next/
+out/
+.npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Python / Django ──────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.Python
+env/
+venv/
+.venv/
+*.env
+.env.*
+
+# ── Base de datos local ──────────────────────────────────────
+db.sqlite3
+*.sqlite3
+
+# ── Archivos de media (subidos por usuarios) ─────────────────
+media/
+
+# ── Archivos estáticos compilados ───────────────────────────
+staticfiles/
+
+# ── IDEs y editores ──────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*.DS_Store
+Thumbs.db
+
+# ── Secretos y config local ──────────────────────────────────
+*.env
+.env.local
+.env.production
+secrets.py
+local_settings.py

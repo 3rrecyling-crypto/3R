@@ -1,0 +1,29 @@
+<li class="list-group-item">
+    <div class="d-flex justify-content-between align-items-center">
+        <strong>{{ category.nombre }}</strong>
+
+        <div class="btn-group" role="group">
+            <a href="{% url 'editar_categoria' pk=category.pk %}" class="btn btn-sm btn-outline-secondary" title="Editar">
+                <i class="fas fa-edit"></i>
+            </a>
+            <a href="{% url 'eliminar_categoria' pk=category.pk %}" class="btn btn-sm btn-outline-danger" title="Eliminar">
+                <i class="fas fa-trash"></i>
+            </a>
+        </div>
+    </div>
+
+    {% with subcategorias=category.subcategorias.all %}
+        
+        {% if subcategorias %}
+            
+            <ul class="list-group mt-2" style="border-left: 2px solid #0d6efd; padding-left: 15px;">
+                
+                {% for subcat in subcategorias %}
+                    
+                    {% include 'compras/_category_node.html' with category=subcat %}
+                
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+    </li>

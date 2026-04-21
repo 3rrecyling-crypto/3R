@@ -1,0 +1,307 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+
+{% block title %}Factura {{ factura.serie|default:"" }}{{ factura.folio }} | 3R Recycling{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb bg-light p-2 rounded shadow-sm">
+            <li class="breadcrumb-item"><a href="{% url 'dashboard_facturacion' %}">Facturación</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ factura.serie|default:"F" }}-{{ factura.folio }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-9">
+            
+            <div class="card shadow-sm mb-4 border-top-0 border-start-0 border-end-0 border-bottom-0">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                    <h5 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-file-invoice me-2"></i>Detalle del Comprobante
+                    </h5>
+                    {% if factura.estado == 'timbrado' %}
+                        <span class="badge bg-success fs-6 px-3 py-2"><i class="fas fa-check-circle me-1"></i> TIMBRADO</span>
+                    {% elif factura.estado == 'pagada' %}
+                        <span class="badge bg-primary fs-6 px-3 py-2"><i class="fas fa-hand-holding-usd me-1"></i> PAGADA</span>
+                    {% elif factura.estado == 'cancelada' %}
+                        <span class="badge bg-danger fs-6 px-3 py-2"><i class="fas fa-ban me-1"></i> CANCELADA</span>
+                    {% elif factura.estado == 'pendiente' %}
+                        <span class="badge bg-warning text-dark fs-6 px-3 py-2"><i class="fas fa-clock me-1"></i> BORRADOR</span>
+                    {% else %}
+                         <span class="badge bg-secondary fs-6 px-3 py-2">{{ factura.estado|upper }}</span>
+                    {% endif %}
+                </div>
+
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6 border-end">
+                            <h6 class="text-muted text-uppercase fw-bold small mb-2"><i class="fas fa-building me-1"></i> Emisor</h6>
+                            <h5 class="mb-1 text-dark fw-bold">{{ factura.emisor.razon_social }}</h5>
+                            <ul class="list-unstyled text-muted small mb-0">
+                                <li><strong>RFC:</strong> {{ factura.emisor.rfc }}</li>
+                                <li><strong>Régimen:</strong> {{ factura.emisor.regimen_fiscal }}</li>
+                                <li><strong>CP:</strong> {{ factura.emisor.codigo_postal }}</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6 ps-md-4">
+                            <h6 class="text-muted text-uppercase fw-bold small mb-2"><i class="fas fa-user-tie me-1"></i> Receptor</h6>
+                            <h5 class="mb-1 text-primary fw-bold">{{ factura.receptor.razon_social }}</h5>
+                            <ul class="list-unstyled text-muted small mb-0">
+                                <li><strong>RFC:</strong> {{ factura.receptor.rfc }}</li>
+                                <li><strong>Uso CFDI:</strong> {{ factura.uso_cfdi }}</li>
+                                <li><strong>CP:</strong> {{ factura.receptor.codigo_postal }}</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="row mb-4 p-3 bg-light rounded mx-0 border">
+                        <div class="col-md-3 col-6 mb-2">
+                            <span class="d-block small text-muted text-uppercase fw-bold">Folio Interno</span>
+                            <span class="fw-bold text-dark">{{ factura.serie|default:"" }}-{{ factura.folio }}</span>
+                        </div>
+                        <div class="col-md-3 col-6 mb-2">
+                            <span class="d-block small text-muted text-uppercase fw-bold">Fecha Emisión</span>
+                            <span class="fw-bold text-dark">{{ factura.fecha_emision|date:"d/m/Y H:i" }}</span>
+                        </div>
+                        <div class="col-md-3 col-6 mb-2">
+                            <span class="d-block small text-muted text-uppercase fw-bold">Método Pago</span>
+                            <span class="badge bg-info text-dark">{{ factura.metodo_pago }}</span>
+                        </div>
+                        <div class="col-md-3 col-6 mb-2">
+                            <span class="d-block small text-muted text-uppercase fw-bold">Forma Pago</span>
+                            <span class="fw-bold text-dark">{{ factura.forma_pago }}</span>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive mb-4">
+                        <table class="table table-hover table-bordered align-middle">
+                            <thead class="table-light text-secondary small text-uppercase">
+                                <tr>
+                                    <th class="text-center" width="10%">Cant.</th>
+                                    <th class="text-center" width="10%">Unidad</th>
+                                    <th>Descripción</th>
+                                    <th class="text-end" width="15%">P. Unitario</th>
+                                    <th class="text-end" width="15%">Importe</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in factura.conceptos.all %}
+                                <tr>
+                                    <td class="text-center fw-bold">{{ item.cantidad|floatformat:2 }}</td>
+                                    <td class="text-center">
+                                        {{ item.unidad }} <br>
+                                        <small class="text-muted badge bg-light text-dark border">{{ item.clave_unidad }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="fw-medium">{{ item.descripcion }}</span>
+                                        <div class="small text-muted mt-1">
+                                            <i class="fas fa-tag me-1"></i>Clave SAT: {{ item.clave_prod_serv }}
+                                        </div>
+                                    </td>
+                                    <td class="text-end text-muted">${{ item.valor_unitario|floatformat:2|intcomma }}</td>
+                                    <td class="text-end fw-bold text-dark">${{ item.importe|floatformat:2|intcomma }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="row justify-content-end">
+                        <div class="col-md-5">
+                            <table class="table table-sm table-borderless">
+                                <tr>
+                                    <td class="text-end text-muted">Subtotal:</td>
+                                    <td class="text-end fw-bold">${{ factura.subtotal|floatformat:2|intcomma }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-end text-muted">IVA (16%):</td>
+                                    <td class="text-end fw-bold">${{ factura.impuestos_trasladados|floatformat:2|intcomma }}</td>
+                                </tr>
+                                {% if factura.impuestos_retenidos > 0 %}
+                                <tr>
+                                    <td class="text-end text-danger">Retenciones:</td>
+                                    <td class="text-end text-danger fw-bold">- ${{ factura.impuestos_retenidos|floatformat:2|intcomma }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr class="border-top border-2">
+                                    <td class="text-end fs-5 pt-2">Total:</td>
+                                    <td class="text-end fs-4 fw-bold text-primary pt-2">${{ factura.monto_total|floatformat:2|intcomma }}</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="2" class="text-end small text-muted">Moneda: {{ factura.moneda }} | TC: {{ factura.tipo_cambio }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if factura.metodo_pago == 'PPD' %}
+            <div class="card shadow-sm mb-4 border-top border-success border-3">
+                <div class="card-header bg-white py-3">
+                    <h6 class="m-0 font-weight-bold text-success"><i class="fas fa-receipt me-2"></i>Historial de Pagos (REP)</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0 align-middle">
+                            <thead class="small text-uppercase bg-light">
+                                <tr>
+                                    <th class="ps-4">Fecha Pago</th>
+                                    <th>Folio REP</th>
+                                    <th class="text-end">Monto Aplicado</th>
+                                    <th class="text-end">Saldo Insoluto</th>
+                                    <th class="text-center">Estado</th>
+                                    <th class="text-center">Documentos</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in factura.pagos_recibidos.all %}
+                                <tr>
+                                    <td class="ps-4">{{ doc.complemento.fecha_pago|date:"d/m/Y" }}</td>
+                                    <td class="fw-bold text-primary">{{ doc.complemento.serie }}-{{ doc.complemento.folio }}</td>
+                                    <td class="text-end text-success fw-bold">${{ doc.importe_pagado|floatformat:2|intcomma }}</td>
+                                    <td class="text-end text-muted">${{ doc.saldo_insoluto|floatformat:2|intcomma }}</td>
+                                    <td class="text-center">
+                                        {% if "CANCELADO" in doc.complemento.uuid %}
+                                            <span class="badge bg-danger">Cancelado</span>
+                                        {% elif doc.complemento.timbrado %}
+                                            <span class="badge bg-success">Timbrado</span>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark">Pendiente</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if doc.complemento.archivo_pdf %}
+                                            <a href="{{ doc.complemento.archivo_pdf.url }}" target="_blank" class="btn btn-sm btn-outline-danger" title="Ver PDF"><i class="fas fa-file-pdf"></i></a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted fst-italic">No se han registrado pagos para esta factura.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+
+        <div class="col-lg-3">
+            
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-dark text-white fw-bold">
+                    <i class="fas fa-cogs me-2"></i>Acciones
+                </div>
+                <div class="card-body d-grid gap-2">
+                    {% if factura.estado == 'timbrado' or factura.estado == 'pagada' %}
+                        <a href="{% url 'factura_pdf_cliente' factura.pk %}" target="_blank" class="btn btn-outline-danger shadow-sm">
+                            <i class="fas fa-file-pdf me-2"></i> Descargar PDF
+                        </a>
+                        
+                        {% if factura.archivo_xml %}
+                        <a href="{{ factura.archivo_xml.url }}" download class="btn btn-outline-success shadow-sm">
+                            <i class="fas fa-file-code me-2"></i> Descargar XML
+                        </a>
+                        {% else %}
+                        <button class="btn btn-outline-secondary" disabled>XML No disponible</button>
+                        {% endif %}
+
+                        <hr class="my-2">
+
+                        {% if factura.metodo_pago == 'PPD' and factura.estado != 'pagada' %}
+                            <a href="{% url 'registrar_pago' factura.pk %}" class="btn btn-success fw-bold text-white shadow-sm">
+                                <i class="fas fa-hand-holding-usd me-2"></i> Registrar Pago
+                            </a>
+                        {% endif %}
+
+                        <button class="btn btn-sm btn-outline-secondary" onclick="window.print()">
+                            <i class="fas fa-print me-2"></i> Imprimir
+                        </button>
+                        
+                        <button class="btn btn-sm btn-outline-danger mt-2" data-bs-toggle="modal" data-bs-target="#modalCancelar">
+                            <i class="fas fa-ban me-2"></i> Cancelar Factura
+                        </button>
+
+                    {% elif factura.estado == 'cancelada' %}
+                         <div class="alert alert-danger text-center mb-0 p-2">
+                            <i class="fas fa-ban fa-2x mb-2"></i><br>
+                            <strong>FACTURA CANCELADA</strong>
+                            <p class="small mb-0 mt-1">Sin validez fiscal.</p>
+                        </div>
+                        <a href="{% url 'factura_pdf_cliente' factura.pk %}" target="_blank" class="btn btn-outline-secondary btn-sm mt-2">
+                            <i class="fas fa-file-pdf me-1"></i> Ver PDF (Acuse)
+                        </a>
+
+                    {% else %}
+                        <div class="alert alert-warning text-center small mb-2">
+                            <i class="fas fa-exclamation-triangle me-1"></i> Factura en borrador o con error. Revisa los datos.
+                        </div>
+                        {% endif %}
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-white fw-bold small text-uppercase text-muted">
+                    Datos Fiscales (SAT)
+                </div>
+                <div class="card-body small">
+                    <p class="mb-1 fw-bold">Folio Fiscal (UUID):</p>
+                    <p class="text-muted text-break bg-light p-2 rounded border font-monospace">
+                        {{ factura.folio_fiscal|default:"No timbrado" }}
+                    </p>
+                    
+                    <p class="mb-1 fw-bold">Fecha Timbrado:</p>
+                    <p class="text-muted">{{ factura.fecha_timbrado|default:"--" }}</p>
+
+                    <p class="mb-1 fw-bold">Serie / Folio:</p>
+                    <p class="text-muted">{{ factura.serie|default:"" }}-{{ factura.folio }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if factura.estado == 'timbrado' or factura.estado == 'pagada' %}
+<div class="modal fade" id="modalCancelar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Cancelar Factura</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <form action="#" method="POST"> 
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="text-center mb-4">
+                        <i class="fas fa-file-invoice-dollar fa-3x text-danger mb-3 opacity-50"></i>
+                        <h5>¿Estás seguro de cancelar la factura <strong>{{ factura.serie|default:"" }}-{{ factura.folio }}</strong>?</h5>
+                        <p class="text-muted small">Esta acción revocará el UUID ante el SAT. Es irreversible.</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Motivo de Cancelación (SAT):</label>
+                        <select name="motivo" class="form-select" required>
+                            <option value="02" selected>02 - Comprobante emitido con errores sin relación (Más común)</option>
+                            <option value="03">03 - No se llevó a cabo la operación</option>
+                            <option value="01">01 - Comprobante emitido con errores con relación</option>
+                            <option value="04">04 - Operación nominativa relacionada en factura global</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-danger fw-bold" disabled title="Configura la vista de cancelación primero">Confirmar Cancelación</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

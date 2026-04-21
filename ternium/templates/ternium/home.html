@@ -1,0 +1,834 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Centro de Comando - 3R Recycling{% endblock %}
+
+{% block content %}
+<style>
+    /* ==========================================================================
+       PALETA DE COLORES PROFESIONAL Y ELEGANTE
+    ========================================================================== */
+    :root {
+        /* 1. VARIABLES NUEVAS DEL DASHBOARD */
+        --color-primary: #2c3e50;
+        --color-primary-dark: #1a252f;
+        --color-primary-light: #34495e;
+        --color-primary-accent: #3498db;
+        --color-primary-accent-dark: #2980b9;
+        
+        --color-ternium: #e74c3c;
+        --color-ternium-soft: #fadbd8;
+        --color-ternium-dark: #c0392b;
+        
+        --color-patio: #2ecc71;
+        --color-patio-soft: #eafaf1;
+        --color-patio-dark: #27ae60;
+        
+        --color-special: #f39c12;
+        --color-special-soft: #fef5e7;
+        --color-special-dark: #d68910;
+        
+        --color-bg-dark: #1a1a2e;
+        --color-bg-card: #ffffff;
+        --color-text-dark: #2c3e50;
+        --color-text-light: #ecf0f1;
+        --color-border: #e9ecef;
+        
+        --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.08);
+        --shadow-card-hover: 0 15px 35px rgba(0, 0, 0, 0.12);
+        --shadow-nav: 0 4px 20px rgba(0, 0, 0, 0.2);
+        
+        --gradient-primary: linear-gradient(135deg, #2c3e50 0%, #4a6491 100%);
+        --gradient-ternium: linear-gradient(135deg, #e74c3c 0%, #ff7979 100%);
+        --gradient-patio: linear-gradient(135deg, #2ecc71 0%, #58d68d 100%);
+        --gradient-special: linear-gradient(135deg, #f39c12 0%, #f7dc6f 100%);
+
+        /* 2. VARIABLES CLÁSICAS (SOBREESCRIBEN BASE.HTML) */
+        --primary-color: #1a252f;   
+        --secondary-color: #0d47a1; 
+        --primary-dark: #1a252f;    
+    }
+
+    /* FONDO ELEGANTE CON GRADIENTE */
+    body { 
+        background: var(--color-primary) !important; 
+        background-attachment: fixed;
+        color: var(--color-text-light);
+        font-family: 'Roboto', sans-serif;
+        min-height: 100vh;
+    }
+
+    /* HEADER ELEGANTE */
+    .header-container {
+        background: linear-gradient(135deg, #1a252f 0%, #0d47a1 100%);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        margin: 1rem 0 2rem;
+        padding: 1.5rem 2rem;
+        box-shadow: var(--shadow-nav);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .header-container::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+        pointer-events: none;
+    }
+
+    .header-title {
+        color: white;
+        font-weight: 700;
+        font-size: 1.8rem;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        margin-bottom: 0.25rem;
+        position: relative;
+        z-index: 2;
+    }
+
+    .header-subtitle {
+        color: #dbe9f4;
+        font-size: 0.95rem;
+        opacity: 0.95;
+        position: relative;
+        z-index: 2;
+    }
+
+    /* RELOJ */
+    .clock-container {
+        background: rgba(0, 0, 0, 0.2);
+        backdrop-filter: blur(5px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 50px;
+        padding: 0.8rem 1.5rem;
+        position: relative;
+        z-index: 2;
+    }
+
+    .clock-text {
+        font-family: 'Roboto Mono', monospace;
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: white;
+        letter-spacing: 1px;
+    }
+
+    /* TÍTULOS DE SECCIÓN */
+    .section-header {
+        display: flex;
+        align-items: center;
+        margin: 3rem 0 1.5rem;
+        position: relative;
+    }
+
+    .section-badge {
+        background: var(--color-primary-accent);
+        color: white;
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-right: 1rem;
+        box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+    }
+
+    .section-line {
+        flex-grow: 1;
+        height: 1px;
+        background: linear-gradient(90deg, rgba(52, 152, 219, 0.3) 0%, transparent 100%);
+    }
+
+    /* TARJETAS */
+    .dashboard-card {
+        background: var(--color-bg-card);
+        border: none;
+        border-radius: 16px;
+        padding: 1.75rem;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: var(--shadow-card);
+        position: relative;
+        overflow: hidden;
+        color: var(--color-text-dark);
+    }
+
+    .dashboard-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        border-radius: 16px 16px 0 0;
+    }
+
+    .dashboard-card:hover {
+        transform: translateY(-8px);
+        box-shadow: var(--shadow-card-hover);
+    }
+
+    /* BORDES Y COLORES */
+    .border-t-ternium::before { background: var(--gradient-ternium); }
+    .border-t-ops::before { background: var(--gradient-primary); }
+    .border-t-patio::before { background: var(--gradient-patio); }
+    .border-t-special::before { background: var(--gradient-special); }
+
+    .icon-circle {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1.5rem;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .icon-circle::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, currentColor 0%, transparent 100%);
+        opacity: 0.1;
+    }
+
+    .dashboard-card:hover .icon-circle {
+        transform: scale(1.1) rotate(5deg);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .text-ternium, .icon-circle.text-ternium { color: var(--color-ternium); }
+    .text-ops, .icon-circle.text-ops { color: var(--color-primary-accent); }
+    .text-patio, .icon-circle.text-patio { color: var(--color-patio); }
+    .text-special, .icon-circle.text-special { color: var(--color-special); }
+
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: 800;
+        line-height: 1;
+        margin: 0.5rem 0;
+        background: linear-gradient(135deg, var(--color-text-dark) 0%, var(--color-primary) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    /* BOTONES */
+    .btn-action-group {
+        margin-top: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .btn-soft {
+        border: 1px solid var(--color-border);
+        background: linear-gradient(to bottom, #fff 0%, #f8f9fa 100%);
+        color: var(--color-text-dark);
+        font-weight: 600;
+        font-size: 0.9rem;
+        padding: 0.75rem 1rem;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        cursor: pointer;
+        width: 100%;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .btn-soft:hover {
+        background: linear-gradient(to bottom, #f8f9fa 0%, #e9ecef 100%);
+        border-color: #ccc;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-gradient {
+        background: var(--gradient-primary);
+        color: white;
+        border: none;
+        font-weight: 600;
+        padding: 0.75rem 1.5rem;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+    }
+
+    .btn-gradient:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(52, 152, 219, 0.4);
+        color: white;
+    }
+
+    /* CARDS GRADIENTE */
+    .card-gradient { background: linear-gradient(135deg, var(--color-ternium-soft) 0%, #fff 100%); border: 1px solid rgba(231, 76, 60, 0.1); }
+    .card-gradient-patio { background: linear-gradient(135deg, var(--color-patio-soft) 0%, #fff 100%); border: 1px solid rgba(46, 204, 113, 0.1); }
+
+    /* TABLAS */
+    .inventory-table { background: transparent; border-radius: 12px; overflow: hidden; }
+    .inventory-table tr:last-child td { border-bottom: none; }
+    .progress-thin { height: 4px; border-radius: 2px; background: rgba(0, 0, 0, 0.05); }
+    .progress-bar-thin { border-radius: 2px; transition: width 1s ease-in-out; }
+
+    /* =========================================================
+       CORRECCIÓN DE MODALES (Bloopups)
+       Estas reglas fuerzan al modal a estar siempre encima del backdrop
+    ========================================================= */
+    .modal {
+        z-index: 1060 !important; /* Capa superior */
+    }
+    
+    .modal-backdrop {
+        z-index: 1050 !important; /* Capa inferior (fondo negro) */
+    }
+
+    .modal-content {
+        border: none;
+        border-radius: 20px;
+        box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+    }
+
+    .modal-header-gradient { background: var(--gradient-primary); color: white; border-bottom: none; padding: 1.5rem; }
+    .modal-header-ternium { background: var(--gradient-ternium); color: white; border-bottom: none; padding: 1.5rem; }
+    .modal-header-ops { background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white; border-bottom: none; padding: 1.5rem; }
+    .modal-header-special { background: var(--gradient-special); color: white; border-bottom: none; padding: 1.5rem; }
+
+    .btn-close-white { filter: brightness(0) invert(1); opacity: 0.8; transition: opacity 0.2s ease; }
+    .btn-close-white:hover { opacity: 1; }
+
+    .form-select-elegant {
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 10px;
+        padding: 0.75rem 1rem;
+        background: #fff;
+        transition: all 0.3s ease;
+    }
+    .form-select-elegant:focus {
+        border-color: var(--color-primary-accent);
+        box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+    }
+
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+
+    @media (max-width: 768px) {
+        .header-container { padding: 1rem; margin: 0.5rem 0 1.5rem; }
+        .header-title { font-size: 1.5rem; }
+        .stat-number { font-size: 2rem; }
+        .dashboard-card { padding: 1.25rem; }
+    }
+</style>
+
+<div class="container-fluid px-3 px-lg-4 pb-5">
+    
+    <div class="header-container animate-fade-in-up">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+            <div>
+                <h2 class="fw-bold header-title mb-0">Centro de Comando Ejecutivo</h2>
+                <p class="header-subtitle mb-0">
+                    <i class="fas fa-user-circle me-1"></i>{{ user.first_name|default:user.username }} 
+                    | <i class="fas fa-calendar-alt me-1"></i>{% now "l, d F Y" %}
+                </p>
+            </div>
+            <div class="mt-3 mt-md-0">
+                <div class="clock-container d-inline-flex align-items-center">
+                    <div class="spinner-grow spinner-grow-sm text-white me-3" role="status" style="width: 10px; height: 10px;"></div>
+                    <span class="clock-text" id="reloj">--:--</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if has_permission %}
+
+    <div class="section-header delay-1">
+        <span class="section-badge">Logística Ternium</span>
+        <div class="section-line"></div>
+    </div>
+    
+    <div class="row g-4 row-cols-1 row-cols-md-2 row-cols-xl-3">
+        <div class="col animate-fade-in-up delay-2">
+            <div class="dashboard-card border-t-ternium">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div class="icon-circle text-ternium">
+                        <i class="fas fa-truck-loading"></i>
+                    </div>
+                    <div class="text-end">
+                        <h2 class="stat-number">{{ total_entradas }}</h2>
+                        <small class="text-muted fw-bold">ENTRADAS</small>
+                    </div>
+                </div>
+                <h5 class="fw-bold mb-2">Entradas Maquila</h5>
+                <p class="text-muted small mb-4">Recepción y control de materiales</p>
+                <div class="btn-action-group">
+                    <a href="{% url 'lista_entradas' %}" class="btn-soft">
+                        <i class="fas fa-list me-2"></i>Ver Bitácora
+                    </a>
+                    <a href="{% url 'export_entradas_excel' %}" class="btn-soft text-ternium">
+                        <i class="fas fa-file-excel me-2"></i>Reporte General
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col animate-fade-in-up delay-3">
+            <div class="dashboard-card border-t-ternium">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div class="icon-circle text-ternium">
+                        <i class="fas fa-truck-moving"></i>
+                    </div>
+                    <div class="text-end">
+                        <h2 class="stat-number">{{ total_registros_logistica }}</h2>
+                        <small class="text-muted fw-bold">SALIDAS</small>
+                    </div>
+                </div>
+                <h5 class="fw-bold mb-2">Logística (Salidas)</h5>
+                <p class="text-muted small mb-4">Embarques y cartas porte</p>
+                <div class="btn-action-group">
+                    <a href="{% url 'lista_registros_logistica' %}" class="btn-soft">
+                        <i class="fas fa-list me-2"></i>Ver Bitácora
+                    </a>
+                    <button type="button" class="btn-gradient" data-bs-toggle="modal" data-bs-target="#modalReportesTernium">
+                        <i class="fas fa-layer-group me-2"></i>Centro de Reportes
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col animate-fade-in-up delay-1">
+            <div class="dashboard-card border-t-ternium card-gradient">
+                <div class="icon-circle text-ternium mb-3">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <h5 class="fw-bold text-ternium mb-2">DASHBOARD TERNIUM</h5>
+                <p class="text-dark small opacity-75 mb-4">Comparativa Entradas vs Salidas en tiempo real</p>
+                <div class="btn-action-group">
+                    <a href="{% url 'dashboard_analisis' %}" class="btn-gradient" style="background: var(--gradient-ternium);">
+                        <i class="fas fa-chart-bar me-2"></i>Ver Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section-header delay-2">
+        <span class="section-badge" style="background: var(--color-primary-accent);">Remisiones & Ops</span>
+        <div class="section-line"></div>
+    </div>
+    
+    <div class="row g-4 row-cols-1 row-cols-lg-2">
+        <div class="col animate-fade-in-up delay-3">
+            <div class="dashboard-card border-t-ops">
+                <div class="icon-circle text-ops mb-3">
+                    <i class="fas fa-file-invoice"></i>
+                </div>
+                <h5 class="fw-bold mb-2">Gestión Remisiones</h5>
+                <p class="text-muted small mb-4">Gestión de datos y imagenes por unidad de negocio</p>
+                <div class="btn-action-group">
+                    <div class="d-flex gap-2 mb-3">
+                        <a href="{% url 'remision_lista' %}" class="btn-soft w-100">
+                            <i class="fas fa-list me-2"></i>Listado
+                        </a>
+                        <a href="{% url 'crear_remision' %}" class="btn-soft text-ops" style="min-width: 50px;">
+                            <i class="fas fa-plus"></i>
+                        </a>
+                    </div>
+                    <button type="button" class="btn-gradient" data-bs-toggle="modal" data-bs-target="#modalReporteRemisiones">
+                        <i class="fas fa-download me-2"></i>Reporte Remisiones
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col animate-fade-in-up delay-1">
+            <div class="dashboard-card border-t-ops" style="background: linear-gradient(135deg, #ffffff 0%, #f8fbfe 100%);">
+                <div class="d-flex align-items-center mb-4">
+                    <div class="icon-circle text-ops mb-0 me-3">
+                        <i class="fas fa-chart-pie"></i>
+                    </div>
+                    <div>
+                        <h5 class="fw-bold mb-1">Dashboard Operativo Remisiones</h5>
+                        <small class="text-muted">Inteligencia de Negocio en Tiempo Real</small>
+                    </div>
+                </div>
+                <p class="text-muted small mb-4">
+                    Visualiza métricas clave, tendencias y análisis predictivo de operaciones
+                </p>
+                <form action="{% url 'dashboard_remisiones' %}" method="get" class="row g-3 align-items-end">
+                    <div class="col-md-8">
+                        <label class="form-label small fw-bold text-muted text-uppercase mb-2">Filtrar por Origen:</label>
+                        <select name="origen" class="form-select-elegant w-100">
+                            <option value="">-- Ver Todas las Operaciones --</option>
+                            {% for op in operaciones_list %}
+                                <option value="{{ op.id }}">{{ op.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn-gradient w-100 py-3">
+                            <i class="fas fa-arrow-right me-2"></i>Ir al Dashboard
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="section-header delay-3">
+        <span class="section-badge" style="background: var(--color-patio);">Inventario en Patios</span>
+        <div class="section-line"></div>
+    </div>
+    
+    <div class="row g-4 row-cols-1 row-cols-md-2 row-cols-xl-3">
+        {% for patio in patios_inventario %}
+        <div class="col animate-fade-in-up" style="animation-delay: {{ forloop.counter|add:"0.1" }}s;">
+            <div class="dashboard-card border-t-patio card-gradient-patio">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold text-patio mb-0 text-truncate">
+                        <i class="fas fa-map-marker-alt me-2"></i>{{ patio.nombre }}
+                    </h6>
+                    <small class="text-muted fw-bold">
+                        <i class="fas fa-clock me-1"></i>{{ patio.ultima_actualizacion|date:"H:i" }}
+                    </small>
+                </div>
+                
+                <div class="text-center py-3 mb-3">
+                    <h3 class="stat-number">{{ patio.total_kg|floatformat:0|intcomma }}</h3>
+                    <small class="text-muted fw-bold text-uppercase">Kilogramos</small>
+                </div>
+                
+                <div class="bg-light rounded-3 px-3 py-3 flex-grow-1" style="max-height: 220px; overflow-y: auto;">
+                    <table class="table table-borderless table-sm mb-0 inventory-table">
+                        {% for mat in patio.materiales %}
+                        <tr>
+                            <td class="text-muted fw-bold ps-0" style="width: 60%;">{{ mat.nombre|truncatechars:20 }}</td>
+                            <td class="text-end fw-bold text-dark pe-0">{{ mat.cantidad|floatformat:0|intcomma }} Kg</td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" class="p-0 pb-3">
+                                <div class="d-flex align-items-center">
+                                    <div class="progress-thin flex-grow-1 me-2">
+                                        <div class="progress-bar-thin" role="progressbar" 
+                                             style="width: {{ mat.porcentaje }}%; background-color: var(--color-patio);">
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">{{ mat.porcentaje }}%</small>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="2" class="text-center text-muted fst-italic py-4">
+                                <i class="fas fa-inbox fa-lg mb-2 d-block"></i>
+                                Patio vacío
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 animate-fade-in-up">
+            <div class="alert alert-light border-0 opacity-75 text-center text-white bg-dark bg-opacity-25 py-4">
+                <i class="fas fa-warehouse fa-2x mb-3 d-block"></i>
+                No hay patios configurados en el sistema
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if perms.ternium.acceso_plastico or perms.ternium.acceso_tarimas %}
+    <div class="section-header">
+        <span class="section-badge" style="background: var(--color-special);">Módulos Especiales</span>
+        <div class="section-line"></div>
+    </div>
+    
+    <div class="row g-4 row-cols-1 row-cols-md-2">
+        {% if perms.ternium.acceso_plastico %}
+        <div class="col animate-fade-in-up">
+            <div class="dashboard-card border-t-special">
+                <div class="d-flex align-items-center">
+                    <div class="icon-circle text-special mb-0 me-4">
+                        <i class="fas fa-wine-bottle"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h5 class="fw-bold mb-1">Control de Plásticos / Sealed Air</h5>
+                        <small class="text-muted">Gestión de plástico</small>
+                    </div>
+                    <div class="d-flex flex-column gap-2">
+                        <a href="{% url 'lista_plastico' %}" class="btn-gradient" style="background: var(--gradient-special); color: #333;">
+                            <i class="fas fa-door-open me-2"></i>Entrar
+                        </a>
+                        <button class="btn btn-sm btn-light text-muted border" data-bs-toggle="modal" data-bs-target="#modalReportePlastico">
+                            <i class="fas fa-download"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if perms.ternium.acceso_tarimas %}
+        <div class="col animate-fade-in-up delay-1">
+            <div class="dashboard-card border-t-special">
+                <div class="d-flex align-items-center">
+                    <div class="icon-circle text-special mb-0 me-4">
+                        <i class="fas fa-pallet"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h5 class="fw-bold mb-1">Control de Tarimas</h5>
+                        <small class="text-muted">Venta por tipos de tarimas</small>
+                    </div>
+                    <div class="d-flex flex-column gap-2">
+                        <a href="{% url 'lista_tarimas' %}" class="btn-gradient" style="background: var(--gradient-special); color: #333;">
+                            <i class="fas fa-door-open me-2"></i>Entrar
+                        </a>
+                        <button class="btn btn-sm btn-light text-muted border" data-bs-toggle="modal" data-bs-target="#modalReporteTarimas">
+                            <i class="fas fa-download"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-6 col-lg-5 col-xl-4 animate-fade-in-up">
+            <div class="card border-0 shadow-lg p-5" style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);">
+                <div class="mb-4 text-center">
+                    <i class="fas fa-lock fa-4x text-primary"></i>
+                </div>
+                <h3 class="text-center mb-3">Acceso Limitado</h3>
+                <p class="text-center text-muted mb-4">
+                    No tienes permisos asignados para acceder a este módulo.
+                    Contacta al administrador del sistema.
+                </p>
+                <div class="text-center">
+                    <a href="{% url 'login' %}" class="btn-gradient px-4">
+                        <i class="fas fa-sign-in-alt me-2"></i>Iniciar Sesión
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div> <div class="modal fade" id="modalReportesTernium" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header modal-header-ternium">
+                <h5 class="modal-title fw-bold">Centro de Reportes Logísticos</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="list-group list-group-flush">
+                    <a href="{% url 'export_logistica_mensual' %}?year={% now 'Y' %}" class="list-group-item list-group-item-action py-3">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-calendar text-ternium me-3 fs-5"></i>
+                            <div><h6 class="mb-0 fw-bold">Resumen Mensual</h6><small class="text-muted">Ejecutivo Año Actual</small></div>
+                        </div>
+                    </a>
+                    <a href="{% url 'export_logistica_proveedor' %}?year={% now 'Y' %}" class="list-group-item list-group-item-action py-3">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-truck text-ternium me-3 fs-5"></i>
+                            <div><h6 class="mb-0 fw-bold">Por Proveedor</h6><small class="text-muted">Volúmenes</small></div>
+                        </div>
+                    </a>
+                    <a href="{% url 'export_logistica_material' %}?year={% now 'Y' %}" class="list-group-item list-group-item-action py-3">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-cubes text-ternium me-3 fs-5"></i>
+                            <div><h6 class="mb-0 fw-bold">Por Material</h6><small class="text-muted">Concentrado</small></div>
+                        </div>
+                    </a>
+                </div>
+                <div class="p-3 bg-light border-top">
+                    <h6 class="fw-bold small text-muted text-uppercase mb-2">Base de Datos Completa (Excel)</h6>
+                    <form action="{% url 'export_logistica_excel' %}" method="get" class="row g-2">
+                        <div class="col-5"><input type="date" name="fecha_inicio" class="form-control form-control-sm" required></div>
+                        <div class="col-5"><input type="date" name="fecha_fin" class="form-control form-control-sm" required></div>
+                        <div class="col-2"><button type="submit" class="btn btn-sm w-100 text-white" style="background-color: var(--color-ternium);"><i class="fas fa-download"></i></button></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalReporteRemisiones" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header modal-header-ops">
+                <h5 class="modal-title fw-bold">Reporte de Remisiones</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            
+            <div class="modal-body">
+                <p class="text-muted text-center mb-3 small">Filtrar por <strong>Empresa (Top 10)</strong> y Fechas.</p>
+                <form action="{% url 'export_remisiones_to_excel' %}" method="get">
+                    <div class="form-floating mb-3">
+                        <select name="q_empresa" class="form-select border-primary" id="floatEmp" required>
+                            <option value="">Seleccione Empresa...</option>
+                            {% for emp in empresas_reporte %}
+                                <option value="{{ emp.id }}">{{ emp.nombre }} ({{ emp.num_remisiones }} regs)</option>
+                            {% endfor %}
+                        </select>
+                        <label for="floatEmp">Empresa</label>
+                    </div>
+                    
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <div class="form-floating">
+                                <input type="date" name="q_fecha_desde" class="form-control" id="fd" required>
+                                <label for="fd">Desde</label>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="form-floating">
+                                <input type="date" name="q_fecha_hasta" class="form-control" id="fh" required>
+                                <label for="fh">Hasta</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn text-white w-100 mb-4 fw-bold" style="background-color: var(--color-primary-accent); border-radius: 8px;">
+                        <i class="fas fa-file-excel me-2"></i>Descargar Filtrado
+                    </button>
+                </form>
+
+                <hr>
+
+                <div class="text-center">
+                    <p class="small text-muted mb-2">O descarga la base de datos completa:</p>
+                    <a href="{% url 'export_remisiones_to_excel' %}" class="btn btn-secondary w-100 btn-sm">
+                        <i class="fas fa-database me-2"></i>Descargar Base Completa (Todo)
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalReportePlastico" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header modal-header-special py-2">
+                <h6 class="modal-title fw-bold">Reporte Plásticos</h6>
+                <button type="button" class="btn-close btn-close-white btn-sm" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{% url 'exportar_plastico_excel' %}" method="get">
+                <div class="modal-body">
+                    <div class="mb-2"><small>Desde:</small><input type="date" name="fecha_inicio" class="form-control form-control-sm" required></div>
+                    <div class="mb-3"><small>Hasta:</small><input type="date" name="fecha_fin" class="form-control form-control-sm" required></div>
+                    <button type="submit" class="btn w-100 btn-sm text-white fw-bold" style="background-color: var(--color-special);">Descargar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalReporteTarimas" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header modal-header-special py-2">
+                <h6 class="modal-title fw-bold">Reporte Tarimas</h6>
+                <button type="button" class="btn-close btn-close-white btn-sm" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{% url 'exportar_tarimas_excel' %}" method="get">
+                <div class="modal-body">
+                    <div class="mb-2"><small>Desde:</small><input type="date" name="fecha_inicio" class="form-control form-control-sm" required></div>
+                    <div class="mb-3"><small>Hasta:</small><input type="date" name="fecha_fin" class="form-control form-control-sm" required></div>
+                    <button type="submit" class="btn w-100 btn-sm text-white fw-bold" style="background-color: var(--color-special);">Descargar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // CORRECCIÓN CRÍTICA DE MODALES:
+        // Mueve todos los modales al final del body para evitar conflictos de z-index y overflow
+        var modals = document.querySelectorAll('.modal');
+        modals.forEach(function(modal) {
+            document.body.appendChild(modal);
+        });
+
+        // 1. RELOJ EN TIEMPO REAL
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString([], { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            const el = document.getElementById('reloj');
+            if(el) el.innerText = timeString;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // 2. ANIMACIÓN DE ENTRADA SUAVE
+        const cards = document.querySelectorAll('.animate-fade-in-up');
+        cards.forEach(card => {
+            card.style.opacity = '0';
+        });
+
+        setTimeout(() => {
+            cards.forEach(card => {
+                card.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
+                card.style.opacity = '1';
+            });
+        }, 100);
+
+        // 3. EFECTO HOVER MEJORADO PARA CARDS
+        const dashboardCards = document.querySelectorAll('.dashboard-card');
+        dashboardCards.forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.zIndex = '10';
+            });
+            
+            card.addEventListener('mouseleave', function() {
+                this.style.zIndex = '1';
+            });
+        });
+
+        // 4. ACTUALIZACIÓN AUTOMÁTICA DE INVENTARIO (cada 5 minutos)
+        setInterval(() => {
+            console.log('Actualizando datos de inventario...');
+            // Aquí puedes agregar fetch() si deseas recargar datos sin refrescar la página
+        }, 300000); 
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,519 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+
+<style>
+    /* --- PALETA DE COLORES VIBRANTE --- */
+    :root {
+        /* Logística (Azul Oceano) */
+        --theme-logistica-bg: #e7f1ff;
+        --theme-logistica-text: #0d6efd;
+        --theme-logistica-grad: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+
+        /* Carga (Morado/Indigo) */
+        --theme-carga-bg: #f3ebff;
+        --theme-carga-text: #6610f2;
+        --theme-carga-grad: linear-gradient(135deg, #6610f2 0%, #520dc2 100%);
+
+        /* Finanzas (Verde Esmeralda) */
+        --theme-finanzas-bg: #d1e7dd;
+        --theme-finanzas-text: #198754;
+        --theme-finanzas-grad: linear-gradient(135deg, #198754 0%, #146c43 100%);
+
+        /* Documentos (Naranja/Ámbar) */
+        --theme-docs-bg: #fff3cd;
+        --theme-docs-text: #ffc107; /* Texto oscuro para contraste */
+        --theme-docs-grad: linear-gradient(135deg, #fd7e14 0%, #d63384 100%);
+    }
+
+    /* --- INPUT GROUPS & ICONOS (Estilo Colorido) --- */
+    .input-group {
+        flex-wrap: nowrap !important; /* Mantiene el icono pegado al input */
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        border-radius: 8px;
+        transition: transform 0.2s;
+    }
+    .input-group:focus-within {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .input-group-text {
+        border: 1px solid #ced4da;
+        border-right: none;
+        font-size: 1.1rem;
+        width: 45px;
+        justify-content: center;
+        border-top-left-radius: 8px;
+        border-bottom-left-radius: 8px;
+        font-weight: bold;
+    }
+
+    /* Estilos específicos por sección para los iconos */
+    .section-logistica .input-group-text { background-color: var(--theme-logistica-bg); color: var(--theme-logistica-text); border-color: #b6d4fe; }
+    .section-carga .input-group-text     { background-color: var(--theme-carga-bg); color: var(--theme-carga-text); border-color: #e0cffc; }
+    .section-finanzas .input-group-text  { background-color: var(--theme-finanzas-bg); color: var(--theme-finanzas-text); border-color: #a3cfbb; }
+    .section-docs .input-group-text      { background-color: #fff3cd; color: #fd7e14; border-color: #ffe69c; }
+
+    /* Inputs */
+    .form-control, .form-select {
+        border: 1px solid #ced4da;
+        padding: 0.6rem 0.8rem;
+        border-top-right-radius: 8px !important;
+        border-bottom-right-radius: 8px !important;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: var(--theme-logistica-text);
+        box-shadow: none; /* Quitamos el glow default azul */
+        outline: 2px solid rgba(13, 110, 253, 0.25);
+    }
+
+    /* --- TARJETAS --- */
+    .card-colorful {
+        border: none;
+        border-radius: 15px;
+        background: #fff;
+        margin-bottom: 2rem;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        overflow: hidden;
+    }
+    
+    .card-header-gradient {
+        padding: 1rem 1.5rem;
+        color: white;
+        font-weight: 600;
+        font-size: 1rem;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    /* Gradientes de cabecera */
+    .grad-logistica { background: var(--theme-logistica-grad); }
+    .grad-carga { background: var(--theme-carga-grad); }
+    .grad-finanzas { background: var(--theme-finanzas-grad); }
+    .grad-docs { background: var(--theme-docs-grad); }
+
+    /* --- WIDGETS DE CALCULO --- */
+    .calc-box {
+        background-color: #f8f9fa;
+        border-radius: 12px;
+        padding: 15px;
+        border: 1px dashed #ced4da;
+    }
+    
+    .calc-row {
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    
+    .calc-item { flex: 1; min-width: 90px; }
+    .calc-sign { font-size: 1.5rem; font-weight: bold; padding-bottom: 5px; }
+
+    /* Highlight para totales */
+    .total-display {
+        background: var(--theme-finanzas-text);
+        color: white;
+        border-radius: 8px;
+        font-weight: bold;
+    }
+
+    /* --- BOTONES --- */
+    .btn-save-vibrant {
+        background: linear-gradient(45deg, #11998e, #38ef7d);
+        border: none;
+        color: white;
+        padding: 10px 30px;
+        border-radius: 50px;
+        font-weight: bold;
+        box-shadow: 0 4px 15px rgba(56, 239, 125, 0.4);
+        transition: transform 0.2s;
+    }
+    .btn-save-vibrant:hover {
+        transform: scale(1.05);
+        color: white;
+    }
+    .btn-cancel-soft {
+        background: #e9ecef;
+        color: #495057;
+        border-radius: 50px;
+        padding: 10px 25px;
+        border: none;
+    }
+
+    /* Labels */
+    .form-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #6c757d;
+        margin-bottom: 4px;
+        margin-left: 2px;
+    }
+    /* Colores para labels especificos */
+    .text-theme-logistica { color: var(--theme-logistica-text); }
+    .text-theme-carga { color: var(--theme-carga-text); }
+    .text-theme-finanzas { color: var(--theme-finanzas-text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-0 text-dark">
+                <span class="text-primary me-2"><i class="fas fa-cubes"></i></span>{{ titulo }}
+            </h3>
+            <p class="text-muted small mb-0">Complete todos los campos requeridos marcados por colores.</p>
+        </div>
+        <a href="{% url 'lista_plastico' %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+            <i class="fas fa-arrow-left me-1"></i> Volver al listado
+        </a>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate id="plasticoForm">
+        {% csrf_token %}
+
+        {% if form.errors %}
+        <div class="alert alert-danger shadow-sm border-0 rounded-3 mb-4" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i> <strong>Atención:</strong> Por favor revise los errores en el formulario.
+        </div>
+        {% endif %}
+
+        <div class="card border-primary shadow-sm mb-4">
+            <div class="card-body bg-light py-3">
+                <div class="row align-items-center">
+                    <div class="col-md-3 text-end">
+                        <label class="fw-bold text-primary mb-0"><i class="fas fa-industry me-2"></i>OPERACIÓN / EMPRESA:</label>
+                    </div>
+                    <div class="col-md-9">
+                        {{ form.empresa }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card card-colorful section-logistica">
+            <div class="card-header-gradient grad-logistica">
+                <span><i class="fas fa-truck-moving me-2"></i> DATOS DE VIAJE</span>
+                <i class="fas fa-map opacity-50"></i>
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-4">
+                    <div class="col-md-3">
+                        <label class="form-label text-theme-logistica">Remisión</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-hashtag"></i></span>
+                            {{ form.remision }}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-theme-logistica">Fecha</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="far fa-calendar-alt"></i></span>
+                            {{ form.fecha }}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-primary">Origen</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white text-primary border-primary"><i class="fas fa-map-marker-alt"></i></span>
+                            {{ form.origen }}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-success">Destino</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white text-success border-success"><i class="fas fa-location-arrow"></i></span>
+                            {{ form.destino }}
+                        </div>
+                    </div>
+
+                    <div class="col-12"><hr class="text-muted opacity-25 my-1"></div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Operador</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-user-tie"></i></span>
+                            {{ form.operador }}
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Unidad</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-truck"></i></span>
+                            {{ form.unidad }}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Folio LD</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-file-invoice"></i></span>
+                            {{ form.folio_ld }}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Folio DLV</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-file-contract"></i></span>
+                            {{ form.folio_dlv }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-lg-8">
+                <div class="card card-colorful section-carga h-100">
+                   <div class="card-header bg-secondary text-white">
+                        <span><i class="fas fa-box-open me-2"></i> DETALLE DE CARGA</span>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-8">
+                                <label class="form-label text-theme-carga">Descripción Material</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-cubes"></i></span>
+                                    {{ form.descripcion }}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-theme-carga">Fecha Entrega</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-clock"></i></span>
+                                    {{ form.fecha_entrega }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="calc-box bg-light border-0 shadow-sm">
+                            <div class="calc-row">
+                                <div class="calc-item" style="flex: 0 0 100px;">
+                                    <label class="form-label">Unidad</label>
+                                    {{ form.unidad_medida }}
+                                </div>
+                                <div class="calc-item">
+                                    <label class="form-label text-dark">Bruto</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text"><i class="fas fa-weight-hanging"></i></span>
+                                        {{ form.peso_bruto }}
+                                    </div>
+                                </div>
+                                <div class="calc-sign text-secondary"><i class="fas fa-minus"></i></div>
+                                <div class="calc-item">
+                                    <label class="form-label text-danger">Tarimas</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-danger text-white border-danger"><i class="fas fa-pallet"></i></span>
+                                        {{ form.peso_tarimas }}
+                                    </div>
+                                </div>
+                                <div class="calc-sign text-secondary"><i class="fas fa-equals"></i></div>
+                                <div class="calc-item">
+                                    <label class="form-label text-success">NETO</label>
+                                    {{ form.peso }}
+                                </div>
+                            </div>
+                            <div class="mt-2 text-end">
+                                <span class="badge bg-warning text-dark"><i class="fas fa-info-circle"></i> Tarimas en KG</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card card-colorful section-finanzas h-100">
+                    <div class="card-header-gradient grad-finanzas">
+                        <span><i class="fas fa-hand-holding-usd me-2"></i> COSTOS</span>
+                    </div>
+                    <div class="card-body p-4 d-flex flex-column justify-content-center">
+                        
+                        <div class="mb-3">
+                            <label class="form-label text-theme-finanzas">Precio Unitario</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-tag"></i></span>
+                                {{ form.precio }}
+                            </div>
+                        </div>
+
+                        <div class="p-3 rounded mb-3" style="background: #e6f7ec; border: 1px solid #c3e6cb;">
+                            <label class="form-label text-success fw-bold">TOTAL ESTIMADO</label>
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text bg-success text-white border-0"><i class="fas fa-dollar-sign"></i></span>
+                                {{ form.venta }}
+                            </div>
+                        </div>
+
+                        <div class="form-check form-switch p-2 bg-light rounded border d-flex align-items-center">
+                            <div class="ms-4">
+                                {{ form.pagado }}
+                            </div>
+                            <label class="form-check-label ms-3 fw-bold text-dark" for="{{ form.pagado.id_for_label }}">
+                                ¿Pagado?
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card card-colorful section-docs border-danger">
+            <div class="card-header-gradient grad-docs">
+                <span><i class="fas fa-folder-open me-2"></i> EVIDENCIAS</span>
+                <div class="d-flex gap-2 align-items-center">
+                    <i class="fas fa-camera opacity-50 ms-2"></i>
+                </div>
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label text-danger mb-0">PDF OPCIONAL</label>
+                            {% if is_editing and plastico.pdf_adicional %}
+                                <a href="{{ plastico.pdf_adicional.url }}" target="_blank" class="badge bg-danger text-white text-decoration-none shadow-sm">
+                                    <i class="fas fa-eye me-1"></i> Ver Actual
+                                </a>
+                            {% endif %}
+                        </div>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-file-pdf"></i></span>
+                            {{ form.pdf_adicional }}
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                         <div class="d-flex justify-content-between align-items-center mb-1">
+                             <label class="form-label" style="color: #fd7e14;">PDF EVIDENCIA</label>
+                         </div>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-images"></i></span>
+                            {{ form.evidencia_documento }}
+                        </div>
+                        <small class="text-muted" style="font-size: 0.7rem;">*Subir aquí agregará una nueva evidencia a la galería.</small>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Comentarios</label>
+                        {{ form.comentario }}
+                    </div>
+
+                    {% if is_editing and plastico.evidencias.all %}
+                    <div class="col-12">
+                        <div class="p-3 rounded" style="background-color: #fff9ec; border: 1px solid #ffeeba;">
+                            <h6 class="text-muted small fw-bold mb-3">GALERÍA ADJUNTA:</h6>
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for ev in plastico.evidencias.all %}
+                                <div class="position-relative bg-white border p-2 rounded shadow-sm" style="width: 80px; height: 80px; display:flex; align-items:center; justify-content:center; cursor:pointer;" onclick="openPreviewModal('{{ ev.archivo.url }}')">
+                                    {% if ev.archivo.url|slice:"-4:" == ".pdf" %}
+                                        <i class="fas fa-file-pdf fa-2x text-danger"></i>
+                                    {% else %}
+                                        <i class="fas fa-image fa-2x text-warning"></i>
+                                    {% endif %}
+                                    
+                                    {% if user.is_superuser %}
+                                    <button type="button" class="position-absolute top-0 end-0 btn btn-sm btn-danger p-0 rounded-circle" style="width:20px; height:20px;" onclick="event.stopPropagation(); eliminarEvidencia('{% url 'eliminar_evidencia_individual' ev.id %}')">
+                                        &times;
+                                    </button>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-3 pb-5">
+            <a href="{% url 'lista_plastico' %}" class="btn btn-cancel-soft shadow-sm">
+                <i class="fas fa-times me-2"></i> Cancelar
+            </a>
+            <button type="submit" class="btn btn-save-vibrant">
+                <i class="fas fa-save me-2"></i> GUARDAR REGISTRO
+            </button>
+        </div>
+    </form>
+</div>
+
+<form id="delete-evidence-form" method="POST" style="display: none;">{% csrf_token %}</form>
+
+<div class="modal fade" id="universalModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content" style="height: 85vh;">
+      <div class="modal-header py-2 bg-dark text-white">
+        <h6 class="modal-title">Vista Previa</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0" id="modal-content-area"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+    function abrirHerramienta(url) {
+        window.open(url, 'Herramientas3R', 'width=1000,height=800,scrollbars=yes,resizable=yes');
+    }
+
+    $(document).ready(function() {
+        // Clases de Bootstrap para inputs que no las tengan
+        $('input[type="text"], input[type="number"], input[type="date"], select, textarea').addClass('form-control');
+        $('select').addClass('form-select').removeClass('form-control');
+        $('input[type="checkbox"]').removeClass('form-control').addClass('form-check-input');
+
+        $('.select2').select2({ theme: 'bootstrap-5', width: '100%' });
+
+        // Cálculo automático de pesos
+        function calcularTodo() {
+            let bruto = parseFloat($('#id_peso_bruto').val()) || 0;
+            let tarimasKG = parseFloat($('#id_peso_tarimas').val()) || 0;
+            let unidad = $('#id_unidad_medida').val();
+            let neto = 0;
+
+            // Si es TON, convertimos tarimas (KG) a Toneladas
+            if (unidad === 'TON') {
+                neto = bruto - (tarimasKG / 1000);
+            } else {
+                neto = bruto - tarimasKG;
+            }
+            if (neto < 0) neto = 0;
+            
+            $('#id_peso').val(neto.toFixed(3));
+            
+            let precio = parseFloat($('#id_precio').val()) || 0;
+            // Si la unidad es TON, el precio es por TON, pero el peso ya está en TON
+            // Si la unidad es TON, la venta se calcula Ton * Precio
+            // NOTA: Revisa si tu lógica de negocio requiere convertir a KG para cobrar
+            // Asumimos venta = peso_neto * precio
+            let cobrable = (unidad === 'TON') ? (neto * 1000) : neto; // Ajuste según tu JS original
+            
+            $('#id_venta').val((cobrable * precio).toFixed(2));
+        }
+
+        $('#id_peso_bruto, #id_peso_tarimas, #id_unidad_medida, #id_precio').on('input change', calcularTodo);
+    });
+
+    function openPreviewModal(src) {
+        $('#modal-content-area').html(`<iframe src="${src}" style="width:100%; height:100%; border:none;"></iframe>`);
+        new bootstrap.Modal(document.getElementById('universalModal')).show();
+    }
+    
+    function eliminarEvidencia(url) {
+        if(confirm('¿Eliminar archivo permanentemente?')) { $('#delete-evidence-form').attr('action', url).submit(); }
+    }
+</script>
+{% endblock %}

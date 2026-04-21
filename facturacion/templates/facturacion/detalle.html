@@ -1,0 +1,655 @@
+{% extends 'ternium/base.html' %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}Factura {{ factura.serie|default:"F" }}-{{ factura.folio }}{% endblock %}
+
+{% block extra_css %}
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+
+<style>
+    :root {
+        --font-primary: 'Inter', sans-serif;
+        --font-mono: 'JetBrains Mono', monospace;
+        --radius-card: 16px;
+        --radius-btn: 10px;
+        
+        /* Paleta Profesional */
+        --color-timbrado: #4361ee;
+        --color-pagado: #06d6a0;
+        --color-cancelado: #ef476f;
+        --color-pendiente: #ffd166;
+        --color-dark: #2b2d42;
+        --color-text-muted: #8d99ae;
+        --bg-body: #f8f9fa;
+    }
+
+    body {
+        font-family: var(--font-primary);
+        background-color: var(--bg-body);
+        color: var(--color-dark);
+    }
+
+    /* === TARJETAS MODERNAS === */
+    .card-pro {
+        border: none;
+        border-radius: var(--radius-card);
+        background: white;
+        box-shadow: 0 10px 30px -10px rgba(0,0,0,0.08);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        overflow: hidden;
+    }
+    .card-pro:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 15px 35px -10px rgba(0,0,0,0.12);
+    }
+
+    /* === GRADIENTES DE ESTADO (HERO) === */
+    .hero-status {
+        position: relative;
+        padding: 2.5rem;
+        color: white;
+        border-radius: var(--radius-card);
+        margin-bottom: 2rem;
+        overflow: hidden;
+    }
+    .hero-bg-timbrado { background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%); }
+    .hero-bg-pagada { background: linear-gradient(135deg, #06d6a0 0%, #0cb0a9 100%); }
+    .hero-bg-cancelada { background: linear-gradient(135deg, #ef476f 0%, #d90429 100%); }
+    .hero-bg-pendiente { background: linear-gradient(135deg, #ffd166 0%, #ff9f1c 100%); color: #2b2d42; }
+
+    .hero-overlay-icon {
+        position: absolute;
+        right: -20px;
+        top: -20px;
+        font-size: 10rem;
+        opacity: 0.1;
+        transform: rotate(15deg);
+    }
+
+    /* === STEPPER DE PROGRESO === */
+    .status-steps {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 20px;
+        position: relative;
+    }
+    .status-steps::before {
+        content: '';
+        position: absolute;
+        top: 15px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: rgba(255,255,255,0.3);
+        z-index: 0;
+    }
+    .step-item {
+        position: relative;
+        z-index: 1;
+        text-align: center;
+        opacity: 0.6;
+    }
+    .step-item.active { opacity: 1; font-weight: bold; }
+    .step-circle {
+        width: 32px;
+        height: 32px;
+        background: rgba(255,255,255,0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 5px;
+        border: 2px solid white;
+    }
+    .step-item.active .step-circle { background: white; color: var(--color-timbrado); }
+    /* Ajuste de color para pendiente */
+    .hero-bg-pendiente .step-item.active .step-circle { color: #ff9f1c; }
+
+    /* === TIPOGRAFÍA & ETIQUETAS === */
+    .font-mono { font-family: var(--font-mono); letter-spacing: -0.5px; }
+    
+    .label-detail {
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.8px;
+        color: var(--color-text-muted);
+        margin-bottom: 0.2rem;
+        display: block;
+    }
+    
+    .data-value {
+        font-weight: 600;
+        font-size: 1rem;
+        color: var(--color-dark);
+    }
+
+    /* === TABLAS DE CONCEPTOS === */
+    .table-concepts thead th {
+        background-color: #f1f5f9;
+        color: #64748b;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        border: none;
+        padding: 1rem;
+    }
+    .table-concepts tbody td {
+        padding: 1rem;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+    }
+    .table-concepts tbody tr:last-child td { border-bottom: none; }
+
+    /* === BOTONES DE ACCIÓN (SIDEBAR) === */
+    .btn-action-tile {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: var(--radius-btn);
+        margin-bottom: 0.8rem;
+        text-decoration: none;
+        color: var(--color-dark);
+        transition: all 0.2s;
+    }
+    .btn-action-tile:hover {
+        border-color: var(--color-timbrado);
+        transform: translateX(5px);
+        background: #f8fafc;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+    .btn-icon-box {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        margin-right: 1rem;
+        font-size: 1.2rem;
+    }
+    .tile-pdf .btn-icon-box { background: rgba(231, 74, 59, 0.1); color: #e74a3b; }
+    .tile-xml .btn-icon-box { background: rgba(28, 200, 138, 0.1); color: #1cc88a; }
+    .tile-cancel .btn-icon-box { background: rgba(231, 74, 59, 0.1); color: #e74a3b; }
+    .tile-pay .btn-icon-box { background: rgba(246, 194, 62, 0.1); color: #f6c23e; }
+
+    /* === UUID Copy === */
+    .uuid-badge {
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .uuid-badge:hover {
+        background-color: #e2e8f0 !important;
+    }
+    .uuid-badge:active {
+        transform: scale(0.98);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="container">
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{% url 'dashboard_facturacion' %}" class="text-decoration-none text-muted fw-bold">Facturación</a></li>
+                    <li class="breadcrumb-item active fw-bold text-dark" aria-current="page">Detalle F-{{ factura.folio }}</li>
+                </ol>
+            </nav>
+            <div class="badge bg-white text-dark border shadow-sm p-2">
+                <i class="far fa-clock me-1"></i> Creada: {{ factura.fecha_emision|date:"d M Y, H:i" }}
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-8 col-xl-9">
+
+                <div class="hero-status 
+                    {% if factura.estado == 'cancelada' %}hero-bg-cancelada
+                    {% elif factura.estado == 'pagada' %}hero-bg-pagada
+                    {% elif factura.estado == 'timbrado' %}hero-bg-timbrado
+                    {% else %}hero-bg-pendiente{% endif %} shadow-lg">
+                    
+                    <i class="hero-overlay-icon fas 
+                        {% if factura.estado == 'cancelada' %}fa-ban
+                        {% elif factura.estado == 'pagada' %}fa-hand-holding-usd
+                        {% elif factura.estado == 'timbrado' %}fa-check-circle
+                        {% else %}fa-pencil-ruler{% endif %}">
+                    </i>
+
+                    <div class="row align-items-center position-relative" style="z-index: 2;">
+                        <div class="col-md-7">
+                            <span class="text-uppercase fw-bold opacity-75 ls-1">Estatus del Comprobante</span>
+                            <h1 class="display-5 fw-bold mb-0">
+                                {% if factura.estado == 'timbrado' %}TIMBRADA / VIGENTE
+                                {% elif factura.estado == 'pagada' %}PAGADA
+                                {% elif factura.estado == 'cancelada' %}CANCELADA
+                                {% elif factura.estado == 'pendiente' %}BORRADOR
+                                {% else %}{{ factura.estado|upper }}{% endif %}
+                            </h1>
+                            <p class="mt-2 opacity-75 mb-0">
+                                <i class="fas fa-hashtag me-1"></i> Folio Interno: <strong>{{ factura.folio }}</strong>
+                            </p>
+                        </div>
+                        <div class="col-md-5 text-md-end mt-3 mt-md-0">
+                            <span class="text-uppercase fw-bold opacity-75 ls-1 d-block">Monto Total</span>
+                            <span class="display-6 fw-bold font-mono">${{ factura.monto_total|intcomma }}</span>
+                            <span class="fs-5 fw-bold opacity-75">{{ factura.moneda }}</span>
+                        </div>
+                    </div>
+
+                    <div class="status-steps mt-4">
+                        <div class="step-item active">
+                            <div class="step-circle"><i class="fas fa-pencil-alt"></i></div>
+                            <span class="small">Creada</span>
+                        </div>
+                        <div class="step-item {% if factura.estado != 'pendiente' %}active{% endif %}">
+                            <div class="step-circle"><i class="fas fa-stamp"></i></div>
+                            <span class="small">Timbrada</span>
+                        </div>
+                        <div class="step-item {% if factura.estado == 'pagada' %}active{% endif %}">
+                            <div class="step-circle"><i class="fas fa-dollar-sign"></i></div>
+                            <span class="small">Pagada</span>
+                        </div>
+                    </div>
+                </div>
+
+                {% if factura.estado == 'cancelada' %}
+                <div class="card-pro border-start border-5 border-danger mb-4 animate__animated animate__fadeIn">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-1 d-flex align-items-center justify-content-center text-danger">
+                                <i class="fas fa-exclamation-triangle fa-2x"></i>
+                            </div>
+                            <div class="col-md-11">
+                                <h5 class="fw-bold text-danger">Comprobante Cancelado ante el SAT</h5>
+                                <div class="row g-3 mt-1">
+                                    <div class="col-md-4">
+                                        <span class="label-detail">Fecha Cancelación</span>
+                                        <span class="font-mono">{{ factura.fecha_cancelacion|date:"d/m/Y H:i" }}</span>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <span class="label-detail">Motivo</span>
+                                        <span class="fw-bold">{{ factura.cancellation_reason|default:"02 - Sin relación" }}</span>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <span class="label-detail">Sustituida Por</span>
+                                        {% if factura.uuid_sustitucion %}
+                                            <span class="badge bg-light text-primary border font-mono">{{ factura.uuid_sustitucion|truncatechars:15 }}...</span>
+                                        {% else %}
+                                            <span class="text-muted small">No aplica</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if factura.tipo_relacion and factura.uuid_relacionado %}
+                <div class="card-pro border-start border-5 border-warning mb-4 animate__animated animate__fadeIn">
+                    <div class="card-body d-flex align-items-center">
+                        <div class="me-3 text-warning"><i class="fas fa-exchange-alt fa-2x"></i></div>
+                        <div>
+                            <h6 class="fw-bold text-dark mb-1">CFDI por Sustitución (04)</h6>
+                            <p class="small text-muted mb-0">Esta factura reemplaza al folio fiscal:</p>
+                            <span class="font-mono bg-warning bg-opacity-10 text-dark px-2 rounded">{{ factura.uuid_relacionado }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="row g-4 mb-4">
+                    <div class="col-md-6">
+                        <div class="card-pro h-100 p-3">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="btn-icon-box bg-primary bg-opacity-10 text-primary rounded p-2 me-3">
+                                    <i class="fas fa-building fa-lg"></i>
+                                </div>
+                                <div>
+                                    <span class="label-detail text-primary">EMISOR</span>
+                                    <h6 class="fw-bold mb-0">{{ factura.emisor.razon_social|truncatechars:30 }}</h6>
+                                </div>
+                            </div>
+                            <div class="ps-1">
+                                <div class="mb-2"><span class="text-muted small">RFC:</span> <span class="fw-bold">{{ factura.emisor.rfc }}</span></div>
+                                <div class="mb-2"><span class="text-muted small">Régimen:</span> <span class="fw-bold small">{{ factura.emisor.regimen_fiscal }}</span></div>
+                                <div><span class="text-muted small">CP:</span> <span class="fw-bold">{{ factura.emisor.codigo_postal }}</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card-pro h-100 p-3">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="btn-icon-box bg-success bg-opacity-10 text-success rounded p-2 me-3">
+                                    <i class="fas fa-user-tie fa-lg"></i>
+                                </div>
+                                <div>
+                                    <span class="label-detail text-success">RECEPTOR (CLIENTE)</span>
+                                    <h6 class="fw-bold mb-0">{{ factura.receptor.razon_social|truncatechars:30 }}</h6>
+                                </div>
+                            </div>
+                            <div class="ps-1">
+                                <div class="mb-2"><span class="text-muted small">RFC:</span> <span class="fw-bold">{{ factura.receptor.rfc }}</span></div>
+                                <div class="mb-2"><span class="text-muted small">Uso CFDI:</span> <span class="fw-bold badge bg-light text-dark border">{{ factura.uso_cfdi }}</span></div>
+                                <div><span class="text-muted small">CP Fiscal:</span> <span class="fw-bold">{{ factura.receptor.codigo_postal }}</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-pro mb-4 p-4">
+                    <div class="row g-4 text-center">
+                        <div class="col-md-4 text-start">
+                            <span class="label-detail">Folio Fiscal (UUID)</span>
+                            <div class="d-flex align-items-center" onclick="copyUUID('{{ factura.folio_fiscal }}')" title="Clic para copiar">
+                                <span class="font-mono text-primary fw-bold text-break uuid-badge p-1 rounded">
+                                    {{ factura.folio_fiscal|default:"PENDIENTE DE TIMBRADO" }}
+                                </span>
+                                {% if factura.folio_fiscal %}
+                                <i class="fas fa-copy ms-2 text-muted small"></i>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-2 col-6 border-start">
+                            <span class="label-detail">Método</span>
+                            <div class="fw-bold badge bg-dark">{{ factura.metodo_pago }}</div>
+                        </div>
+                        <div class="col-md-2 col-6 border-start">
+                            <span class="label-detail">Forma</span>
+                            <div class="fw-bold">{{ factura.forma_pago }}</div>
+                        </div>
+                        <div class="col-md-2 col-6 border-start">
+                            <span class="label-detail">T. Cambio</span>
+                            <div class="fw-bold font-mono">{{ factura.tipo_cambio }}</div>
+                        </div>
+                        <div class="col-md-2 col-6 border-start">
+                            <span class="label-detail">ID API</span>
+                            <div class="font-mono small text-muted">{{ factura.id_fiscalapi|truncatechars:8 }}...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-pro mb-4">
+                    <div class="card-header bg-white py-3 px-4 border-bottom">
+                        <h6 class="m-0 fw-bold text-dark"><i class="fas fa-shopping-cart me-2 text-muted"></i>Conceptos</h6>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-concepts mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Cant.</th>
+                                    <th>Unidad</th>
+                                    <th style="width: 40%;">Descripción</th>
+                                    <th class="text-end">Precio U.</th>
+                                    <th class="text-end">Importe</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for concepto in factura.conceptos.all %}
+                                <tr>
+                                    <td class="fw-bold text-dark">{{ concepto.cantidad|floatformat:2 }}</td>
+                                    <td>
+                                        <div class="badge bg-light text-secondary border mb-1">{{ concepto.clave_unidad }}</div>
+                                        <div class="small text-muted font-mono">{{ concepto.clave_prod_serv }}</div>
+                                    </td>
+                                    <td>
+                                        <span class="fw-bold text-dark">{{ concepto.descripcion }}</span>
+                                    </td>
+                                    <td class="text-end font-mono text-muted">${{ concepto.valor_unitario|intcomma }}</td>
+                                    <td class="text-end font-mono fw-bold text-dark">${{ concepto.importe|intcomma }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="5" class="text-center py-4 text-muted">No hay conceptos.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="bg-light bg-opacity-25 p-4">
+                        <div class="row justify-content-end">
+                            <div class="col-md-5 col-lg-4">
+                                <div class="d-flex justify-content-between mb-2 small text-secondary">
+                                    <span>Subtotal</span>
+                                    <span class="font-mono fw-bold">${{ factura.subtotal|floatformat:2|intcomma }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2 small text-secondary">
+                                    <span>IVA Trasladado (16%)</span>
+                                    <span class="font-mono fw-bold">${{ factura.impuestos_trasladados|floatformat:2|intcomma }}</span>
+                                </div>
+                                {% if factura.impuestos_retenidos > 0 %}
+                                <div class="d-flex justify-content-between mb-2 small text-danger fw-bold">
+                                    <span>Retención IVA (6%)</span>
+                                    <span class="font-mono">- ${{ factura.impuestos_retenidos|floatformat:2|intcomma }}</span>
+                                </div>
+                                {% endif %}
+                                <hr class="border-secondary opacity-25">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold text-dark h5 mb-0">TOTAL</span>
+                                    <span class="fw-bold text-primary h4 mb-0 font-mono">${{ factura.monto_total|floatformat:2|intcomma }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if factura.metodo_pago == 'PPD' %}
+                <div class="card-pro mb-4">
+                    <div class="card-header bg-success bg-opacity-10 py-3 px-4 d-flex justify-content-between align-items-center">
+                        <h6 class="m-0 fw-bold text-success"><i class="fas fa-history me-2"></i>Pagos Asociados (REP)</h6>
+                        {% if factura.estado != 'pagada' and factura.estado != 'cancelada' %}
+                        <a href="{% url 'registrar_pago' factura.pk %}" class="btn btn-sm btn-success fw-bold shadow-sm rounded-pill px-3">
+                            <i class="fas fa-plus me-1"></i> Registrar Pago
+                        </a>
+                        {% endif %}
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-concepts mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Folio</th>
+                                    <th>Parc.</th>
+                                    <th class="text-end">Saldo Ant.</th>
+                                    <th class="text-end text-success">Pagado</th>
+                                    <th class="text-end">Insoluto</th>
+                                    <th class="text-center">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pago in factura.pagos_recibidos.all %}
+                                <tr>
+                                    <td class="font-mono">{{ pago.complemento.fecha_pago|date:"d/m/y" }}</td>
+                                    <td>
+                                        <a href="{% url 'pago_pdf_cliente' pago.complemento.pk %}" target="_blank" class="fw-bold text-primary text-decoration-none">
+                                            {{ pago.complemento.serie }}-{{ pago.complemento.folio }}
+                                        </a>
+                                    </td>
+                                    <td class="text-center">{{ pago.numero_parcialidad }}</td>
+                                    <td class="text-end text-muted font-mono">${{ pago.saldo_anterior|intcomma }}</td>
+                                    <td class="text-end text-success fw-bold font-mono">${{ pago.importe_pagado|intcomma }}</td>
+                                    <td class="text-end text-muted font-mono">${{ pago.saldo_insoluto|intcomma }}</td>
+                                    <td class="text-center">
+                                        {% if "CANCELADO" in pago.complemento.uuid %}
+                                            <span class="badge bg-danger rounded-pill">Cancelado</span>
+                                        {% else %}
+                                            <span class="badge bg-success rounded-pill">Vigente</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="7" class="text-center py-4 text-muted fst-italic">Pendiente de pago.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+
+            </div>
+
+            <div class="col-lg-4 col-xl-3">
+                <div class="sticky-top" style="top: 20px; z-index: 1;">
+                    
+                    <div class="card-pro p-4 mb-4">
+                        <span class="label-detail mb-3">ACCIONES RÁPIDAS</span>
+                        
+                        <div class="d-flex flex-column">
+                            {% if factura.folio_fiscal %}
+                                <a href="{% url 'factura_pdf_cliente' factura.pk %}" target="_blank" class="btn-action-tile tile-pdf">
+                                    <div class="btn-icon-box"><i class="fas fa-file-pdf"></i></div>
+                                    <div class="lh-1">
+                                        <span class="fw-bold d-block mb-1">Ver PDF</span>
+                                        <small class="text-muted">Versión impresa</small>
+                                    </div>
+                                </a>
+                                
+                                <a href="{% url 'descargar_xml' factura.pk %}" class="btn-action-tile tile-xml">
+                                    <div class="btn-icon-box"><i class="fas fa-file-code"></i></div>
+                                    <div class="lh-1">
+                                        <span class="fw-bold d-block mb-1">Bajar XML</span>
+                                        <small class="text-muted">Archivo fiscal</small>
+                                    </div>
+                                </a>
+
+                                {% if factura.estado != 'cancelada' %}
+                                    <div class="border-top my-3"></div>
+                                    <button type="button" class="btn-action-tile tile-cancel border-danger bg-white" data-bs-toggle="modal" data-bs-target="#modalCancelar">
+                                        <div class="btn-icon-box"><i class="fas fa-ban"></i></div>
+                                        <div class="lh-1">
+                                            <span class="fw-bold d-block mb-1 text-danger">Cancelar</span>
+                                            <small class="text-muted">Invalidar factura</small>
+                                        </div>
+                                    </button>
+                                {% endif %}
+
+                            {% elif factura.estado == 'pendiente' %}
+                                <a href="{% url 'generar_factura_accion' %}?id={{factura.pk}}" class="btn btn-primary btn-lg fw-bold shadow-sm rounded-pill mb-2 w-100 py-3">
+                                    <i class="fas fa-paper-plane me-2"></i>Timbrar Ahora
+                                </a>
+                                <a href="#" class="btn btn-outline-secondary w-100 rounded-pill">
+                                    <i class="fas fa-edit me-1"></i> Editar Borrador
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="card-pro p-4">
+                        <span class="label-detail mb-3">ORIGEN DE DATOS</span>
+                        <div class="mb-3">
+                            <span class="text-muted small fw-bold d-block mb-1">Remisiones Asociadas</span>
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for remision in factura.remisiones.all %}
+                                    <span class="badge bg-white text-dark border shadow-sm font-mono">
+                                        <i class="fas fa-receipt text-muted me-1"></i>R-{{ remision.remision }}
+                                    </span>
+                                {% empty %}
+                                    <span class="text-muted fst-italic small">Factura libre (Sin remisiones)</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% if factura.qr_url %}
+                        <div class="text-center mt-4">
+                            <img src="{{ factura.qr_url }}" class="img-fluid rounded border p-1" style="max-width: 120px; opacity: 0.9;">
+                            <div class="small text-muted mt-1" style="font-size: 0.65rem;">Escanea para verificar</div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalCancelar" tabindex="-1" aria-labelledby="modalCancelarLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header bg-danger text-white border-0 py-3">
+                <h5 class="modal-title fw-bold" id="modalCancelarLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Confirmar Cancelación
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <form action="{% url 'cancelar_factura' factura.pk %}" method="POST">
+                {% csrf_token %}
+                <div class="modal-body p-4 bg-light">
+                    <div class="text-center mb-4">
+                        <p class="text-muted">Está a punto de cancelar el folio <strong>{{ factura.folio }}</strong>. <br>Esta acción es <strong>irreversible</strong> ante el SAT.</p>
+                    </div>
+                    
+                    <div class="card border-0 shadow-sm p-3 mb-3 bg-white">
+                        <label for="selectMotivo" class="label-detail text-primary mb-2">1. Selecciona el Motivo</label>
+                        <select name="motivo" id="selectMotivo" class="form-select form-select-lg border-0 bg-light fw-bold" required onchange="toggleSustitucion()">
+                            <option value="02" selected>02 - Errores SIN relación (Más común)</option>
+                            <option value="03">03 - Operación no realizada</option>
+                            <option value="01">01 - Errores CON relación (Sustitución)</option>
+                            <option value="04">04 - Operación nominativa</option>
+                        </select>
+                    </div>
+
+                    <div id="divSustitucion" class="d-none animate__animated animate__fadeIn">
+                        <div class="card border-warning border-2 p-3 bg-warning bg-opacity-10">
+                            <label class="label-detail text-dark mb-2">2. UUID de la Nueva Factura</label>
+                            <input type="text" name="sustitucion" id="inputSustitucion" class="form-control font-mono border-warning" placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX">
+                            <div class="form-text text-dark small mt-1">
+                                <i class="fas fa-info-circle me-1"></i>Pega el folio fiscal que reemplaza a esta factura.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-white border-top-0 p-3 justify-content-between">
+                    <button type="button" class="btn btn-light text-muted fw-bold rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger fw-bold px-4 rounded-pill shadow-sm">
+                        <i class="fas fa-check me-2"></i>Sí, Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function toggleSustitucion() {
+        const motivo = document.getElementById('selectMotivo').value;
+        const div = document.getElementById('divSustitucion');
+        const input = document.getElementById('inputSustitucion');
+        
+        if (motivo === '01') {
+            div.classList.remove('d-none');
+            input.setAttribute('required', 'true');
+        } else {
+            div.classList.add('d-none');
+            input.removeAttribute('required');
+            input.value = '';
+        }
+    }
+
+    // Copiar UUID al portapapeles
+    function copyUUID(uuid) {
+        if (!uuid || uuid === "None") return;
+        navigator.clipboard.writeText(uuid).then(() => {
+            alert("UUID copiado: " + uuid);
+        });
+    }
+
+    // Fix para el modal en Bootstrap 5
+    document.addEventListener('DOMContentLoaded', function () {
+        const modalEl = document.getElementById('modalCancelar');
+        if (modalEl) {
+            document.body.appendChild(modalEl);
+        }
+    });
+</script>
+{% endblock %}

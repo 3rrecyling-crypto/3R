@@ -1,0 +1,112 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Nueva Nota de Crédito Libre{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<style>
+    .select2-container--bootstrap-5 .select2-selection { border-color: #dee2e6; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow border-0 border-top border-warning border-5">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold text-dark">
+                        <i class="fas fa-reply-all text-warning me-2"></i>Nueva Nota de Crédito (Libre)
+                    </h5>
+                </div>
+                
+                <div class="card-body bg-light bg-opacity-50">
+                    <form method="POST" id="form-nc">
+                        {% csrf_token %}
+                        
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-12">
+                                <label class="form-label fw-bold">Cliente / Receptor <span class="text-danger">*</span></label>
+                                {{ form.receptor }}
+                                {% if form.receptor.errors %}
+                                    <div class="text-danger small">{{ form.receptor.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Uso de CFDI <span class="text-danger">*</span></label>
+                                {{ form.uso_cfdi }}
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Forma de Pago <span class="text-danger">*</span></label>
+                                {{ form.forma_pago }}
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Método de Pago</label>
+                                {{ form.metodo_pago }}
+                            </div>
+                        </div>
+
+                        <hr class="text-muted">
+
+                        <h6 class="fw-bold text-muted mb-3"><i class="fas fa-link me-2"></i>Documento Relacionado</h6>
+                        <div class="row g-3 mb-4 p-3 bg-white rounded border border-warning border-opacity-25">
+                            <div class="col-md-5">
+                                <label class="form-label small text-muted">Tipo de Relación</label>
+                                {{ form.tipo_relacion }}
+                            </div>
+                            <div class="col-md-7">
+                                <label class="form-label small text-muted">UUID Factura Original (Folio Fiscal)</label>
+                                {{ form.uuid_relacionado }}
+                                <div class="form-text">Ej. 550e8400-e29b-41d4-a716-446655440000</div>
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold text-muted mb-3"><i class="fas fa-tag me-2"></i>Detalle de la Bonificación</h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-8">
+                                <label class="form-label fw-bold">Descripción del Concepto</label>
+                                {{ form.concepto_descripcion }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Monto Total (Sin IVA) <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    {{ form.monto_sin_iva }}
+                                </div>
+                                <div class="form-text text-end">El sistema calculará el IVA automáticamente.</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <a href="{% url 'dashboard_facturacion' %}" class="btn btn-outline-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-warning fw-bold px-4">
+                                <i class="fas fa-save me-2"></i>Generar Nota de Crédito
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+    $(document).ready(function() {
+        // Inicializar Select2 en todos los selectores
+        $('.form-select').select2({
+            theme: 'bootstrap-5',
+            width: '100%'
+        });
+    });
+</script>
+{% endblock %}

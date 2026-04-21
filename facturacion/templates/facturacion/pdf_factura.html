@@ -1,0 +1,354 @@
+{% load static %}
+{% load humanize %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Factura {{ factura.folio }}</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 1cm;
+            @bottom-center {
+                content: "Página " counter(page) " de " counter(pages);
+                font-family: Helvetica, Arial, sans-serif;
+                font-size: 8px;
+                color: #999;
+            }
+        }
+        
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 9pt;
+            color: #333;
+            line-height: 1.3;
+        }
+
+        /* Utilidades */
+        .bold { font-weight: bold; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .text-xs { font-size: 6pt; }
+        .text-sm { font-size: 8pt; }
+        .text-lg { font-size: 14pt; }
+        .text-blue { color: #004085; }
+        .w-100 { width: 100%; }
+        .no-wrap { white-space: nowrap; }
+
+        /* Layout */
+        table.layout { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        table.layout td { vertical-align: top; padding: 2px; }
+
+        /* Logo */
+        .company-logo {
+            max-width: 200px;
+            max-height: 90px;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        /* Caja Factura */
+        .invoice-box {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 0;
+            background-color: #fff;
+            overflow: hidden;
+        }
+        .invoice-title {
+            background-color: #2c3e50;
+            color: white;
+            padding: 5px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 10pt;
+        }
+        .invoice-data-table td { padding: 4px 6px; border-bottom: 1px solid #eee; }
+        .invoice-data-table tr:last-child td { border-bottom: none; }
+
+        /* Sección Cliente y Relaciones */
+        .section-header {
+            background-color: #eee;
+            color: #333;
+            font-weight: bold;
+            padding: 4px 8px;
+            font-size: 9pt;
+            border-top: 1px solid #ccc;
+            border-bottom: 1px solid #ccc;
+            margin-top: 10px;
+            margin-bottom: 5px;
+        }
+
+        /* Tabla Conceptos */
+        table.conceptos { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 8pt; }
+        table.conceptos th {
+            background-color: #2c3e50;
+            color: white;
+            padding: 6px;
+            text-align: left;
+            font-weight: bold;
+        }
+        table.conceptos td { border-bottom: 1px solid #ddd; padding: 6px; vertical-align: top; }
+        table.conceptos tr:nth-child(even) { background-color: #f9f9f9; }
+
+        /* Totales */
+        .totales-table { width: 100%; border-collapse: collapse; }
+        .totales-table td { padding: 4px; }
+        .total-highlight {
+            background-color: #eee;
+            font-weight: bold;
+            border-top: 2px solid #333;
+            font-size: 10pt;
+        }
+
+        /* Footer SAT */
+        .footer-sat {
+            margin-top: 30px;
+            border-top: 1px solid #ccc;
+            padding-top: 10px;
+        }
+        .cadena-sat {
+            word-break: break-all;
+            font-family: 'Courier New', monospace;
+            font-size: 5pt;
+            color: #555;
+            text-align: justify;
+            margin-bottom: 4px;
+        }
+        .label-sat { font-weight: bold; font-size: 6pt; color: #333; margin-top: 3px; }
+    </style>
+</head>
+<body>
+
+    {# Usamos emisor_default como fallback si factura.emisor es None #}
+    {% with emisor_final=factura.emisor|default:emisor_default %}
+
+    <table class="layout">
+        <tr>
+            <td width="55%">
+                {# Ajusta la ruta de tu logo según corresponda #}
+                <img src="{% static 'r3_recycling/img/logo.png' %}" class="company-logo" alt="Logo">
+                
+                <div class="text-sm">
+                    <div class="bold text-lg" style="margin-bottom: 5px;">
+                        {{ emisor_final.razon_social|default:"EMISOR NO CONFIGURADO"|upper }}
+                    </div>
+                    
+                    <span class="bold">RFC:</span> {{ emisor_final.rfc }}<br>
+                    <span class="bold">Régimen Fiscal:</span> {{ emisor_final.regimen_fiscal }}<br>
+                    <span class="bold">Lugar de Expedición (CP):</span> {{ emisor_final.codigo_postal }}<br>
+                    
+                    <div style="margin-top: 4px; line-height: 1.4;">
+                        {% if emisor_final.direccion %}
+                            {{ emisor_final.direccion|linebreaksbr }}
+                        {% else %}
+                            <span style="color: #999; font-style: italic;">(Dirección fiscal no capturada)</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </td>
+            <td width="45%">
+                <div class="invoice-box">
+                    <div class="invoice-title">FACTURA ELECTRÓNICA (CFDI)</div>
+                    <table class="w-100 text-sm invoice-data-table">
+                        <tr>
+                            <td class="bold">Folio Interno:</td>
+                            <td class="text-right text-blue bold">{{ factura.folio }}</td>
+                        </tr>
+                        <tr>
+                            <td class="bold">Folio Fiscal:</td>
+                            <td class="text-right text-xs">{{ factura.folio_fiscal|default:"NO TIMBRADA" }}</td>
+                        </tr>
+                        <tr>
+                            <td class="bold">Fecha de Emisión:</td>
+                            <td class="text-right">{{ factura.fecha_emision|date:"Y-m-d H:i:s" }}</td>
+                        </tr>
+                        <tr>
+                            <td class="bold">Fecha Certificación:</td>
+                            <td class="text-right">{{ factura.fecha_timbrado|default:"-" }}</td>
+                        </tr>
+                        <tr>
+                            <td class="bold">Tipo de Comprobante:</td>
+                            <td class="text-right">I - Ingreso</td>
+                        </tr>
+                        <tr>
+                            <td class="bold">No. Certificado SAT:</td>
+                            <td class="text-right">{{ factura.no_certificado_sat|default:"-" }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    {% endwith %}
+
+    <div class="section-header">DATOS DEL CLIENTE (RECEPTOR)</div>
+    <table class="layout text-sm" style="margin-left: 5px;">
+        <tr>
+            <td width="60%">
+                <div class="bold text-lg">{{ factura.receptor.razon_social }}</div>
+                
+                <div style="margin-top: 2px; line-height: 1.4;">
+                    {% if factura.receptor.direccion %}
+                        {{ factura.receptor.direccion|linebreaksbr }}
+                    {% else %}
+                        <span style="color: #666; font-style: italic;">
+                            (Dirección no disponible. Verifique que el cliente tenga un Lugar registrado)
+                        </span>
+                    {% endif %}
+                </div>
+                
+                <div style="margin-top: 2px;">C.P.: {{ factura.receptor.codigo_postal }}</div>
+            </td>
+            <td width="40%">
+                <table class="w-5">
+                    <tr><td class="bold">RFC:</td><td>{{ factura.receptor.rfc }}</td></tr>
+                    <tr><td class="bold">Régimen Fiscal:</td><td>{{ factura.receptor.regimen_fiscal }}</td></tr>
+                    <tr><td class="bold">Uso CFDI:</td><td>{{ factura.uso_cfdi }}</td></tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    {% if factura.tipo_relacion and factura.uuid_relacionado %}
+    <div class="section-header">CFDI RELACIONADOS</div>
+    <table class="layout text-sm" style="margin-left: 5px; margin-bottom: 10px;">
+        <tr>
+            <td width="20%" class="bold">Tipo de Relación:</td>
+            <td>
+                {{ factura.tipo_relacion }} 
+                {% if factura.tipo_relacion == '04' %}- Sustitución de los CFDI previos{% endif %}
+                {% if factura.tipo_relacion == '01' %}- Nota de crédito de los documentos relacionados{% endif %}
+                {% if factura.tipo_relacion == '07' %}- CFDI por aplicación de anticipo{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td class="bold" style="vertical-align: top;">UUID Relacionado(s):</td>
+            <td style="font-family: monospace;">{{ factura.uuid_relacionado }}</td>
+        </tr>
+    </table>
+    {% endif %}
+    
+    <table class="conceptos">
+        <thead>
+            <tr>
+                <th width="8%" class="text-center">Cant.</th>
+                <th width="10%" class="text-center">Unidad</th>
+                <th width="10%" class="text-center">Clave SAT</th>
+                <th width="47%">Descripción</th>
+                <th width="12%" class="text-right">Precio Unit.</th>
+                <th width="13%" class="text-right">Importe</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in factura.conceptos.all %}
+            <tr>
+                <td class="text-center">{{ c.cantidad }}</td>
+                <td class="text-center">{{ c.clave_unidad }}</td>
+                <td class="text-center">{{ c.clave_prod_serv }}</td>
+                <td>
+                    {{ c.descripcion }}
+                    {% if c.no_identificacion %}
+                    <br><small style="color:#666;">SKU/ID: {{ c.no_identificacion }}</small>
+                    {% endif %}
+                    
+                    {# Desglose de impuestos por partida (Opcional, pero útil) #}
+                    {% if c.iva_importe > 0 or c.iva_ret_importe > 0 %}
+                    <div style="font-size: 7pt; color: #555; margin-top: 2px;">
+                        {% if c.iva_importe > 0 %}Traslados: ${{ c.iva_importe|floatformat:2|intcomma }} {% endif %}
+                        {% if c.iva_ret_importe > 0 %} | Retenciones: -${{ c.iva_ret_importe|floatformat:2|intcomma }}{% endif %}
+                    </div>
+                    {% endif %}
+                </td>
+                <td class="text-right no-wrap">$ {{ c.valor_unitario|floatformat:2|intcomma }}</td>
+                <td class="text-right bold no-wrap">$ {{ c.importe|floatformat:2|intcomma }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="layout" style="margin-top: 20px;">
+        <tr>
+            <td width="65%" style="padding-right: 20px;">
+                <div style="background: #f0f0f0; padding: 5px; border-radius: 3px; font-size: 8pt; margin-bottom: 10px;">
+                    <strong>IMPORTE CON LETRA:</strong><br>
+                    {{ factura.monto_letra_calculado|default:"(CANTIDAD EN LETRA NO GENERADA)" }}
+                </div>
+
+                <table class="w-10 text-sm" style="color: #444;">
+                    <tr><td width="35%"><strong>Forma de Pago:</strong></td><td>{{ factura.forma_pago }}</td></tr>
+                    <tr><td><strong>Método de Pago:</strong></td><td>{{ factura.metodo_pago }}</td></tr>
+                    <tr><td><strong>Moneda:</strong></td><td>{{ factura.moneda }}</td></tr>
+                    <tr><td><strong>Tipo de Cambio:</strong></td><td>{{ factura.tipo_cambio }}</td></tr>
+                </table>
+            </td>
+
+            <td width="35%">
+                <table class="totales-table text-right text-sm">
+                    <tr>
+                        <td>Subtotal:</td>
+                        <td class="no-wrap">$ {{ factura.subtotal|floatformat:2|intcomma }}</td>
+                    </tr>
+                    
+                    {# Aquí podrías desglosar más impuestos si fuera necesario #}
+                    <tr>
+                        <td>IVA Trasladado:</td>
+                        <td class="no-wrap">$ {{ factura.impuestos_trasladados|floatformat:2|intcomma }}</td>
+                    </tr>
+                    
+                    {% if factura.impuestos_retenidos > 0 %}
+                    <tr>
+                        <td style="color:red;">(-) Retenciones:</td>
+                        <td class="no-wrap" style="color:red;">$ {{ factura.impuestos_retenidos|floatformat:2|intcomma }}</td>
+                    </tr>
+                    {% endif %}
+                    
+                    <tr class="total-highlight">
+                        <td style="padding-top:8px;">TOTAL:</td>
+                        <td class="no-wrap" style="padding-top:8px; font-size: 11pt;">$ {{ factura.monto_total|floatformat:2|intcomma }}</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    {% if factura.folio_fiscal or factura.estado == 'timbrado' %}
+    <div class="footer-sat">
+        <table class="layout">
+            <tr>
+                <td width="18%" style="vertical-align: top; text-align: center;">
+                   {% if factura.qr_url %}
+                     <img src="{{ factura.qr_url }}" style="width: 120px; height: 120px;">
+                   {% else %}
+                     <div style="width: 100px; height: 100px; background: #eee; border: 1px solid #ccc; margin: auto; display: flex; align-items: center; justify-content: center; font-size: 8px;">
+                        QR NO DISPONIBLE
+                     </div>
+                   {% endif %}
+                </td>
+                
+                <td width="82%" style="padding-left: 10px;">
+                    <div class="label-sat">Sello Digital del Emisor:</div>
+                    <div class="cadena-sat">{{ factura.sello_digital|default:"-" }}</div>
+                    
+                    <div class="label-sat">Sello del SAT:</div>
+                    <div class="cadena-sat">{{ factura.sello_sat|default:"-" }}</div>
+                    
+                    <div class="label-sat">Cadena Original del complemento de certificación digital del SAT:</div>
+                    <div class="cadena-sat">{{ factura.cadena_original|default:"-" }}</div>
+                    
+                    <div class="text-center text-xs" style="margin-top: 15px; color: #777;">
+                        Este documento es una representación impresa de un CFDI v4.0
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+    {% else %}
+    <div class="text-center bold text-lg" style="color: red; margin-top: 50px; border: 2px dashed red; padding: 20px;">
+        VISTA PREVIA - SIN VALIDEZ FISCAL
+    </div>
+    {% endif %}
+
+</body>
+</html>

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Recibo Electrónico de Pago</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 1cm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 10px;
+            color: #333;
+            line-height: 1.2;
+        }
+        .header-table, .info-table, .docs-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+        .header-table td { vertical-align: top; }
+        
+        .title {
+            font-size: 16px;
+            font-weight: bold;
+            color: {{ color_principal }};
+            text-align: right;
+        }
+        .subtitle {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            border-bottom: 2px solid {{ color_principal }};
+            color: {{ color_principal }};
+            padding-bottom: 2px;
+        }
+        
+        .box {
+            border: 1px solid #ddd;
+            padding: 8px;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .label { font-weight: bold; color: #555; font-size: 9px; }
+        .value { font-size: 10px; margin-bottom: 4px; color: #000; }
+        
+        .docs-table th {
+            background-color: {{ color_principal }};
+            color: white;
+            font-weight: bold;
+            text-align: center;
+            padding: 4px;
+            font-size: 9px;
+            border: 1px solid {{ color_principal }};
+        }
+        .docs-table td {
+            border: 1px solid #ccc;
+            padding: 4px;
+            text-align: center;
+            font-size: 9px;
+        }
+        .text-end { text-align: right !important; }
+        .text-start { text-align: left !important; }
+        
+        /* Footer SAT */
+        .footer-sat {
+            margin-top: 20px;
+            border-top: 1px solid #ccc;
+            padding-top: 10px;
+            font-size: 8px;
+        }
+        .cadena-original {
+            word-break: break-all;
+            color: #555;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <table class="header-table">
+        <tr>
+            <td width="20%">
+                <img src="http://localhost:8000/static/img/logo_ternium.png" style="max-width: 120px;" alt="Logo">
+            </td>
+            <td width="40%">
+                <div class="value" style="font-size: 14px; font-weight: bold;">{{ emisor.razon_social }}</div>
+                <div class="value">RFC: {{ emisor.rfc }}</div>
+                <div class="value">Régimen Fiscal: {{ emisor.regimen_fiscal }}</div>
+                <div class="value">CP: {{ emisor.codigo_postal }}</div>
+                <div class="value">Lugar de Expedición: {{ emisor.codigo_postal }}</div>
+            </td>
+            <td width="40%" class="text-end">
+                <div class="title">COMPLEMENTO DE PAGO</div>
+                <div class="value" style="margin-top: 5px;">
+                    <strong>Serie/Folio:</strong> {{ pago.serie }}-{{ pago.folio }}<br>
+                    <strong>Folio Fiscal (UUID):</strong><br> {{ pago.uuid|default:"NO TIMBRADO" }}
+                </div>
+                <div class="value">
+                    <strong>Fecha Emisión:</strong> {{ pago.fecha_pago|date:"d/m/Y H:i" }}<br>
+                    <strong>Tipo Comprobante:</strong> P - Pago<br>
+                    <strong>Versión:</strong> 4.0 (REP 2.0)
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="subtitle">RECEPTOR DEL PAGO</div>
+    <table class="info-table box">
+        <tr>
+            <td>
+                <span class="label">Razón Social:</span> <span class="value">{{ pago.receptor.razon_social }}</span><br>
+                <span class="label">RFC:</span> <span class="value">{{ pago.receptor.rfc }}</span><br>
+                <span class="label">Domicilio Fiscal:</span> <span class="value">{{ pago.receptor.codigo_postal }}</span>
+            </td>
+            <td>
+                <span class="label">Régimen Fiscal:</span> <span class="value">{{ pago.receptor.regimen_fiscal }}</span><br>
+                <span class="label">Uso CFDI:</span> <span class="value">CP01 - Pagos</span>
+            </td>
+        </tr>
+    </table>
+
+    <br>
+
+    <div class="subtitle">DATOS DEL PAGO</div>
+    <table class="info-table box">
+        <tr>
+            <td width="25%">
+                <span class="label">Fecha de Pago:</span><br>
+                <span class="value">{{ pago.fecha_pago|date:"Y-m-d\TH:i:s" }}</span>
+            </td>
+            <td width="25%">
+                <span class="label">Forma de Pago:</span><br>
+                <span class="value">{{ pago.forma_pago }}</span>
+            </td>
+            <td width="25%">
+                <span class="label">Moneda:</span><br>
+                <span class="value">{{ pago.moneda }}</span>
+            </td>
+            <td width="25%">
+                <span class="label">Monto Total:</span><br>
+                <span class="value" style="font-size: 14px; font-weight: bold;">${{ pago.monto_total|floatformat:2 }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="label">No. Operación:</span><br>
+                <span class="value">{{ pago.num_operacion|default:"-" }}</span>
+            </td>
+            <td>
+                <span class="label">Tipo Cambio:</span><br>
+                <span class="value">{{ pago.tipo_cambio }}</span>
+            </td>
+            <td>
+                <span class="label">Cta. Ordenante:</span><br>
+                <span class="value">{{ pago.cuenta_emisor|default:"-" }}</span>
+            </td>
+            <td>
+                <span class="label">Cta. Beneficiario:</span><br>
+                <span class="value">{{ pago.cuenta_receptor|default:"-" }}</span>
+            </td>
+        </tr>
+    </table>
+
+    <br>
+
+    <div class="subtitle">DOCUMENTOS RELACIONADOS (FACTURAS PAGADAS)</div>
+    <table class="docs-table">
+        <thead>
+            <tr>
+                <th>UUID Documento</th>
+                <th>Serie/Folio</th>
+                <th>Moneda</th>
+                <th>Método</th>
+                <th>Parc.</th>
+                <th>Saldo Anterior</th>
+                <th>Importe Pagado</th>
+                <th>Saldo Insoluto</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for doc in pago.documentos_relacionados.all %}
+            <tr>
+                <td class="text-start" style="font-size: 8px;">{{ doc.factura.folio_fiscal }}</td>
+                <td>{{ doc.factura.serie }}-{{ doc.factura.folio }}</td>
+                <td>{{ doc.factura.moneda }}</td>
+                <td>PPD</td>
+                <td>{{ doc.numero_parcialidad }}</td>
+                <td class="text-end">${{ doc.saldo_anterior|floatformat:2 }}</td>
+                <td class="text-end fw-bold" style="background-color: #f0fff0;">${{ doc.importe_pagado|floatformat:2 }}</td>
+                <td class="text-end">${{ doc.saldo_insoluto|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="6" class="text-end label">TOTAL PAGADO:</td>
+                <td class="text-end" style="font-weight: bold;">${{ pago.monto_total|floatformat:2 }}</td>
+                <td></td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div style="margin-top: 10px; font-size: 10px;">
+        <strong>Importe con Letra:</strong> {{ monto_letra }}
+    </div>
+
+    <div class="footer-sat">
+        <table width="100%">
+            <tr>
+                <td width="20%" style="vertical-align: top; text-align: center;">
+                    {% if datos_sat.qr_url %}
+                        <img src="{{ datos_sat.qr_url }}" 
+                             alt="QR SAT" 
+                             style="width: 3.5cm; height: 3.5cm; display: block; margin: 0 auto;">
+                    {% else %}
+                        <div style="border: 1px solid #ccc; width: 3.5cm; height: 3.5cm; text-align: center; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #999; margin: 0 auto;">
+                            Sin Timbre
+                        </div>
+                    {% endif %}
+                </td>
+                
+                <td width="80%" style="padding-left: 10px;">
+                    {% if pago.uuid %}
+                        <div class="label">Sello Digital del Emisor:</div>
+                        <div class="cadena-original" style="font-size: 6px; margin-bottom: 3px;">{{ datos_sat.sello_cfd }}</div>
+
+                        <div class="label">Sello Digital del SAT:</div>
+                        <div class="cadena-original" style="font-size: 6px; margin-bottom: 3px;">{{ datos_sat.sello_sat }}</div>
+
+                        <div class="label">Cadena Original del Complemento de Certificación Digital del SAT:</div>
+                        <div class="cadena-original" style="font-size: 6px; margin-bottom: 3px;">{{ datos_sat.cadena_original }}</div>
+
+                        <div style="margin-top: 5px;">
+                            <strong>RFC Proveedor Certificación:</strong> {{ datos_sat.rfc_prov }} <br>
+                            <strong>No. de Serie del CSD del SAT:</strong> {{ datos_sat.no_certificado }} <br>
+                            <strong>Fecha y Hora de Certificación:</strong> {{ datos_sat.fecha_timbrado }}
+                        </div>
+                    {% else %}
+                        <h3 style="color: red; text-align: center; font-size: 10px;">VISTA PREVIA - DOCUMENTO NO TIMBRADO</h3>
+                        <p style="text-align: center; font-size: 8px;">Este documento no tiene validez fiscal hasta que sea timbrado ante el SAT.</p>
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+        <div style="text-align: center; margin-top: 5px; font-size: 8px;">
+            Este documento es una representación impresa de un CFDI.
+        </div>
+    </div>
+
+</body>
+</html>

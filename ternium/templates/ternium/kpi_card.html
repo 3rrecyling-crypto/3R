@@ -1,0 +1,21 @@
+{% load humanize %}
+
+<div class="card kpi-card h-100 border-start border-4 border-{{ color }}">
+    <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between">
+            <div>
+                <div class="kpi-label text-muted mb-1">{{ title }}</div>
+                <div class="kpi-value text-dark">
+                    {# Formateamos el valor: 1 decimal y comas para miles #}
+                    {{ value|floatformat:1|intcomma }}
+                    <span class="fs-6 text-muted fw-normal ms-1">{{ unit }}</span>
+                </div>
+            </div>
+            
+            <div class="rounded-circle bg-{{ color }} bg-opacity-10 d-flex align-items-center justify-content-center ms-3" 
+                 style="width: 50px; height: 50px; min-width: 50px;">
+                <i class="{{ icon }} text-{{ color }} fs-4"></i>
+            </div>
+        </div>
+    </div>
+</div>

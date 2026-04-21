@@ -1,0 +1,844 @@
+{% extends 'ternium/base.html' %}
+{% load static humanize %}
+
+{% block extra_css %}
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+    
+    <style>
+        .select2-container--bootstrap-5 .select2-selection {
+            min-height: 38px;
+            border-radius: 0.375rem;
+        }
+        #seccion-impuestos-contenedor {
+            transition: all 0.3s ease;
+        }
+        .sticky-card {
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+        }
+        .loading-text {
+            font-size: 0.8rem;
+            color: #6c757d;
+            font-style: italic;
+        }
+        .saldo-editable {
+            cursor: pointer;
+            border-bottom: 1px dashed #ccc;
+            transition: color 0.3s ease;
+        }
+        .saldo-editable:hover {
+            color: #0d6efd;
+            border-bottom-color: #0d6efd;
+        }
+        .modal-backdrop { z-index: 1040 !important; }
+        .modal-content { z-index: 1100 !important; }
+        .modal { z-index: 1050 !important; }
+        
+        .card-saldo-antes {
+            background-color: #f8f9fa;
+            border-left: 4px solid #6c757d;
+        }
+        .card-saldo-despues {
+            background-color: #e8f5e9;
+            border-left: 4px solid #198754;
+        }
+        .card-saldo-despues.negativo {
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+        
+        .list-group-item {
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+        }
+        .list-group-item:hover {
+            background-color: #f8f9fa;
+        }
+        .btn-eliminar-archivo {
+            cursor: pointer;
+            color: #dc3545;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-left: 10px;
+            transition: all 0.2s;
+        }
+        .btn-eliminar-archivo:hover {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .badge-impuesto {
+            font-size: 0.75rem;
+            margin-left: 5px;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-3 mb-4">
+            <div class="card shadow border-0 sticky-card">
+                <div class="card-header bg-dark text-white text-center py-3">
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-wallet me-2"></i>Resumen de Saldo</h5>
+                </div>
+                <div class="card-body">
+                    
+                    <div class="p-3 mb-3 rounded card-saldo-antes">
+                        <small class="text-muted text-uppercase fw-bold d-block mb-1" style="font-size: 0.7rem;">
+                            Saldo Antes de Realizar la Operación
+                        </small>
+                        <h4 id="display-saldo-antes" 
+                            class="fw-bold text-secondary mb-0 saldo-editable"
+                            title="Clic para corregir saldo base"
+                            onclick="abrirModalSaldo()">
+                            $0.00
+                        </h4>
+                        <div id="saldo-loader" class="loading-text d-none">Consultando...</div>
+                    </div>
+
+                    <h6 class="text-primary fw-bold mb-3 mt-4">
+                        <i class="fas fa-calculator me-2"></i>Desglose
+                    </h6>
+                    <ul class="list-group list-group-flush small mb-3">
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-transparent">
+                            Monto Base
+                            <span id="resumen-subtotal" class="fw-bold text-dark">$0.00</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-transparent">
+                            (+) IVA
+                            <span id="resumen-iva" class="text-danger fw-bold">$0.00</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-transparent">
+                            (-) Retenciones
+                            <span id="resumen-ret" class="text-success fw-bold">$0.00</span>
+                        </li>
+                    </ul>
+
+                    <div id="card-saldo-final" class="p-3 rounded card-saldo-despues">
+                        <small class="text-muted text-uppercase fw-bold d-block mb-1" style="font-size: 0.7rem;">
+                            Saldo Después de Realizar la Operación
+                        </small>
+                        <h3 id="display-saldo-despues" class="fw-bold text-success mb-0">
+                            $0.00
+                        </h3>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-9">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-primary text-white py-3 d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0 fw-bold">
+                        <i class="fas {% if movimiento %}fa-edit{% else %}fa-plus-circle{% endif %} me-2"></i>
+                        {% if movimiento %}Editar Movimiento{% else %}Nuevo Movimiento Bancario{% endif %}
+                    </h4>
+                    <span id="icono-operacion" class="badge bg-white text-primary fs-6 p-2 shadow-sm">Operación</span>
+                </div>
+                
+                <div class="card-body p-4">
+                    <form method="post" id="movimientoForm" enctype="multipart/form-data" novalidate>
+                        {% csrf_token %}
+                        
+                        <input type="hidden" name="ids_eliminar" id="ids_eliminar" value="">
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold"><i class="fas fa-calendar-alt me-1 text-primary"></i>Fecha</label>
+                                {{ form.fecha }}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold"><i class="fas fa-university me-1 text-primary"></i>Cuenta Origen</label>
+                                {{ form.cuenta }}
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label fw-bold"><i class="fas fa-filter me-1 text-primary"></i>Tipo</label>
+                                {{ form.tipo_movimiento }}
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label fw-bold">Concepto / Referencia</label>
+                                {{ form.concepto }}
+                                <datalist id="lista-conceptos">
+                                    {% for c in lista_conceptos %}<option value="{{ c }}">{% endfor %}
+                                </datalist>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Unidad de Negocio</label>
+                                {{ form.unidad_negocio }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-primary">Operación</label>
+                                {{ form.operacion }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Categoría</label>
+                                {{ form.categoria }}
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Subcategoría</label>
+                                {{ form.subcategoria }}
+                            </div>
+
+                            <div class="col-md-6">
+                                <div id="div_tercero">
+                                    <label class="form-label fw-bold" id="label-tercero">Recibido de / Pagado a</label>
+                                    <div class="input-group shadow-sm">
+                                        {{ form.tercero_obj }} 
+                                        <button type="button" onclick="abrirTerceroPopup('{% url 'crear_tercero' %}')" class="btn btn-primary" title="Agregar nuevo">
+                                            <i class="fas fa-user-plus"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="div_cuenta_destino" class="d-none">
+                                    <label class="form-label fw-bold text-success">Cuenta Destino (Transferencia MXN)</label>
+                                    {{ form.cuenta_destino_transfer }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card border-0 shadow-sm mb-4 bg-light">
+                            <div class="card-header bg-secondary text-white fw-bold">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span><i class="fas fa-file-invoice me-2"></i>Carga de Comprobantes</span>
+                                    <span class="badge bg-light text-dark" id="contador-archivos">0 archivos</span>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <label class="form-label text-muted fw-bold">Agregar XMLs y PDFs</label>
+                                        <input type="file" id="input-archivos" name="archivos_comprobantes" class="form-control" multiple accept=".xml,.pdf">
+                                        <div class="form-text small">
+                                            Selecciona múltiples archivos. El sistema leerá los XML para sumar el IVA y Retenciones automáticamente.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row mt-3">
+                                    <div class="col-md-6 border-end">
+                                        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2 flex-wrap">
+                                            <h6 class="text-primary mb-0">XMLs (Datos)</h6>
+                                            <div class="text-end">
+                                                <span class="badge bg-success badge-impuesto" id="badge-total-iva" title="IVA Trasladado">IVA: $0.00</span>
+                                                <span class="badge bg-warning text-dark badge-impuesto" id="badge-total-ret-iva" title="IVA Retenido">Ret IVA: $0.00</span>
+                                                <span class="badge bg-info text-dark badge-impuesto" id="badge-total-ret-isr" title="ISR Retenido">Ret ISR: $0.00</span>
+                                            </div>
+                                        </div>
+                                        <div id="lista-xmls" class="list-group list-group-flush small" style="max-height: 200px; overflow-y: auto;">
+                                            <div class="text-center text-muted py-2 fst-italic" style="font-size: 0.8rem;">Sin archivos XML</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <h6 class="text-danger border-bottom pb-2 mb-2">PDFs (Visualización)</h6>
+                                        <div id="lista-pdfs" class="list-group list-group-flush small" style="max-height: 200px; overflow-y: auto;">
+                                            <div class="text-center text-muted py-2 fst-italic" style="font-size: 0.8rem;">Sin archivos PDF</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card bg-light border-0 mb-4 shadow-sm">
+                            <div class="card-body">
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold text-dark">Subtotal (Importe Base)</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-white border-end-0"><i class="fas fa-dollar-sign text-success"></i></span>
+                                            {{ form.monto_total }}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-8" id="seccion-impuestos-contenedor">
+                                        <div class="row g-2">
+                                            <div class="col-4">
+                                                <label class="form-label small text-muted">IVA (Automático)</label>
+                                                {{ form.iva }}
+                                            </div>
+                                            <div class="col-4">
+                                                <label class="form-label small text-muted">Ret. IVA</label>
+                                                {{ form.ret_iva }}
+                                            </div>
+                                            <div class="col-4">
+                                                <label class="form-label small text-muted">Ret. ISR</label>
+                                                {{ form.ret_isr }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-12">
+                                <label class="form-label text-muted fw-bold">Observaciones Adicionales</label>
+                                {{ form.comentarios }}
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-3 pt-3 border-top align-items-center">
+                            <a href="{% url 'lista_movimientos' %}" class="btn btn-light border px-4">Cancelar</a>
+                            
+                            {% if movimiento %}
+                                <a href="{% url 'detalle_movimiento' movimiento.pk %}" class="btn btn-info text-white px-4 fw-bold shadow">
+                                    <i class="fas fa-file-invoice me-2"></i>Gestionar Histórico
+                                </a>
+                            {% endif %}
+
+                            <button type="submit" class="btn btn-success px-5 fw-bold shadow">
+                                <i class="fas fa-cloud-upload-alt me-2"></i>
+                                {% if movimiento %}Actualizar Movimiento{% else %}Finalizar y Guardar{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalSaldo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content shadow-lg">
+            <div class="modal-header bg-dark text-white py-2">
+                <h6 class="modal-title">Corrección de Saldo</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="" id="formSaldo">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <label class="form-label small fw-bold text-muted">Nuevo Saldo Inicial</label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" step="0.01" name="saldo_inicial" id="inputSaldo" class="form-control fw-bold" required>
+                    </div>
+                </div>
+                <div class="modal-footer py-1 border-0">
+                    <button type="submit" class="btn btn-sm btn-dark w-100">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalVerPDF" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content h-100 border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white py-2">
+                <h6 class="modal-title fw-bold" id="tituloModalPDF"><i class="fas fa-file-pdf me-2"></i>Visor de PDF</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0 bg-dark" style="height: 85vh;">
+                <iframe id="iframePDF" src="" width="100%" height="100%" frameborder="0"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+    // --- VARIABLES DE ESTADO Y FORMATOS ---
+    const fmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
+    let currentCuentaId = null;
+    let currentSaldoInicial = 0; 
+    let saldoBaseCuenta = 0;     
+
+    // --- MANEJO DE ARCHIVOS (MEMORIA LOCAL) ---
+    // archivosNuevos: File Objects (Input)
+    // archivosExistentes: Objects {id, name, url, etc} (DB)
+    let archivosNuevos = [];
+    let archivosExistentes = [];
+    let idsEliminar = [];
+
+    // --- DATOS INYECTADOS DESDE DJANGO (Si es edición) ---
+    {% if movimiento %}
+        const esEdicion = true;
+        const saldoFinalGuardado = parseFloat("{{ movimiento.saldo_banco|default:0 }}");
+        const abonoGuardado = parseFloat("{{ movimiento.abono|default:0 }}");
+        const cargoGuardado = parseFloat("{{ movimiento.cargo|default:0 }}");
+        saldoBaseCuenta = saldoFinalGuardado - abonoGuardado + cargoGuardado;
+
+        // Cargar archivos existentes
+        {% for comp in movimiento.comprobantes.all %}
+            archivosExistentes.push({
+                id: "{{ comp.id }}",
+                tipo: "{% if comp.archivo_xml %}xml{% else %}pdf{% endif %}",
+                nombre: "{% if comp.archivo_xml %}{{ comp.archivo_xml.name }}{% else %}{{ comp.archivo_pdf.name }}{% endif %}",
+                url: "{% if comp.archivo_xml %}{{ comp.archivo_xml.url }}{% else %}{{ comp.archivo_pdf.url }}{% endif %}",
+                folio: "{{ comp.uuid|slice:'-8:'|default:'S/N' }}",
+                // --- AQUÍ ESTÁ LA CLAVE: INYECTAR TODOS LOS IMPUESTOS ---
+                iva: {{ comp.monto_iva|default:0 }},
+                retIva: {{ comp.monto_ret_iva|default:0 }}, // Ahora sí inyectamos la retención
+                retIsr: {{ comp.monto_ret_isr|default:0 }}  // Ahora sí inyectamos el ISR
+            });
+        {% endfor %}
+    {% else %}
+        const esEdicion = false;
+    {% endif %}
+
+    // --- FUNCIONES DE MODALES ---
+    function abrirTerceroPopup(url) {
+        const w = 600; const h = 700;
+        const left = (window.screen.width / 2) - (w / 2);
+        const top = (window.screen.height / 2) - (h / 2);
+        window.open(url, "CrearTercero", `width=${w},height=${h},top=${top},left=${left},scrollbars=yes`);
+    }
+
+    function abrirModalSaldo() {
+        if (!currentCuentaId) {
+            alert("Primero selecciona una cuenta.");
+            return;
+        }
+        document.getElementById('inputSaldo').value = currentSaldoInicial;
+        document.getElementById('formSaldo').action = "/bancos/cuenta/editar/" + currentCuentaId + "/"; 
+        var myModal = new bootstrap.Modal(document.getElementById('modalSaldo'));
+        myModal.show();
+    }
+
+    $(document).ready(function() {
+        var modals = document.querySelectorAll('.modal');
+        modals.forEach(modal => document.body.appendChild(modal));
+
+        // SELECTORES
+        const $cuentaSelect = $('#id_cuenta');
+        const $operacionSelect = $('#id_operacion');
+        const $tipoSelect = $('#id_tipo_movimiento');
+        const $terceroSelect = $('#id_tercero_obj');
+        const $categoriaSelect = $('#id_categoria');
+        const $subcategoriaSelect = $('#id_subcategoria');
+        const $destinoSelect = $('#id_cuenta_destino_transfer');
+
+        const divTercero = document.getElementById('div_tercero');
+        const divDestino = document.getElementById('div_cuenta_destino');
+        
+        const inputSubtotal = document.getElementById('id_monto_total');
+        const inputIva = document.getElementById('id_iva');
+        const inputRetIva = document.getElementById('id_ret_iva');
+        const inputRetIsr = document.getElementById('id_ret_isr');
+        const seccionImpuestos = document.getElementById('seccion-impuestos-contenedor');
+        
+        const displaySaldoAntes = document.getElementById('display-saldo-antes');
+        const displaySaldoDespues = document.getElementById('display-saldo-despues');
+        const cardSaldoDespues = document.getElementById('card-saldo-final');
+        const resumenSubtotal = document.getElementById('resumen-subtotal');
+        const resumenIva = document.getElementById('resumen-iva');
+        const resumenRet = document.getElementById('resumen-ret');
+        const iconoOperacion = document.getElementById('icono-operacion');
+        const labelTercero = document.getElementById('label-tercero');
+        const loader = document.getElementById('saldo-loader');
+
+        // ELEMENTOS ARCHIVOS
+        const inputArchivos = document.getElementById('input-archivos');
+        const inputIdsEliminar = document.getElementById('ids_eliminar');
+        const listaXmls = document.getElementById('lista-xmls');
+        const listaPdfs = document.getElementById('lista-pdfs');
+        const badgeTotalIva = document.getElementById('badge-total-iva');
+        const badgeTotalRetIva = document.getElementById('badge-total-ret-iva');
+        const badgeTotalRetIsr = document.getElementById('badge-total-ret-isr');
+        const contadorArchivos = document.getElementById('contador-archivos');
+        
+        const modalPDF = new bootstrap.Modal(document.getElementById('modalVerPDF'));
+        const iframePDF = document.getElementById('iframePDF');
+        const tituloModalPDF = document.getElementById('tituloModalPDF');
+
+        // ==========================================
+        // LÓGICA DE ARCHIVOS (NUEVOS + EXISTENTES)
+        // ==========================================
+        
+        // 1. Escuchar Nuevos Archivos
+        inputArchivos.addEventListener('change', function(e) {
+            const newFiles = Array.from(e.target.files);
+            
+            newFiles.forEach(file => {
+                const tipo = file.name.split('.').pop().toLowerCase();
+                const tempId = Date.now() + Math.random();
+
+                if (tipo === 'xml') {
+                    procesarXML(file, (data) => {
+                        archivosNuevos.push({
+                            id: tempId,
+                            file: file,
+                            tipo: 'xml',
+                            data: data // Contiene iva, retIva, retIsr
+                        });
+                        renderizarArchivos();
+                    });
+                } else if (tipo === 'pdf') {
+                    archivosNuevos.push({
+                        id: tempId,
+                        file: file,
+                        tipo: 'pdf'
+                    });
+                    renderizarArchivos();
+                }
+            });
+            // NO limpiamos this.value inmediatamente aquí para no romper el DataTransfer
+        });
+
+        // 2. Procesar XML (Lectura Cliente)
+        function procesarXML(file, callback) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(e.target.result, "text/xml");
+                    
+                    const comprobante = xmlDoc.getElementsByTagName("cfdi:Comprobante")[0] || xmlDoc.getElementsByTagName("Comprobante")[0];
+                    const folio = comprobante ? (comprobante.getAttribute("Folio") || "S/N") : "S/N";
+                    
+                    let iva = 0;
+                    let retIva = 0;
+                    let retIsr = 0;
+
+                    const impuestosNodes = xmlDoc.getElementsByTagName("cfdi:Impuestos");
+                    let impuestosGlobal = null;
+                    for(let i=0; i<impuestosNodes.length; i++) {
+                        if (impuestosNodes[i].parentNode.nodeName.includes("Comprobante")) {
+                            impuestosGlobal = impuestosNodes[i];
+                            break;
+                        }
+                    }
+
+                    if (impuestosGlobal) {
+                        if (impuestosGlobal.getAttribute("TotalImpuestosTrasladados")) {
+                            iva = parseFloat(impuestosGlobal.getAttribute("TotalImpuestosTrasladados"));
+                        }
+                        const retenciones = impuestosGlobal.getElementsByTagName("cfdi:Retencion");
+                        for(let i=0; i<retenciones.length; i++) {
+                            const imp = retenciones[i].getAttribute("Impuesto");
+                            const val = parseFloat(retenciones[i].getAttribute("Importe") || 0);
+                            if(imp === "002") retIva += val;
+                            if(imp === "001") retIsr += val;
+                        }
+                    } else {
+                        // Fallback conceptos
+                        const traslados = xmlDoc.getElementsByTagName("cfdi:Traslado");
+                        for (let i=0; i<traslados.length; i++) {
+                            if (traslados[i].getAttribute("Impuesto")==="002") {
+                                iva += parseFloat(traslados[i].getAttribute("Importe")||0);
+                            }
+                        }
+                    }
+
+                    callback({ folio: folio, iva: iva, retIva: retIva, retIsr: retIsr });
+
+                } catch (error) {
+                    console.error("Error XML", error);
+                    callback({ folio: 'Error', iva: 0, retIva: 0, retIsr: 0 });
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // 3. Renderizar Listas (Mezcla Nuevos y Existentes)
+        function renderizarArchivos() {
+            listaXmls.innerHTML = '';
+            listaPdfs.innerHTML = '';
+            
+            // Totales acumulados (SUMA TOTAL: Existentes + Nuevos)
+            let grandTotalIva = 0; 
+            let grandTotalRetIva = 0; 
+            let grandTotalRetIsr = 0;
+
+            const dt = new DataTransfer();
+
+            // A) RENDERIZAR EXISTENTES (BD)
+            archivosExistentes.forEach(item => {
+                const nombreCorto = item.nombre.split('/').pop().substring(0, 15);
+                const div = document.createElement('div');
+                div.className = "list-group-item d-flex justify-content-between align-items-center py-1";
+                
+                if (item.tipo === 'xml') {
+                    grandTotalIva += item.iva;
+                    grandTotalRetIva += item.retIva;
+                    grandTotalRetIsr += item.retIsr;
+
+                    // HTML MEJORADO PARA MOSTRAR TODOS LOS IMPUESTOS
+                    div.innerHTML = `
+                        <div class="d-flex align-items-center w-100">
+                            <i class="fas fa-file-code text-success me-2"></i>
+                            <div class="flex-grow-1">
+                                <a href="${item.url}" target="_blank" class="fw-bold text-decoration-none" title="${item.nombre}">${nombreCorto}...</a>
+                                <div class="text-muted" style="font-size:0.7rem">Folio: ${item.folio} (Guardado)</div>
+                            </div>
+                            <div class="text-end me-2" style="font-size:0.75rem;">
+                                <div class="text-success" title="IVA">+${fmt.format(item.iva)}</div>
+                                ${item.retIva > 0 ? `<div class="text-warning text-dark" title="Ret IVA">-${fmt.format(item.retIva)}</div>` : ''}
+                                ${item.retIsr > 0 ? `<div class="text-info text-dark" title="Ret ISR">-${fmt.format(item.retIsr)}</div>` : ''}
+                            </div>
+                            <span class="btn-eliminar-archivo" onclick="eliminarExistente('${item.id}')" title="Borrar de BD">
+                                <i class="fas fa-times"></i>
+                            </span>
+                        </div>
+                    `;
+                    listaXmls.appendChild(div);
+                } else {
+                    div.innerHTML = `
+                        <div class="d-flex align-items-center w-100">
+                            <div class="text-truncate flex-grow-1" style="max-width: 70%;" title="${item.nombre}">
+                                <i class="fas fa-file-pdf text-danger me-2"></i>
+                                <a href="${item.url}" target="_blank" class="text-decoration-none text-dark">${nombreCorto}...</a>
+                            </div>
+                            <span class="badge bg-secondary me-2" style="font-size:0.7rem">Guardado</span>
+                            <span class="btn-eliminar-archivo" onclick="eliminarExistente('${item.id}')" title="Borrar de BD">
+                                <i class="fas fa-times"></i>
+                            </span>
+                        </div>
+                    `;
+                    listaPdfs.appendChild(div);
+                }
+            });
+
+            // B) RENDERIZAR NUEVOS (Input)
+            archivosNuevos.forEach(item => {
+                dt.items.add(item.file); 
+
+                const nombreCorto = item.file.name.substring(0, 15);
+                const div = document.createElement('div');
+                div.className = "list-group-item d-flex justify-content-between align-items-center py-1 bg-light";
+
+                if (item.tipo === 'xml') {
+                    grandTotalIva += item.data.iva;
+                    grandTotalRetIva += item.data.retIva;
+                    grandTotalRetIsr += item.data.retIsr;
+
+                    div.innerHTML = `
+                        <div class="d-flex align-items-center w-100">
+                            <i class="fas fa-file-code text-success me-2"></i>
+                            <div class="flex-grow-1">
+                                <span class="fw-bold" title="${item.file.name}">${nombreCorto}...</span>
+                                <div class="text-muted" style="font-size:0.7rem">Folio: ${item.data.folio} <span class="text-primary">(Nuevo)</span></div>
+                            </div>
+                            <div class="text-end me-2" style="font-size:0.75rem;">
+                                <div class="text-success" title="IVA">+${fmt.format(item.data.iva)}</div>
+                                ${item.data.retIva > 0 ? `<div class="text-warning text-dark" title="Ret IVA">-${fmt.format(item.data.retIva)}</div>` : ''}
+                                ${item.data.retIsr > 0 ? `<div class="text-info text-dark" title="Ret ISR">-${fmt.format(item.data.retIsr)}</div>` : ''}
+                            </div>
+                            <span class="btn-eliminar-archivo" onclick="eliminarNuevo(${item.id})" title="Quitar">
+                                <i class="fas fa-times"></i>
+                            </span>
+                        </div>
+                    `;
+                    listaXmls.appendChild(div);
+                } else {
+                    const fileURL = URL.createObjectURL(item.file);
+                    div.innerHTML = `
+                        <div class="d-flex align-items-center w-100">
+                            <div class="text-truncate flex-grow-1" style="max-width: 70%;" title="${item.file.name}">
+                                <i class="fas fa-file-pdf text-danger me-2"></i>${nombreCorto}...
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger btn-ver-pdf shadow-sm me-2 py-0" 
+                                    data-url="${fileURL}" data-name="${item.file.name}">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <span class="btn-eliminar-archivo" onclick="eliminarNuevo(${item.id})" title="Quitar">
+                                <i class="fas fa-times"></i>
+                            </span>
+                        </div>
+                    `;
+                    listaPdfs.appendChild(div);
+                }
+            });
+
+            // IMPORTANTE: Sobrescribir el input con el objeto DataTransfer acumulado
+            inputArchivos.files = dt.files;
+            
+            const totalFiles = archivosExistentes.length + archivosNuevos.length;
+            contadorArchivos.innerText = `${totalFiles} archivos`;
+
+            // ACTUALIZAR BADGES Y INPUTS CON LA SUMA TOTAL
+            actualizarTotalesImpuestos(grandTotalIva, grandTotalRetIva, grandTotalRetIsr);
+
+            asignarEventosPDF();
+        }
+
+        // --- FUNCIONES DE ELIMINACIÓN ---
+        window.eliminarExistente = function(id) {
+            if(confirm("¿Estás seguro de eliminar este archivo guardado? Se borrará al guardar.")) {
+                archivosExistentes = archivosExistentes.filter(item => item.id !== id);
+                idsEliminar.push(id);
+                inputIdsEliminar.value = idsEliminar.join(',');
+                renderizarArchivos();
+            }
+        };
+
+        window.eliminarNuevo = function(id) {
+            archivosNuevos = archivosNuevos.filter(item => item.id !== id);
+            renderizarArchivos();
+        };
+
+        function asignarEventosPDF() {
+            document.querySelectorAll('.btn-ver-pdf').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    iframePDF.src = this.getAttribute('data-url');
+                    tituloModalPDF.innerHTML = `<i class="fas fa-file-pdf me-2"></i>${this.getAttribute('data-name')}`;
+                    modalPDF.show();
+                });
+            });
+        }
+
+        function actualizarTotalesImpuestos(iva, retIva, retIsr) {
+            // Actualizar Badges
+            badgeTotalIva.textContent = `IVA: ${fmt.format(iva)}`;
+            badgeTotalRetIva.textContent = `Ret IVA: ${fmt.format(retIva)}`;
+            badgeTotalRetIsr.textContent = `Ret ISR: ${fmt.format(retIsr)}`;
+            
+            // Actualizar Inputs del formulario (Para que se guarden los totales correctos en el Movimiento)
+            inputIva.value = iva.toFixed(2);
+            inputRetIva.value = retIva.toFixed(2);
+            inputRetIsr.value = retIsr.toFixed(2);
+            
+            // Disparar evento para recalcular saldos
+            inputIva.dispatchEvent(new Event('input'));
+        }
+
+        // ==========================================
+        // LÓGICA FINANCIERA (Saldo Final)
+        // ==========================================
+        function checkOperacion() {
+            const data = $operacionSelect.select2('data')[0];
+            const text = data ? data.text.toUpperCase() : "";
+            
+            if (text.includes('BANCO') || text.includes('DIVISA') || text.includes('VENTA')) {
+                divTercero.classList.add('d-none');
+                divDestino.classList.remove('d-none');
+                $destinoSelect.prop('required', true);
+            } else {
+                divDestino.classList.add('d-none');
+                divTercero.classList.remove('d-none');
+                $destinoSelect.prop('required', false);
+                $destinoSelect.val(null).trigger('change');
+            }
+        }
+
+        function actualizarCalculos() {
+            const subtotal = parseFloat(inputSubtotal.value) || 0;
+            const iva = parseFloat(inputIva.value) || 0;
+            const retIva = parseFloat(inputRetIva.value) || 0;
+            const retIsr = parseFloat(inputRetIsr.value) || 0;
+            const tipo = $tipoSelect.val();
+            
+            let totalOperacion = 0;
+            let saldoFinal = saldoBaseCuenta;
+
+            if (tipo === 'ingreso') {
+                seccionImpuestos.style.opacity = '0.5';
+                seccionImpuestos.style.pointerEvents = 'none';
+                totalOperacion = subtotal; 
+                saldoFinal += totalOperacion;
+                
+                iconoOperacion.innerHTML = '<i class="fas fa-arrow-circle-up me-1"></i>INGRESO';
+                iconoOperacion.className = "badge bg-white text-success fs-6 p-2 shadow-sm border border-success";
+                labelTercero.innerHTML = '<i class="fas fa-user-tie me-1"></i>Recibido de (Cliente)';
+            } else {
+                seccionImpuestos.style.opacity = '1';
+                seccionImpuestos.style.pointerEvents = 'auto';
+                
+                totalOperacion = subtotal + iva - (retIva + retIsr);
+                saldoFinal -= totalOperacion;
+                
+                iconoOperacion.innerHTML = '<i class="fas fa-arrow-circle-down me-1"></i>EGRESO';
+                iconoOperacion.className = "badge bg-white text-danger fs-6 p-2 shadow-sm border border-danger";
+                labelTercero.innerHTML = '<i class="fas fa-truck-loading me-1"></i>Pagado a (Proveedor)';
+            }
+
+            displaySaldoAntes.textContent = fmt.format(saldoBaseCuenta);
+            resumenSubtotal.textContent = fmt.format(subtotal);
+            resumenIva.textContent = fmt.format(iva);
+            resumenRet.textContent = fmt.format(retIva + retIsr); 
+            displaySaldoDespues.textContent = fmt.format(saldoFinal);
+
+            if (saldoFinal < 0) {
+                displaySaldoDespues.classList.remove('text-success');
+                displaySaldoDespues.classList.add('text-danger');
+                cardSaldoDespues.classList.add('negativo');
+                cardSaldoDespues.classList.remove('card-saldo-despues');
+            } else {
+                displaySaldoDespues.classList.remove('text-danger');
+                displaySaldoDespues.classList.add('text-success');
+                cardSaldoDespues.classList.remove('negativo');
+                cardSaldoDespues.classList.add('card-saldo-despues');
+            }
+        }
+
+        function fetchSaldo() {
+            const cuentaId = $cuentaSelect.val();
+            currentCuentaId = cuentaId;
+
+            if (esEdicion && cuentaId == "{{ form.cuenta.value|default:'' }}") {
+                actualizarCalculos();
+                return;
+            }
+
+            if (!cuentaId) {
+                saldoBaseCuenta = 0;
+                currentSaldoInicial = 0;
+                actualizarCalculos();
+                return;
+            }
+
+            loader.classList.remove('d-none');
+            $.getJSON("{% url 'ajax_saldo_cuenta' %}", { cuenta_id: cuentaId }, function(data) {
+                saldoBaseCuenta = parseFloat(data.saldo) || 0;
+                currentSaldoInicial = parseFloat(data.saldo_inicial) || 0; 
+                loader.classList.add('d-none');
+                actualizarCalculos();
+            });
+        }
+
+        $categoriaSelect.change(function() {
+            const categoriaId = $(this).val();
+            if (!categoriaId) {
+                $subcategoriaSelect.html('<option value="">---------</option>');
+                return;
+            }
+            $.getJSON("{% url 'ajax_load_subcategories' %}", { categoria_id: categoriaId }, function(data) {
+                let options = '<option value="">Seleccione...</option>';
+                data.forEach(item => {
+                    options += `<option value="${item.id}">${item.nombre}</option>`;
+                });
+                $subcategoriaSelect.html(options);
+            });
+        });
+
+        // Inicializadores
+        $cuentaSelect.select2({ theme: 'bootstrap-5', width: '100%' }).on('change', fetchSaldo);
+        $operacionSelect.select2({ theme: 'bootstrap-5', width: '100%' }).on('change', checkOperacion);
+        $terceroSelect.select2({ theme: 'bootstrap-5', width: '100%' });
+        $categoriaSelect.select2({ theme: 'bootstrap-5', width: '100%' });
+        $subcategoriaSelect.select2({ theme: 'bootstrap-5', width: '100%' });
+        $destinoSelect.select2({ theme: 'bootstrap-5', width: '100%' });
+        
+        $tipoSelect.on('change', actualizarCalculos);
+        [inputSubtotal, inputIva, inputRetIva, inputRetIsr].forEach(el => {
+            el.addEventListener('input', actualizarCalculos);
+        });
+
+        if ($cuentaSelect.val()) {
+            fetchSaldo(); 
+        }
+        
+        // Renderizar inicial (si hay archivos existentes)
+        renderizarArchivos();
+        
+        checkOperacion();
+        actualizarCalculos();
+    });
+</script>
+{% endblock %}

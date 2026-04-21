@@ -1,0 +1,41 @@
+<div class="file-upload-container">
+    <label class="file-upload-label" for="{{ field.id_for_label }}">
+        <i class="fas fa-upload"></i>
+        {{ field.label }}
+        <div class="file-name" id="{{ field.id_for_label }}-name">Ningún archivo seleccionado</div>
+    </label>
+    {{ field }}
+    
+    <div class="file-preview mt-2" id="{{ field.id_for_label }}-preview"></div>
+    
+    {% if field.help_text %}
+    <small class="text-muted d-block mt-1">{{ field.help_text }}</small>
+    {% endif %}
+    
+    {% if field.errors %}
+    <div class="invalid-feedback d-block">
+        {% for error in field.errors %}
+        {{ error }}
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.getElementById('{{ field.id_for_label }}').addEventListener('change', function(e) {
+    const fileName = e.target.files.length ? e.target.files[0].name : 'Ningún archivo seleccionado';
+    document.getElementById('{{ field.id_for_label }}-name').textContent = fileName;
+    
+    const preview = document.getElementById('{{ field.id_for_label }}-preview');
+    preview.innerHTML = '';
+    
+    if (e.target.files.length && e.target.files[0].type.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(e.target.files[0]);
+        preview.appendChild(img);
+        preview.style.display = 'block';
+    } else {
+        preview.style.display = 'none';
+    }
+});
+</script>

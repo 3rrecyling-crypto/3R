@@ -1,0 +1,549 @@
+{% extends 'ternium/base.html' %}
+{% load static %}
+
+{% block title %}Nueva Factura Libre{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<style>
+    .select2-container--bootstrap-5 .select2-selection {
+        border-color: #dee2e6;
+        padding: 0.375rem 0.75rem;
+        min-height: 38px;
+    }
+    .table-responsive { overflow-x: visible !important; }
+    
+    .modal-backdrop { z-index: 1040 !important; }
+    .modal { z-index: 1055 !important; }
+    
+    .input-readonly { background-color: #f8f9fa; cursor: not-allowed; }
+
+    /* Estilo para pestañas personalizadas */
+    .nav-tabs .nav-link {
+        color: #495057;
+        border: none;
+        border-bottom: 3px solid transparent;
+        font-weight: 600;
+    }
+    .nav-tabs .nav-link.active {
+        color: #0d6efd;
+        border-bottom: 3px solid #0d6efd;
+        background-color: transparent;
+    }
+    .nav-tabs .nav-link:hover {
+        border-color: transparent;
+        color: #0a58ca;
+    }
+    
+    /* Ocultar columna catálogo por defecto */
+    .col-catalogo { display: none; }
+    
+    /* Estilo alerta validación */
+    .alerta-validacion {
+        background-color: #fff3cd;
+        border: 1px solid #ffecb5;
+        color: #664d03;
+        border-left: 5px solid #ffc107;
+    }
+    
+    /* Animación para el icono de recarga */
+    .fa-spin-fast {
+        -webkit-animation: fa-spin 0.5s infinite linear;
+        animation: fa-spin 0.5s infinite linear;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 mt-4">
+    <div class="card shadow border-0">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h3 class="mb-0"><i class="fas fa-file-invoice me-2"></i>Nueva Factura</h3>
+            <a href="{% url 'dashboard_facturacion' %}" class="btn btn-light btn-sm">
+                <i class="fas fa-arrow-left me-1"></i>Volver
+            </a>
+        </div>
+        
+        <div class="card-body bg-light bg-opacity-10">
+            <form method="post" id="facturaForm">
+                {% csrf_token %}
+
+                <div class="row g-3 mb-4 p-3 bg-white rounded shadow-sm border">
+                    <div class="col-12 border-bottom pb-2 mb-2">
+                        <h6 class="text-primary fw-bold">Datos del Receptor</h6>
+                    </div>
+                    
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold">Serie / Folio</label>
+                        <div class="input-group">
+                            {{ form.serie_personalizada }}
+                            <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#modalSerie"><i class="fas fa-plus"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold">Cliente / Receptor (Lugar)</label>
+                        <div class="input-group">
+                            {{ form.lugar_receptor }}
+                            
+                            <a href="#" id="btnEditarLugar" target="_blank" class="btn btn-warning d-none" title="Editar datos en nueva ventana">
+                                <i class="fas fa-external-link-alt me-1"></i> Editar Datos
+                            </a>
+
+                            <button type="button" id="btnRecargarInfo" class="btn btn-secondary d-none" title="Recargar información del cliente">
+                                <i class="fas fa-sync-alt"></i> Recargar
+                            </button>
+                        </div>
+                        
+                        <div id="alerta-lugar" class="mt-2 p-3 rounded alerta-validacion d-none shadow-sm">
+                            <div class="d-flex align-items-start">
+                                <i class="fas fa-exclamation-triangle me-3 fs-4 mt-1"></i>
+                                <div>
+                                    <h6 class="fw-bold mb-1">¡Faltan Datos Fiscales!</h6>
+                                    <p class="mb-1">El cliente seleccionado no tiene: <span id="campos-faltantes" class="fw-bold text-danger text-decoration-underline"></span>.</p>
+                                    <small class="text-muted">
+                                        1. Haz clic en <strong>"Editar Datos"</strong> para corregirlo.<br>
+                                        2. Guarda los cambios en la otra ventana.<br>
+                                        3. Regresa aquí y presiona <strong>"Recargar"</strong>.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                         <div id="msg-exito-lugar" class="mt-2 text-success fw-bold d-none">
+                            <i class="fas fa-check-circle"></i> Datos fiscales completos y validados.
+                        </div>
+                    </div>
+
+                    <div class="col-md-2"><label class="form-label small fw-bold">Uso CFDI</label>{{ form.uso_cfdi }}</div>
+                    <div class="col-md-3"><label class="form-label small fw-bold">Método de Pago</label>{{ form.metodo_pago }}</div>
+                    <div class="col-md-3"><label class="form-label small fw-bold">Forma de Pago</label>{{ form.forma_pago }}</div>
+                    <div class="col-md-2"><label class="form-label small fw-bold">Moneda</label>{{ form.moneda }}</div>
+                    <div class="col-md-2"><label class="form-label small fw-bold">Tipo de Cambio</label>{{ form.tipo_cambio }}</div>
+                </div>
+
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-bottom pb-0">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="text-primary fw-bold mb-0 py-2">Conceptos de la Factura</h6>
+                            
+                            <ul class="nav nav-tabs" id="conceptosTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual-pane" type="button" role="tab" onclick="toggleCatalogo(false)">
+                                        <i class="fas fa-keyboard me-2"></i>Factura Normal
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="catalogo-tab" data-bs-toggle="tab" data-bs-target="#catalogo-pane" type="button" role="tab" onclick="toggleCatalogo(true)">
+                                        <i class="fas fa-boxes me-2"></i>Productos/Servicios
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-bordered align-middle mb-0" id="tablaConceptos">
+                                <thead class="table-light text-center small text-uppercase">
+                                    <tr>
+                                        <th width="15%" class="bg-warning bg-opacity-10 col-catalogo">Buscar Prod.</th>
+                                        
+                                        <th width="5%">Cant.</th>
+                                        <th width="14%">
+                                            Clave Prod/Serv
+                                            <br>
+                                            <span class="text-muted fw-normal" style="font-size: 0.75rem;">Clave Unidad</span>
+                                        </th>
+                                        <th>Descripción</th>
+                                        <th width="12%">Imp. Traslado</th> 
+                                        <th width="12%">Imp. Retención</th> 
+                                        <th width="10%">Precio U.</th>
+                                        <th width="10%">Importe</th>
+                                        <th width="3%"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bodyConceptos">
+                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="agregarFila()">
+                            <i class="fas fa-plus me-1"></i> Agregar Concepto
+                        </button>
+                    </div>
+                </div>
+
+                <div class="row justify-content-end">
+                    <div class="col-md-3 col-lg-3">
+                        <div class="bg-white p-3 rounded border shadow-sm">
+                            <table class="table table-sm table-borderless mb-0">
+                                <tr>
+                                    <td class="text-end text-muted">Subtotal:</td>
+                                    <td class="text-end fw-bold"><span id="granSubtotal">$0.00</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-end text-muted">Traslados (+):</td>
+                                    <td class="text-end fw-bold text-success"><span id="granTraslados">$0.00</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-end text-muted">Retenciones (-):</td>
+                                    <td class="text-end fw-bold text-danger"><span id="granRetenciones">$0.00</span></td>
+                                </tr>
+                                <tr class="border-top mt-2">
+                                    <td class="text-end fs-5 pt-2">Total:</td>
+                                    <td class="text-end fs-5 fw-bold text-primary pt-2"><span id="granTotal">$0.00</span></td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4 pb-5">
+                    <button type="submit" name="accion" value="previsualizar" class="btn btn-outline-primary btn-lg px-4 shadow-sm me-2">
+                        <i class="fas fa-eye me-2"></i> Vista Previa (Borrador)
+                    </button>
+                    
+                    <button type="submit" name="accion" value="timbrar" class="btn btn-success btn-lg px-5 shadow" id="btnTimbrar">
+                        <i class="fas fa-check-circle me-2"></i> Generar y Timbrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalSerie" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg">
+          <div class="modal-header bg-success text-white">
+            <h5 class="modal-title">Nueva Serie</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body p-4">
+            <input type="text" id="inputNombreSerie" class="form-control text-uppercase fw-bold" placeholder="EJ. RENTA">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-success" onclick="guardarSerie()">Guardar</button>
+          </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+    const urlBuscarSat = "{% url 'buscar_catalogo_sat' %}";
+    const urlCrearSerie = "{% url 'api_crear_serie' %}";
+    const urlBuscarLocal = "{% url 'api_buscar_productos_local' %}";
+    const urlValidarLugar = "/facturacion/api/validar-lugar/"; // Asegúrate de tener esta URL en urls.py
+
+    $(document).ready(function() {
+        $('.select2').select2({ theme: 'bootstrap-5' });
+        
+        // Agregar primera fila al cargar
+        agregarFila();
+        
+        $('#modalSerie').appendTo("body");
+        
+        // Asegurar estado inicial de las columnas (Ocultas por defecto)
+        toggleCatalogo(false);
+
+        // --- LÓGICA DE VALIDACIÓN Y RECARGA ---
+        function validarLugar(lugarId) {
+            const btnEditar = $('#btnEditarLugar');
+            const btnRecargar = $('#btnRecargarInfo');
+            const alerta = $('#alerta-lugar');
+            const msgExito = $('#msg-exito-lugar');
+            const iconRecarga = btnRecargar.find('i');
+            
+            if (!lugarId) {
+                btnEditar.addClass('d-none');
+                btnRecargar.addClass('d-none');
+                alerta.addClass('d-none');
+                msgExito.addClass('d-none');
+                return;
+            }
+
+            // Animación de carga
+            iconRecarga.addClass('fa-spin-fast');
+
+            // 1. Configurar URL de Edición
+            const editUrl = `/lugares/editar/${lugarId}/`; 
+            btnEditar.attr('href', editUrl).removeClass('d-none');
+            btnRecargar.removeClass('d-none');
+
+            // 2. Llamada AJAX
+            $.ajax({
+                url: urlValidarLugar,
+                data: { 'lugar_id': lugarId },
+                success: function(response) {
+                    iconRecarga.removeClass('fa-spin-fast'); // Parar animación
+
+                    if (response.valido) {
+                        // TODO OK
+                        alerta.addClass('d-none');
+                        msgExito.removeClass('d-none'); // Mostrar check verde
+                    } else {
+                        // FALTAN DATOS
+                        msgExito.addClass('d-none');
+                        alerta.removeClass('d-none');
+                        $('#campos-faltantes').text(response.faltantes.join(', '));
+                    }
+                },
+                error: function() {
+                    iconRecarga.removeClass('fa-spin-fast');
+                    alert("Error de conexión al validar.");
+                }
+            });
+        }
+
+        // Evento 1: Cambio en el Select
+        $('#id_lugar_receptor').on('change', function() {
+            validarLugar($(this).val());
+        });
+
+        // Evento 2: Clic en Recargar
+        $('#btnRecargarInfo').on('click', function() {
+            const idActual = $('#id_lugar_receptor').val();
+            if(idActual) {
+                validarLugar(idActual);
+            }
+        });
+    });
+
+    // --- FUNCIÓN PARA ALTERNAR COLUMNA CATÁLOGO ---
+    function toggleCatalogo(mostrar) {
+        const celdas = document.querySelectorAll('.col-catalogo');
+        celdas.forEach(celda => {
+            celda.style.display = mostrar ? 'table-cell' : 'none';
+        });
+    }
+
+    // --- FUNCIONES DE CÁLCULO DINÁMICO ---
+    function calcularFila(elemento) {
+        let fila = elemento.closest('tr');
+        let cantidad = parseFloat(fila.querySelector('.cantidad').value) || 0;
+        let precio = parseFloat(fila.querySelector('.precio').value) || 0;
+        
+        let importe = cantidad * precio;
+        fila.querySelector('.importe').value = importe.toFixed(2);
+        
+        calcularTotalesGenerales();
+    }
+
+    function calcularTotalesGenerales() {
+        let subtotal = 0;
+        let totalTraslados = 0;
+        let totalRetenciones = 0;
+
+        document.querySelectorAll('#bodyConceptos tr').forEach(fila => {
+            let importe = parseFloat(fila.querySelector('.importe').value) || 0;
+            subtotal += importe;
+
+            // 1. Obtener Tasa Traslado (ComboBox 1)
+            let selectTraslado = fila.querySelector('.select-traslado');
+            let tasaTraslado = 0;
+            if(selectTraslado.value){
+                let option = selectTraslado.options[selectTraslado.selectedIndex];
+                if(option.dataset.factor !== 'Exento') {
+                    tasaTraslado = parseFloat(option.dataset.tasa) || 0;
+                }
+            }
+            totalTraslados += importe * tasaTraslado;
+
+            // 2. Obtener Tasa Retención (ComboBox 2)
+            let selectRetencion = fila.querySelector('.select-retencion');
+            let tasaRetencion = 0;
+            if(selectRetencion.value){
+                let option = selectRetencion.options[selectRetencion.selectedIndex];
+                tasaRetencion = parseFloat(option.dataset.tasa) || 0;
+            }
+            totalRetenciones += importe * tasaRetencion;
+        });
+
+        let total = subtotal + totalTraslados - totalRetenciones;
+
+        document.getElementById('granSubtotal').innerText = '$' + subtotal.toLocaleString('es-MX', {minimumFractionDigits: 2});
+        document.getElementById('granTraslados').innerText = '$' + totalTraslados.toLocaleString('es-MX', {minimumFractionDigits: 2});
+        document.getElementById('granRetenciones').innerText = '-$' + totalRetenciones.toLocaleString('es-MX', {minimumFractionDigits: 2});
+        document.getElementById('granTotal').innerText = '$' + total.toLocaleString('es-MX', {minimumFractionDigits: 2});
+    }
+
+    // --- AGREGAR FILA ---
+    function agregarFila() {
+        
+        let opcionesTraslado = '<option value="">Sin Impuesto</option>';
+        {% for imp in impuestos_traslado %}
+            var selected = "{{ imp.tasa_o_cuota }}" == "0.160000" ? "selected" : "";
+            opcionesTraslado += `<option value="{{ imp.id }}" data-tasa="{{ imp.tasa_o_cuota }}" data-factor="{{ imp.tipo_factor }}" ${selected}>{{ imp.nombre }}</option>`;
+        {% endfor %}
+
+        let opcionesRetencion = '<option value="">Sin Retención</option>';
+        {% for imp in impuestos_retencion %}
+            opcionesRetencion += `<option value="{{ imp.id }}" data-tasa="{{ imp.tasa_o_cuota }}">{{ imp.nombre }}</option>`;
+        {% endfor %}
+
+        let nuevaFilaHtml = `
+            <tr>
+                <td class="col-catalogo" style="display:none;">
+                    <select class="form-select select2-local-prod"></select>
+                </td>
+
+                <td><input type="number" step="0.01" name="cantidad[]" class="form-control text-center cantidad" value="1" oninput="calcularFila(this)"></td>
+                
+                <td>
+                    <select name="clave_prod_serv[]" class="form-select new-prod campo-sat mb-1" style="font-size:0.8rem"></select>
+                    <select name="clave_unidad[]" class="form-select new-unit campo-unidad" style="font-size:0.8rem"></select>
+                </td>
+                
+                <td><input type="text" name="descripcion[]" class="form-control campo-descripcion" placeholder="Descripción del concepto..."></td>
+                
+                <td>
+                    <select name="impuesto_traslado[]" class="form-select select-traslado" onchange="calcularFila(this)">
+                        ${opcionesTraslado}
+                    </select>
+                </td>
+
+                <td>
+                    <select name="impuesto_retencion[]" class="form-select select-retencion" onchange="calcularFila(this)">
+                        ${opcionesRetencion}
+                    </select>
+                </td>
+                
+                <td>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text">$</span>
+                        <input type="number" step="0.01" name="valor_unitario[]" class="form-control text-end precio campo-precio" oninput="calcularFila(this)">
+                    </div>
+                </td>
+                <td>
+                    <input type="number" class="form-control text-end importe input-readonly" readonly value="0.00">
+                </td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-outline-danger btn-sm border-0" onclick="eliminarFila(this)"><i class="fas fa-trash-alt"></i></button>
+                </td>
+            </tr>`;
+
+        let $nuevaFila = $(nuevaFilaHtml);
+        $('#bodyConceptos').append($nuevaFila);
+
+        const tabActiva = document.querySelector('.nav-link.active');
+        if (tabActiva && tabActiva.id === 'manual-tab') {
+            $nuevaFila.find('.col-catalogo').hide();
+        } else {
+            $nuevaFila.find('.col-catalogo').show();
+        }
+
+        // Inicializamos los Selects del SAT CON PLACEHOLDERS ESPECÍFICOS
+        inicializarSelect2SAT($nuevaFila.find('.new-prod'), 'ClaveProdServ', 'Buscar Prod/Serv (ej. 84111506)');
+        inicializarSelect2SAT($nuevaFila.find('.new-unit'), 'ClaveUnidad', 'Buscar Unidad (ej. E48)');
+        
+        $nuevaFila.find('.new-prod').removeClass('new-prod').addClass('select2-sat-prod');
+        $nuevaFila.find('.new-unit').removeClass('new-unit').addClass('select2-sat-unidad');
+
+        $nuevaFila.find('.select2-local-prod').select2({
+            theme: 'bootstrap-5',
+            placeholder: 'Buscar en mi catálogo...',
+            allowClear: true,
+            ajax: {
+                url: urlBuscarLocal,
+                dataType: 'json',
+                delay: 250,
+                data: function (params) { return { q: params.term }; },
+                processResults: function (data) { return { results: data.results }; }
+            }
+        });
+
+        // --- EVENTO DE SELECCIÓN DE PRODUCTO LOCAL ACTUALIZADO ---
+        $nuevaFila.find('.select2-local-prod').on('select2:select', function (e) {
+            var data = e.params.data;
+            var row = $(this).closest('tr');
+
+            // 1. Llenar datos básicos
+            row.find('.campo-descripcion').val(data.descripcion);
+            row.find('.campo-precio').val(data.precio);
+            
+            if (data.clave_sat) {
+                row.find('.campo-sat').append(new Option(data.clave_sat, data.clave_sat, true, true)).trigger('change');
+            }
+            if (data.clave_unidad) {
+                row.find('.campo-unidad').append(new Option(data.clave_unidad, data.clave_unidad, true, true)).trigger('change');
+            }
+
+            // 2. --- ASIGNACIÓN DE IMPUESTOS VINCULADOS ---
+            
+            // Traslado (IVA)
+            if (data.traslado_id) {
+                row.find('.select-traslado').val(data.traslado_id).trigger('change');
+            } else {
+                row.find('.select-traslado').val("").trigger('change');
+            }
+
+            // Retención
+            if (data.retencion_id) {
+                row.find('.select-retencion').val(data.retencion_id).trigger('change');
+            } else {
+                row.find('.select-retencion').val("").trigger('change');
+            }
+            
+            // 3. Calcular montos
+            calcularFila(row.find('.campo-precio')[0]);
+        });
+        
+        calcularFila($nuevaFila.find('.cantidad')[0]);
+    }
+
+    function eliminarFila(boton) {
+        let filas = document.querySelectorAll('#bodyConceptos tr');
+        if (filas.length > 1) {
+            boton.closest('tr').remove();
+            calcularTotalesGenerales();
+        } else {
+            alert("La factura debe tener al menos un concepto.");
+        }
+    }
+    
+    // Función actualizada para aceptar textoPlaceholder
+    function inicializarSelect2SAT(elemento, tipoCatalogo, textoPlaceholder) {
+        $(elemento).select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            placeholder: textoPlaceholder || 'Buscar...',
+            allowClear: true,
+            minimumInputLength: 3,
+            ajax: {
+                url: urlBuscarSat, dataType: 'json', delay: 400,
+                data: function (params) { return { q: params.term, tipo: tipoCatalogo }; },
+                processResults: function (data) { return { results: data.results }; }
+            }
+        });
+    }
+
+    // Funciones de series
+    $('#inputNombreSerie').on('keypress', function (e) { if(e.which === 13){ guardarSerie(); } });
+
+    function guardarSerie() {
+        const input = document.getElementById('inputNombreSerie');
+        const nombre = input.value.trim();
+        if(!nombre) { alert("Nombre obligatorio"); return; }
+
+        $.ajax({
+            url: urlCrearSerie,
+            type: "POST",
+            data: { 'nombre': nombre, 'csrfmiddlewaretoken': '{{ csrf_token }}' },
+            success: function(response) {
+                if(response.success) {
+                    $('#id_serie_personalizada').append(new Option(response.nombre, response.id, true, true)).trigger('change');
+                    $('#modalSerie').modal('hide');
+                    input.value = '';
+                } else { alert(response.error); }
+            }
+        });
+    }
+</script>
+{% endblock %}

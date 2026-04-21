@@ -1,0 +1,671 @@
+{% extends 'ternium/base.html' %}
+{% load static %} 
+{% load humanize %}
+
+{% block content %}
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+
+<style>
+    :root {
+        --trane-red: #751027;
+        --trane-red-light: #a31432;
+        --bg-light: #f4f7f6;
+        --text-main: #2b3445;
+    }
+    
+    body { 
+        background-color: var(--bg-light); 
+        font-family: 'Inter', sans-serif; 
+        color: var(--text-main);
+    }
+    
+    /* Cards Mejoradas */
+    .card {
+        border: none;
+        border-radius: 16px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card-kpi:hover { 
+        transform: translateY(-5px); 
+        box-shadow: 0 10px 20px rgba(0,0,0,0.08); 
+    }
+    
+    .icon-shape { 
+        width: 56px; height: 56px; 
+        display: flex; align-items: center; justify-content: center; 
+        border-radius: 14px; font-size: 1.5rem; 
+    }
+    
+    .bg-gradient-trane { 
+        background: linear-gradient(135deg, var(--trane-red) 0%, var(--trane-red-light) 100%); 
+        color: white; 
+    }
+    
+    .bg-patio-flow { background-color: #f8fbfa; }
+
+    /* Gráficas */
+    .chart-container-fixed { position: relative; height: 340px; width: 100%; }
+    
+    /* Tablas Estilizadas */
+    .table thead th { 
+        background-color: #f8f9fa; 
+        text-transform: uppercase; 
+        font-size: 0.75rem; 
+        letter-spacing: 0.5px; 
+        font-weight: 700;
+        color: #6c757d;
+        border-bottom: 2px solid #e9ecef;
+    }
+    .table tbody td { vertical-align: middle; }
+    
+    .page-item.active .page-link { 
+        background-color: var(--trane-red); 
+        border-color: var(--trane-red); 
+    }
+</style>
+
+<div class="container-fluid py-4">
+
+    <div class="row align-items-center mb-4">
+        <div class="col-md-6 mb-3 mb-md-0">
+            <h2 class="fw-bold text-dark mb-1"><i class="fas fa-recycle text-danger me-2"></i>Reporte de Trazabilidad 3R</h2>
+            <p class="text-muted mb-0">Gestión Integral de Residuos - Cliente TRANE</p>
+        </div>
+        <div class="col-md-6 text-md-end text-start">
+            <div class="d-inline-flex align-items-center bg-white p-2 rounded-pill shadow-sm flex-wrap gap-2 border">
+                <form method="get" class="d-flex align-items-center m-0">
+                    {% if fecha_inicio %}<input type="hidden" name="fecha_inicio" value="{{ fecha_inicio }}">{% endif %}
+                    {% if fecha_fin %}<input type="hidden" name="fecha_fin" value="{{ fecha_fin }}">{% endif %}
+
+                    <label class="fw-bold text-secondary mb-0 me-2 small ps-2"><i class="fas fa-filter"></i> Material:</label>
+                    <select id="materialSelect" name="material" class="form-select form-select-sm border-0 fw-bold text-danger bg-light rounded-pill px-3" style="width: auto; cursor: pointer;" onchange="this.form.submit()">
+                        <option value="">Todos los Materiales</option>
+                        {% for mat in materiales_filtro %}
+                            <option value="{{ mat.id }}" {% if filtro_actual == mat.id %}selected{% endif %}>{{ mat.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <a href="?" class="btn btn-sm btn-white text-muted ms-1 rounded-circle" title="Limpiar Filtro"><i class="fas fa-times"></i></a>
+                </form>
+            </div>
+            
+            <button type="button" class="btn btn-info shadow-sm rounded-pill fw-bold text-white ms-2 px-3 py-2 border" data-bs-toggle="modal" data-bs-target="#modalSalidasTrane">
+                <i class="fas fa-sign-out-alt me-1"></i> Salidas
+            </button>
+
+            <span class="badge bg-white text-dark border p-2 shadow-sm rounded-pill ms-2 px-3">
+                <i class="far fa-calendar-alt text-danger me-1"></i> {{ fecha_actual|date:"F Y" }}
+            </span>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card card-kpi h-100 border-start border-4 border-danger">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted text-uppercase fw-bold fs-7 mb-1">Total Gestionado (Salidas Trane)</h6>
+                            <h2 class="fw-bold text-dark mb-0">{{ total_tons }} <span class="text-muted fs-6 fw-normal">Ton</span></h2>
+                        </div>
+                        <div class="icon-shape bg-gradient-trane shadow-sm"><i class="fas fa-weight-hanging"></i></div>
+                    </div>
+                    <div class="mt-3">
+                        <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-2"><i class="fa fa-check-circle me-1"></i> 100% Material Reciclado Asegurado</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card card-kpi h-100 border-start border-4 border-secondary">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted text-uppercase fw-bold fs-7 mb-1">Movimientos Totales</h6>
+                            <h2 class="fw-bold text-dark mb-0">{{ total_viajes }} <span class="text-muted fs-6 fw-normal">Viajes</span></h2>
+                        </div>
+                        <div class="icon-shape bg-light text-dark shadow-sm border"><i class="fas fa-truck-loading"></i></div>
+                    </div>
+                    <div class="mt-3 text-muted small">
+                        Recolecciones realizadas en planta Trane
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4 g-3">
+        <div class="col-lg-8">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 id="monthlyChartTitle" class="mb-0 fw-bold text-dark"><i class="fas fa-chart-line text-danger me-2"></i>Evolución Mensual</h5>
+                </div>
+                <div class="card-body pt-0">
+                    <div class="chart-container-fixed"><canvas id="monthlyChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white border-0 py-3 text-center">
+                    <h5 class="mb-0 fw-bold text-dark">Distribución de Destinos</h5>
+                </div>
+                <div class="card-body pt-0 d-flex flex-column justify-content-center">
+                    <div class="chart-container-fixed" style="height: 280px;"><canvas id="destinosChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="mb-0 fw-bold text-dark"><i class="fas fa-chart-bar text-danger me-2"></i>Detalle de Volumen por Material (Ton)</h5>
+                </div>
+                <div class="card-body pt-0">
+                    <div class="chart-container-fixed" style="height: 350px;">
+                        <canvas id="materialesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-top border-4 border-dark">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-3 border-bottom">
+                    <h5 class="mb-0 fw-bold text-dark"><i class="fas fa-truck-moving me-2 text-danger"></i>Salidas de Planta Trane (Fase 1)</h5>
+                    
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <form method="get" class="d-flex align-items-center gap-2 m-0 bg-light p-1 rounded-pill border px-3">
+                            {% if filtro_actual %}<input type="hidden" name="material" value="{{ filtro_actual }}">{% endif %}
+                            <i class="far fa-calendar-alt text-muted"></i>
+                            <input type="date" name="fecha_inicio" class="form-control form-control-sm border-0 bg-transparent" value="{{ fecha_inicio|default_if_none:'' }}" onchange="this.form.submit()" title="Desde">
+                            <span class="text-muted">-</span>
+                            <input type="date" name="fecha_fin" class="form-control form-control-sm border-0 bg-transparent" value="{{ fecha_fin|default_if_none:'' }}" onchange="this.form.submit()" title="Hasta">
+                        </form>
+
+                        <select id="dt-filtro-material" class="form-select form-select-sm rounded-pill" style="width: auto;">
+                            <option value="">Filtrar Material...</option>
+                            {% for m in materiales_unicos %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+                        </select>
+                        <select id="dt-filtro-destino" class="form-select form-select-sm rounded-pill" style="width: auto;">
+                            <option value="">Filtrar Destino...</option>
+                            {% for d in destinos_unicos %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="tabla-fase1" class="table table-hover align-middle mb-0 w-100">
+                            <thead>
+                                <tr>
+                                    <th class="ps-3">Material</th>
+                                    <th>Destino Inmediato</th>
+                                    <th class="text-center">Tipo Destino</th>
+                                    <th class="text-center">Viajes</th>
+                                    <th class="text-end">Volumen (Ton)</th>
+                                    <th class="text-center">Detalle</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in trazabilidad_list %}
+                                <tr>
+                                    <td class="ps-3 fw-bold text-dark">{{ item.material }}</td>
+                                    <td class="text-primary fw-bold"><i class="fas fa-map-marker-alt me-1 text-muted"></i> {{ item.destino }}</td>
+                                    <td class="text-center">
+                                        {% if "PATIO" in item.tipo_destino %}
+                                            <span class="badge bg-warning bg-opacity-25 text-dark px-3 py-1 rounded-pill border border-warning">{{ item.tipo_destino }}</span>
+                                        {% else %}
+                                            <span class="badge bg-info bg-opacity-25 text-dark px-3 py-1 rounded-pill border border-info">{{ item.tipo_destino }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center"><span class="badge bg-light text-dark border">{{ item.viajes }}</span></td>
+                                    <td class="text-end fw-bold text-danger">{{ item.toneladas|floatformat:3 }}</td>
+                                    <td class="text-center">
+                                        <script type="application/json" id="breakdown-f1-{{ forloop.counter }}">{{ item.json_breakdown|safe }}</script>
+                                        <button class="btn btn-sm btn-outline-primary fw-bold rounded-pill px-3" onclick="abrirDesglose('breakdown-f1-{{ forloop.counter }}', '{{ item.material }}', '{{ item.destino }}')">
+                                            <i class="fas fa-list-ul me-1"></i> Desglose
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-top border-4 border-secondary">
+                <div class="card-header bg-white text-dark py-3">
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-dolly me-2 text-secondary"></i>Gestión en Patios (Fase 2: Patio ➔ Cliente Final)</h5>
+                </div>
+                <div class="card-body bg-patio-flow">
+                    <div class="table-responsive">
+                        <table id="tabla-fase2" class="table table-hover align-middle mb-0 w-100 bg-white">
+                            <thead>
+                                <tr>
+                                    <th class="ps-3 py-2">Material</th>
+                                    <th class="py-2">Patio Origen</th>
+                                    <th class="py-2">Destino Final</th>
+                                    <th class="py-2 text-end">Volumen (Ton)</th>
+                                    <th class="py-2 text-center">Garantía</th>
+                                    <th class="py-2 text-center">Detalle</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for flujo in trazabilidad_patios %}
+                                <tr>
+                                    <td class="ps-3 fw-bold text-dark">{{ flujo.material }}</td>
+                                    <td><i class="fas fa-warehouse me-1 text-secondary"></i> {{ flujo.patio_origen }}</td>
+                                    <td class="text-primary fw-bold"><i class="fas fa-industry me-1 text-muted"></i> {{ flujo.cliente_final }}</td>
+                                    <td class="text-end fw-bold text-dark">{{ flujo.toneladas|floatformat:3 }}</td>
+                                    <td class="text-center">
+                                        <span class="badge bg-success bg-opacity-25 text-success border border-success px-3 py-1 rounded-pill"><i class="fas fa-check-double me-1"></i> Reciclado</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <script type="application/json" id="breakdown-f2-{{ forloop.counter }}">{{ flujo.json_breakdown|safe }}</script>
+                                        <button class="btn btn-sm btn-outline-secondary fw-bold rounded-pill px-3" onclick="abrirDesglose('breakdown-f2-{{ forloop.counter }}', '{{ flujo.material }}', '{{ flujo.cliente_final }}')">
+                                            <i class="fas fa-list-ul me-1"></i> Desglose
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h6 class="mb-0 fw-bold text-muted text-uppercase"><i class="fas fa-history me-2"></i>Bitácora General Completa</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="tabla-bitacora" class="table table-hover align-middle mb-0 table-sm w-100">
+                            <thead>
+                                <tr>
+                                    <th class="ps-3 py-2">Folio</th>
+                                    <th class="py-2">Fecha</th>
+                                    <th class="py-2">Ruta (De ➔ A)</th>
+                                    <th class="py-2">Info. Logística</th>
+                                    <th class="py-2">Material</th>
+                                    <th class="py-2 text-center">Peso (Ton)</th>
+                                    <th class="py-2">Trazabilidad (TRANE)</th> 
+                                    <th class="py-2 text-center">Adjuntos</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mov in ultimos_movimientos %}
+                                <tr>
+                                    <td class="ps-3 text-sm fw-bold text-danger">{{ mov.remision }}</td>
+                                    <td>
+                                        <div class="fw-bold text-dark">{{ mov.fecha|date:"Y/m/d" }}</div>
+                                        <span class="badge bg-light text-secondary border mt-1" style="font-size: 0.65rem;">{{ mov.status }}</span>
+                                    </td>
+                                    <td class="small">
+                                        <span class="text-muted">Or:</span> <span class="fw-bold">{{ mov.origen_nombre }}</span><br>
+                                        <span class="text-muted">Ds:</span> <span class="fw-bold text-primary">{{ mov.destino_nombre }}</span>
+                                    </td>
+                                    <td class="small">
+                                        <div class="text-truncate" style="max-width: 150px;" title="{{ mov.transporte }}"><i class="fas fa-truck text-muted me-1 w-15px"></i> {{ mov.transporte }}</div>
+                                        <div class="text-truncate" style="max-width: 150px;" title="{{ mov.operador }}"><i class="fas fa-id-badge text-muted me-1 w-15px"></i> {{ mov.operador }}</div>
+                                    </td>
+                                    <td class="small fw-bold">{{ mov.material_nombre }}</td>
+                                    <td class="text-center text-sm fw-bold bg-light rounded">{{ mov.peso_str }}</td>
+                                    <td class="small text-muted" style="max-width: 200px; white-space: normal; word-wrap: break-word;">{{ mov.trazabilidad_notas|default:"-" }}</td> 
+                                    <td class="text-center text-nowrap">
+                                        {% if mov.evidencia_documento %}
+                                            <button type="button" class="btn btn-sm btn-outline-danger me-1 p-1 rounded" title="Evidencia Principal" onclick="verEvidencia('{{ mov.evidencia_documento.url|escapejs }}')"><i class="fas fa-camera"></i></button>
+                                        {% endif %}
+                                        {% if mov.manifiesto %}
+                                            <button type="button" class="btn btn-sm btn-outline-primary me-1 p-1 rounded" title="Manifiesto" onclick="verEvidencia('{{ mov.manifiesto.url|escapejs }}')"><i class="fas fa-file-contract"></i></button>
+                                        {% endif %}
+                                        {% for extra in mov.evidencias_extras %}
+                                            <button type="button" class="btn btn-sm btn-outline-info me-1 p-1 rounded" title="Evidencia Extra" onclick="verEvidencia('{{ extra.url|escapejs }}')"><i class="fas fa-paperclip"></i></button>
+                                        {% endfor %}
+                                        {% if not mov.evidencia_documento and not mov.manifiesto and not mov.evidencias_extras %}
+                                            <span class="badge bg-light text-muted border">Sin Documentos</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalSalidasTrane" tabindex="-1" aria-labelledby="modalSalidasTraneLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-info text-white py-3">
+                <h5 class="modal-title fw-bold" id="modalSalidasTraneLabel"><i class="fas fa-folder-open me-2"></i>Salidas de Material y Documentos</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <div class="modal-body bg-light p-4">
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-body bg-white rounded">
+                        <div class="row align-items-end">
+                            <div class="col-md-5">
+                                <label for="filtroFechaSalidas" class="form-label fw-bold text-info"><i class="fas fa-calendar-alt me-2"></i>Filtrar por Fecha:</label>
+                                <input type="date" id="filtroFechaSalidas" class="form-control border-info shadow-sm">
+                            </div>
+                            <div class="col-md-7 d-flex gap-2 mt-3 mt-md-0">
+                                <button class="btn btn-info shadow-sm text-white px-4 fw-bold" onclick="filtrarTablaSalidas()">
+                                    <i class="fas fa-search me-2"></i>Filtrar
+                                </button>
+                                <button class="btn btn-secondary shadow-sm px-4 fw-bold" onclick="limpiarFiltroSalidas()">
+                                    <i class="fas fa-sync-alt me-2"></i>Mostrar Todo
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: 55vh;">
+                            <table class="table table-hover align-middle mb-0" id="tablaSalidasTrane">
+                                <thead class="table-dark position-sticky top-0">
+                                    <tr>
+                                        <th>Folio Manifiesto</th>
+                                        <th>Fecha</th>
+                                        <th>Transporte / Operador</th>
+                                        <th>Destino</th>
+                                        <th>Material</th>
+                                        <th class="text-end">Peso (Kg)</th>
+                                        <th class="text-center">Documentos Vinculados</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for reg in registros_salidas %}
+                                    <tr class="fila-salida" data-fecha="{{ reg.fecha_captura|date:'Y-m-d' }}">
+                                        <td>
+                                            <span class="fw-bold text-primary">{{ reg.folio|default:"-" }}</span>
+                                            {% if reg.remision_vinculada %}
+                                                <br><span class="badge bg-success" style="font-size: 0.70rem;"><i class="fas fa-link"></i> {{ reg.remision_vinculada.remision }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ reg.fecha_captura|date:"d/m/Y"|default:"-" }}</td>
+                                        <td>
+                                            <span class="d-block small fw-bold">{{ reg.linea_transporte.nombre|default:"-" }}</span>
+                                            <span class="text-muted small">{{ reg.operador.nombre|default:reg.operador_manual|default:"-" }}</span>
+                                        </td>
+                                        <td>{{ reg.destino.nombre|default:"-" }}</td>
+                                        <td>{{ reg.material.nombre|default:"-" }}</td>
+                                        <td class="text-end fw-bold text-success">{{ reg.cantidad_kg|floatformat:4|default:"0.0000" }}</td>
+                                        <td class="text-center">
+                                            {% if reg.manifiesto %}
+                                                <a href="{{ reg.manifiesto.url }}" target="_blank" class="btn btn-sm btn-outline-primary shadow-sm mb-1" title="Ver Manifiesto">
+                                                    <i class="fas fa-file-contract"></i> Manifiesto
+                                                </a>
+                                            {% endif %}
+                                            {% if reg.documento_trane %}
+                                                <a href="{{ reg.documento_trane.url }}" target="_blank" class="btn btn-sm btn-outline-info shadow-sm mb-1" title="Ver Documento Trane">
+                                                    <i class="fas fa-file-pdf"></i> Doc Trane
+                                                </a>
+                                            {% endif %}
+                                            {% if not reg.manifiesto and not reg.documento_trane %}
+                                                <span class="text-muted small fst-italic">Pendiente</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="7" class="text-center text-muted py-5"><i class="fas fa-folder-open fa-3x mb-3 text-light"></i><br>No hay información de salidas registrada.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-white">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="desgloseModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered"> 
+    <div class="modal-content shadow-lg border-0">
+      <div class="modal-header bg-dark text-white py-3">
+        <h5 class="modal-title fs-5 fw-bold"><i class="fas fa-list-ul me-2 text-warning"></i>Desglose Operativo de Viajes</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body bg-light p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3 bg-white p-3 rounded shadow-sm border">
+            <div><strong class="text-muted">Material:</strong> <span id="desgloseTitleMat" class="fw-bold fs-6"></span></div>
+            <div><strong class="text-muted">Destino:</strong> <span id="desgloseTitleDest" class="fw-bold text-primary"></span></div>
+        </div>
+        <div class="table-responsive rounded shadow-sm border bg-white" style="max-height: 450px; overflow-y: auto;">
+            <table class="table table-hover table-sm align-middle mb-0">
+                <thead class="bg-secondary text-white" style="position: sticky; top: 0; z-index: 1;">
+                    <tr>
+                        <th class="py-2 ps-3">Folio</th>
+                        <th class="py-2">Fecha</th>
+                        <th class="py-2">Ruta (Origen ➔ Destino)</th>
+                        <th class="py-2">Operador</th>
+                        <th class="py-2 text-end">Peso (Ton)</th>
+                        <th class="py-2">Trazabilidad</th> <th class="py-2 text-center pe-3">Documentos</th>
+                    </tr>
+                </thead>
+                <tbody id="desgloseBody"></tbody>
+            </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="visualizarModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered"> 
+    <div class="modal-content border-0 shadow-lg" style="height: 90vh;">
+      <div class="modal-header bg-dark text-white py-2 border-0">
+        <h5 class="modal-title fs-6 fw-bold"><i class="fas fa-search-plus me-2"></i>Visor de Archivos</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0 d-flex justify-content-center align-items-center bg-secondary" id="modalContent" style="overflow: hidden;"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
+<script>
+let modalDesgloseInstancia = null;
+let modalVisualizadorInstancia = null;
+
+document.addEventListener("DOMContentLoaded", function() {
+    // 1. MODALES
+    const elDesglose = document.getElementById('desgloseModal');
+    const elVisor = document.getElementById('visualizarModal');
+    const elSalidas = document.getElementById('modalSalidasTrane');
+    
+    if(elDesglose) { document.body.appendChild(elDesglose); modalDesgloseInstancia = new bootstrap.Modal(elDesglose); }
+    if(elVisor) { document.body.appendChild(elVisor); modalVisualizadorInstancia = new bootstrap.Modal(elVisor); }
+    if(elSalidas) { document.body.appendChild(elSalidas); }
+
+    // 2. LOGICA FILTRO SALIDAS
+    const dateInput = document.getElementById('filtroFechaSalidas');
+    if(dateInput) { dateInput.value = ''; }
+
+    $('#modalSalidasTrane').on('shown.bs.modal', function () {
+        limpiarFiltroSalidas(); 
+    });
+
+    // 3. DATATABLES
+    const configDataTables = {
+        pageLength: 10,
+        lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "Todos"]],
+        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json' },
+        order: [[0, "desc"]]
+    };
+    $('#tabla-fase1').DataTable({...configDataTables, order: [[0, "asc"]]});
+    $('#tabla-fase2').DataTable({...configDataTables, order: [[0, "asc"]]});
+    $('#tabla-bitacora').DataTable(configDataTables);
+
+    // 4. CHARTS
+    Chart.register(ChartDataLabels);
+    const selectElement = document.getElementById('materialSelect');
+    const materialLabel = (selectElement && selectElement.value !== "") ? selectElement.options[selectElement.selectedIndex].text.trim() : "Toneladas Totales";
+    
+    fetch("{% url 'dashboard_trane_data' %}" + window.location.search)
+    .then(response => response.json())
+    .then(data => {
+        try {
+            const ctxMonth = document.getElementById('monthlyChart').getContext('2d');
+            let gradientFill = ctxMonth.createLinearGradient(0, 0, 0, 400);
+            gradientFill.addColorStop(0, 'rgba(117, 16, 39, 0.4)'); 
+            gradientFill.addColorStop(1, 'rgba(117, 16, 39, 0.0)');
+            new Chart(ctxMonth, { 
+                type: 'line', 
+                data: { labels: data.mensual.labels || [], datasets: [{ label: materialLabel, data: (data.mensual.data || []).map(Number), borderColor: '#751027', backgroundColor: gradientFill, borderWidth: 3, fill: true, tension: 0.4, pointBackgroundColor: '#ffffff', pointBorderColor: '#751027', pointBorderWidth: 2, pointRadius: 5, pointHoverRadius: 8 }] }, 
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { align: 'top', font: { weight: 'bold', size: 12 }, color: '#2b3445', formatter: val => (Number(val) > 0) ? Number(val).toFixed(1) : '' } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { borderDash: [4, 4], color: '#e9ecef' } } } } 
+            });
+        } catch (e) {}
+
+        try {
+            const ctxDest = document.getElementById('destinosChart').getContext('2d');
+            new Chart(ctxDest, { 
+                type: 'doughnut', 
+                data: { 
+                    labels: data.destinos.labels || [], 
+                    datasets: [{ 
+                        data: (data.destinos.data || []).map(Number), 
+                        backgroundColor: ['#e74c3c', '#3498db', '#f1c40f', '#2ecc71', '#9b59b6', '#e67e22', '#1abc9c', '#34495e', '#c0392b', '#7f8c8d'], 
+                        borderWidth: 2, 
+                        borderColor: '#ffffff', 
+                        hoverOffset: 8 
+                    }] 
+                }, 
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    cutout: '55%', 
+                    layout: { padding: 10 }, 
+                    plugins: { 
+                        legend: { position: 'bottom', labels: { font: { size: 11, family: "'Inter', sans-serif" }, usePointStyle: true, padding: 15 } }, 
+                        datalabels: { 
+                            display: true,
+                            color: '#ffffff', 
+                            font: { weight: 'bold', size: 14 }, 
+                            textStrokeColor: '#000000', 
+                            textStrokeWidth: 3, 
+                            formatter: (val, ctx) => { 
+                                try { 
+                                    let sum = 0; 
+                                    let dataArr = ctx.dataset.data; 
+                                    dataArr.forEach(d => { sum += Number(d); }); 
+                                    if (sum === 0) return ""; 
+                                    let pct = (Number(val) * 100 / sum); 
+                                    return pct < 1 ? "" : pct.toFixed(1) + "%"; 
+                                } catch(err) { return ""; } 
+                            } 
+                        } 
+                    } 
+                } 
+            });
+        } catch (e) {}
+
+        try {
+            const ctxMat = document.getElementById('materialesChart').getContext('2d');
+            const matLabels = (data.materiales && data.materiales.labels && data.materiales.labels.length > 0) ? data.materiales.labels : ['Sin datos'];
+            const matData = (data.materiales && data.materiales.data && data.materiales.data.length > 0) ? data.materiales.data.map(Number) : [0];
+            new Chart(ctxMat, { 
+                type: 'bar', 
+                data: { labels: matLabels, datasets: [{ label: 'Toneladas', data: matData, backgroundColor: '#a31432', hoverBackgroundColor: '#751027', borderRadius: 4, borderWidth: 1, borderColor: '#751027' }] }, 
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { align: 'top', anchor: 'end', font: { weight: 'bold', size: 12, family: "'Inter', sans-serif" }, color: '#2b3445', formatter: val => (Number(val) > 0) ? Number(val).toFixed(2) : '' } }, scales: { x: { grid: { display: false }, ticks: { autoSkip: false, maxRotation: 45, minRotation: 0, font: {family: "'Inter', sans-serif"} } }, y: { beginAtZero: true, grid: { borderDash: [4, 4], color: '#e9ecef' }, title: { display: true, text: 'Toneladas', font: {family: "'Inter', sans-serif", weight: 'bold'} } } } } 
+            });
+        } catch (e) {}
+    });
+});
+
+function filtrarTablaSalidas() {
+    const dateVal = document.getElementById('filtroFechaSalidas').value;
+    if(!dateVal) { $('.fila-salida').show(); return; }
+    $('.fila-salida').each(function() {
+        if($(this).data('fecha') === dateVal) { $(this).show(); } else { $(this).hide(); }
+    });
+}
+
+function limpiarFiltroSalidas() {
+    const input = document.getElementById('filtroFechaSalidas');
+    if(input) input.value = '';
+    $('.fila-salida').show();
+}
+
+function abrirDesglose(idDiv, material, destino) {
+    const datos = JSON.parse(document.getElementById(idDiv).textContent);
+    let htmlStr = '';
+    datos.forEach(mov => {
+        let filesHtml = '';
+        mov.archivos.forEach(f => {
+            // AQUÍ LOS ARCHIVOS DEL DESGLOSE DE LA FASE 1 YA VIENEN DE JSON SEGURA
+            filesHtml += `<button type="button" class="btn btn-sm btn-light border shadow-sm ${f.color} me-1 rounded" onclick="verEvidencia('${f.url}')"><i class="fas ${f.icon}"></i></button>`;
+        });
+        htmlStr += `<tr>
+            <td class="ps-3 fw-bold text-danger">${mov.remision}</td>
+            <td class="small">${mov.fecha}</td>
+            <td class="small">De: ${mov.origen}<br>A: ${mov.destino}</td>
+            <td class="small">${mov.operador}</td>
+            <td class="text-end fw-bold">${mov.peso}</td>
+            <td class="small text-muted">${mov.trazabilidad || "-"}</td>
+            <td class="text-center">${filesHtml || '<span class="badge bg-light text-muted">Sin adjuntos</span>'}</td>
+        </tr>`;
+    });
+    document.getElementById('desgloseBody').innerHTML = htmlStr;
+    document.getElementById('desgloseTitleMat').innerText = material;
+    document.getElementById('desgloseTitleDest').innerText = destino;
+    modalDesgloseInstancia.show();
+}
+
+function verEvidencia(url) {
+    const modalBody = document.getElementById('modalContent');
+    modalBody.innerHTML = '<div class="spinner-border text-light"></div>';
+    
+    let secureUrl = url;
+    if (secureUrl.startsWith('http://')) { secureUrl = secureUrl.replace('http://', 'https://'); }
+    
+    // CORRECCIÓN APLICADA: Limpiamos la URL de parámetros de S3 como ?AWSAccessKeyId=...
+    const cleanUrl = secureUrl.split('?')[0].split('#')[0];
+    const ext = cleanUrl.split('.').pop().toLowerCase();
+    
+    let content = '';
+    
+    // Ahora validamos contra la extensión limpia en lugar de toda la URL cruda
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) {
+        content = `<img src="${secureUrl}" class="img-fluid rounded" style="max-height: 85vh; object-fit: contain;" />`;
+    } else if (ext === 'pdf') {
+        content = `<iframe src="https://docs.google.com/gview?url=${encodeURIComponent(secureUrl)}&embedded=true" width="100%" height="100%" style="min-height: 85vh; border: none;"></iframe>`;
+    } else {
+        content = `<div class="text-center text-white"><i class="fas fa-file-download fa-4x mb-3"></i><br><a href="${secureUrl}" class="btn btn-primary rounded-pill" download>Descargar Archivo</a></div>`;
+    }
+    
+    setTimeout(() => { modalBody.innerHTML = content; }, 300); 
+    modalVisualizadorInstancia.show();
+}
+</script>
+{% endblock %}

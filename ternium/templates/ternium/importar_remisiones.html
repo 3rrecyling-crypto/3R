@@ -1,0 +1,91 @@
+{% extends 'ternium/base.html' %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-7">
+            
+            <div class="card shadow border-0 mb-5">
+                <div class="card-header bg-primary text-white py-3">
+                    <h4 class="mb-0 fw-bold">
+                        <i class="bi bi-file-earmark-spreadsheet-fill me-2"></i>1. Importar Datos (Excel)
+                    </h4>
+                </div>
+                
+                <div class="card-body p-4">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <p class="text-muted mb-4">
+                        Carga el archivo Excel con la información de las remisiones. Esto creará o actualizará los registros de texto.
+                    </p>
+
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Archivo Excel (.xlsx)</label>
+                            {{ form.archivo_excel }} 
+                            </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-table me-2"></i>Procesar Excel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow border-0">
+                <div class="card-header bg-success text-white py-3">
+                    <h4 class="mb-0 fw-bold">
+                        <i class="bi bi-images me-2"></i>2. Importar Evidencias (ZIP)
+                    </h4>
+                </div>
+                
+                <div class="card-body p-4">
+                    <p class="text-muted mb-4">
+                        Sube un archivo <strong>.ZIP</strong> que contenga imágenes o PDFs. 
+                        El sistema buscará automáticamente la remisión basándose en el nombre del archivo.
+                    </p>
+                    
+                    <div class="alert alert-light border-start border-success border-4">
+                        <i class="bi bi-info-circle-fill text-success me-2"></i><strong>Regla de Nombres:</strong>
+                        <ul class="mb-0 mt-1 small">
+                            <li>Si el archivo es <code>MTY-1611.jpg</code>, se vinculará a la remisión <strong>MTY-1611</strong>.</li>
+                            <li>Si el archivo es <code>REM-500.pdf</code>, se vinculará a la remisión <strong>REM-500</strong>.</li>
+                        </ul>
+                    </div>
+
+                    <form action="{% url 'importar_evidencias_masivas' %}" method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label for="id_archivo_zip" class="form-label fw-bold text-dark">Archivo ZIP</label>
+                            <input type="file" name="archivo_zip" class="form-control form-control-lg" accept=".zip, application/zip" required id="id_archivo_zip">
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg shadow-sm">
+                                <i class="bi bi-cloud-upload-fill me-2"></i>Subir Evidencias Masivas
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <a href="{% url 'remision_lista' %}" class="btn btn-link text-decoration-none text-secondary">
+                    <i class="bi bi-arrow-left me-1"></i> Volver al listado de remisiones
+                </a>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
