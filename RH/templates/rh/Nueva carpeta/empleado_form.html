@@ -1,0 +1,470 @@
+{# RH/templates/rh/empleado_form.html #}
+{% extends 'rh/base.html' %}
+{% load humanize %}
+
+{% block rh_title %}{% if form.instance.pk %}Editar Empleado{% else %}Nuevo Empleado{% endif %}{% endblock %}
+
+{% block rh_content %}
+<div class="card shadow-lg">
+    <div class="card-header bg-gradient-primary text-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h3 class="mb-0"><i class="fas fa-id-card-alt me-2"></i>{% if form.instance.pk %}Editar Empleado: {{ empleado.nombre }} {{ empleado.apellido }}{% else %}Nuevo Empleado{% endif %}</h3>
+            {% if form.instance.pk and form.instance.foto_perfil %}
+                <img src="{{ form.instance.foto_perfil.url }}" alt="Foto de Perfil" class="rounded-circle border border-3 border-white" style="width: 60px; height: 60px; object-fit: cover;">
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card-body">
+
+        {% if form.instance.pk and dashboard_stats %}
+        <div class="row mb-4">
+            <h5 class="card-title text-primary mb-3"><i class="fas fa-chart-line me-2"></i>Resumen del Empleado</h5>
+            <div class="col-xl col-md-6 mb-3">
+                <div class="card border-left-primary shadow-sm h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Sueldo Mensual</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ dashboard_stats.sueldo_mensual }}</div>
+                            </div>
+                            <div class="col-auto"><i class="fas fa-dollar-sign fa-2x text-gray-300"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl col-md-6 mb-3">
+                <div class="card border-left-success shadow-sm h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Días de Vacaciones</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ dashboard_stats.vacaciones_disponibles|intcomma }}</div>
+                            </div>
+                            <div class="col-auto"><i class="fas fa-plane-departure fa-2x text-gray-300"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl col-md-6 mb-3">
+                <div class="card border-left-danger shadow-sm h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Actas Admin.</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ dashboard_stats.actas_administrativas }}</div>
+                            </div>
+                            <div class="col-auto"><i class="fas fa-gavel fa-2x text-gray-300"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl col-md-6 mb-3">
+                <div class="card border-left-warning shadow-sm h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Suspensiones</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ dashboard_stats.suspensiones }}</div>
+                            </div>
+                            <div class="col-auto"><i class="fas fa-user-clock fa-2x text-gray-300"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl col-md-6 mb-3">
+                 <div class="card border-left-info shadow-sm h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Permisos</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ dashboard_stats.permisos }}</div>
+                            </div>
+                            <div class="col-auto"><i class="fas fa-calendar-check fa-2x text-gray-300"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+             <div class="col-xl col-md-6 mb-3">
+                 <div class="card border-left-dark shadow-sm h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-dark text-uppercase mb-1">Re-Contrat.</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ dashboard_stats.recontrataciones }}</div>
+                            </div>
+                            <div class="col-auto"><i class="fas fa-user-plus fa-2x text-gray-300"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% if all_errors %}
+        <div class="alert alert-danger" role="alert">
+            <h4 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>¡Error de Validación!</h4>
+            <p>Por favor, corrige los siguientes errores antes de continuar:</p>
+            <hr>
+            <ul class="mb-0">
+                {% for error in all_errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+            {% csrf_token %}
+
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card h-100"><div class="card-body text-center">
+                            <div class="position-relative mb-3">
+                                <img id="profile-preview" src="{% if form.instance.foto_perfil %}{{ form.instance.foto_perfil.url }}{% else %}https://via.placeholder.com/200x200?text=Foto+Perfil{% endif %}" class="img-thumbnail rounded-circle shadow" style="width: 200px; height: 200px; object-fit: cover;">
+                                <label for="id_foto_perfil" class="btn btn-sm btn-primary position-absolute bottom-0 end-0 rounded-circle" style="width: 40px; height: 40px;"><i class="fas fa-camera"></i></label>
+                                <input type="file" name="foto_perfil" accept="image/*" id="id_foto_perfil" class="d-none">
+                            </div>
+                            <div class="form-check form-switch mb-3">{{ form.activo }}<label class="form-check-label" for="{{ form.activo.id_for_label }}">Empleado Activo</label></div>
+                            <div id="inactive_fields" style="display: none;">
+                                <div class="mb-3"><label for="{{ form.motivo_inactivacion.id_for_label }}" class="form-label">Motivo</label>{{ form.motivo_inactivacion }}</div>
+                                <div class="mb-3"><label for="{{ form.fecha_inactivacion.id_for_label }}" class="form-label">Fecha</label>{{ form.fecha_inactivacion }}</div>
+                            </div>
+                    </div></div>
+                </div>
+                <div class="col-md-9">
+                    <div class="card h-100"><div class="card-body">
+                            <h5 class="card-title text-primary mb-4"><i class="fas fa-info-circle me-2"></i>Información Básica</h5>
+                            <div class="row g-3">
+                                <div class="col-md-6"><label class="form-label">Nombre(s)</label>{{ form.nombre }}</div>
+                                <div class="col-md-6"><label class="form-label">Apellido(s)</label>{{ form.apellido }}</div>
+                                <div class="col-md-6"><label class="form-label">Número de Empleado</label>{{ form.numero_empleado }}</div>
+                                <div class="col-md-6"><label class="form-label">Puesto</label>{{ form.puesto }}</div>
+                                <div class="col-md-6"><label class="form-label">Departamento</label>{{ form.departamento }}</div>
+                                <div class="col-md-6"><label class="form-label">Fecha de Contratación</label>{{ form.fecha_contratacion }}</div>
+                                <div class="col-12"><label class="form-label">Correo Electrónico</label><div class="input-group"><span class="input-group-text"><i class="fas fa-envelope"></i></span>{{ form.email }}</div></div>
+                            </div>
+                    </div></div>
+                </div>
+            </div>
+
+            <ul class="nav nav-tabs nav-tabs-custom mb-4" id="employeeTab" role="tablist">
+                 <li class="nav-item" role="presentation"><button class="nav-link active" id="personal-tab" data-bs-toggle="tab" data-bs-target="#personal" type="button" role="tab"><i class="fas fa-user me-2"></i>Datos Personales</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" id="salario-tab" data-bs-toggle="tab" data-bs-target="#salario" type="button" role="tab"><i class="fas fa-dollar-sign me-2"></i>Salario</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" id="bancarios-tab" data-bs-toggle="tab" data-bs-target="#bancarios" type="button" role="tab"><i class="fas fa-university me-2"></i>Datos Bancarios</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" id="documentos-tab" data-bs-toggle="tab" data-bs-target="#documentos" type="button" role="tab"><i class="fas fa-file-contract me-2"></i>Documentos</button></li>
+                <li class="nav-item" role="presentation" id="documentos-operador-tab-li" style="display: none;"><button class="nav-link" id="documentos-operador-tab" data-bs-toggle="tab" data-bs-target="#documentos-operador" type="button" role="tab"><i class="fas fa-truck-moving me-2"></i>Doc. Operador</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" id="historial-laboral-tab" data-bs-toggle="tab" data-bs-target="#historial-laboral" type="button" role="tab"><i class="fas fa-history me-2"></i>Historial Laboral</button></li>
+            </ul>
+
+            <div class="tab-content" id="employeeTabContent">
+                <div class="tab-pane fade show active" id="personal" role="tabpanel"><div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">Fecha de Nacimiento</label>{{ form.fecha_nacimiento }}</div>
+                        <div class="col-md-6"><label class="form-label">Teléfono Personal</label><div class="input-group"><span class="input-group-text"><i class="fas fa-phone"></i></span>{{ form.telefono_personal }}</div></div>
+                        <div class="col-md-6"><label class="form-label">Estado Civil</label>{{ form.estado_civil }}</div>
+                        <div class="col-md-6"><label class="form-label">Nacionalidad</label>{{ form.nacionalidad }}</div>
+                        <div class="col-12"><label class="form-label">Dirección</label>{{ form.direccion }}</div>
+                        <div class="col-md-4"><label class="form-label">CURP</label>{{ form.curp }}</div>
+                        <div class="col-md-4"><label class="form-label">RFC</label>{{ form.rfc }}</div>
+                        <div class="col-md-4"><label class="form-label">NSS</label>{{ form.nss }}</div>
+                </div></div>
+                <div class="tab-pane fade" id="salario" role="tabpanel">
+                    <h5 class="card-title text-primary mb-4"><i class="fas fa-dollar-sign me-2"></i>Historial de Salarios</h5>{{ salario_formset.management_form }}
+                    <div id="salary-container">{% for s_form in salario_formset %}<div class="card mb-3 salary-form-row"><div class="card-body">{{ s_form.non_field_errors }}<div class="row g-3 align-items-end">{{ s_form.id }} {{ s_form.empleado }}
+                        <div class="col-md-3"><label for="{{ s_form.fecha_efectiva.id_for_label }}" class="form-label">Fecha Efectiva</label>{{ s_form.fecha_efectiva }}{% for error in s_form.fecha_efectiva.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+                        <div class="col-md-3"><label for="{{ s_form.sueldo_diario.id_for_label }}" class="form-label">Sueldo Diario</label><div class="input-group"><span class="input-group-text">$</span>{{ s_form.sueldo_diario }}</div>{% for error in s_form.sueldo_diario.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+                        <div class="col-md-3"><label class="form-label">Sueldo Semanal</label><input type="text" class="form-control salary-display-weekly" readonly></div>
+                        <div class="col-md-3"><label class="form-label">Sueldo Mensual</label><input type="text" class="form-control salary-display-monthly" readonly></div>
+                        <div class="col-12"><label for="{{ s_form.observaciones.id_for_label }}" class="form-label">Observaciones</label>{{ s_form.observaciones }}{% for error in s_form.observaciones.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+                        {% if s_form.instance.pk %}<div class="col-12 form-check">{{ s_form.DELETE }} <label class="form-check-label" for="{{ s_form.DELETE.id_for_label }}">Eliminar</label></div>{% endif %}
+                    </div></div></div>{% endfor %}</div>
+                    <button type="button" class="btn btn-outline-success mt-3" id="add-salary-entry"><i class="fas fa-plus-circle me-2"></i>Añadir Salario</button>
+                    <template id="empty-salary-form">{% with s_form=salario_formset.empty_form %}<div class="card mb-3 salary-form-row"><div class="card-body"><div class="row g-3 align-items-end">
+                        <div class="col-md-3"><label class="form-label">Fecha Efectiva</label>{{ s_form.fecha_efectiva }}</div>
+                        <div class="col-md-3"><label class="form-label">Sueldo Diario</label><div class="input-group"><span class="input-group-text">$</span>{{ s_form.sueldo_diario }}</div></div>
+                        <div class="col-md-3"><label class="form-label">Sueldo Semanal</label><input type="text" class="form-control salary-display-weekly" readonly></div>
+                        <div class="col-md-3"><label class="form-label">Sueldo Mensual</label><input type="text" class="form-control salary-display-monthly" readonly></div>
+                        <div class="col-12"><label class="form-label">Observaciones</label>{{ s_form.observaciones }}</div>
+                        <button type="button" class="btn btn-danger btn-sm mt-2 remove-form-row">Eliminar</button>
+                    </div></div></div>{% endwith %}</template>
+                </div>
+                <div class="tab-pane fade" id="bancarios" role="tabpanel"><div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">Banco</label>{{ form.banco }}</div>
+                        <div class="col-md-6"><label class="form-label">Número de Cuenta</label>{{ form.numero_cuenta }}</div>
+                        <div class="col-12"><label class="form-label">CLABE Interbancaria</label><div class="input-group"><span class="input-group-text"><i class="fas fa-barcode"></i></span>{{ form.clabe_interbancaria }}</div></div>
+                </div></div>
+                <div class="tab-pane fade" id="documentos" role="tabpanel"><div class="row g-3">
+                        <div class="col-md-4"><div class="card h-100"><div class="card-header bg-light"><h6 class="mb-0"><i class="fas fa-id-card me-2"></i>INE/IFE</h6></div><div class="card-body"><div class="mb-3">{{ form.ine_documento }}{% if form.instance.ine_documento %}<div class="mt-2"><a href="{{ form.instance.ine_documento.url }}" target="_blank" class="btn btn-sm btn-outline-primary w-100"><i class="fas fa-eye me-1"></i> Ver</a></div>{% endif %}</div></div></div></div>
+                        <div class="col-md-4"><div class="card h-100"><div class="card-header bg-light"><h6 class="mb-0"><i class="fas fa-home me-2"></i>Comprobante Domicilio</h6></div><div class="card-body"><div class="mb-3">{{ form.comprobante_domicilio }}{% if form.instance.comprobante_domicilio %}<div class="mt-2"><a href="{{ form.instance.comprobante_domicilio.url }}" target="_blank" class="btn btn-sm btn-outline-primary w-100"><i class="fas fa-eye me-1"></i> Ver</a></div>{% endif %}</div></div></div></div>
+                        <div class="col-md-4"><div class="card h-100"><div class="card-header bg-light"><h6 class="mb-0"><i class="fas fa-file-alt me-2"></i>Curriculum Vitae</h6></div><div class="card-body"><div class="mb-3">{{ form.curriculum_vitae }}{% if form.instance.curriculum_vitae %}<div class="mt-2"><a href="{{ form.instance.curriculum_vitae.url }}" target="_blank" class="btn btn-sm btn-outline-primary w-100"><i class="fas fa-eye me-1"></i> Ver</a></div>{% endif %}</div></div></div></div>
+                </div></div>
+                <div class="tab-pane fade" id="documentos-operador" role="tabpanel">
+                    <h5 class="card-title text-primary mb-4"><i class="fas fa-truck-moving me-2"></i>Documentos del Operador</h5>{{ documentos_operador_formset.management_form }}
+                    <div id="operator-documents-container">{% for doc_form in documentos_operador_formset %}<div class="card mb-3 document-form-row"><div class="card-body">{{ doc_form.non_field_errors }}<div class="row g-3">{{ doc_form.id }} {{ doc_form.empleado }}
+                        <div class="col-md-6"><label class="form-label" for="{{ doc_form.tipo_documento.id_for_label }}">Tipo de Documento</label>{{ doc_form.tipo_documento }}{% for error in doc_form.tipo_documento.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+                        <div class="col-md-6"><label class="form-label" for="{{ doc_form.archivo.id_for_label }}">Archivo</label>{{ doc_form.archivo }}{% if doc_form.instance.pk and doc_form.instance.archivo %}<div class="mt-2"><a href="{{ doc_form.instance.archivo.url }}" target="_blank" class="btn btn-sm btn-outline-info w-100"><i class="fas fa-eye me-1"></i> Ver Documento Actual</a></div>{% endif %}{% for error in doc_form.archivo.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+                        <div class="col-md-6"><label class="form-label">Número de Documento</label>{{ doc_form.numero_documento }}</div>
+                        <div class="col-md-3"><label class="form-label">Fecha de Expedición</label>{{ doc_form.fecha_expedicion }}</div>
+                        <div class="col-md-3 expiry-date-col"><label class="form-label">Fecha de Vencimiento</label>{{ doc_form.fecha_vencimiento }}</div>
+                        <div class="col-12"><label class="form-label">Observaciones</label>{{ doc_form.observaciones }}</div>
+                        {% if doc_form.instance.pk %}<div class="col-12 form-check">{{ doc_form.DELETE }} <label class="form-check-label" for="{{ doc_form.DELETE.id_for_label }}">Eliminar</label></div>{% endif %}
+                    </div></div></div>{% endfor %}</div>
+                    <button type="button" class="btn btn-outline-success mt-3" id="add-operator-document"><i class="fas fa-plus-circle me-2"></i> Añadir Documento</button>
+                    <template id="empty-operator-form">{% with doc_form=documentos_operador_formset.empty_form %}<div class="card mb-3 document-form-row"><div class="card-body"><div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">Tipo de Documento</label>{{ doc_form.tipo_documento }}</div><div class="col-md-6"><label class="form-label">Archivo</label>{{ doc_form.archivo }}</div>
+                        <div class="col-md-6"><label class="form-label">Número de Documento</label>{{ doc_form.numero_documento }}</div><div class="col-md-3"><label class="form-label">Fecha de Expedición</label>{{ doc_form.fecha_expedicion }}</div>
+                        <div class="col-md-3 expiry-date-col"><label class="form-label">Fecha de Vencimiento</label>{{ doc_form.fecha_vencimiento }}</div><div class="col-12"><label class="form-label">Observaciones</label>{{ doc_form.observaciones }}</div>
+                        <button type="button" class="btn btn-danger btn-sm mt-2 remove-form-row">Eliminar</button>
+                    </div></div></div>{% endwith %}</template>
+                </div>
+                
+                <div class="tab-pane fade" id="historial-laboral" role="tabpanel">
+                    <h5 class="card-title text-primary mb-4"><i class="fas fa-history me-2"></i>Registro de Eventos Laborales</h5>
+                    {{ historial_laboral_formset.management_form }}
+                    <div id="history-container">
+                        {% for h_form in historial_laboral_formset %}
+                        <div class="card mb-3 history-form-row">
+                            <div class="card-body">
+                                {{ h_form.non_field_errors }}
+                                <div class="row g-3 align-items-center">
+                                    {{ h_form.id }} {{ h_form.empleado }}
+                                    <div class="col-md-4">
+                                        <label for="{{ h_form.tipo_evento.id_for_label }}" class="form-label fw-bold">Tipo de Evento</label>
+                                        {{ h_form.tipo_evento }}
+                                        {% for error in h_form.tipo_evento.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                                    </div>
+                                    <div class="col-md-4 field-container" data-field="fecha_inicio">
+                                        <label for="{{ h_form.fecha_inicio.id_for_label }}" class="form-label">Fecha del Evento / Inicio</label>
+                                        {{ h_form.fecha_inicio }}
+                                        {% for error in h_form.fecha_inicio.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                                    </div>
+                                    <div class="col-md-4 field-container" data-field="fecha_fin" style="display: none;">
+                                        <label for="{{ h_form.fecha_fin.id_for_label }}" class="form-label">Fecha de Fin</label>
+                                        {{ h_form.fecha_fin }}
+                                    </div>
+                                    <div class="col-md-6 field-container" data-field="puesto" style="display: none;">
+                                        <label for="{{ h_form.puesto.id_for_label }}" class="form-label">Nuevo Puesto</label>
+                                        {{ h_form.puesto }}
+                                    </div>
+                                    <div class="col-md-6 field-container" data-field="departamento" style="display: none;">
+                                        <label for="{{ h_form.departamento.id_for_label }}" class="form-label">Nuevo Departamento</label>
+                                        {{ h_form.departamento }}
+                                    </div>
+                                    <div class="col-12 field-container" data-field="descripcion" style="display: none;">
+                                        <label for="{{ h_form.descripcion.id_for_label }}" class="form-label">Descripción / Observaciones</label>
+                                        {{ h_form.descripcion }}
+                                    </div>
+                                    <div class="col-12 field-container" data-field="motivo_salida" style="display: none;">
+                                        <label for="{{ h_form.motivo_salida.id_for_label }}" class="form-label">Motivo de la Salida</label>
+                                        {{ h_form.motivo_salida }}
+                                    </div>
+                                    <div class="col-md-8 field-container" data-field="documento_adjunto">
+                                         <label for="{{ h_form.documento_adjunto.id_for_label }}" class="form-label">Adjuntar Documento</label>
+                                         {{ h_form.documento_adjunto }}
+                                         {% if h_form.instance.pk and h_form.instance.documento_adjunto %}
+                                            <div class="mt-2">
+                                                <a href="{{ h_form.instance.documento_adjunto.url }}" target="_blank" class="btn btn-sm btn-outline-info">
+                                                    <i class="fas fa-eye me-1"></i> Ver Documento Actual
+                                                </a>
+                                            </div>
+                                         {% endif %}
+                                    </div>
+                                    {% if h_form.instance.pk %}
+                                    <div class="col-md-4 d-flex align-items-end justify-content-end">
+                                        <div class="form-check">
+                                            {{ h_form.DELETE }}
+                                            <label class="form-check-label text-danger" for="{{ h_form.DELETE.id_for_label }}">Eliminar Evento</label>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-outline-success mt-3" id="add-history-entry"><i class="fas fa-plus-circle me-2"></i>Añadir Evento al Historial</button>
+                    
+                    <template id="empty-history-form">
+                        {% with h_form=historial_laboral_formset.empty_form %}
+                        <div class="card mb-3 history-form-row">
+                            <div class="card-body">
+                                <div class="row g-3 align-items-center">
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold">Tipo de Evento</label>
+                                        {{ h_form.tipo_evento }}
+                                    </div>
+                                    <div class="col-md-4 field-container" data-field="fecha_inicio">
+                                        <label class="form-label">Fecha del Evento / Inicio</label>
+                                        {{ h_form.fecha_inicio }}
+                                    </div>
+                                    <div class="col-md-4 field-container" data-field="fecha_fin" style="display: none;">
+                                        <label class="form-label">Fecha de Fin</label>
+                                        {{ h_form.fecha_fin }}
+                                    </div>
+                                    <div class="col-md-6 field-container" data-field="puesto" style="display: none;">
+                                        <label class="form-label">Nuevo Puesto</label>
+                                        {{ h_form.puesto }}
+                                    </div>
+                                    <div class="col-md-6 field-container" data-field="departamento" style="display: none;">
+                                        <label class="form-label">Nuevo Departamento</label>
+                                        {{ h_form.departamento }}
+                                    </div>
+                                    <div class="col-12 field-container" data-field="descripcion" style="display: none;">
+                                        <label class="form-label">Descripción / Observaciones</label>
+                                        {{ h_form.descripcion }}
+                                    </div>
+                                    <div class="col-12 field-container" data-field="motivo_salida" style="display: none;">
+                                        <label class="form-label">Motivo de la Salida</label>
+                                        {{ h_form.motivo_salida }}
+                                    </div>
+                                    <div class="col-md-8 field-container" data-field="documento_adjunto">
+                                         <label class="form-label">Adjuntar Documento</label>
+                                         {{ h_form.documento_adjunto }}
+                                    </div>
+                                    <div class="col-md-4 d-flex align-items-end justify-content-end">
+                                        <button type="button" class="btn btn-danger btn-sm remove-form-row">Eliminar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endwith %}
+                    </template>
+                </div>
+                 </div>
+
+            <div class="mt-4 pt-3 border-top d-flex justify-content-between">
+                <a href="{% url 'rh:lista_empleados' %}" class="btn btn-outline-secondary btn-lg"><i class="fas fa-arrow-left me-2"></i>Regresar</a>
+                <div><button type="reset" class="btn btn-outline-danger btn-lg me-2"><i class="fas fa-undo me-2"></i>Limpiar</button><button type="submit" class="btn btn-primary btn-lg shadow-sm"><i class="fas fa-save me-2"></i>Guardar</button></div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ form.media }}
+{{ documentos_operador_formset.media }}
+{{ historial_laboral_formset.media }}
+{{ salario_formset.media }}
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    
+    // Función genérica para añadir/quitar filas de un formset
+    function setupFormset(containerId, addButtonId, templateId, formsetPrefix, rowClass) {
+        const container = document.getElementById(containerId);
+        const addButton = document.getElementById(addButtonId);
+        const template = document.getElementById(templateId);
+        const totalFormsInput = document.querySelector(`#id_${formsetPrefix}-TOTAL_FORMS`);
+
+        if (!container || !addButton || !template || !totalFormsInput) return;
+
+        addButton.addEventListener('click', () => {
+            let totalForms = parseInt(totalFormsInput.value);
+            const newFormHtml = template.innerHTML.replace(/__prefix__/g, totalForms);
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = newFormHtml;
+            const newFormElement = tempDiv.firstElementChild;
+            container.appendChild(newFormElement);
+            totalFormsInput.value = totalForms + 1;
+            
+            // Disparar la lógica de mostrar/ocultar campos para la nueva fila
+            const newSelect = newFormElement.querySelector('.history-event-type');
+            if (newSelect) toggleHistoryFields(newSelect);
+        });
+
+        container.addEventListener('click', (e) => {
+            if (e.target && e.target.classList.contains('remove-form-row')) {
+                e.target.closest(`.${rowClass}`).remove();
+            }
+        });
+    }
+    
+    // --- LÓGICA PARA HISTORIAL LABORAL DINÁMICO ---
+    function toggleHistoryFields(selectElement) {
+        const formRow = selectElement.closest('.history-form-row');
+        if (!formRow) return;
+
+        const eventType = selectElement.value;
+        const fields = {
+            fecha_fin: formRow.querySelector('[data-field="fecha_fin"]'),
+            puesto: formRow.querySelector('[data-field="puesto"]'),
+            departamento: formRow.querySelector('[data-field="departamento"]'),
+            descripcion: formRow.querySelector('[data-field="descripcion"]'),
+            motivo_salida: formRow.querySelector('[data-field="motivo_salida"]')
+        };
+
+        // Ocultar todos los campos opcionales por defecto
+        Object.values(fields).forEach(el => { if(el) el.style.display = 'none'; });
+
+        // Mostrar campos según el tipo de evento
+        switch(eventType) {
+            case 'SUSPENSION':
+            case 'INCAPACIDAD':
+                if (fields.fecha_fin) fields.fecha_fin.style.display = 'block';
+                if (fields.descripcion) fields.descripcion.style.display = 'block';
+                break;
+            case 'RENUNCIA':
+                if (fields.motivo_salida) fields.motivo_salida.style.display = 'block';
+                break;
+            case 'CAMBIO_PUESTO':
+                if (fields.puesto) fields.puesto.style.display = 'block';
+                if (fields.departamento) fields.departamento.style.display = 'block';
+                if (fields.descripcion) fields.descripcion.style.display = 'block';
+                break;
+            case 'ACTA_ADMINISTRATIVA':
+            case 'PERMISO':
+            case 'RECONTRATACION':
+                if (fields.descripcion) fields.descripcion.style.display = 'block';
+                break;
+        }
+    }
+
+    // Aplicar lógica al cargar la página y al cambiar el tipo de evento
+    const historyContainer = document.getElementById('history-container');
+    if (historyContainer) {
+        historyContainer.addEventListener('change', (e) => {
+            if (e.target && e.target.classList.contains('history-event-type')) {
+                toggleHistoryFields(e.target);
+            }
+        });
+        document.querySelectorAll('.history-event-type').forEach(toggleHistoryFields);
+    }
+    
+    // --- OTRAS FUNCIONES DEL FORMULARIO ---
+
+    // Inicializar los formsets
+    setupFormset('operator-documents-container', 'add-operator-document', 'empty-operator-form', 'docs_operador', 'document-form-row');
+    setupFormset('salary-container', 'add-salary-entry', 'empty-salary-form', 'salarios', 'salary-form-row');
+    setupFormset('history-container', 'add-history-entry', 'empty-history-form', 'historial_laboral', 'history-form-row');
+
+    // ... (El resto del script para mostrar errores, foto de perfil, estado activo, pestaña de operador y cálculo de salarios sin cambios) ...
+    const firstInvalidInput = document.querySelector('.is-invalid, .invalid-feedback.d-block');
+    if (firstInvalidInput) {
+        const tabPane = firstInvalidInput.closest('.tab-pane');
+        if (tabPane) {
+            const tabButton = document.querySelector(`button[data-bs-toggle="tab"][data-bs-target="#${tabPane.id}"]`);
+            if (tabButton) new bootstrap.Tab(tabButton).show();
+            firstInvalidInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    const fotoPerfilInput = document.getElementById('id_foto_perfil');
+    if(fotoPerfilInput) fotoPerfilInput.addEventListener('change', e => { if (e.target.files[0]) { const reader = new FileReader(); reader.onload = event => { document.getElementById('profile-preview').src = event.target.result; }; reader.readAsDataURL(e.target.files[0]); } });
+
+    const activoToggle = document.getElementById('{{ form.activo.id_for_label }}'), inactiveFieldsDiv = document.getElementById('inactive_fields');
+    if(activoToggle && inactiveFieldsDiv) { const toggle = () => { inactiveFieldsDiv.style.display = activoToggle.checked ? 'none' : 'block'; }; activoToggle.addEventListener('change', toggle); toggle(); }
+
+    const puestoSelect = document.getElementById('{{ form.puesto.id_for_label }}'), operatorTab = document.getElementById('documentos-operador-tab-li');
+    if(puestoSelect && operatorTab) { const toggle = () => { if (puestoSelect.selectedIndex > -1) operatorTab.style.display = puestoSelect.options[puestoSelect.selectedIndex].text.toUpperCase().includes('OPERADOR') ? 'block' : 'none'; }; puestoSelect.addEventListener('change', toggle); toggle(); }
+
+    function calculateSalaries(dailyInput) {
+        const row = dailyInput.closest('.salary-form-row');
+        if (!row) return;
+        const weekly = row.querySelector('.salary-display-weekly'), monthly = row.querySelector('.salary-display-monthly'), val = parseFloat(dailyInput.value);
+        if(weekly && monthly) { if (!isNaN(val) && val > 0) { weekly.value = '$' + (val * 7).toFixed(2); monthly.value = '$' + (val * 30).toFixed(2); } else { weekly.value = ''; monthly.value = ''; } }
+    }
+    document.getElementById('employeeTabContent').addEventListener('input', e => { if(e.target.matches('[name$="-sueldo_diario"]')) calculateSalaries(e.target); });
+    document.querySelectorAll('[name$="-sueldo_diario"]').forEach(calculateSalaries);
+});
+</script>
+{% endblock %}

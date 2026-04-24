@@ -1,0 +1,362 @@
+{# RH/templates/rh/lista_empleados.html #}
+{% extends 'rh/base.html' %}
+
+{% block rh_title %}Gestión de Empleados - Recursos Humanos{% endblock %}
+
+{% block rh_content %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 py-3 border-bottom">
+        <div>
+            <h1 class="h3 font-weight-semibold mb-2">
+                <i class="fas fa-users me-2 text-primary"></i>Gestión de Empleados
+            </h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb bg-transparent p-0 mb-0">
+                    <li class="breadcrumb-item"><a href="{% url 'rh:lista_empleados' %}" class="text-decoration-none">Inicio</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Empleados</li>
+                </ol>
+            </nav>
+        </div>
+        <a href="{% url 'rh:empleado_create' %}" class="btn btn-primary btn-lg shadow-sm px-4">
+            <i class="fas fa-user-plus me-2"></i>Nuevo Empleado
+        </a>
+    </div>
+
+    <div class="card shadow-sm mb-4 border-0">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center border-bottom py-3">
+            <h2 class="h6 mb-0 fw-semibold">
+                <i class="fas fa-filter me-2 text-primary"></i>Filtros Avanzados
+            </h2>
+            <button class="btn btn-sm btn-outline-primary rounded-pill" type="button" data-bs-toggle="collapse" data-bs-target="#filtersCollapse">
+                <i class="fas fa-sliders-h me-1"></i>Mostrar/Ocultar
+            </button>
+        </div>
+        <div class="collapse show" id="filtersCollapse">
+            <div class="card-body pt-3">
+                <form method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="nombre" class="form-label small fw-semibold text-muted">Nombre</label>
+                        <input type="text" class="form-control form-control-sm" id="nombre" name="nombre" value="{{ request.GET.nombre }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="departamento" class="form-label small fw-semibold text-muted">Departamento</label>
+                        <select class="form-select form-select-sm" id="departamento" name="departamento">
+                            <option value="">Todos</option>
+                            {% for depto in departamentos %}
+                            <option value="{{ depto.id }}" {% if request.GET.departamento == depto.id|stringformat:"s" %}selected{% endif %}>
+                                {{ depto.nombre }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="puesto" class="form-label small fw-semibold text-muted">Puesto</label>
+                        <select class="form-select form-select-sm" id="puesto" name="puesto">
+                            <option value="">Todos</option>
+                            {% for puesto in puestos %}
+                            <option value="{{ puesto.id }}" {% if request.GET.puesto == puesto.id|stringformat:"s" %}selected{% endif %}>
+                                {{ puesto.nombre }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="estado" class="form-label small fw-semibold text-muted">Estado</label>
+                        <select class="form-select form-select-sm" id="estado" name="estado">
+                            <option value="">Todos</option>
+                            <option value="1" {% if request.GET.estado == "1" %}selected{% endif %}>Activo</option>
+                            <option value="0" {% if request.GET.estado == "0" %}selected{% endif %}>Inactivo</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="fecha_inicio" class="form-label small fw-semibold text-muted">Contratación desde</label>
+                        <input type="date" class="form-control form-control-sm" id="fecha_inicio" name="fecha_inicio" value="{{ request.GET.fecha_inicio }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="fecha_fin" class="form-label small fw-semibold text-muted">Contratación hasta</label>
+                        <input type="date" class="form-control form-control-sm" id="fecha_fin" name="fecha_fin" value="{{ request.GET.fecha_fin }}">
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end justify-content-end">
+                        <button type="submit" class="btn btn-primary btn-sm rounded-pill px-4 me-2">
+                            <i class="fas fa-search me-1"></i>Filtrar
+                        </button>
+                        <a href="{% url 'rh:lista_empleados' %}" class="btn btn-outline-secondary btn-sm rounded-pill px-4">
+                            <i class="fas fa-undo me-1"></i>Limpiar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center border-bottom py-3">
+            <h2 class="h6 mb-0 fw-semibold">
+                <i class="fas fa-list me-2 text-primary"></i>Resultados
+                <span class="badge bg-primary rounded-pill ms-2">{{ page_obj.paginator.count }}</span>
+            </h2>
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-primary rounded-pill dropdown-toggle px-3" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-download me-1"></i>Exportar
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="exportDropdown">
+                    <li><a class="dropdown-item" href="{% url 'rh:export_empleados_excel' %}"><i class="fas fa-file-excel me-2 text-success"></i>Exportar Excel (Todos)</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                </ul>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            {% if empleados %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th scope="col" class="sortable py-3" data-sort="id">
+                                <span class="d-flex align-items-center">ID <i class="fas fa-sort ms-2 text-muted"></i></span>
+                            </th>
+                            <th scope="col" class="sortable py-3" data-sort="nombre">
+                                <span class="d-flex align-items-center">Nombre <i class="fas fa-sort ms-2 text-muted"></i></span>
+                            </th>
+                            <th scope="col" class="sortable py-3" data-sort="puesto__nombre">
+                                <span class="d-flex align-items-center">Puesto / Depto. <i class="fas fa-sort ms-2 text-muted"></i></span>
+                            </th>
+                            <th scope="col" class="py-3">Docs. Oficiales</th>
+                            <th scope="col" class="sortable py-3" data-sort="fecha_contratacion">
+                                <span class="d-flex align-items-center">Contratación <i class="fas fa-sort ms-2 text-muted"></i></span>
+                            </th>
+                            <th scope="col" class="py-3 text-center">Días Lab.</th>
+                            <th scope="col" class="py-3">Nacimiento / Edad</th>
+                            <th scope="col" class="py-3">Estado</th>
+                            <th scope="col" class="text-center py-3">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for empleado in empleados %}
+                        <tr class="border-bottom">
+                            <td class="py-3 fw-semibold">{{ empleado.id }}</td>
+                            <td class="py-3">
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar me-3">
+                                        <span class="avatar-initial bg-primary bg-opacity-10 text-primary fw-semibold rounded-circle">
+                                            {{ empleado.nombre|first }}{{ empleado.apellido|first }}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <strong>{{ empleado.nombre }} {{ empleado.apellido }}</strong>
+                                        <div class="text-muted small">{{ empleado.email|default:"Sin email" }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-3">
+                                <div>{{ empleado.puesto.nombre|default:"Sin Puesto" }}</div>
+                                <div class="small text-muted">{{ empleado.departamento.nombre|default:"Sin Depto." }}</div>
+                            </td>
+                            <td class="py-3">
+                                <div class="small text-nowrap"><strong>CURP:</strong> {{ empleado.curp|default:"N/A" }}</div>
+                                <div class="small text-nowrap"><strong>RFC:</strong> {{ empleado.rfc|default:"N/A" }}</div>
+                                <div class="small text-nowrap"><strong>NSS:</strong> {{ empleado.nss|default:"N/A" }}</div>
+                            </td>
+                            <td class="py-3 text-nowrap">
+                                {{ empleado.fecha_contratacion|date:"d M Y" }}
+                            </td>
+                            <td class="py-3 text-center fw-semibold">{{ empleado.dias_laborados|default:"N/A" }}</td>
+                            <td class="py-3 text-nowrap">
+                                 {{ empleado.fecha_nacimiento|date:"d M Y"|default:"N/A" }}
+                                 {% if empleado.age is not None %}
+                                    <div class="text-muted small">{{ empleado.age }} años</div>
+                                 {% endif %}
+                            </td>
+                            <td class="py-3">
+                                {% if empleado.activo %}
+                                    <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-1">
+                                        <i class="fas fa-circle me-1 small"></i> Activo
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-1">
+                                        <i class="fas fa-circle me-1 small"></i> Inactivo
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center py-3">
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a href="{% url 'rh:empleado_detail' empleado.pk %}" class="btn btn-outline-info rounded-start-pill" title="Ver Detalles" data-bs-toggle="tooltip">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'rh:empleado_update' empleado.pk %}" class="btn btn-outline-warning" title="Editar" data-bs-toggle="tooltip">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'rh:empleado_delete' empleado.pk %}" class="btn btn-outline-danger rounded-end-pill" title="Eliminar" data-bs-toggle="tooltip">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <div class="mb-4">
+                    <i class="fas fa-user-times fa-4x text-muted opacity-25"></i>
+                </div>
+                <h4 class="text-muted mb-3">No se encontraron empleados</h4>
+                <p class="text-muted mb-4">Prueba ajustando los filtros de búsqueda</p>
+                <a href="{% url 'rh:empleado_create' %}" class="btn btn-primary px-4 rounded-pill">
+                    <i class="fas fa-user-plus me-2"></i>Agregar Nuevo Empleado
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        
+        {% if is_paginated %}
+        <div class="card-footer bg-white border-top py-3">
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center mb-0">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link rounded-start-pill" href="?page=1{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="First">
+                            <i class="fas fa-angle-double-left"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Previous">
+                            <i class="fas fa-angle-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link rounded-circle mx-1">{{ num }}</span>
+                        </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link rounded-circle mx-1" href="?page={{ num }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Next">
+                            <i class="fas fa-angle-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link rounded-end-pill" href="?page={{ page_obj.paginator.num_pages }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Last">
+                            <i class="fas fa-angle-double-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+                <div class="text-center text-muted small mt-2">
+                    Mostrando {{ page_obj.start_index }} - {{ page_obj.end_index }} de {{ page_obj.paginator.count }} registros
+                </div>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Inicializar tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    // Tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl, {
+            trigger: 'hover focus'
+        })
+    });
+    
+    // Ordenamiento por columnas
+    document.querySelectorAll('.sortable').forEach(function(header) {
+        header.addEventListener('click', function() {
+            const sortField = this.dataset.sort;
+            const currentUrl = new URL(window.location.href);
+            let sortDirection = 'asc';
+            
+            if (currentUrl.searchParams.get('sort') === sortField) {
+                sortDirection = currentUrl.searchParams.get('direction') === 'asc' ? 'desc' : 'asc';
+            }
+            
+            currentUrl.searchParams.set('sort', sortField);
+            currentUrl.searchParams.set('direction', sortDirection);
+            window.location.href = currentUrl.toString();
+        });
+    });
+    
+    // Efecto hover en filas
+    const tableRows = document.querySelectorAll('tbody tr');
+    tableRows.forEach(row => {
+        row.addEventListener('mouseenter', () => {
+            row.style.transform = 'translateX(2px)';
+            row.style.transition = 'transform 0.2s ease';
+        });
+        row.addEventListener('mouseleave', () => {
+            row.style.transform = '';
+        });
+    });
+});
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .avatar {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+    }
+    .avatar-initial {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        font-size: 0.875rem;
+    }
+    .sortable {
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+    .sortable .fa-sort {
+        opacity: 0.5;
+    }
+    .sortable:hover {
+        background-color: rgba(13, 110, 253, 0.05);
+    }
+    .sortable:hover .fa-sort {
+        opacity: 1;
+    }
+    .table-hover tbody tr:hover {
+        background-color: rgba(13, 110, 253, 0.03);
+        box-shadow: inset 2px 0 0 0 var(--bs-primary);
+    }
+    .card {
+        border-radius: 0.75rem;
+    }
+    .dropdown-menu {
+        border-radius: 0.5rem;
+        border: none;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
+    }
+    .badge {
+        font-weight: 500;
+        letter-spacing: 0.3px;
+    }
+    .page-link {
+        min-width: 38px;
+        text-align: center;
+    }
+    .page-item.active .page-link {
+        box-shadow: 0 2px 8px rgba(13, 110, 253, 0.2);
+    }
+</style>
+{% endblock %}

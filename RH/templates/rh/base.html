@@ -1,0 +1,122 @@
+{# RH/templates/rh/base.html #}
+{# Esta plantilla extiende la plantilla base principal de la aplicación 'transporte' #}
+{% extends 'base.html' %}
+
+{# Define un bloque de título específico para las páginas de RH #}
+{% block title %}Recursos Humanos - {% block rh_title %}{% endblock %}{% endblock %}
+
+{# El contenido principal de las páginas de RH irá aquí #}
+{% block content %}
+    {# Se cambió "container" por "container-fluid" para aprovechar mejor el espacio en dashboards #}
+    <div class="container-fluid mt-4 mb-5"> 
+        {# Este bloque será llenado por las plantillas que extiendan esta base de RH #}
+        {% block rh_content %}
+        {% endblock %}
+    </div>
+{% endblock %}
+
+{# Agregamos un bloque extra_js para que todas las páginas de RH puedan agregar scripts específicos #}
+{% block extra_js %}
+    {# Este bloque puede ser sobrescrito por plantillas hijas #}
+{% endblock %}
+
+{# Script global y Overlay de Carga profesional para RH #}
+{% block extra_footer_scripts %}
+<style>
+    /* Estilos para animaciones suaves en el spinner */
+    .fade-in-overlay { animation: fadeIn 0.2s ease-in forwards; }
+    .fade-out-overlay { animation: fadeOut 0.2s ease-out forwards; }
+    
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+</style>
+
+<script>
+// Función para mostrar el loading con estilo moderno
+function showLoading(customMessage = 'Procesando solicitud...') {
+  // Evitar duplicados
+  if (document.getElementById('loading-spinner')) return;
+
+  const spinner = document.createElement('div');
+  spinner.id = 'loading-spinner';
+  spinner.className = 'fade-in-overlay';
+  spinner.innerHTML = `
+    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+                z-index: 10500; display: flex; flex-direction: column; 
+                align-items: center; justify-content: center;">
+      
+      <div class="spinner-border" style="width: 3.5rem; height: 3.5rem; border-width: 0.25em; color: #3b82f6;" role="status">
+        <span class="visually-hidden">Cargando...</span>
+      </div>
+      
+      <div class="mt-4 text-center text-white" style="max-width: 450px; padding: 0 20px;">
+        <h5 class="fw-bold mb-2" style="letter-spacing: 0.5px; color: #f8fafc;">${customMessage}</h5>
+        <p class="text-white-50 small mb-4" style="font-size: 0.85rem;">
+            Por favor espere un momento. No cierre ni recargue esta ventana.
+        </p>
+        
+        <div class="d-inline-flex align-items-center justify-content-center small rounded-pill py-2 px-3 shadow-sm" 
+             style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa;">
+            <i class="fas fa-info-circle me-2"></i>
+            <span>La descarga iniciará automáticamente</span>
+        </div>
+        
+        <div class="mt-4 pt-3">
+            <button onclick="hideLoading()" class="btn btn-sm btn-link text-decoration-none" style="color: #64748b;">
+                <i class="fas fa-times me-1"></i> Cerrar aviso
+            </button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(spinner);
+  
+  // Auto-remover por seguridad después de 2 minutos (por si se traba el proceso)
+  setTimeout(() => hideLoading(), 120000);
+}
+
+// Función para ocultar con transición suave
+function hideLoading() {
+  const spinner = document.getElementById('loading-spinner');
+  if (spinner) {
+    spinner.classList.remove('fade-in-overlay');
+    spinner.classList.add('fade-out-overlay');
+    setTimeout(() => spinner.remove(), 200); // Esperar a que termine la animación
+  }
+}
+
+// Interceptar clics en botones de descarga y exportación
+document.addEventListener('DOMContentLoaded', function() {
+  // Selecciona tanto descargas de documentos como exportaciones a Excel
+  const downloadLinks = document.querySelectorAll('a[href*="descargar_documentos"], a[href*="exportar"], a[href*="reporte_bajas_excel"], a[href*="export_empleados_excel"]');
+  
+  downloadLinks.forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      // Si el enlace se abre en otra pestaña, no bloqueamos la pantalla actual
+      if (this.getAttribute('target') !== '_blank') {
+        
+        // Determinar un mensaje más específico según la URL
+        let msg = 'Generando archivo...';
+        if (this.href.includes('exportar') || this.href.includes('excel')) {
+            msg = 'Generando reporte Excel...';
+        } else if (this.href.includes('zip')) {
+            msg = 'Comprimiendo documentos...';
+        }
+        
+        showLoading(msg);
+        
+        // TRUCO UX: Como las descargas en Django (FileResponse) no recargan el DOM, 
+        // el spinner se quedaría bloqueando la pantalla por siempre. 
+        // Lo ocultamos automáticamente después de unos segundos asumiendo que el navegador 
+        // ya recibió los headers de descarga.
+        setTimeout(hideLoading, 8000);
+      }
+    });
+  });
+});
+</script>
+
+{# Llamamos al bloque extra_js del base principal (si existe) para no romper la herencia #}
+{{ block.super }}
+{% endblock %}

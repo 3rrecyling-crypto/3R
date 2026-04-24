@@ -1,0 +1,49 @@
+{# rh/templates/rh/tipo_documento_operador_form.html #}
+{% extends 'rh/base.html' %}
+
+{% block rh_title %}{% if form.instance.pk %}Editar Tipo de Documento{% else %}Nuevo Tipo de Documento{% endif %}{% endblock %}
+
+{% block rh_content %}
+<div class="card shadow-lg">
+    <div class="card-header bg-gradient-primary text-white">
+        <h3 class="mb-0">
+            <i class="fas fa-edit me-2"></i>
+            {% if form.instance.pk %}Editar Tipo de Documento{% else %}Nuevo Tipo de Documento{% endif %}
+        </h3>
+    </div>
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+                <label for="{{ form.nombre.id_for_label }}" class="form-label">Nombre del Tipo</label>
+                {{ form.nombre }}
+                {% for error in form.nombre.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="mb-3">
+                <label for="{{ form.descripcion.id_for_label }}" class="form-label">Descripción</label>
+                {{ form.descripcion }}
+                {% for error in form.descripcion.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="form-check mb-4">
+                {{ form.requiere_fecha_vencimiento }}
+                <label for="{{ form.requiere_fecha_vencimiento.id_for_label }}" class="form-check-label">
+                    Este tipo de documento requiere una fecha de vencimiento
+                </label>
+                {% for error in form.requiere_fecha_vencimiento.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'rh:lista_tipos_documento_operador' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Regresar
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-2"></i>Guardar Cambios
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

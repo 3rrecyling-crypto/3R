@@ -1,0 +1,286 @@
+{% extends 'rh/base.html' %}
+
+{% block rh_title %}Calendario Anual de Cumpleaños - Recursos Humanos{% endblock %}
+
+{% block rh_content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-7">
+            <h1 class="h2 font-weight-bold text-primary">Calendario de Cumpleaños</h1>
+            <p class="text-muted mb-2">Planificación anual de celebraciones y aniversarios</p>
+            <span class="badge bg-light text-dark p-2 shadow-sm" style="font-size: 0.9em;">
+                <i class="fas fa-calendar-day me-2 text-primary"></i>{{ today|date:"l, d F Y" }}
+            </span>
+        </div>
+        <div class="col-md-5 mt-3 mt-md-0">
+            <div class="input-group shadow-sm">
+                <span class="input-group-text bg-white border-end-0 text-muted">
+                    <i class="fas fa-search"></i>
+                </span>
+                <input type="text" id="buscadorCumpleanos" class="form-control border-start-0 form-control-lg fs-6" placeholder="Buscar colaborador por nombre...">
+            </div>
+        </div>
+    </div>
+
+    {% if cumpleanos_hoy %}
+    <div class="card shadow mb-5 border-0" id="tarjetaCumpleanosHoy">
+        <div class="card-header text-white d-flex justify-content-between align-items-center bg-gold-gradient">
+            <h2 class="h4 mb-0 text-white fw-bold">
+                <i class="fas fa-crown me-2"></i>¡Feliz Cumpleaños Hoy!
+            </h2>
+            <span class="badge bg-dark text-warning">{{ cumpleanos_hoy|length }}</span>
+        </div>
+        <div class="card-body bg-gold-light">
+            <div class="row justify-content-center">
+                {% for item in cumpleanos_hoy %}
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100 gold-card-effect text-center p-3">
+                        <div class="card-body">
+                            <div class="mb-3 position-relative d-inline-block">
+                                {% if item.empleado.foto_perfil %}
+                                    <img src="{{ item.empleado.foto_perfil.url }}" class="rounded-circle border border-4 border-warning" width="100" height="100" style="object-fit: cover;">
+                                {% else %}
+                                    <div class="rounded-circle bg-warning d-flex align-items-center justify-content-center mx-auto border border-4 border-white shadow-sm" style="width: 100px; height: 100px;">
+                                        <span class="text-white h1 mb-0">{{ item.empleado.nombre|slice:":1" }}</span>
+                                    </div>
+                                {% endif %}
+                                <div class="position-absolute top-0 start-100 translate-middle">
+                                    <i class="fas fa-birthday-cake text-danger fa-2x" style="filter: drop-shadow(2px 2px 0 white);"></i>
+                                </div>
+                            </div>
+                            
+                            <h4 class="card-title fw-bold text-dark">{{ item.empleado.nombre }} {{ item.empleado.apellido }}</h4>
+                            <h5 class="text-primary fw-bold mb-3">¡Cumple {{ item.edad_a_cumplir }} años!</h5>
+                            
+                            <hr class="border-warning opacity-50">
+                            
+                            <p class="mb-1 text-muted"><small>DEPARTAMENTO</small></p>
+                            <p class="fw-bold text-dark">{{ item.empleado.departamento|default:"General" }}</p>
+                            
+                            <p class="mb-1 text-muted"><small>PUESTO</small></p>
+                            <p class="fw-bold text-dark">{{ item.empleado.puesto|default:"-" }}</p>
+
+                            <button class="btn btn-warning btn-sm mt-2 fw-bold rounded-pill px-4 shadow-sm">
+                                <i class="fas fa-gift me-2"></i>Felicitar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="accordion shadow-sm" id="accordionCumpleanos">
+        {% for mes_data in cumpleanos_por_mes %}
+        <div class="accordion-item border-0 mb-2 rounded shadow-sm mes-item">
+            <h2 class="accordion-header" id="heading-{{ mes_data.numero_mes }}">
+                <button class="accordion-button {% if not mes_data.es_mes_actual %}collapsed{% endif %} fw-bold fs-5 text-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ mes_data.numero_mes }}" aria-expanded="{% if mes_data.es_mes_actual %}true{% else %}false{% endif %}" aria-controls="collapse-{{ mes_data.numero_mes }}">
+                    <i class="fas fa-calendar me-2 text-secondary"></i> {{ mes_data.nombre_mes }} 
+                    <span class="badge bg-primary rounded-pill ms-3 total-empleados-mes">{{ mes_data.empleados|length }} Empleados</span>
+                    {% if mes_data.es_mes_actual %}
+                        <span class="badge bg-warning text-dark ms-2 shadow-sm indicador-mes-actual"><i class="fas fa-star me-1"></i>Mes Actual</span>
+                    {% endif %}
+                </button>
+            </h2>
+            <div id="collapse-{{ mes_data.numero_mes }}" class="accordion-collapse collapse {% if mes_data.es_mes_actual %}show{% endif %}" aria-labelledby="heading-{{ mes_data.numero_mes }}" data-bs-parent="#accordionCumpleanos">
+                <div class="accordion-body p-0">
+                    {% if mes_data.empleados %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0 tabla-cumpleanos">
+                            <thead class="table-light text-secondary">
+                                <tr>
+                                    <th class="ps-4">Día</th>
+                                    <th>Colaborador</th>
+                                    <th>Departamento</th>
+                                    <th>Edad</th>
+                                    <th>Estatus</th>
+                                    <th class="text-end pe-4">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in mes_data.empleados %}
+                                <tr class="fila-empleado {% if item.es_hoy %}table-warning border-warning{% endif %}">
+                                    <td class="ps-4">
+                                        <div class="d-flex flex-column align-items-center justify-content-center rounded border {% if item.es_hoy %}bg-warning text-dark border-warning{% else %}bg-light text-secondary{% endif %}" style="width: 50px; height: 50px;">
+                                            <span class="h5 mb-0 fw-bold">{{ item.dia_nacimiento }}</span>
+                                            <small style="font-size: 0.7rem;">{{ mes_data.nombre_mes|slice:":3"|upper }}</small>
+                                        </div>
+                                    </td>
+                                    <td class="col-nombre">
+                                        <div class="d-flex align-items-center">
+                                            {% if item.empleado.foto_perfil %}
+                                                <img src="{{ item.empleado.foto_perfil.url }}" class="rounded-circle me-3" width="40" height="40" style="object-fit: cover;">
+                                            {% else %}
+                                                <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                                    {{ item.empleado.nombre|slice:":1" }}
+                                                </div>
+                                            {% endif %}
+                                            <div>
+                                                <div class="fw-bold nombre-texto {% if item.es_hoy %}text-dark{% else %}text-secondary{% endif %}">
+                                                    {{ item.empleado.nombre }} {{ item.empleado.apellido }}
+                                                    {% if item.es_hoy %} <i class="fas fa-crown text-warning ms-1"></i>{% endif %}
+                                                </div>
+                                                <small class="text-muted">{{ item.empleado.puesto|default:"" }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border">{{ item.empleado.departamento|default:"-" }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="fw-bold text-muted">{{ item.edad_a_cumplir }} años</span>
+                                    </td>
+                                    <td>
+                                        {% if item.es_hoy %}
+                                            <span class="badge bg-warning text-dark shadow-sm"><i class="fas fa-star me-1"></i>ES HOY</span>
+                                        {% elif item.dias_faltantes == 1 and mes_data.es_mes_actual %}
+                                            <span class="badge bg-info text-white">Mañana</span>
+                                        {% elif item.dias_faltantes > 0 and mes_data.es_mes_actual %}
+                                            <span class="text-info fw-bold"><i class="fas fa-clock me-1"></i>Faltan {{ item.dias_faltantes }} días</span>
+                                        {% elif item.ya_paso and mes_data.es_mes_actual %}
+                                            <span class="text-muted"><i class="fas fa-check me-1"></i>Pasó hace {{ item.dias_faltantes_abs }} días</span>
+                                        {% else %}
+                                            <span class="text-muted"><i class="fas fa-calendar-day me-1"></i>Próximamente</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <a href="{% url 'rh:empleado_detail' item.empleado.pk %}" class="btn btn-sm btn-light text-primary" title="Ver Perfil">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="p-4 text-center text-muted bg-white sin-cumpleanos">
+                        <i class="fas fa-calendar-times fa-2x mb-3 text-light"></i>
+                        <p class="mb-0">No hay cumpleaños registrados en {{ mes_data.nombre_mes }}.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="mt-4">
+        <a href="{% url 'rh:lista_empleados' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Volver al listado
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Estilos para el efecto Dorado */
+    .bg-gold-gradient {
+        background: linear-gradient(45deg, #FFD700, #FDB931);
+        border: none;
+    }
+    .bg-gold-light {
+        background-color: #fffcf0;
+    }
+    .gold-card-effect {
+        border: 2px solid #FDB931;
+        box-shadow: 0 4px 15px rgba(253, 185, 49, 0.2);
+        transition: transform 0.3s ease;
+        background: white;
+    }
+    .gold-card-effect:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(253, 185, 49, 0.4);
+    }
+    
+    /* Estilos Acordeón */
+    .accordion-button:not(.collapsed) {
+        background-color: #f8f9fa;
+        box-shadow: inset 0 -1px 0 rgba(0,0,0,.125);
+    }
+    .accordion-button:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+
+    /* Ajustes tabla */
+    .table-warning {
+        background-color: #fff8e1 !important;
+    }
+    td {
+        vertical-align: middle;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('buscadorCumpleanos');
+    const accordionItems = document.querySelectorAll('.mes-item');
+    const tarjetaHoy = document.getElementById('tarjetaCumpleanosHoy');
+
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+
+        // Si hay una búsqueda, ocultar la tarjeta de "Cumpleaños Hoy" para no saturar
+        if (tarjetaHoy) {
+            tarjetaHoy.style.display = searchTerm === '' ? '' : 'none';
+        }
+
+        accordionItems.forEach(item => {
+            const rows = item.querySelectorAll('.fila-empleado');
+            const collapseElement = item.querySelector('.accordion-collapse');
+            const btnElement = item.querySelector('.accordion-button');
+            const isMesActual = item.querySelector('.indicador-mes-actual') !== null;
+            let hasVisibleRows = false;
+
+            if (rows.length > 0) {
+                rows.forEach(row => {
+                    const nombreTexto = row.querySelector('.nombre-texto').textContent.toLowerCase();
+                    
+                    if (nombreTexto.includes(searchTerm)) {
+                        row.style.display = '';
+                        hasVisibleRows = true;
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            }
+
+            if (searchTerm !== '') {
+                // Si el usuario está buscando algo
+                if (hasVisibleRows) {
+                    item.style.display = ''; // Mostrar el mes
+                    // Abrir el panel
+                    if (!collapseElement.classList.contains('show')) {
+                        collapseElement.classList.add('show');
+                        btnElement.classList.remove('collapsed');
+                        btnElement.setAttribute('aria-expanded', 'true');
+                    }
+                } else {
+                    item.style.display = 'none'; // Ocultar el mes si no hay resultados
+                }
+            } else {
+                // Si el buscador está vacío, regresar todo a la normalidad
+                item.style.display = '';
+                rows.forEach(row => row.style.display = '');
+                
+                if (isMesActual) {
+                    collapseElement.classList.add('show');
+                    btnElement.classList.remove('collapsed');
+                    btnElement.setAttribute('aria-expanded', 'true');
+                } else {
+                    collapseElement.classList.remove('show');
+                    btnElement.classList.add('collapsed');
+                    btnElement.setAttribute('aria-expanded', 'false');
+                }
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

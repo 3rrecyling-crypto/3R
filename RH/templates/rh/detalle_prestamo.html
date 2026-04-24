@@ -1,0 +1,382 @@
+<!-- templates/rh/detalle_prestamo.html -->
+{% extends 'rh/base.html' %}
+{% load humanize %}
+
+{% block rh_title %}Detalle del Préstamo #{{ prestamo.id }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --success-gradient: linear-gradient(135deg, #00b09b, #96c93d);
+        --border-radius: 16px;
+        --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    body {
+        background: #f8fafc;
+    }
+
+    /* Header */
+    .detail-header {
+        background: var(--primary-gradient);
+        border-radius: var(--border-radius);
+        padding: 1.5rem 2rem;
+        margin-bottom: 2rem;
+        color: white;
+        box-shadow: var(--card-shadow);
+    }
+
+    .detail-header h1 {
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin-bottom: 0.25rem;
+    }
+
+    .detail-header p {
+        margin-bottom: 0;
+        opacity: 0.9;
+    }
+
+    .status-badge {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 0.5rem 1.5rem;
+        border-radius: 50px;
+        font-weight: 600;
+    }
+
+    /* Cards compactas */
+    .info-card {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+        border: none;
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+    }
+
+    .card-header-custom {
+        padding: 1rem 1.25rem;
+        background: #f8fafc;
+        border-bottom: 1px solid #e9ecef;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .card-header-custom i {
+        font-size: 1.2rem;
+        color: #667eea;
+    }
+
+    .card-header-custom h5 {
+        margin: 0;
+        font-weight: 600;
+        font-size: 1rem;
+    }
+
+    /* Stats en grid compacto */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+        padding: 1.25rem;
+    }
+
+    .stat-item {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 1rem;
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 1.4rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        color: #6c757d;
+        text-transform: uppercase;
+    }
+
+    .stat-primary { color: #667eea; }
+    .stat-success { color: #00b09b; }
+    .stat-danger { color: #dc3545; }
+    .stat-warning { color: #f7971e; }
+
+    /* Tabla de detalles compacta */
+    .details-table {
+        width: 100%;
+        padding: 1rem 1.25rem;
+    }
+
+    .details-table tr {
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .details-table tr:last-child {
+        border-bottom: none;
+    }
+
+    .details-table td {
+        padding: 0.75rem 0;
+    }
+
+    .details-table td:first-child {
+        color: #6c757d;
+        width: 40%;
+    }
+
+    .details-table td:last-child {
+        font-weight: 600;
+    }
+
+    /* Timeline de pagos */
+    .payments-timeline {
+        max-height: 350px;
+        overflow-y: auto;
+        padding: 1rem 1.25rem;
+    }
+
+    .payment-item {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        background: #f8fafc;
+        border-radius: 10px;
+        margin-bottom: 0.5rem;
+    }
+
+    .payment-icon {
+        width: 35px;
+        height: 35px;
+        background: var(--success-gradient);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        margin-right: 0.75rem;
+        font-size: 0.85rem;
+    }
+
+    .payment-info {
+        flex: 1;
+    }
+
+    .payment-date {
+        font-size: 0.75rem;
+        color: #6c757d;
+    }
+
+    .payment-amount {
+        font-weight: 600;
+        color: #00b09b;
+        font-size: 0.9rem;
+    }
+
+    .payment-number {
+        font-size: 0.7rem;
+        background: #e9ecef;
+        padding: 0.15rem 0.5rem;
+        border-radius: 50px;
+    }
+
+    /* Botones */
+    .btn-register {
+        background: var(--success-gradient);
+        color: white;
+        border: none;
+        padding: 0.6rem 1.5rem;
+        font-weight: 600;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        box-shadow: 0 4px 10px rgba(0, 176, 155, 0.2);
+    }
+
+    .btn-register:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(0, 176, 155, 0.3);
+        color: white;
+    }
+
+    /* Scrollbar personalizada */
+    .payments-timeline::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .payments-timeline::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+
+    .payments-timeline::-webkit-scrollbar-thumb {
+        background: #00b09b;
+        border-radius: 4px;
+    }
+</style>
+{% endblock %}
+
+{% block rh_content %}
+<div class="container-fluid px-4">
+    <!-- Mensajes -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% else %}info-circle{% endif %} me-2"></i>
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Header -->
+    <div class="detail-header d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+            <h1>
+                <i class="fas fa-hand-holding-usd me-2"></i>
+                Préstamo #{{ prestamo.id }}
+            </h1>
+            <p>
+                <i class="fas fa-user me-1"></i> {{ prestamo.empleado.nombre_completo }} • 
+                <i class="fas fa-calendar ms-2 me-1"></i> {{ prestamo.fecha_solicitud|date:"d/m/Y" }}
+            </p>
+        </div>
+        <div class="status-badge">
+            <i class="fas fa-circle me-2 {% if prestamo.estado == 'ACTIVO' %}text-success{% else %}text-secondary{% endif %}"></i>
+            {{ prestamo.get_estado_display }}
+        </div>
+    </div>
+
+    <!-- Botón de acción -->
+    <div class="d-flex justify-content-end mb-4">
+        <a href="{% url 'rh:registrar_pago' prestamo.id %}" class="btn-register">
+            <i class="fas fa-plus-circle me-2"></i>
+            Registrar Nuevo Pago
+        </a>
+    </div>
+
+    <div class="row g-4">
+        <!-- Columna izquierda: Información del préstamo (más compacta) -->
+        <div class="col-lg-5">
+            <!-- Card de montos -->
+            <div class="info-card">
+                <div class="card-header-custom">
+                    <i class="fas fa-chart-pie"></i>
+                    <h5>Resumen Financiero</h5>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value stat-primary">${{ prestamo.monto_total|floatformat:0|intcomma }}</div>
+                        <div class="stat-label">Monto Total</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value stat-success">${{ prestamo.monto_pagado|floatformat:0|intcomma }}</div>
+                        <div class="stat-label">Pagado</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value stat-danger">${{ prestamo.saldo_pendiente|floatformat:0|intcomma }}</div>
+                        <div class="stat-label">Saldo Pendiente</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value stat-warning">{{ prestamo.semanas_restantes }}</div>
+                        <div class="stat-label">Semanas Rest.</div>
+                    </div>
+                </div>
+                <div class="px-3 pb-3">
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-success" style="width: {{ prestamo.progreso_pago }}%"></div>
+                    </div>
+                    <small class="text-muted d-block text-center mt-2">{{ prestamo.progreso_pago|floatformat:1 }}% completado</small>
+                </div>
+            </div>
+
+            <!-- Detalles del préstamo (ahora en tabla compacta) -->
+            <div class="info-card">
+                <div class="card-header-custom">
+                    <i class="fas fa-info-circle"></i>
+                    <h5>Detalles del Préstamo</h5>
+                </div>
+                <table class="details-table">
+                    <tr>
+                        <td>Tipo de préstamo:</td>
+                        <td>{{ prestamo.get_tipo_prestamo_display }}</td>
+                    </tr>
+                    <tr>
+                        <td>Plazo:</td>
+                        <td>
+                            {{ prestamo.plazo_semanas }} semanas 
+                            (≈ {% widthratio prestamo.plazo_semanas 4.33 1 as meses %}{{ meses|floatformat:1 }} meses)
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Pago semanal:</td>
+                        <td class="text-success">${{ prestamo.pago_semanal|floatformat:2|intcomma }}</td>
+                    </tr>
+                    <tr>
+                        <td>Tasa de interés:</td>
+                        <td>{{ prestamo.tasa_interes|default:"0" }}%</td>
+                    </tr>
+                    <tr>
+                        <td>Fecha primer pago:</td>
+                        <td>{{ prestamo.fecha_primer_pago|date:"d/m/Y" }}</td>
+                    </tr>
+                    <tr>
+                        <td>Concepto:</td>
+                        <td><small>{{ prestamo.concepto|truncatechars:40 }}</small></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Columna derecha: Historial de pagos -->
+        <div class="col-lg-7">
+            <div class="info-card">
+                <div class="card-header-custom">
+                    <i class="fas fa-history"></i>
+                    <h5>Historial de Pagos</h5>
+                    <span class="badge bg-secondary ms-2">{{ pagos|length }} pagos</span>
+                </div>
+                
+                {% if pagos %}
+                <div class="payments-timeline">
+                    {% for pago in pagos %}
+                    <div class="payment-item">
+                        <div class="payment-icon">
+                            {{ forloop.revcounter }}
+                        </div>
+                        <div class="payment-info">
+                            <div class="payment-date">
+                                <i class="far fa-calendar-alt me-1"></i>
+                                {{ pago.fecha_pago_real|date:"d/m/Y" }}
+                            </div>
+                            <div class="payment-amount">
+                                ${{ pago.monto_pagado|floatformat:2|intcomma }}
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <span class="payment-number">Pago #{{ pago.numero_pago }}</span>
+                            {% if pago.observaciones %}
+                            <br>
+                            <small class="text-muted" title="{{ pago.observaciones }}">
+                                <i class="fas fa-comment"></i>
+                            </small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-receipt fa-2x text-muted mb-2"></i>
+                    <p class="text-muted mb-0">No hay pagos registrados</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

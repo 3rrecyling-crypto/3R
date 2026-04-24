@@ -1,0 +1,54 @@
+{% extends 'rh/base.html' %} 
+{% load static rh_extras %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">
+            <i class="fas fa-traffic-light me-2"></i>Semáforo de Vencimiento de Documentos
+        </h1>
+    </div>
+
+    <div class="card border-left-danger shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-danger">
+                <i class="fas fa-exclamation-circle me-2"></i>Vencen en 10 días o menos (o ya vencidos)
+            </h6>
+        </div>
+        <div class="card-body">
+            {% include 'rh/partials/_semaphore_table.html' with documentos=docs_rojo color_class='table-danger' %}
+        </div>
+    </div>
+
+    <div class="card border-left-warning shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>Vencen entre 11 y 30 días
+            </h6>
+        </div>
+        <div class="card-body">
+            {% include 'rh/partials/_semaphore_table.html' with documentos=docs_amarillo color_class='table-warning' %}
+        </div>
+    </div>
+
+    <div class="card border-left-success shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-success">
+                <i class="fas fa-check-circle me-2"></i>Vencen en más de 30 días
+            </h6>
+        </div>
+        <div class="card-body">
+            {% include 'rh/partials/_semaphore_table.html' with documentos=docs_verde color_class='table-success' %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block 'styles' %}
+<style>
+    /* Estilos para los bordes de color de las tarjetas */
+    .border-left-danger { border-left: .25rem solid #e74a3b !important; }
+    .border-left-warning { border-left: .25rem solid #f6c23e !important; }
+    .border-left-success { border-left: .25rem solid #1cc88a !important; }
+</style>
+{% endblock %}

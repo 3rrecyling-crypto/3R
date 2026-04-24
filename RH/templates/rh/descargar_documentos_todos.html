@@ -1,0 +1,357 @@
+<!-- templates/rh/descargar_documentos_todos.html -->
+{% extends 'rh/base.html' %}
+
+{% block rh_title %}Documentos de Todos los Empleados{% endblock %}
+
+{% block rh_content %}
+<style>
+    .badge-custom {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+    .accordion-button:not(.collapsed) {
+        background-color: #f8f9fa;
+        color: #000;
+    }
+    .operador-badge {
+        background-color: #0d6efd !important;
+    }
+    .admin-badge {
+        background-color: #6c757d !important;
+    }
+    .documento-badge {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.4rem;
+    }
+</style>
+
+<div class="card shadow-lg">
+    <div class="card-header bg-gradient-primary text-white d-flex justify-content-between align-items-center">
+        <div>
+            <h3 class="mb-0"><i class="fas fa-users me-2"></i>Documentos de Todos los Empleados</h3>
+            <small class="opacity-75">{{ total_empleados }} empleados activos</small>
+        </div>
+        
+        <div class="btn-group">
+            <a href="{% url 'rh:generar_documentos_todos' %}" class="btn btn-outline-light">
+                <i class="fas fa-file-archive me-2"></i>Generar TODOS los documentos
+            </a>
+        </div>
+    </div>
+    
+    <div class="card-body">
+        <div class="alert alert-info mb-4">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-info-circle fa-2x me-3"></i>
+                <div>
+                    <h5 class="mb-1">Acceso a documentos personalizados</h5>
+                    <p class="mb-0">
+                        Aquí puedes descargar los documentos Word personalizados para cada empleado.
+                        Los documentos se generan automáticamente con los datos del sistema.
+                        <strong>El sistema detecta automáticamente si el empleado es Operador para usar documentos específicos.</strong>
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card border-primary mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Acciones Rápidas</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'rh:generar_documentos_todos' %}" class="btn btn-primary btn-lg">
+                                <i class="fas fa-file-archive me-2"></i>Generar TODOS
+                            </a>
+                            <button class="btn btn-outline-primary btn-lg" data-bs-toggle="modal" data-bs-target="#generarDepartamentoModal">
+                                <i class="fas fa-building me-2"></i>Por Departamento
+                            </button>
+                            <a href="{% url 'rh:lista_empleados' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-list me-2"></i>Ver lista completa
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card border-success">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Estadísticas</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center">
+                            <h1 class="display-4 text-primary">{{ total_empleados|default:0 }}</h1>
+                            <p class="text-muted">Empleados Activos</p>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <h6>Documentos por tipo:</h6>
+                            <ul class="list-unstyled">
+                                <li>
+                                    <i class="fas fa-truck text-info me-2"></i>
+                                    <strong>Operadores:</strong> 
+                                    <span class="badge operador-badge">4 documentos específicos</span>
+                                </li>
+                                <li>
+                                    <i class="fas fa-user-tie text-secondary me-2"></i>
+                                    <strong>Administrativos:</strong> 
+                                    <span class="badge admin-badge">2 documentos específicos</span>
+                                </li>
+                                <li><i class="fas fa-file-word text-primary me-2"></i>Generación automática por tipo</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-list me-2"></i>Empleados por Departamento</h5>
+                            <div>
+                                <span class="badge operador-badge me-2">
+                                    <i class="fas fa-truck"></i> Operador
+                                </span>
+                                <span class="badge admin-badge">
+                                    <i class="fas fa-user-tie"></i> Admin
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                        {% if departamentos %}
+                            {% for depto_nombre, depto_data in departamentos.items %}
+                            {% with depto_id=depto_data.id empleados_list=depto_data.empleados %}
+                            {% if depto_id and empleados_list %}
+                            <div class="accordion mb-3" id="accordion{{ forloop.counter }}">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" 
+                                                type="button" data-bs-toggle="collapse" 
+                                                data-bs-target="#collapse{{ forloop.counter }}">
+                                            <i class="fas fa-building me-2"></i>
+                                            {{ depto_nombre|default:"Sin nombre" }}
+                                            <span class="badge bg-primary rounded-pill ms-2">{{ empleados_list|length }}</span>
+                                        </button>
+                                    </h2>
+                                    <div id="collapse{{ forloop.counter }}" 
+                                         class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" 
+                                         data-bs-parent="#accordion{{ forloop.counter }}">
+                                        <div class="accordion-body">
+                                            <div class="row">
+                                                {% for item in empleados_list %}
+                                                {% with empleado=item.empleado es_operador=item.es_operador %}
+                                                {% if empleado.pk %}
+                                                <div class="col-md-6 mb-2">
+                                                    <div class="card border-light shadow-sm">
+                                                        <div class="card-body py-2">
+                                                            <div class="d-flex justify-content-between align-items-center">
+                                                                <div style="flex: 1;">
+                                                                    <div class="d-flex align-items-center mb-1">
+                                                                        <h6 class="mb-0 me-2">{{ empleado.nombre_completo|default:"Nombre no disponible" }}</h6>
+                                                                        {% if es_operador %}
+                                                                        <span class="badge operador-badge documento-badge">
+                                                                            <i class="fas fa-truck"></i> Operador
+                                                                        </span>
+                                                                        {% else %}
+                                                                        <span class="badge admin-badge documento-badge">
+                                                                            <i class="fas fa-user-tie"></i> Admin
+                                                                        </span>
+                                                                        {% endif %}
+                                                                    </div>
+                                                                    <small class="text-muted d-block mb-1">
+                                                                        {{ empleado.puesto.nombre|default:"Sin puesto" }}
+                                                                    </small>
+                                                                    <div>
+                                                                        {% if es_operador %}
+                                                                        <small class="text-info">
+                                                                            <i class="fas fa-file-contract me-1"></i>
+                                                                            Documentos específicos para operador
+                                                                        </small>
+                                                                        {% else %}
+                                                                        <small class="text-secondary">
+                                                                            <i class="fas fa-file-alt me-1"></i>
+                                                                            Documentos administrativos
+                                                                        </small>
+                                                                        {% endif %}
+                                                                    </div>
+                                                                </div>
+                                                                <div class="btn-group">
+                                                                    <a href="{% url 'rh:descargar_documentos_zip' empleado.pk %}" 
+                                                                       class="btn btn-sm btn-outline-primary" title="Descargar todos los documentos">
+                                                                        <i class="fas fa-download"></i>
+                                                                    </a>
+                                                                    
+                                                                    {% if es_operador %}
+                                                                    <div class="dropdown">
+                                                                        <button class="btn btn-sm btn-outline-info dropdown-toggle" 
+                                                                                type="button" data-bs-toggle="dropdown" 
+                                                                                aria-expanded="false" title="Documentos de operador">
+                                                                            <i class="fas fa-truck"></i>
+                                                                        </button>
+                                                                        <ul class="dropdown-menu">
+                                                                            <li>
+                                                                                <h6 class="dropdown-header">Operador</h6>
+                                                                            </li>
+                                                                            <li>
+                                                                                <a class="dropdown-item" href="{% url 'rh:descargar_documento_individual' empleado.pk 'contrato-indeterminado' %}">
+                                                                                    <i class="fas fa-file-contract me-2"></i>Contrato Indeterminado
+                                                                                </a>
+                                                                            </li>
+                                                                            <li>
+                                                                                <a class="dropdown-item" href="{% url 'rh:descargar_documento_individual' empleado.pk 'contrato-determinado' %}">
+                                                                                    <i class="fas fa-file-contract me-2"></i>Contrato Determinado
+                                                                                </a>
+                                                                            </li>
+                                                                            <li><hr class="dropdown-divider"></li>
+                                                                            <li>
+                                                                                <a class="dropdown-item" href="{% url 'rh:descargar_documento_individual' empleado.pk 'carta-renuncia' %}">
+                                                                                    <i class="fas fa-signature me-2"></i>Carta de Renuncia
+                                                                                </a>
+                                                                            </li>
+                                                                            <li>
+                                                                                <a class="dropdown-item" href="{% url 'rh:descargar_documento_individual' empleado.pk 'formato-desfase' %}">
+                                                                                    <i class="fas fa-clock me-2"></i>Formato de Desfase
+                                                                                </a>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </div>
+                                                                    {% else %}
+                                                                    <div class="dropdown">
+                                                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" 
+                                                                                type="button" data-bs-toggle="dropdown" 
+                                                                                aria-expanded="false" title="Documentos administrativos">
+                                                                            <i class="fas fa-user-tie"></i>
+                                                                        </button>
+                                                                        <ul class="dropdown-menu">
+                                                                            <li>
+                                                                                <h6 class="dropdown-header">Administrativo</h6>
+                                                                            </li>
+                                                                            <li>
+                                                                                <a class="dropdown-item" href="{% url 'rh:descargar_documento_individual' empleado.pk 'contrato-indeterminado' %}">
+                                                                                    <i class="fas fa-file-contract me-2"></i>Contrato Indeterminado
+                                                                                </a>
+                                                                            </li>
+                                                                            <li>
+                                                                                <a class="dropdown-item" href="{% url 'rh:descargar_documento_individual' empleado.pk 'contrato-determinado' %}">
+                                                                                    <i class="fas fa-file-contract me-2"></i>Contrato Determinado
+                                                                                </a>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </div>
+                                                                    {% endif %}
+                                                                    
+                                                                    <a href="{% url 'rh:empleado_detail' empleado.pk %}" 
+                                                                       class="btn btn-sm btn-outline-secondary" title="Ver ficha">
+                                                                        <i class="fas fa-eye"></i>
+                                                                    </a>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {% endif %}
+                                                {% endwith %}
+                                                {% endfor %}
+                                            </div>
+                                            
+                                            <div class="mt-3 text-center">
+                                                {% if depto_id %}
+                                                <a href="{% url 'rh:generar_documentos_departamento' depto_id %}" 
+                                                   class="btn btn-sm btn-primary">
+                                                    <i class="fas fa-download me-1"></i>Descargar todos los de {{ depto_nombre|default:"este departamento" }}
+                                                </a>
+                                                {% else %}
+                                                <button class="btn btn-sm btn-secondary" disabled>
+                                                    <i class="fas fa-exclamation-circle me-1"></i>Departamento sin ID
+                                                </button>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% endwith %}
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center py-5">
+                                <i class="fas fa-users-slash fa-3x text-muted mb-3"></i>
+                                <h5 class="text-muted">No hay empleados activos</h5>
+                                <p class="text-muted">No se encontraron empleados activos con departamento asignado.</p>
+                                <a href="{% url 'rh:lista_empleados' %}" class="btn btn-primary">
+                                    <i class="fas fa-user-plus me-2"></i>Agregar empleados
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para generar por departamento -->
+<div class="modal fade" id="generarDepartamentoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-building me-2"></i>Generar por Departamento</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Selecciona un departamento para generar documentos de todos sus empleados:</p>
+                {% if departamentos %}
+                <div class="list-group">
+                    {% for depto_nombre, depto_data in departamentos.items %}
+                    {% with depto_id=depto_data.id %}
+                    {% if depto_id %}
+                    <a href="{% url 'rh:generar_documentos_departamento' depto_id %}" 
+                       class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-building me-2 text-primary"></i>
+                            {{ depto_nombre|default:"Sin nombre" }}
+                        </div>
+                        <span class="badge bg-primary rounded-pill badge-custom">
+                            {{ depto_data.empleados|length }}
+                        </span>
+                    </a>
+                    {% endif %}
+                    {% endwith %}
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    No hay departamentos disponibles con empleados activos.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Agregar tooltips a los botones -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar tooltips de Bootstrap
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+    
+    // Mostrar info sobre documentos específicos
+    const operadorBadges = document.querySelectorAll('.operador-badge');
+    operadorBadges.forEach(badge => {
+        badge.setAttribute('title', 'Usa documentos específicos para operadores');
+    });
+    
+    const adminBadges = document.querySelectorAll('.admin-badge');
+    adminBadges.forEach(badge => {
+        badge.setAttribute('title', 'Usa documentos administrativos generales');
+    });
+});
+</script>
+{% endblock %}

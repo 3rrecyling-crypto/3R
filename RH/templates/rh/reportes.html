@@ -1,0 +1,58 @@
+{% extends 'rh/base.html' %}
+{% load humanize %}
+
+{% block rh_title %}Reporte de Bajas de Personal{% endblock %}
+
+{% block rh_content %}
+<div class="card shadow-lg">
+    <div class="card-header bg-gradient-danger text-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h3 class="mb-0"><i class="fas fa-user-minus me-2"></i>Reporte de Bajas de Personal</h3>
+            <a href="?export=excel" class="btn btn-light">
+                <i class="fas fa-file-excel me-2"></i>Exportar a Excel
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <p class="card-text">Este reporte incluye a todos los empleados con eventos de <strong>Renuncia, Baja o Abandono</strong>.</p>
+        
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID Empleado</th>
+                        <th>Nombre Completo</th>
+                        <th>Núm. Empleado</th>
+                        <th>Tipo de Evento</th>
+                        <th>Motivo de Salida</th>
+                        <th>Fecha del Evento</th>
+                        <th>Comentarios</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for evento in eventos_baja %}
+                    <tr>
+                        <td>{{ evento.empleado.id }}</td>
+                        <td>{{ evento.empleado.nombre }} {{ evento.empleado.apellido }}</td>
+                        <td>{{ evento.empleado.numero_empleado|default:"N/A" }}</td>
+                        <td>
+                            {% if evento.tipo_evento == 'RENUNCIA' %}<span class="badge bg-warning text-dark">{{ evento.get_tipo_evento_display }}</span>
+                            {% elif evento.tipo_evento == 'BAJA' %}<span class="badge bg-danger">{{ evento.get_tipo_evento_display }}</span>
+                            {% elif evento.tipo_evento == 'ABANDONO' %}<span class="badge bg-secondary">{{ evento.get_tipo_evento_display }}</span>
+                            {% else %}{{ evento.get_tipo_evento_display }}{% endif %}
+                        </td>
+                        <td>{{ evento.get_motivo_salida_display|default:"--" }}</td>
+                        <td>{{ evento.fecha_inicio|date:"d/m/Y" }}</td>
+                        <td>{{ evento.descripcion|default:"Sin comentarios." }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center">No se encontraron eventos de baja.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

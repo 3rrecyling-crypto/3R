@@ -1,0 +1,891 @@
+{% extends 'rh/base.html' %}
+
+{% block rh_title %}Dar de Baja - {{ empleado.nombre_completo }}{% endblock %}
+
+{% block rh_content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10 col-xl-8">
+            <!-- Header -->
+            <div class="d-flex align-items-center mb-4">
+                <div class="me-3">
+                    <div class="bg-danger bg-gradient rounded-circle p-3 shadow-sm">
+                        <i class="fas fa-user-slash text-white fa-2x"></i>
+                    </div>
+                </div>
+                <div>
+                    <h2 class="fw-bold mb-1">Dar de Baja a Empleado</h2>
+                    <p class="text-muted mb-0">Proceso de baja laboral para <span class="fw-semibold text-dark">{{ empleado.nombre_completo }}</span></p>
+                </div>
+                <div class="ms-auto">
+                    <div class="badge bg-light text-dark border border-2 border-danger p-3 rounded-3">
+                        <i class="fas fa-id-badge me-2 text-danger"></i>
+                        <span class="fw-bold">ID: #{{ empleado.numero_empleado }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta Principal -->
+            <div class="card border-0 shadow-lg rounded-4 overflow-hidden mb-4">
+                <!-- Información del empleado -->
+                <div class="card-header bg-gradient-info text-white border-0 py-4">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-user-circle fa-2x me-3"></i>
+                        <div>
+                            <h4 class="fw-bold mb-1">Información del Empleado</h4>
+                            <p class="mb-0 opacity-90">Detalles del empleado que será dado de baja</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-body p-0">
+                    <!-- Información en grid -->
+                    <div class="p-4 bg-light-subtle">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="bg-white rounded-3 p-3 shadow-sm h-100">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="fas fa-briefcase me-2 text-primary"></i>
+                                        <small class="text-uppercase fw-semibold text-muted">Puesto</small>
+                                    </div>
+                                    <p class="fw-bold mb-0">{{ empleado.puesto.nombre|default:"N/A" }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="bg-white rounded-3 p-3 shadow-sm h-100">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="fas fa-building me-2 text-info"></i>
+                                        <small class="text-uppercase fw-semibold text-muted">Departamento</small>
+                                    </div>
+                                    <p class="fw-bold mb-0">{{ empleado.departamento.nombre|default:"N/A" }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="bg-white rounded-3 p-3 shadow-sm h-100">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="fas fa-calendar-alt me-2 text-success"></i>
+                                        <small class="text-uppercase fw-semibold text-muted">Fecha Contratación</small>
+                                    </div>
+                                    <p class="fw-bold mb-0">{{ empleado.fecha_contratacion|date:"d/m/Y" }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form method="post" enctype="multipart/form-data" class="p-4">
+                        {% csrf_token %}
+                        
+                        <!-- Motivos Jerarquizados -->
+                        <div class="mb-5">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="bg-warning bg-opacity-10 p-2 rounded-3 me-3">
+                                    <i class="fas fa-exclamation-triangle fa-lg text-warning"></i>
+                                </div>
+                                <div>
+                                    <h4 class="fw-bold mb-1">Motivos de la Baja</h4>
+                                    <p class="text-muted mb-0">Seleccione los motivos jerarquizados de la baja</p>
+                                </div>
+                            </div>
+                            
+                            <div class="card border-warning border-2 rounded-4 shadow-sm">
+                                <div class="card-body p-4">
+                                    <div class="row g-4">
+                                        <div class="col-lg-4">
+                                            <label class="form-label fw-semibold">
+                                                Motivo Principal <span class="text-danger">*</span>
+                                            </label>
+                                            {{ form.motivo_principal }}
+                                            {% if form.motivo_principal.errors %}
+                                                <div class="alert alert-danger alert-dismissible fade show mt-2 p-2 small" role="alert">
+                                                    {{ form.motivo_principal.errors }}
+                                                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
+                                                </div>
+                                            {% endif %}
+                                            <div class="mt-2">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-info-circle me-1"></i>
+                                                    Seleccione la razón principal
+                                                </small>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-lg-4">
+                                            <label class="form-label fw-semibold">
+                                                Motivo Secundario
+                                            </label>
+                                            {{ form.motivo_secundario }}
+                                            <div class="mt-2">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-info-circle me-1"></i>
+                                                    Motivo específico relacionado
+                                                </small>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-lg-4">
+                                            <label class="form-label fw-semibold">
+                                                Detalle Específico
+                                            </label>
+                                            {{ form.motivo_detalle }}
+                                            <div class="mt-2">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-info-circle me-1"></i>
+                                                    Detalle adicional (opcional)
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Información de la Baja -->
+                        <div class="mb-5">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="bg-danger bg-opacity-10 p-2 rounded-3 me-3">
+                                    <i class="fas fa-calendar-times fa-lg text-danger"></i>
+                                </div>
+                                <div>
+                                    <h4 class="fw-bold mb-1">Información de la Baja</h4>
+                                    <p class="text-muted mb-0">Complete los detalles de la baja laboral</p>
+                                </div>
+                            </div>
+                            
+                            <div class="card border-danger border-2 rounded-4 shadow-sm">
+                                <div class="card-body p-4">
+                                    <div class="row g-4 mb-4">
+                                        <div class="col-lg-6">
+                                            <label class="form-label fw-semibold">
+                                                <i class="fas fa-calendar-day me-2 text-danger"></i>
+                                                Fecha de Baja <span class="text-danger">*</span>
+                                            </label>
+                                            <div class="input-group">
+                                                <span class="input-group-text bg-light border-end-0">
+                                                    <i class="fas fa-calendar text-danger"></i>
+                                                </span>
+                                                {{ form.fecha_baja }}
+                                            </div>
+                                            {% if form.fecha_baja.errors %}
+                                                <div class="alert alert-danger alert-dismissible fade show mt-2 p-2 small" role="alert">
+                                                    {{ form.fecha_baja.errors }}
+                                                    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
+                                                </div>
+                                            {% endif %}
+                                            <div class="mt-2">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-clock me-1"></i>
+                                                    La fecha debe ser igual o anterior a hoy
+                                                </small>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-lg-6">
+                                            <label class="form-label fw-semibold">
+                                                <i class="fas fa-file-pdf me-2 text-danger"></i>
+                                                Documento de Baja (opcional)
+                                            </label>
+                                            <div class="input-group">
+                                                <span class="input-group-text bg-light border-end-0">
+                                                    <i class="fas fa-upload text-danger"></i>
+                                                </span>
+                                                {{ form.documento_baja }}
+                                            </div>
+                                            <div class="mt-2">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-info-circle me-1"></i>
+                                                    Suba el documento de baja en PDF o imagen
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="form-label fw-semibold">
+                                            <i class="fas fa-comment-dots me-2 text-danger"></i>
+                                            Comentario de Baja <span class="text-danger">*</span>
+                                        </label>
+                                        <div class="form-floating">
+                                            {{ form.comentario_baja }}
+                                            <label>Describa los detalles, antecedentes, situación actual, etc.</label>
+                                        </div>
+                                        {% if form.comentario_baja.errors %}
+                                            <div class="alert alert-danger alert-dismissible fade show mt-2 p-2 small" role="alert">
+                                                {{ form.comentario_baja.errors }}
+                                                <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
+                                            </div>
+                                        {% endif %}
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                <i class="fas fa-edit me-1"></i>
+                                                Proporcione una descripción detallada de la situación
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- CONCILIACIÓN Y ARBITRAJE - NUEVA SECCIÓN -->
+                        <div class="mb-5">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="bg-warning bg-opacity-10 p-2 rounded-3 me-3">
+                                    <i class="fas fa-balance-scale fa-lg text-warning"></i>
+                                </div>
+                                <div>
+                                    <h4 class="fw-bold mb-1">Conciliación y Arbitraje</h4>
+                                    <p class="text-muted mb-0">Información sobre proceso legal de conciliación</p>
+                                </div>
+                            </div>
+                            
+                            <div class="card border-warning border-2 rounded-4 shadow-sm">
+                                <div class="card-body p-4">
+                                    <!-- Switch para conciliación -->
+                                    <div class="d-flex align-items-center mb-3 p-3 bg-light rounded-3">
+                                        <div class="form-check form-switch me-3">
+                                            {{ form.fue_conciliacion_arbitraje }}
+                                            <label class="form-check-label fw-semibold" for="{{ form.fue_conciliacion_arbitraje.id_for_label }}">
+                                                <i class="fas fa-balance-scale me-2 text-warning"></i>
+                                                ¿El empleado acudió a Conciliación y Arbitraje?
+                                            </label>
+                                        </div>
+                                        <div class="ms-auto">
+                                            <span class="badge bg-warning-subtle text-warning py-2 px-3">
+                                                <i class="fas fa-gavel me-1"></i>
+                                                Proceso legal laboral
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Campos que se muestran solo si está palomeado -->
+                                    <div id="conciliacion-fields" style="display: none;" class="border-top border-warning border-2 pt-4 mt-3">
+                                        <div class="alert alert-warning border-0 bg-warning-subtle">
+                                            <div class="d-flex">
+                                                <div class="flex-shrink-0">
+                                                    <i class="fas fa-exclamation-triangle fa-lg text-warning"></i>
+                                                </div>
+                                                <div class="flex-grow-1 ms-3">
+                                                    <h6 class="alert-heading fw-bold mb-1">Información importante</h6>
+                                                    <p class="mb-0 small">
+                                                        Los siguientes campos son obligatorios cuando se registra un proceso de Conciliación y Arbitraje.
+                                                        Asegúrese de tener el documento oficial emitido por la autoridad laboral.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="row g-4 mt-3">
+                                            <div class="col-lg-6">
+                                                <label class="form-label fw-semibold">
+                                                    <i class="fas fa-calendar-day me-2 text-warning"></i>
+                                                    Fecha de Conciliación <span class="text-danger">*</span>
+                                                </label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text bg-light border-end-0">
+                                                        <i class="fas fa-calendar text-warning"></i>
+                                                    </span>
+                                                    {{ form.fecha_conciliacion_arbitraje }}
+                                                </div>
+                                                {% if form.fecha_conciliacion_arbitraje.errors %}
+                                                    <div class="alert alert-danger alert-dismissible fade show mt-2 p-2 small" role="alert">
+                                                        {{ form.fecha_conciliacion_arbitraje.errors }}
+                                                        <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
+                                                    </div>
+                                                {% endif %}
+                                                <div class="mt-2">
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-calendar-check me-1"></i>
+                                                        Fecha en que se realizó el proceso de conciliación
+                                                    </small>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="col-lg-6">
+                                                <label class="form-label fw-semibold">
+                                                    <i class="fas fa-file-contract me-2 text-warning"></i>
+                                                    Documento de Conciliación <span class="text-danger">*</span>
+                                                </label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text bg-light border-end-0">
+                                                        <i class="fas fa-file-upload text-warning"></i>
+                                                    </span>
+                                                    {{ form.documento_conciliacion }}
+                                                </div>
+                                                {% if form.documento_conciliacion.errors %}
+                                                    <div class="alert alert-danger alert-dismissible fade show mt-2 p-2 small" role="alert">
+                                                        {{ form.documento_conciliacion.errors }}
+                                                        <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
+                                                    </div>
+                                                {% endif %}
+                                                <div class="mt-2">
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-file-pdf me-1"></i>
+                                                        Documento oficial de Conciliación y Arbitraje
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mt-4">
+                                            <label class="form-label fw-semibold">
+                                                <i class="fas fa-sticky-note me-2 text-warning"></i>
+                                                Observaciones de Conciliación
+                                            </label>
+                                            <div class="form-floating">
+                                                {{ form.observaciones_conciliacion }}
+                                                <label>Detalles sobre acuerdos, resultados, observaciones del proceso legal</label>
+                                            </div>
+                                            <div class="mt-2">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-clipboard-list me-1"></i>
+                                                    Observaciones adicionales sobre el proceso de conciliación
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- FIN DE CONCILIACIÓN Y ARBITRAJE -->
+                        
+                        <!-- Recontratación -->
+                        <div class="mb-5">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="bg-success bg-opacity-10 p-2 rounded-3 me-3">
+                                    <i class="fas fa-user-plus fa-lg text-success"></i>
+                                </div>
+                                <div>
+                                    <h4 class="fw-bold mb-1">Información de Recontratación</h4>
+                                    <p class="text-muted mb-0">Configure las opciones de recontratación futura</p>
+                                </div>
+                            </div>
+                            
+                            <div class="card border-success border-2 rounded-4 shadow-sm">
+                                <div class="card-body p-4">
+                                    <!-- Switch compacto -->
+                                    <div class="d-flex align-items-center mb-3 p-3 bg-light rounded-3">
+                                        <div class="form-check form-switch me-3">
+                                            {{ form.es_recontratable }}
+                                            <label class="form-check-label fw-semibold" for="{{ form.es_recontratable.id_for_label }}">
+                                                <i class="fas fa-redo me-2 text-success"></i>
+                                                ¿Empleado recontratable?
+                                            </label>
+                                        </div>
+                                        <div class="ms-auto">
+                                            <span class="badge bg-success-subtle text-success py-2 px-3">
+                                                <i class="fas fa-lightbulb me-1"></i>
+                                                Puede volver a ser contratado
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Campos que se muestran solo si está palomeado -->
+                                    <div id="recontratable-fields" style="display: none;" class="border-top border-success border-2 pt-4 mt-3">
+                                        <div class="row g-4">
+                                            <div class="col-lg-6">
+                                                <label class="form-label fw-semibold">
+                                                    <i class="fas fa-calendar-check me-2 text-success"></i>
+                                                    Fecha Posible de Recontratación
+                                                </label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text bg-light border-end-0">
+                                                        <i class="fas fa-calendar text-success"></i>
+                                                    </span>
+                                                    {{ form.fecha_posible_recontratacion }}
+                                                </div>
+                                                <div class="mt-2">
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-clock me-1"></i>
+                                                        Fecha estimada para posible recontratación
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mt-4">
+                                            <label class="form-label fw-semibold">
+                                                <i class="fas fa-comment-medical me-2 text-success"></i>
+                                                Motivo por el cual es recontratable
+                                            </label>
+                                            <div class="form-floating">
+                                                {{ form.motivo_recontratable }}
+                                                <label>Explica por qué este empleado podría ser recontratado en el futuro</label>
+                                            </div>
+                                            <div class="mt-2">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-sticky-note me-1"></i>
+                                                    Descripción de las razones para recontratación
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Botones de acción -->
+                        <div class="border-top pt-4 mt-2">
+                            <div class="d-flex justify-content-between">
+                                <a href="{% url 'rh:empleado_detail' empleado.id %}" class="btn btn-lg btn-outline-secondary rounded-3 px-4 py-3">
+                                    <i class="fas fa-times-circle me-2"></i>
+                                    <span class="fw-semibold">Cancelar</span>
+                                </a>
+                                <button type="submit" class="btn btn-lg btn-danger rounded-3 px-5 py-3 shadow-sm">
+                                    <i class="fas fa-user-slash me-2"></i>
+                                    <span class="fw-bold">Confirmar Baja</span>
+                                </button>
+                            </div>
+                            <div class="text-center mt-4">
+                                <small class="text-muted">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>
+                                    Esta acción es irreversible. Revise toda la información antes de confirmar.
+                                </small>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Mostrar/ocultar campos de recontratación con animación
+    const recontratableCheckbox = document.getElementById('{{ form.es_recontratable.id_for_label }}');
+    const recontratableFields = document.getElementById('recontratable-fields');
+    
+    // Mostrar/ocultar campos de conciliación
+    const conciliacionCheckbox = document.getElementById('{{ form.fue_conciliacion_arbitraje.id_for_label }}');
+    const conciliacionFields = document.getElementById('conciliacion-fields');
+    
+    // Configurar animación inicial para recontratable
+    recontratableFields.style.opacity = '0';
+    recontratableFields.style.transform = 'translateY(-10px)';
+    recontratableFields.style.transition = 'all 0.3s ease-in-out';
+    
+    // Configurar animación inicial para conciliación
+    conciliacionFields.style.opacity = '0';
+    conciliacionFields.style.transform = 'translateY(-10px)';
+    conciliacionFields.style.transition = 'all 0.3s ease-in-out';
+    
+    function toggleFields(checkbox, fields) {
+        if (checkbox.checked) {
+            fields.style.display = 'block';
+            // Forzar reflow para que la animación funcione
+            void fields.offsetWidth;
+            fields.style.opacity = '1';
+            fields.style.transform = 'translateY(0)';
+        } else {
+            fields.style.opacity = '0';
+            fields.style.transform = 'translateY(-10px)';
+            setTimeout(() => {
+                fields.style.display = 'none';
+            }, 300);
+        }
+    }
+    
+    function toggleRecontratableFields() {
+        toggleFields(recontratableCheckbox, recontratableFields);
+    }
+    
+    function toggleConciliacionFields() {
+        toggleFields(conciliacionCheckbox, conciliacionFields);
+        
+        // Si se marca conciliación, hacer campos obligatorios
+        const fechaConciliacion = document.getElementById('{{ form.fecha_conciliacion_arbitraje.id_for_label }}');
+        const docConciliacion = document.getElementById('{{ form.documento_conciliacion.id_for_label }}');
+        
+        if (conciliacionCheckbox.checked) {
+            if (fechaConciliacion) fechaConciliacion.required = true;
+            if (docConciliacion) docConciliacion.required = true;
+        } else {
+            if (fechaConciliacion) fechaConciliacion.required = false;
+            if (docConciliacion) docConciliacion.required = false;
+        }
+    }
+    
+    // Configurar event listeners
+    recontratableCheckbox.addEventListener('change', toggleRecontratableFields);
+    conciliacionCheckbox.addEventListener('change', toggleConciliacionFields);
+    
+    // Estado inicial
+    toggleRecontratableFields();
+    toggleConciliacionFields();
+    
+    // Validación de fecha de conciliación
+    const fechaBaja = document.getElementById('{{ form.fecha_baja.id_for_label }}');
+    const fechaConciliacion = document.getElementById('{{ form.fecha_conciliacion_arbitraje.id_for_label }}');
+    
+    if (fechaBaja && fechaConciliacion) {
+        fechaBaja.addEventListener('change', function() {
+            // La fecha de conciliación no puede ser anterior a la fecha de baja
+            fechaConciliacion.min = this.value;
+            
+            // Si conciliación está marcada y no tiene fecha, asignar fecha de baja
+            if (conciliacionCheckbox.checked && !fechaConciliacion.value) {
+                fechaConciliacion.value = this.value;
+            }
+        });
+    }
+    
+    // Validación de archivo de conciliación
+    const docConciliacion = document.getElementById('{{ form.documento_conciliacion.id_for_label }}');
+    if (docConciliacion) {
+        docConciliacion.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                // Validar tipo de archivo
+                const validTypes = ['application/pdf', 'application/msword', 
+                                   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                                   'image/jpeg', 'image/png'];
+                
+                if (!validTypes.includes(file.type)) {
+                    alert('Formato no válido. Solo se permiten: PDF, Word, JPG o PNG');
+                    this.value = '';
+                    return;
+                }
+                
+                // Validar tamaño (max 10MB)
+                const maxSize = 10 * 1024 * 1024; // 10MB
+                if (file.size > maxSize) {
+                    alert('El archivo es demasiado grande. Máximo 10MB');
+                    this.value = '';
+                    return;
+                }
+                
+                console.log('Documento de conciliación seleccionado:', file.name, '(', (file.size / 1024).toFixed(2), 'KB)');
+            }
+        });
+    }
+    
+    // Mejorar estilos de selects
+    const selects = document.querySelectorAll('select');
+    selects.forEach(select => {
+        select.classList.add('form-select', 'py-3', 'select-fixed');
+    });
+    
+    // Mejorar estilos de inputs
+    const inputs = document.querySelectorAll('input[type="text"], input[type="date"], input[type="file"]');
+    inputs.forEach(input => {
+        input.classList.add('form-control', 'py-3');
+    });
+    
+    // Mejorar textareas
+    const textareas = document.querySelectorAll('textarea');
+    textareas.forEach(textarea => {
+        textarea.classList.add('form-control');
+        textarea.style.minHeight = '120px';
+    });
+    
+    // AJAX para motivos secundarios
+    const motivoPrincipal = document.getElementById('{{ form.motivo_principal.id_for_label }}');
+    const motivoSecundario = document.getElementById('{{ form.motivo_secundario.id_for_label }}');
+    const motivoDetalle = document.getElementById('{{ form.motivo_detalle.id_for_label }}');
+    
+    motivoPrincipal.addEventListener('change', function() {
+        const motivoId = this.value;
+        
+        if (motivoId) {
+            // Mostrar indicador de carga
+            motivoSecundario.innerHTML = '<option value="">Cargando...</option>';
+            motivoDetalle.innerHTML = '<option value="">---------</option>';
+            
+            // Cargar submotivos
+            fetch(`{% url 'rh:get_submotivos_ajax' %}?motivo_principal_id=${motivoId}`)
+                .then(response => response.json())
+                .then(data => {
+                    motivoSecundario.innerHTML = '<option value="">---------</option>';
+                    data.forEach(item => {
+                        const option = new Option(item.nombre, item.id);
+                        motivoSecundario.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    motivoSecundario.innerHTML = '<option value="">Error al cargar</option>';
+                    console.error('Error:', error);
+                });
+        } else {
+            motivoSecundario.innerHTML = '<option value="">---------</option>';
+            motivoDetalle.innerHTML = '<option value="">---------</option>';
+        }
+    });
+    
+    // AJAX para detalles
+    motivoSecundario.addEventListener('change', function() {
+        const motivoId = this.value;
+        
+        if (motivoId) {
+            // Mostrar indicador de carga
+            motivoDetalle.innerHTML = '<option value="">Cargando...</option>';
+            
+            // Cargar detalles
+            fetch(`{% url 'rh:get_detalles_ajax' %}?motivo_secundario_id=${motivoId}`)
+                .then(response => response.json())
+                .then(data => {
+                    motivoDetalle.innerHTML = '<option value="">---------</option>';
+                    data.forEach(item => {
+                        const option = new Option(item.nombre, item.id);
+                        motivoDetalle.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    motivoDetalle.innerHTML = '<option value="">Error al cargar</option>';
+                    console.error('Error:', error);
+                });
+        } else {
+            motivoDetalle.innerHTML = '<option value="">---------</option>';
+        }
+    });
+    
+    // Validación de fecha de baja
+    const hoy = new Date().toISOString().split('T')[0];
+    if (fechaBaja) {
+        fechaBaja.max = hoy;
+        fechaBaja.value = fechaBaja.value || hoy;
+    }
+    
+    // Validación de fecha de conciliación
+    if (fechaConciliacion) {
+        fechaConciliacion.max = hoy;
+    }
+    
+    // Añadir tooltips informativos
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Efecto de confirmación en el botón principal
+    const submitBtn = document.querySelector('button[type="submit"]');
+    submitBtn.addEventListener('click', function(e) {
+        // Validación básica antes de enviar
+        if (!motivoPrincipal.value) {
+            e.preventDefault();
+            alert('Por favor seleccione un motivo principal.');
+            motivoPrincipal.focus();
+            return;
+        }
+        
+        if (!fechaBaja.value) {
+            e.preventDefault();
+            alert('Por favor seleccione una fecha de baja.');
+            fechaBaja.focus();
+            return;
+        }
+        
+        // Validación de conciliación
+        if (conciliacionCheckbox.checked) {
+            if (!fechaConciliacion.value) {
+                e.preventDefault();
+                alert('Por favor ingrese la fecha de Conciliación y Arbitraje.');
+                fechaConciliacion.focus();
+                return;
+            }
+            
+            if (!docConciliacion.value) {
+                e.preventDefault();
+                alert('Por favor seleccione el documento de Conciliación y Arbitraje.');
+                docConciliacion.focus();
+                return;
+            }
+        }
+        
+        // Confirmación final
+        if (!confirm('¿Está seguro de dar de baja a este empleado?\n\nEmpleado: {{ empleado.nombre_completo }}\nID: #{{ empleado.numero_empleado }}\n\n' + 
+                    (conciliacionCheckbox.checked ? '⚠️ Se registrará proceso de Conciliación y Arbitraje\n\n' : '') +
+                    'Esta acción no se puede deshacer.')) {
+            e.preventDefault();
+        }
+    });
+    
+    // Mejorar la experiencia de usuario en los selects
+    selects.forEach(select => {
+        select.addEventListener('focus', function() {
+            this.style.zIndex = '10';
+        });
+        select.addEventListener('blur', function() {
+            this.style.zIndex = '1';
+        });
+    });
+});
+</script>
+
+<style>
+/* Estilos adicionales */
+.bg-gradient-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+}
+
+.form-floating > .form-control:focus ~ label,
+.form-floating > .form-control:not(:placeholder-shown) ~ label {
+    color: #495057;
+    font-weight: 500;
+}
+
+.card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.badge {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.input-group-text {
+    background-color: #f8f9fa;
+    border-color: #dee2e6;
+}
+
+/* Estilos para los switches */
+.form-switch .form-check-input {
+    width: 3em;
+    height: 1.5em;
+    cursor: pointer;
+}
+
+.form-switch .form-check-input:checked {
+    border-color: rgba(var(--bs-primary-rgb), 0.25);
+}
+
+.form-switch .form-check-input:checked[for="{{ form.fue_conciliacion_arbitraje.id_for_label }}"] {
+    background-color: #ffc107;
+    border-color: #ffc107;
+}
+
+.form-switch .form-check-input:checked[for="{{ form.es_recontratable.id_for_label }}"] {
+    background-color: #198754;
+    border-color: #198754;
+}
+
+.form-switch .form-check-input:focus {
+    border-color: #86b7fe;
+    outline: 0;
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+}
+
+.bg-warning-subtle {
+    background-color: rgba(255, 193, 7, 0.1) !important;
+}
+
+.bg-success-subtle {
+    background-color: rgba(25, 135, 84, 0.1) !important;
+}
+
+/* Estilos para selects con texto largo */
+.select-fixed {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 2.5rem !important;
+    background-position: right 0.75rem center;
+}
+
+.select-fixed option {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    padding: 8px 12px !important;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.select-fixed option:hover {
+    background-color: #f8f9fa;
+}
+
+/* Asegurar que los selects se vean bien en todos los navegadores */
+select.form-select {
+    appearance: auto !important;
+    -webkit-appearance: menulist !important;
+    -moz-appearance: menulist !important;
+    padding: 0.75rem 2.5rem 0.75rem 1rem !important;
+}
+
+.alert {
+    border: none;
+    border-left: 4px solid;
+}
+
+/* Estilos específicos para conciliación */
+#conciliacion-fields .alert-warning {
+    border-left: 4px solid #ffc107;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .btn-lg {
+        padding: 0.75rem 1.5rem !important;
+        font-size: 1rem !important;
+    }
+    
+    .card-body {
+        padding: 1.5rem !important;
+    }
+    
+    /* En móviles, mostrar el texto completo en los selects */
+    .select-fixed {
+        white-space: normal;
+        height: auto;
+        min-height: 3.5rem;
+    }
+}
+
+/* Mejorar la legibilidad en pantallas pequeñas */
+@media (max-width: 576px) {
+    .d-flex.align-items-center {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+    
+    .ms-auto {
+        margin-top: 1rem;
+        margin-left: 0 !important;
+        width: 100%;
+    }
+    
+    .bg-gradient.rounded-circle {
+        margin-bottom: 1rem;
+    }
+}
+
+/* Asegurar que los inputs de fecha se vean bien */
+input[type="date"].form-control {
+    line-height: 1.5;
+}
+
+/* Mejorar la apariencia del input file */
+input[type="file"].form-control {
+    padding: 0.75rem;
+    line-height: 1.5;
+}
+
+/* Estilos para los contenedores condicionales */
+#recontratable-fields,
+#conciliacion-fields {
+    overflow: hidden;
+}
+
+/* Animaciones suaves para los campos condicionales */
+#recontratable-fields,
+#conciliacion-fields {
+    transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+}
+
+#recontratable-fields[style*="display: block"],
+#conciliacion-fields[style*="display: block"] {
+    max-height: 2000px;
+    opacity: 1;
+}
+</style>
+{% endblock %}

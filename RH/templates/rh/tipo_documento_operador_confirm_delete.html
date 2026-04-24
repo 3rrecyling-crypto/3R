@@ -1,0 +1,32 @@
+{# rh/templates/rh/tipo_documento_operador_confirm_delete.html #}
+{% extends 'rh/base.html' %}
+
+{% block rh_title %}Confirmar Eliminación{% endblock %}
+
+{% block rh_content %}
+<div class="card shadow-lg border-danger">
+    <div class="card-header bg-danger text-white">
+        <h3 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Confirmar Eliminación</h3>
+    </div>
+    <div class="card-body">
+        <p class="fs-5">
+            ¿Estás seguro de que deseas eliminar permanentemente el tipo de documento: <strong>"{{ tipo_documento.nombre }}"</strong>?
+        </p>
+        <p class="text-muted">
+            Esta acción no se puede deshacer. Los documentos de empleados que usen este tipo podrían quedar sin clasificar.
+        </p>
+        
+        <form method="post">
+            {% csrf_token %}
+            <div class="d-flex justify-content-between mt-4">
+                <a href="{% url 'rh:lista_tipos_documento_operador' %}" class="btn btn-secondary">
+                    <i class="fas fa-times me-2"></i>Cancelar
+                </a>
+                <button type="submit" class="btn btn-danger">
+                    <i class="fas fa-trash-alt me-2"></i>Sí, eliminar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

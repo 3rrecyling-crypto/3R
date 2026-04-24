@@ -1,0 +1,805 @@
+{# RH/templates/rh/gestion_prestamos.html #}
+{% extends 'rh/base.html' %}
+{% load humanize %}
+
+{% block rh_title %}Gestión de Préstamos{% endblock %}
+
+{% block rh_content %}
+<style>
+    :root {
+        --prestamos-color: #9b59b6;
+        --prestamos-light: rgba(155, 89, 182, 0.1);
+        --prestamos-dark: #8e44ad;
+        --solicitado-color: #f39c12;
+        --aprobado-color: #2ecc71;
+        --encurso-color: #3498db;
+        --pagado-color: #27ae60;
+        --moroso-color: #e74c3c;
+    }
+    
+    .prestamos-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 50rem;
+    }
+    
+    .badge-solicitado { background-color: var(--solicitado-color); color: white; }
+    .badge-aprobado { background-color: var(--aprobado-color); color: white; }
+    .badge-encurso { background-color: var(--encurso-color); color: white; }
+    .badge-pagado { background-color: var(--pagado-color); color: white; }
+    .badge-moroso { background-color: var(--moroso-color); color: white; }
+    .badge-rechazado { background-color: #95a5a6; color: white; }
+    
+    .card-prestamos {
+        border-left: 4px solid var(--prestamos-color);
+        transition: all 0.3s ease;
+    }
+    
+    .card-prestamos:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    }
+    
+    .money-icon {
+        background: var(--prestamos-light);
+        color: var(--prestamos-color);
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .progress-prestamo {
+        height: 6px;
+        border-radius: 3px;
+        background-color: #f0f0f0;
+    }
+    
+    .progress-prestamo-bar {
+        background: linear-gradient(90deg, var(--prestamos-color), var(--prestamos-dark));
+        border-radius: 3px;
+    }
+    
+    .monto-badge {
+        background: var(--prestamos-light);
+        color: var(--prestamos-color);
+        padding: 0.25rem 0.75rem;
+        border-radius: 50rem;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+    
+    .stat-card-prestamo {
+        background: white;
+        border-radius: 10px;
+        padding: 1.25rem;
+        border: 1px solid #e9ecef;
+        transition: all 0.3s ease;
+    }
+    
+    .stat-card-prestamo:hover {
+        border-color: var(--prestamos-color);
+        box-shadow: 0 5px 15px rgba(155, 89, 182, 0.1);
+    }
+    
+    .stat-icon-prestamo {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .stat-number-prestamo {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1;
+        margin-bottom: 0.5rem;
+    }
+    
+    .prestamos-table th {
+        font-weight: 600;
+        color: #495057;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-top: none;
+    }
+    
+    .prestamos-table td {
+        vertical-align: middle;
+        padding: 1rem 0.75rem;
+    }
+    
+    .action-buttons .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+    
+    .empty-state {
+        padding: 3rem 1rem;
+        text-align: center;
+        color: #6c757d;
+    }
+    
+    .empty-state-icon {
+        font-size: 3rem;
+        color: #dee2e6;
+        margin-bottom: 1rem;
+    }
+    
+    .interes-badge {
+        background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+        color: #d63031;
+        padding: 0.25rem 0.75rem;
+        border-radius: 50rem;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+    
+    .saldo-badge {
+        background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+        color: #00b894;
+        padding: 0.25rem 0.75rem;
+        border-radius: 50rem;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+    
+    .plazo-badge {
+        background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%);
+        color: #0984e3;
+        padding: 0.25rem 0.75rem;
+        border-radius: 50rem;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+    
+    .week-badge {
+        background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+        color: #00b894;
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+    
+    .month-equivalent {
+        font-size: 0.75rem;
+        color: #6c757d;
+    }
+</style>
+
+<div class="container-fluid">
+    <!-- Header con título y botones -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="{% url 'rh:inicio_rh' %}">Dashboard</a></li>
+                            <li class="breadcrumb-item active" aria-current="page">Préstamos</li>
+                        </ol>
+                    </nav>
+                    <h2 class="h3 mb-0 fw-bold text-dark">
+                        <i class="fas fa-hand-holding-usd me-2" style="color: var(--prestamos-color);"></i>
+                        Gestión de Préstamos
+                    </h2>
+                    <p class="text-muted mb-0">Administra los préstamos otorgados al personal (Sistema por semanas 1-52)</p>
+                </div>
+                <div>
+                    <a href="{% url 'rh:solicitar_prestamo' %}" class="btn" style="background-color: var(--prestamos-color); color: white;">
+                        <i class="fas fa-plus me-1"></i> Nuevo Préstamo
+                    </a>
+                    {% if filtros_aplicados %}
+                    <a href="{% url 'rh:gestion_prestamos' %}" class="btn btn-outline-secondary ms-2">
+                        <i class="fas fa-times me-1"></i> Limpiar Filtros
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="filter-card">
+                <h6 class="mb-3 fw-bold text-dark">
+                    <i class="fas fa-filter me-2"></i>Filtrar Préstamos
+                </h6>
+                <form method="get" class="row g-3">
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold">Estado</label>
+                        <select name="estado" class="form-select form-select-sm">
+                            <option value="">Todos los estados</option>
+                            {% for estado in estados_prestamo %}
+                                <option value="{{ estado.0 }}" 
+                                    {% if filtros_aplicados.estado == estado.0 %}selected{% endif %}>
+                                    {{ estado.1 }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold">Tipo</label>
+                        <select name="tipo_prestamo" class="form-select form-select-sm">
+                            <option value="">Todos los tipos</option>
+                            {% for tipo in tipos_prestamo %}
+                                <option value="{{ tipo.0 }}" 
+                                    {% if filtros_aplicados.tipo_prestamo == tipo.0 %}selected{% endif %}>
+                                    {{ tipo.1 }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold">Empleado</label>
+                        <select name="empleado" class="form-select form-select-sm">
+                            <option value="">Todos los empleados</option>
+                            {% for empleado in empleados %}
+                                <option value="{{ empleado.id }}" 
+                                    {% if filtros_aplicados.empleado_id == empleado.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ empleado.nombre_completo }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Desde</label>
+                                <input type="date" name="fecha_inicio" 
+                                       value="{{ filtros_aplicados.fecha_inicio }}"
+                                       class="form-control form-control-sm">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Hasta</label>
+                                <input type="date" name="fecha_fin" 
+                                       value="{{ filtros_aplicados.fecha_fin }}"
+                                       class="form-control form-control-sm">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Plazo min.</label>
+                                <input type="number" name="plazo_min" 
+                                       value="{{ request.GET.plazo_min }}"
+                                       class="form-control form-control-sm" min="1" max="52"
+                                       placeholder="1 semana">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Plazo max.</label>
+                                <input type="number" name="plazo_max" 
+                                       value="{{ request.GET.plazo_max }}"
+                                       class="form-control form-control-sm" min="1" max="52"
+                                       placeholder="52 semanas">
+                            </div>
+                        </div>
+                        <div class="form-text small text-center mt-1">
+                            <i class="fas fa-info-circle"></i> Plazos en semanas (1-52)
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm" style="background-color: var(--prestamos-color); color: white;">
+                                <i class="fas fa-search me-1"></i> Aplicar Filtros
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="stat-card-prestamo">
+                <div class="stat-icon-prestamo" style="background-color: rgba(155, 89, 182, 0.1); color: var(--prestamos-color);">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+                <div class="stat-number-prestamo" style="color: var(--prestamos-color);">{{ total_prestamos }}</div>
+                <h6 class="text-muted small mb-0">Total Préstamos</h6>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="stat-card-prestamo">
+                <div class="stat-icon-prestamo" style="background-color: rgba(52, 152, 219, 0.1); color: #3498db;">
+                    <i class="fas fa-sync-alt"></i>
+                </div>
+                <div class="stat-number-prestamo text-info">{{ prestamos_activos }}</div>
+                <h6 class="text-muted small mb-0">Activos</h6>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="stat-card-prestamo">
+                <div class="stat-icon-prestamo" style="background-color: rgba(39, 174, 96, 0.1); color: #27ae60;">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-number-prestamo text-success">{{ prestamos_pagados }}</div>
+                <h6 class="text-muted small mb-0">Pagados</h6>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="stat-card-prestamo">
+                <div class="stat-icon-prestamo" style="background-color: rgba(231, 76, 60, 0.1); color: #e74c3c;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="stat-number-prestamo text-danger">{{ prestamos_morosos }}</div>
+                <h6 class="text-muted small mb-0">Morosos</h6>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumen financiero -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h6 class="fw-bold m-0 text-dark">
+                        <i class="fas fa-chart-line me-2"></i>
+                        Resumen Financiero
+                        <span class="week-badge ms-2">Sistema por semanas</span>
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 text-center">
+                            <div class="mb-3">
+                                <div class="monto-badge d-inline-block mb-2">
+                                    ${{ total_saldo_pendiente|intcomma }}
+                                </div>
+                                <h6 class="text-muted small mb-0">Saldo Pendiente Total</h6>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="mb-3">
+                                <div class="interes-badge d-inline-block mb-2">
+                                    {{ prestamos_activos }} activos
+                                </div>
+                                <h6 class="text-muted small mb-0">Préstamos Activos</h6>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="mb-3">
+                                <div class="saldo-badge d-inline-block mb-2">
+                                    ${{ total_prestamos_activos_valor|intcomma }}
+                                </div>
+                                <h6 class="text-muted small mb-0">Valor Total Activos</h6>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="mb-3">
+                                <div class="plazo-badge d-inline-block mb-2">
+                                    {{ total_prestamos }} total
+                                </div>
+                                <h6 class="text-muted small mb-0">Préstamos Registrados</h6>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="progress-prestamo mb-2">
+                        <div class="progress-prestamo-bar" style="width: {% if total_prestamos_activos_valor > 0 %}{% widthratio total_saldo_pendiente total_prestamos_activos_valor 100 %}%{% else %}0%{% endif %}"></div>
+                    </div>
+                    <div class="d-flex justify-content-between small text-muted">
+                        <span>Saldo Pendiente: ${{ total_saldo_pendiente|intcomma }}</span>
+                        <span>Valor Original: ${{ total_prestamos_activos_valor|intcomma }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h6 class="fw-bold m-0 text-dark">
+                        <i class="fas fa-bolt me-2"></i>
+                        Acciones Rápidas
+                    </h6>
+                </div>
+                <div class="card-body d-flex flex-column">
+                    <a href="{% url 'rh:solicitar_prestamo' %}" class="btn mb-2" style="background-color: var(--prestamos-color); color: white;">
+                        <i class="fas fa-plus me-1"></i> Nuevo Préstamo
+                    </a>
+                    <a href="{% url 'rh:reporte_prestamos_excel' %}{% if filtros_aplicados %}?{% for key, value in filtros_aplicados.items %}{% if value %}{{ key }}={{ value }}{% if not forloop.last %}&{% endif %}{% endif %}{% endfor %}{% endif %}" 
+                       class="btn btn-outline-success mb-2">
+                        <i class="fas fa-file-excel me-1"></i> Exportar Excel
+                    </a>
+                    <button type="button" class="btn btn-outline-info mb-2" data-bs-toggle="modal" data-bs-target="#ayudaModal">
+                        <i class="fas fa-question-circle me-1"></i> Guía de Préstamos
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Préstamos -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="fw-bold m-0 text-dark">
+                            <i class="fas fa-list me-2"></i>
+                            Lista de Préstamos
+                            <span class="badge bg-light text-dark border ms-2">{{ prestamos.count }}</span>
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="text-muted small me-3">
+                                <i class="fas fa-calendar-week text-primary"></i> Plazos en semanas (1-52)
+                            </span>
+                            <a href="{% url 'rh:reporte_prestamos_excel' %}{% if filtros_aplicados %}?{% for key, value in filtros_aplicados.items %}{% if value %}{{ key }}={{ value }}{% if not forloop.last %}&{% endif %}{% endif %}{% endfor %}{% endif %}" 
+                               class="btn btn-sm btn-outline-success">
+                                <i class="fas fa-file-excel me-1"></i> Exportar Excel
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-body p-0">
+                    {% if prestamos %}
+                        <div class="table-responsive">
+                            <table class="table table-hover prestamos-table mb-0">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th class="ps-4">Empleado / Concepto</th>
+                                        <th class="text-center">Monto</th>
+                                        <th class="text-center">Saldo</th>
+                                        <th class="text-center">Plazo</th>
+                                        <th class="text-center">Pagos</th>
+                                        <th class="text-center">Progreso</th>
+                                        <th>Estado</th>
+                                        <th class="text-center">Solicitado</th>
+                                        <th class="text-end pe-4">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for prestamo in prestamos %}
+                                    <tr class="position-relative">
+                                        <td class="ps-4">
+                                            <div class="d-flex align-items-center">
+                                                <div class="money-icon me-3">
+                                                    <i class="fas fa-hand-holding-usd"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="fw-bold">{{ prestamo.empleado.nombre_completo }}</div>
+                                                    <small class="text-muted">
+                                                        {{ prestamo.concepto|truncatechars:40 }}
+                                                        <br>
+                                                        {{ prestamo.empleado.departamento.nombre|default:"Sin departamento" }}
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="fw-bold fs-5">${{ prestamo.monto_total|intcomma }}</div>
+                                            <small class="text-muted">Total</small>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="fw-bold" style="color: #e74c3c;">${{ prestamo.saldo_pendiente|intcomma }}</div>
+                                            <small class="text-muted">Pendiente</small>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="fw-bold fs-5">
+                                                {{ prestamo.plazo_semanas }}
+                                                <span class="week-badge ms-1">sem</span>
+                                            </div>
+                                            <div class="month-equivalent">
+                                                ≈ {{ prestamo.get_plazo_equivalente_meses|default:"0.0" }} meses
+                                            </div>
+                                            <small class="text-muted">
+                                                {{ prestamo.plazo_semanas }} semana{{ prestamo.plazo_semanas|pluralize }}
+                                            </small>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="fw-bold fs-5">${{ prestamo.pago_semanal|floatformat:2 }}</div>
+                                            <small class="text-muted">semanal</small>
+                                            <br>
+                                            <small class="text-muted month-equivalent">
+                                                ${{ prestamo.pago_mensual_aproximado|default:0|floatformat:2 }}/mes
+                                            </small>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="progress-prestamo mb-2">
+                                                <div class="progress-prestamo-bar" style="width: {{ prestamo.progreso_pago|floatformat:0 }}%"></div>
+                                            </div>
+                                            <small class="text-muted">{{ prestamo.progreso_pago|floatformat:1 }}% pagado</small>
+                                            {% if prestamo.semanas_restantes > 0 %}
+                                                <br>
+                                                <small class="text-info">
+                                                    {{ prestamo.semanas_restantes }} semana{{ prestamo.semanas_restantes|pluralize }} restantes
+                                                </small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if prestamo.estado == 'SOLICITADO' %}
+                                                <span class="badge prestamos-badge badge-solicitado">
+                                                    <i class="fas fa-clock me-1"></i> {{ prestamo.get_estado_display }}
+                                                </span>
+                                            {% elif prestamo.estado == 'APROBADO' %}
+                                                <span class="badge prestamos-badge badge-aprobado">
+                                                    <i class="fas fa-check-circle me-1"></i> {{ prestamo.get_estado_display }}
+                                                </span>
+                                            {% elif prestamo.estado == 'EN_CURSO' %}
+                                                <span class="badge prestamos-badge badge-encurso">
+                                                    <i class="fas fa-sync-alt me-1"></i> {{ prestamo.get_estado_display }}
+                                                </span>
+                                            {% elif prestamo.estado == 'PAGADO' %}
+                                                <span class="badge prestamos-badge badge-pagado">
+                                                    <i class="fas fa-check-double me-1"></i> {{ prestamo.get_estado_display }}
+                                                </span>
+                                            {% elif prestamo.estado == 'MOROSO' %}
+                                                <span class="badge prestamos-badge badge-moroso">
+                                                    <i class="fas fa-exclamation-triangle me-1"></i> {{ prestamo.get_estado_display }}
+                                                </span>
+                                            {% else %}
+                                                <span class="badge prestamos-badge badge-rechazado">
+                                                    {{ prestamo.get_estado_display }}
+                                                </span>
+                                            {% endif %}
+                                            {% if prestamo.esta_moroso %}
+                                                <br>
+                                                <small class="text-danger mt-1">
+                                                    <i class="fas fa-exclamation-circle"></i> En mora
+                                                </small>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            {{ prestamo.fecha_solicitud|date:"d/m/Y" }}
+                                            <br>
+                                            <small class="text-muted">
+                                                hace {{ prestamo.fecha_solicitud|timesince }}
+                                            </small>
+                                        </td>
+                                        <td class="text-end pe-4">
+                                            <div class="action-buttons">
+                                                <a href="{% url 'rh:detalle_prestamo' prestamo.id %}" 
+                                                   class="btn btn-sm btn-outline-primary" 
+                                                   title="Ver detalles">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                
+                                                {% if prestamo.estado == 'SOLICITADO' %}
+                                                    <a href="{% url 'rh:aprobar_prestamo' prestamo.id %}" 
+                                                       class="btn btn-sm btn-outline-success" 
+                                                       title="Aprobar/Rechazar">
+                                                        <i class="fas fa-check"></i>
+                                                    </a>
+                                                {% endif %}
+                                                
+                                                {% if prestamo.estado == 'EN_CURSO' %}
+                                                    <a href="{% url 'rh:registrar_pago' prestamo.id %}" 
+                                                       class="btn btn-sm btn-outline-info" 
+                                                       title="Registrar pago">
+                                                        <i class="fas fa-money-bill-wave"></i>
+                                                    </a>
+                                                {% endif %}
+                                                
+                                                {% if prestamo.contrato %}
+                                                    <a href="{{ prestamo.contrato.url }}" 
+                                                       class="btn btn-sm btn-outline-warning" 
+                                                       title="Ver contrato" target="_blank">
+                                                        <i class="fas fa-file-contract"></i>
+                                                    </a>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="empty-state">
+                            <div class="empty-state-icon">
+                                <i class="fas fa-hand-holding-usd"></i>
+                            </div>
+                            <h5 class="text-muted mb-2">No hay préstamos registrados</h5>
+                            <p class="text-muted mb-3">
+                                {% if filtros_aplicados %}
+                                    No se encontraron resultados con los filtros aplicados.
+                                {% else %}
+                                    Aún no hay préstamos registrados en el sistema.
+                                {% endif %}
+                            </p>
+                            <a href="{% url 'rh:solicitar_prestamo' %}" class="btn" style="background-color: var(--prestamos-color); color: white;">
+                                <i class="fas fa-plus me-1"></i> Registrar Primer Préstamo
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+                
+                {% if prestamos.has_other_pages %}
+                <div class="card-footer bg-white border-top py-3">
+                    <nav aria-label="Paginación">
+                        <ul class="pagination justify-content-center mb-0">
+                            {% if prestamos.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ prestamos.previous_page_number }}{% for key, value in filtros_aplicados.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                            
+                            {% for num in prestamos.paginator.page_range %}
+                                {% if prestamos.number == num %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ num }}</span>
+                                    </li>
+                                {% elif num > prestamos.number|add:'-3' and num < prestamos.number|add:'3' %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ num }}{% for key, value in filtros_aplicados.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if prestamos.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ prestamos.next_page_number }}{% for key, value in filtros_aplicados.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Ayuda -->
+<div class="modal fade" id="ayudaModal" tabindex="-1" aria-labelledby="ayudaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="ayudaModalLabel">
+                    <i class="fas fa-question-circle me-2" style="color: var(--prestamos-color);"></i>
+                    Guía de Préstamos - Sistema por Semanas
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="fw-bold mb-3">Límites de Préstamos:</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                <strong>Máximo:</strong> 3 meses de sueldo
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                <strong>Pago mensual máximo:</strong> 40% del sueldo
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                <strong>Plazo mínimo:</strong> 1 semana
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                <strong>Plazo máximo:</strong> 52 semanas (1 año)
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="fw-bold mb-3">Conversión de Plazos (Semanas → Meses):</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="fas fa-calendar-week text-primary me-2"></i>
+                                <strong>4 semanas</strong> ≈ 1 mes
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-calendar-week text-primary me-2"></i>
+                                <strong>12 semanas</strong> ≈ 3 meses
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-calendar-week text-primary me-2"></i>
+                                <strong>26 semanas</strong> ≈ 6 meses
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-calendar-week text-primary me-2"></i>
+                                <strong>52 semanas</strong> ≈ 12 meses (1 año)
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <h6 class="fw-bold mb-3">Tasas de Interés:</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="fas fa-percentage text-info me-2"></i>
+                                <strong>Préstamo Personal:</strong> 0% - 5%
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-percentage text-info me-2"></i>
+                                <strong>Adelanto de Sueldo:</strong> 0%
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-percentage text-info me-2"></i>
+                                <strong>Emergencia:</strong> 0% - 3%
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="fw-bold mb-3">Frecuencia de Pagos (Sistema Semanal):</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="fas fa-calendar-week text-primary me-2"></i>
+                                <strong>Pagos semanales</strong> (cada 7 días)
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-calculator text-info me-2"></i>
+                                <strong>Pago mensual equivalente:</strong> Pago semanal × 4.33
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                                <strong>Mora:</strong> 7+ días sin pago
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Nuevo Sistema por Semanas:</strong> Ahora todos los préstamos se manejan en semanas (1-52) para mayor flexibilidad. 
+                    Los pagos son semanales, pero mostramos el equivalente mensual para referencia.
+                </div>
+                <div class="alert alert-warning mt-2">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Importante:</strong> Todos los préstamos requieren contrato firmado y autorización de Recursos Humanos y Finanzas.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <a href="{% url 'rh:solicitar_prestamo' %}" class="btn" style="background-color: var(--prestamos-color); color: white;">
+                    <i class="fas fa-plus me-1"></i> Crear Préstamo
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript para conversión automática -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Agregar tooltips de conversión
+    const plazoCells = document.querySelectorAll('.prestamos-table td:nth-child(4)');
+    
+    plazoCells.forEach(cell => {
+        const plazoText = cell.querySelector('.fw-bold.fs-5');
+        if (plazoText) {
+            const semanas = parseInt(plazoText.textContent);
+            if (!isNaN(semanas)) {
+                const meses = (semanas / 4.33).toFixed(1);
+                const anios = (semanas / 52).toFixed(2);
+                cell.title = `${semanas} semanas = ${meses} meses ≈ ${anios} años`;
+            }
+        }
+    });
+    
+    // Agregar tooltips a los pagos semanales
+    const pagoCells = document.querySelectorAll('.prestamos-table td:nth-child(5)');
+    
+    pagoCells.forEach(cell => {
+        const pagoText = cell.querySelector('.fw-bold.fs-5');
+        if (pagoText) {
+            const pagoSemanal = parseFloat(pagoText.textContent.replace('$', '').replace(',', ''));
+            if (!isNaN(pagoSemanal)) {
+                const pagoMensual = (pagoSemanal * 4.33).toFixed(2);
+                cell.title = `Pago semanal: $${pagoSemanal.toFixed(2)}\nEquivalente mensual: $${pagoMensual}`;
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,446 @@
+{# RH/templates/rh/recontratar.html #}
+{% extends 'rh/base.html' %}
+{% load crispy_forms_tags %}
+
+{% block rh_title %}Recontratar Empleado{% endblock %}
+
+{% block rh_content %}
+<style>
+    :root {
+        --recontratar-color: #3498db;
+        --recontratar-light: rgba(52, 152, 219, 0.1);
+        --recontratar-dark: #2980b9;
+    }
+    
+    .recontratar-card {
+        border-left: 4px solid var(--recontratar-color);
+        border-radius: 10px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    }
+    
+    .info-badge {
+        background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+        color: #2c3e50;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-weight: 600;
+        border: 1px solid rgba(0,0,0,0.1);
+    }
+    
+    .employee-avatar {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--recontratar-color), var(--recontratar-dark));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        color: white;
+        font-weight: bold;
+        margin: 0 auto;
+    }
+    
+    .timeline {
+        position: relative;
+        padding-left: 30px;
+        margin: 2rem 0;
+    }
+    
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #e9ecef;
+    }
+    
+    .timeline-item {
+        position: relative;
+        margin-bottom: 1.5rem;
+    }
+    
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -30px;
+        top: 5px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--recontratar-color);
+        border: 2px solid white;
+        box-shadow: 0 0 0 3px var(--recontratar-light);
+    }
+    
+    .form-section {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border: 1px solid #e9ecef;
+    }
+    
+    .section-title {
+        color: var(--recontratar-color);
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid var(--recontratar-light);
+    }
+    
+    .btn-recontratar {
+        background: linear-gradient(135deg, var(--recontratar-color), var(--recontratar-dark));
+        color: white;
+        border: none;
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-recontratar:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        color: white;
+    }
+</style>
+
+<div class="container">
+    <!-- Encabezado -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'rh:inicio_rh' %}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'rh:historial_bajas' %}">Historial de Bajas</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'rh:detalle_baja' baja.id %}">Detalle de Baja</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Recontratar</li>
+                </ol>
+            </nav>
+            
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="fw-bold text-dark mb-0">
+                        <i class="fas fa-user-plus me-2" style="color: var(--recontratar-color);"></i>
+                        Recontratar Empleado
+                    </h2>
+                    <p class="text-muted mb-0">Proceso de recontratación de personal</p>
+                </div>
+                <div>
+                    <a href="{% url 'rh:detalle_baja' baja.id %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Volver
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información del empleado -->
+    <div class="row mb-4">
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center">
+                    <div class="employee-avatar mb-3">
+                        {{ baja.empleado.nombre|slice:":1" }}{{ baja.empleado.apellido|slice:":1" }}
+                    </div>
+                    <h4 class="fw-bold mb-1">{{ baja.empleado.nombre_completo }}</h4>
+                    <p class="text-muted mb-2">
+                        {{ baja.empleado.puesto.nombre|default:"Sin puesto" }}
+                        <br>
+                        {{ baja.empleado.departamento.nombre|default:"Sin departamento" }}
+                    </p>
+                    
+                    <div class="info-badge mb-3">
+                        <i class="fas fa-calendar-alt me-1"></i>
+                        Días desde baja: {{ baja.dias_desde_baja }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-muted mb-2">Motivo de Baja:</h6>
+                        <div class="alert alert-light border">
+                            {{ baja.cadena_motivos }}
+                        </div>
+                    </div>
+                    
+                    <div class="text-start">
+                        <p class="mb-1">
+                            <i class="fas fa-envelope me-2 text-muted"></i>
+                            <small>{{ baja.empleado.email|default:"Sin email" }}</small>
+                        </p>
+                        <p class="mb-1">
+                            <i class="fas fa-phone me-2 text-muted"></i>
+                            <small>{{ baja.empleado.telefono_personal|default:"Sin teléfono" }}</small>
+                        </p>
+                        <p class="mb-0">
+                            <i class="fas fa-calendar me-2 text-muted"></i>
+                            <small>Fecha de baja: {{ baja.fecha_baja|date:"d/m/Y" }}</small>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-8">
+            <div class="card recontratar-card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="fw-bold m-0 text-dark">
+                        <i class="fas fa-file-contract me-2"></i>
+                        Proceso de Recontratación
+                    </h5>
+                </div>
+                <div class="card-body">
+                    
+                    <!-- Timeline del proceso -->
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <h6 class="fw-bold mb-1">Baja Registrada</h6>
+                            <p class="text-muted small mb-0">
+                                {{ baja.fecha_baja|date:"d/m/Y" }} - 
+                                {{ baja.motivo_principal.nombre|default:"Sin motivo específico" }}
+                            </p>
+                            {% if baja.comentario_baja %}
+                                <p class="mt-1 small">{{ baja.comentario_baja|truncatechars:150 }}</p>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="timeline-item">
+                            <h6 class="fw-bold mb-1">Evaluación de Recontratación</h6>
+                            <p class="text-muted small mb-0">
+                                {% if baja.es_recontratable %}
+                                    <span class="badge bg-success">✓ Recontratable</span>
+                                    {% if baja.motivo_recontratable %}
+                                        <p class="mt-1 small">{{ baja.motivo_recontratable }}</p>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-secondary">No recontratable</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        
+                        <div class="timeline-item">
+                            <h6 class="fw-bold mb-1">Formulario de Recontratación</h6>
+                            <p class="text-muted small mb-0">Complete los detalles de la recontratación</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Formulario de recontratación -->
+                    {% if baja.es_recontratable %}
+                    <div class="form-section mt-4">
+                        <h6 class="section-title">
+                            <i class="fas fa-edit me-2"></i>
+                            Detalles de Recontratación
+                        </h6>
+                        
+                        <form method="post" id="recontratarForm">
+                            {% csrf_token %}
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Fecha de Recontratación *</label>
+                                    {{ form.fecha_recontratacion }}
+                                    {% if form.fecha_recontratacion.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {{ form.fecha_recontratacion.errors }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Puesto a Reasignar</label>
+                                    <input type="text" class="form-control" 
+                                           value="{{ baja.empleado.puesto.nombre|default:'Sin especificar' }}" 
+                                           readonly>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Comentarios de Recontratación *</label>
+                                {{ form.comentario_recontratacion }}
+                                {% if form.comentario_recontratacion.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {{ form.comentario_recontratacion.errors }}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">
+                                    Describa los motivos de la recontratación, condiciones acordadas, cambios salariales, etc.
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Departamento de Reasignación</label>
+                                <select class="form-select" name="departamento">
+                                    <option value="{{ baja.empleado.departamento.id|default:'' }}">
+                                        {{ baja.empleado.departamento.nombre|default:"Seleccionar departamento..." }}
+                                    </option>
+                                    {% for depto in departamentos %}
+                                        <option value="{{ depto.id }}">{{ depto.nombre }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Salario Inicial</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" 
+                                           name="salario_inicial" 
+                                           step="0.01"
+                                           placeholder="0.00"
+                                           value="{{ salario_sugerido }}">
+                                    <span class="input-group-text">MXN/mes</span>
+                                </div>
+                                <div class="form-text">
+                                    Salario anterior: ${{ salario_anterior|default:"0.00"|floatformat:2 }} MXN/mes
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">Tipo de Contrato</label>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="radio" name="tipo_contrato" 
+                                                   id="indeterminado" value="INDETERMINADO" checked>
+                                            <label class="form-check-label" for="indeterminado">
+                                                <i class="fas fa-infinity me-1 text-success"></i>
+                                                Indeterminado
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="radio" name="tipo_contrato" 
+                                                   id="determinado" value="DETERMINADO">
+                                            <label class="form-check-label" for="determinado">
+                                                <i class="fas fa-calendar-alt me-1 text-warning"></i>
+                                                Determinado (6 meses)
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-warning border">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Importante:</strong> Al recontratar, el empleado será activado automáticamente 
+                                y se creará un nuevo registro en su historial laboral.
+                            </div>
+                            
+                            <div class="d-flex justify-content-between mt-4">
+                                <a href="{% url 'rh:detalle_baja' baja.id %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times me-1"></i> Cancelar
+                                </a>
+                                <button type="submit" class="btn btn-recontratar">
+                                    <i class="fas fa-user-check me-1"></i> Confirmar Recontratación
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        <strong>Este empleado no es recontratable.</strong>
+                        La baja fue registrada como no recontratable. 
+                        Para proceder, debe cambiar este estado en el detalle de la baja.
+                    </div>
+                    <div class="text-center mt-4">
+                        <a href="{% url 'rh:detalle_baja' baja.id %}" class="btn btn-primary">
+                            <i class="fas fa-arrow-left me-1"></i> Volver al Detalle
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumen de acciones -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h6 class="fw-bold m-0 text-dark">
+                        <i class="fas fa-tasks me-2"></i>
+                        Acciones Posteriores a Recontratación
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <div class="text-center">
+                                <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-2" 
+                                     style="width: 60px; height: 60px;">
+                                    <i class="fas fa-file-contract"></i>
+                                </div>
+                                <h6 class="fw-bold mb-1">Nuevo Contrato</h6>
+                                <p class="small text-muted mb-0">Generar documento de recontratación</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="text-center">
+                                <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center mx-auto mb-2" 
+                                     style="width: 60px; height: 60px;">
+                                    <i class="fas fa-user-tie"></i>
+                                </div>
+                                <h6 class="fw-bold mb-1">Reasignación</h6>
+                                <p class="small text-muted mb-0">Asignar supervisor y equipo</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="text-center">
+                                <div class="bg-warning bg-opacity-10 text-warning rounded-circle d-flex align-items-center justify-content-center mx-auto mb-2" 
+                                     style="width: 60px; height: 60px;">
+                                    <i class="fas fa-graduation-cap"></i>
+                                </div>
+                                <h6 class="fw-bold mb-1">Inducción</h6>
+                                <p class="small text-muted mb-0">Programar proceso de reinducción</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="text-center">
+                                <div class="bg-info bg-opacity-10 text-info rounded-circle d-flex align-items-center justify-content-center mx-auto mb-2" 
+                                     style="width: 60px; height: 60px;">
+                                    <i class="fas fa-chart-line"></i>
+                                </div>
+                                <h6 class="fw-bold mb-1">Seguimiento</h6>
+                                <p class="small text-muted mb-0">Monitorear desempeño inicial</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Establecer fecha mínima para hoy
+    const fechaInput = document.querySelector('input[name="fecha_recontratacion"]');
+    const hoy = new Date().toISOString().split('T')[0];
+    if (fechaInput) {
+        fechaInput.min = hoy;
+        if (!fechaInput.value) {
+            fechaInput.value = hoy;
+        }
+    }
+    
+    // Validación del formulario
+    const form = document.getElementById('recontratarForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const comentario = document.querySelector('textarea[name="comentario_recontratacion"]');
+            if (!comentario.value.trim()) {
+                e.preventDefault();
+                alert('Por favor, complete los comentarios de recontratación.');
+                comentario.focus();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

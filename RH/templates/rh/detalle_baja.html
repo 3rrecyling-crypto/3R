@@ -1,0 +1,667 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header con información principal -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-start mb-4">
+                        <div>
+                            <nav aria-label="breadcrumb">
+                                <ol class="breadcrumb bg-transparent mb-2">
+                                    <li class="breadcrumb-item">
+                                        <a href="{% url 'rh:historial_bajas' %}" class="text-primary">
+                                            <i class="fas fa-arrow-left me-1"></i> Bajas
+                                        </a>
+                                    </li>
+                                    <li class="breadcrumb-item active" aria-current="page">Detalle de Baja</li>
+                                </ol>
+                            </nav>
+                            <h1 class="h3 mb-0">{{ page_title }}</h1>
+                            <p class="text-muted mb-0">
+                                <i class="fas fa-calendar-alt me-1"></i>
+                                Registrado el {{ baja.fecha_registro|date:"d/m/Y" }}
+                            </p>
+                        </div>
+                        
+                        <div class="dropdown">
+                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" 
+                                    data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-cog"></i> Acciones
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'rh:empleado_detail' pk=baja.empleado.id %}">
+                                        <i class="fas fa-user me-2"></i> Ver Perfil del Empleado
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'rh:editar_baja' pk=baja.id %}">
+                                        <i class="fas fa-edit me-2"></i> Editar Baja
+                                    </a>
+                                </li>
+                                {% if not baja.recontratado and baja.es_recontratable %}
+                                <li>
+                                    <a class="dropdown-item text-success" href="{% url 'rh:recontratar_empleado' pk=baja.id %}">
+                                        <i class="fas fa-user-plus me-2"></i> Procesar Recontratación
+                                    </a>
+                                </li>
+                                {% endif %}
+                                {% if not baja.recontratado %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item text-danger" href="{% url 'rh:eliminar_baja' pk=baja.id %}">
+                                        <i class="fas fa-trash me-2"></i> Eliminar Baja
+                                    </a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Estado de la Baja -->
+                    <div class="row align-items-center mb-4">
+                        <div class="col-md-8">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar avatar-xl me-3">
+                                    <img src="{% if baja.empleado.foto %}{{ baja.empleado.foto.url }}{% else %}{% static 'img/default-avatar.png' %}{% endif %}" 
+                                         alt="{{ baja.empleado.nombre_completo }}" 
+                                         class="rounded-circle border">
+                                </div>
+                                <div>
+                                    <h4 class="mb-1">{{ baja.empleado.nombre_completo }}</h4>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-briefcase me-1"></i>
+                                            {{ baja.empleado.puesto|default:"Sin puesto" }}
+                                        </span>
+                                        <span class="badge bg-light text-dark">
+                                            <i class="fas fa-building me-1"></i>
+                                            {{ baja.empleado.departamento|default:"Sin departamento" }}
+                                        </span>
+                                        <span class="badge bg-light text-dark">
+                                            <i class="fas fa-id-card me-1"></i>
+                                            ID: {{ baja.empleado.id }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-0 bg-gradient-{% if baja.recontratado %}success{% elif baja.es_recontratable %}warning{% else %}danger{% endif %} text-white shadow">
+                                <div class="card-body py-3">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-0 text-white">Estado de la Baja</h6>
+                                            <div class="d-flex align-items-center mt-2">
+                                                <i class="fas {% if baja.recontratado %}fa-check-circle{% elif baja.es_recontratable %}fa-clock{% else %}fa-ban{% endif %} fa-2x me-3"></i>
+                                                <div>
+                                                    <h4 class="mb-0 text-white">
+                                                        {% if baja.recontratado %}
+                                                            RECONTRATADO
+                                                        {% elif baja.es_recontratable %}
+                                                            RECONTRATABLE
+                                                        {% else %}
+                                                            BAJA DEFINITIVA
+                                                        {% endif %}
+                                                    </h4>
+                                                    <small class="text-white opacity-75">
+                                                        {{ baja.dias_desde_baja }} días desde la baja
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido Principal -->
+    <div class="row">
+        <!-- Columna Izquierda: Información de la Baja -->
+        <div class="col-lg-8">
+            <!-- Información General -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle text-primary me-2"></i>
+                        Información General de la Baja
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <div class="card border h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title text-muted mb-3">
+                                        <i class="fas fa-calendar-times me-2"></i>Fecha de Baja
+                                    </h6>
+                                    <div class="d-flex align-items-center">
+                                        <div class="display-6 fw-bold text-danger">{{ baja.fecha_baja|date:"d" }}</div>
+                                        <div class="ms-3">
+                                            <div class="text-uppercase text-muted">{{ baja.fecha_baja|date:"F" }}</div>
+                                            <div class="h5 mb-0">{{ baja.fecha_baja|date:"Y" }}</div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <small class="text-muted">
+                                            <i class="fas fa-clock me-1"></i>
+                                            {{ baja.dias_desde_baja }} días transcurridos
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-4">
+                            <div class="card border h-100">
+                                <div class="card-body">
+                                    <h6 class="card-title text-muted mb-3">
+                                        <i class="fas fa-file-contract me-2"></i>Documentación
+                                    </h6>
+                                    {% if baja.documento_baja %}
+                                    <div class="d-flex align-items-center">
+                                        <div class="icon-shape icon-lg bg-light-primary rounded-3 me-3">
+                                            <i class="fas fa-file-pdf text-danger fa-2x"></i>
+                                        </div>
+                                        <div>
+                                            <a href="{{ baja.documento_baja.url }}" target="_blank" 
+                                               class="text-primary fw-bold">
+                                                Ver Documento de Baja
+                                            </a>
+                                            <p class="text-muted small mb-0">
+                                                {{ baja.documento_baja.size|filesizeformat }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {% else %}
+                                    <div class="text-center py-4">
+                                        <i class="fas fa-file-excel fa-3x text-muted mb-3"></i>
+                                        <p class="text-muted mb-0">No hay documento adjunto</p>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Jerarquía de Motivos -->
+                    <div class="card border mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">
+                                <i class="fas fa-project-diagram text-info me-2"></i>
+                                Jerarquía de Motivos
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="timeline timeline-one">
+                                <div class="timeline-item">
+                                    <div class="timeline-icon icon-lg bg-info text-white">
+                                        <i class="fas fa-flag"></i>
+                                    </div>
+                                    <div class="timeline-content">
+                                        <h6 class="mb-1">Motivo Principal</h6>
+                                        <p class="mb-0 fw-bold">{{ baja.motivo_principal.nombre|default:"No especificado" }}</p>
+                                        {% if baja.motivo_principal.descripcion %}
+                                        <p class="text-muted small mt-1 mb-0">{{ baja.motivo_principal.descripcion }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                {% if baja.motivo_secundario %}
+                                <div class="timeline-item">
+                                    <div class="timeline-icon icon-lg bg-warning text-white">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </div>
+                                    <div class="timeline-content">
+                                        <h6 class="mb-1">Motivo Secundario</h6>
+                                        <p class="mb-0">{{ baja.motivo_secundario.nombre }}</p>
+                                        {% if baja.motivo_secundario.descripcion %}
+                                        <p class="text-muted small mt-1 mb-0">{{ baja.motivo_secundario.descripcion }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                {% if baja.motivo_detalle %}
+                                <div class="timeline-item">
+                                    <div class="timeline-icon icon-lg bg-success text-white">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </div>
+                                    <div class="timeline-content">
+                                        <h6 class="mb-1">Detalle del Motivo</h6>
+                                        <p class="mb-0">{{ baja.motivo_detalle.nombre }}</p>
+                                        {% if baja.motivo_detalle.descripcion %}
+                                        <p class="text-muted small mt-1 mb-0">{{ baja.motivo_detalle.descripcion }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Comentarios/Observaciones de la Baja -->
+                    <div class="card border">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">
+                                <i class="fas fa-comment-dots text-primary me-2"></i>
+                                Comentarios y Observaciones de la Baja
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            {% if baja.comentario_baja %}
+                            <div class="alert alert-light border">
+                                <div class="d-flex">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-sticky-note text-primary fa-2x"></i>
+                                    </div>
+                                    <div class="flex-grow-1 ms-3">
+                                        <h5 class="alert-heading">Comentarios Registrados</h5>
+                                        <p class="mb-0">{{ baja.comentario_baja|linebreaks }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-comment-slash fa-3x text-muted mb-3"></i>
+                                <p class="text-muted">No se registraron comentarios adicionales</p>
+                            </div>
+                            {% endif %}
+                            
+                            <!-- Si hay motivo recontratable, mostrarlo aquí también -->
+                            {% if baja.motivo_recontratable %}
+                            <div class="mt-4">
+                                <h6 class="text-warning mb-3">
+                                    <i class="fas fa-star me-2"></i>Motivo para Recontratación
+                                </h6>
+                                <div class="card bg-warning bg-opacity-10 border-warning">
+                                    <div class="card-body">
+                                        <p class="mb-0">{{ baja.motivo_recontratable|linebreaks }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Columna Derecha: Información Adicional -->
+        <div class="col-lg-4">
+            <!-- Información de Recontratación -->
+            {% if baja.es_recontratable or baja.recontratado %}
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user-plus text-{% if baja.recontratado %}success{% else %}warning{% endif %} me-2"></i>
+                        Información de Recontratación
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if baja.recontratado %}
+                    <div class="alert alert-success border-0">
+                        <div class="d-flex align-items-center">
+                            <div class="icon-shape icon-lg bg-success text-white rounded-3 me-3">
+                                <i class="fas fa-check fa-2x"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1 text-success">EMPLEADO RECONTRATADO</h6>
+                                <p class="mb-0 small">Fecha: {{ baja.fecha_recontratacion|date:"d/m/Y" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if baja.comentario_recontratacion %}
+                    <div class="card border-success mt-3">
+                        <div class="card-header bg-success bg-opacity-10 border-success py-2">
+                            <small class="text-success fw-bold">
+                                <i class="fas fa-sticky-note me-1"></i>Comentarios de Recontratación
+                            </small>
+                        </div>
+                        <div class="card-body">
+                            <p class="mb-0">{{ baja.comentario_recontratacion|linebreaks }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% else %}
+                    <div class="alert alert-warning border-0">
+                        <div class="d-flex align-items-center">
+                            <div class="icon-shape icon-lg bg-warning text-white rounded-3 me-3">
+                                <i class="fas fa-clock fa-2x"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1 text-warning">CANDIDATO A RECONTRATACIÓN</h6>
+                                {% if baja.fecha_posible_recontratacion %}
+                                <p class="mb-0 small">
+                                    Fecha posible: {{ baja.fecha_posible_recontratacion|date:"d/m/Y" }}
+                                    {% if baja.fecha_posible_recontratacion < today %}
+                                    <span class="badge bg-danger ms-2">Vencida</span>
+                                    {% endif %}
+                                </p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid mt-3">
+                        <a href="{% url 'rh:recontratar_empleado' pk=baja.id %}" 
+                           class="btn btn-success btn-lg">
+                            <i class="fas fa-user-plus me-2"></i> Procesar Recontratación
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Información del Registro -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user-edit text-info me-2"></i>
+                        Información del Registro
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-4">
+                        <div class="avatar avatar-lg me-3">
+                            <img src="{% if baja.registrado_por.foto %}{{ baja.registrado_por.foto.url }}{% else %}{% static 'img/default-avatar.png' %}{% endif %}" 
+                                 alt="{{ baja.registrado_por.get_full_name }}" 
+                                 class="rounded-circle border">
+                        </div>
+                        <div>
+                            <h6 class="mb-1">{{ baja.registrado_por.get_full_name|default:baja.registrado_por.username }}</h6>
+                            <p class="text-muted small mb-0">
+                                <i class="fas fa-envelope me-1"></i>{{ baja.registrado_por.email }}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+                            <span class="text-muted">
+                                <i class="fas fa-calendar-plus me-2"></i>Fecha de Registro
+                            </span>
+                            <span class="fw-bold">{{ baja.fecha_registro|date:"d/m/Y H:i" }}</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+                            <span class="text-muted">
+                                <i class="fas fa-history me-2"></i>Hace
+                            </span>
+                            <span class="fw-bold">{{ baja.fecha_registro|timesince }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones Rápidas -->
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt text-purple me-2"></i>
+                        Acciones Rápidas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'rh:empleado_detail' pk=baja.empleado.id %}" 
+                           class="btn btn-outline-primary btn-lg">
+                            <i class="fas fa-user-circle me-2"></i> Ver Perfil Completo
+                        </a>
+                        
+                        <a href="{% url 'rh:editar_baja' pk=baja.id %}" 
+                           class="btn btn-outline-warning btn-lg">
+                            <i class="fas fa-edit me-2"></i> Editar Baja
+                        </a>
+                        
+                        {% if not baja.recontratado %}
+                        <a href="{% url 'rh:eliminar_baja' pk=baja.id %}" 
+                           class="btn btn-outline-danger btn-lg">
+                            <i class="fas fa-trash-alt me-2"></i> Eliminar Baja
+                        </a>
+                        {% endif %}
+                        
+                        <a href="{% url 'rh:historial_bajas' %}" 
+                           class="btn btn-outline-secondary">
+                            <i class="fas fa-list me-2"></i> Volver al Listado
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Estilos personalizados para el template */
+    .avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #f8f9fa;
+        border: 2px solid #e9ecef;
+    }
+    
+    .avatar-xl {
+        width: 80px;
+        height: 80px;
+    }
+    
+    .avatar-lg {
+        width: 64px;
+        height: 64px;
+    }
+    
+    .avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .icon-shape {
+        width: 48px;
+        height: 48px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.75rem;
+    }
+    
+    .icon-shape.icon-lg {
+        width: 64px;
+        height: 64px;
+    }
+    
+    .bg-gradient-danger {
+        background: linear-gradient(135deg, #f5365c 0%, #f56036 100%);
+    }
+    
+    .bg-gradient-warning {
+        background: linear-gradient(135deg, #fb6340 0%, #fbb140 100%);
+    }
+    
+    .bg-gradient-success {
+        background: linear-gradient(135deg, #2dce89 0%, #2dcecc 100%);
+    }
+    
+    .bg-light-primary {
+        background-color: rgba(94, 114, 228, 0.1) !important;
+    }
+    
+    .bg-gradient-purple {
+        background: linear-gradient(135deg, #8965e0 0%, #bc65e0 100%);
+    }
+    
+    /* Timeline Styles */
+    .timeline {
+        position: relative;
+        padding-left: 4rem;
+    }
+    
+    .timeline-one .timeline-item {
+        position: relative;
+        padding-bottom: 1.5rem;
+    }
+    
+    .timeline-one .timeline-item:not(:last-child):after {
+        content: '';
+        position: absolute;
+        left: -1.5rem;
+        top: 3rem;
+        bottom: 0;
+        width: 2px;
+        background-color: #e9ecef;
+    }
+    
+    .timeline-one .timeline-icon {
+        position: absolute;
+        left: -4rem;
+        top: 0;
+        z-index: 2;
+        width: 3rem;
+        height: 3rem;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .timeline-one .timeline-content {
+        padding-left: 1rem;
+    }
+    
+    /* Card hover effects */
+    .card {
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    /* Badge styles */
+    .badge {
+        padding: 0.5em 0.8em;
+        font-weight: 500;
+    }
+    
+    /* Display numbers */
+    .display-6 {
+        font-size: 3rem;
+        font-weight: 700;
+    }
+    
+    /* Alert styles */
+    .alert-light {
+        background-color: #f8f9fa;
+        border-color: #e9ecef;
+    }
+    
+    /* Button styles */
+    .btn-lg {
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+    }
+    
+    /* List group styles */
+    .list-group-item {
+        background-color: transparent;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .display-6 {
+            font-size: 2.5rem;
+        }
+        
+        .timeline {
+            padding-left: 3rem;
+        }
+        
+        .timeline-one .timeline-icon {
+            left: -3rem;
+            width: 2.5rem;
+            height: 2.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        });
+        
+        // Formatear números grandes
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+        
+        // Actualizar contador de días dinámicamente
+        function updateDaysCounter() {
+            const daysElements = document.querySelectorAll('.days-counter');
+            daysElements.forEach(el => {
+                const startDate = new Date(el.dataset.startDate);
+                const now = new Date();
+                const diffTime = Math.abs(now - startDate);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                el.textContent = formatNumber(diffDays);
+            });
+        }
+        
+        // Actualizar cada día
+        setInterval(updateDaysCounter, 86400000); // 24 horas
+        
+        // Inicializar
+        updateDaysCounter();
+        
+        // Confirmación para acciones peligrosas
+        const deleteButtons = document.querySelectorAll('.btn-outline-danger');
+        deleteButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                if (!confirm('¿Estás seguro de que deseas eliminar este registro? Esta acción no se puede deshacer.')) {
+                    e.preventDefault();
+                }
+            });
+        });
+        
+        // Animación para cards al cargar
+        const cards = document.querySelectorAll('.card');
+        cards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+    });
+</script>
+{% endblock %}

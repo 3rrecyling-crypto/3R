@@ -49,7 +49,10 @@ INSTALLED_APPS = [
     'herramientas',
     'cargas_diesel',
     'rest_framework',
+    'rest_framework.authtoken',
     'corsheaders',
+    'RH',
+    'api',
 ]
 
 MIDDLEWARE = [
@@ -221,6 +224,32 @@ TWILIO_WHATSAPP_FROM = 'whatsapp:+15707125385'           # Número Sandbox o tu 
 TWILIO_WHATSAPP_TO_APPROVER = 'whatsapp:+5218123465830'  # El número del jefe/aprobador
 TWILIO_CONTENT_SID = os.getenv('TWILIO_CONTENT_SID')
 
+
+# ──────────────────────────────────────────────────────────────
+# DJANGO REST FRAMEWORK
+# ──────────────────────────────────────────────────────────────
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'api.pagination.DynamicPagePagination',
+    'PAGE_SIZE': 25,
+    'DEFAULT_FILTER_BACKENDS': [
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',  # útil en desarrollo
+    ],
+    'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S',
+    'DATE_FORMAT': '%Y-%m-%d',
+    'NON_FIELD_ERRORS_KEY': 'detail',
+}
 
 FISCALAPI_KEY = 'sk_test_332d6810_cbbc_45e1_aa05_c1d4b0cad058'
 # URL base de pruebas (Revisa la documentación de tu proveedor para confirmar esta URL)

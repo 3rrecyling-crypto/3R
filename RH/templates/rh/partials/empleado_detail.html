@@ -1,0 +1,1181 @@
+{# RH/templates/rh/empleado_detail.html #}
+{% extends 'rh/base.html' %}
+{% load humanize %}
+
+{% block rh_title %}Ficha Completa de Empleado: {{ empleado.nombre_completo }}{% endblock %}
+
+{% block rh_content %}
+<div class="card shadow-lg">
+    <div class="card-header bg-gradient-primary text-white d-flex justify-content-between align-items-center">
+        <div>
+            <h3 class="mb-0"><i class="fas fa-user-tie me-2"></i>Ficha Integral de Empleado</h3>
+            <small class="opacity-75">Última actualización: {{ empleado.updated_at|date:"d/m/Y H:i"|default:"No registrada" }}</small>
+        </div>
+        
+        <div class="btn-group">
+            <a href="{% url 'rh:generar_pdf_empleado' empleado.pk %}" class="btn btn-outline-light" target="_blank">
+                <i class="fas fa-file-pdf me-2"></i>Descargar PDF
+            </a>
+            <button class="btn btn-outline-light dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown">
+                <i class="fas fa-cog"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="{% url 'rh:empleado_update' empleado.pk %}"><i class="fas fa-edit me-2"></i>Editar</a></li>
+                <li><a class="dropdown-item" href="{% url 'rh:empleado_delete' empleado.pk %}"><i class="fas fa-trash-alt me-2"></i>Eliminar</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="#"><i class="fas fa-envelope me-2"></i>Enviar correo</a></li>
+                <li><a class="dropdown-item" href="#"><i class="fas fa-file-contract me-2"></i>Generar contrato</a></li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="card-body">
+        <div class="row mb-4">
+            <!-- Profile Column -->
+            <div class="col-md-3 text-center">
+                <div class="position-relative mb-3">
+                    {% if empleado.foto_perfil %}
+                        <img src="{{ empleado.foto_perfil.url }}" alt="Foto de {{ empleado.nombre }}" 
+                             class="img-fluid rounded-circle shadow-sm" 
+                             style="width: 180px; height: 180px; object-fit: cover; border: 3px solid #e9ecef;">
+                    {% else %}
+                        <div class="border rounded-circle shadow-sm bg-light d-flex justify-content-center align-items-center" 
+                             style="width: 180px; height: 180px; border: 3px solid #e9ecef;">
+                            <i class="fas fa-user fa-5x text-secondary"></i>
+                        </div>
+                    {% endif %}
+                    {% if empleado.activo %}
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success fs-6">
+                            Activo <i class="fas fa-check-circle ms-1"></i>
+                        </span>
+                    {% else %}
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger fs-6">
+                            Inactivo <i class="fas fa-times-circle ms-1"></i>
+                        </span>
+                    {% endif %}
+                </div>
+                
+                <h3 class="card-title text-primary mb-1">{{ empleado.nombre_completo }}</h3>
+                <p class="text-muted mb-2">
+                    <i class="fas fa-briefcase me-1"></i> {{ empleado.puesto.nombre|default:"Sin puesto asignado" }}
+                </p>
+                <p class="text-muted small mb-3">
+                    <i class="fas fa-building me-1"></i> {{ empleado.departamento.nombre|default:"Sin departamento" }}
+                </p>
+                
+                <div class="d-flex justify-content-center gap-2 mb-3">
+                    <span class="badge bg-info text-dark">
+                        <i class="fas fa-id-card me-1"></i> #{{ empleado.numero_empleado|default:"N/A" }}
+                    </span>
+                    <span class="badge bg-secondary">
+                        <i class="fas fa-calendar-alt me-1"></i> {{ empleado.antiguedad }} años
+                    </span>
+                </div>
+                
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-body py-2">
+                        <h6 class="mb-2"><i class="fas fa-chart-line me-2 text-primary"></i>Estadísticas</h6>
+                        <div class="d-flex justify-content-between small">
+                            <span>Salario actual:</span>
+                            <strong>${{ empleado.salario_actual.sueldo_mensual|intcomma|default:"N/A" }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between small">
+                            <span>Eventos:</span>
+                            <strong>{{ empleado.historial_laboral_eventos.count }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between small">
+                            <span>Documentos:</span>
+                            <strong>{{ empleado.documentos_count }}</strong>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <a href="mailto:{{ empleado.email }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-envelope me-1"></i> Contactar
+                    </a>
+                </div>
+            </div>
+
+            <!-- Main Content Column -->
+            <div class="col-md-9">
+                <!-- Enhanced Tab Navigation -->
+                <ul class="nav nav-tabs nav-tabs-custom nav-justified" id="employeeDetailTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="laboral-tab" data-bs-toggle="tab" data-bs-target="#laboral" type="button" role="tab">
+                            <i class="fas fa-briefcase me-2"></i>Laboral
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="personal-tab" data-bs-toggle="tab" data-bs-target="#personal" type="button" role="tab">
+                            <i class="fas fa-address-card me-2"></i>Personal
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="historial-tab" data-bs-toggle="tab" data-bs-target="#historial" type="button" role="tab">
+                            <i class="fas fa-history me-2"></i>Historial
+                            {% if empleado.historial_laboral_eventos.count > 0 %}
+                                <span class="badge bg-primary rounded-pill ms-1">{{ empleado.historial_laboral_eventos.count }}</span>
+                            {% endif %}
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="salarios-tab" data-bs-toggle="tab" data-bs-target="#salarios" type="button" role="tab">
+                            <i class="fas fa-money-bill-wave me-2"></i>Compensación
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="documentos-tab" data-bs-toggle="tab" data-bs-target="#documentos" type="button" role="tab">
+                            <i class="fas fa-folder-open me-2"></i>Documentos
+                            {% if empleado.documentos_count > 0 %}
+                                <span class="badge bg-primary rounded-pill ms-1">{{ empleado.documentos_count }}</span>
+                            {% endif %}
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="emergencia-tab" data-bs-toggle="tab" data-bs-target="#emergencia" type="button" role="tab">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Emergencia
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Tab Content -->
+                <div class="tab-content pt-4" id="employeeDetailTabContent">
+                    <!-- Laboral Tab -->
+                    <div class="tab-pane fade show active" id="laboral" role="tabpanel">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-header bg-light">
+                                        <h5 class="mb-0"><i class="fas fa-building me-2 text-primary"></i>Información Laboral</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <dl class="row mb-0">
+                                            <dt class="col-sm-5">Número de Empleado:</dt>
+                                            <dd class="col-sm-7">{{ empleado.numero_empleado|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Fecha de Contratación:</dt>
+                                            <dd class="col-sm-7">{{ empleado.fecha_contratacion|date:"d \d\e F, Y" }} ({{ empleado.antiguedad }} años)</dd>
+                                            
+                                            <dt class="col-sm-5">Tipo de Contrato:</dt>
+                                            <dd class="col-sm-7">{{ empleado.tipo_contrato|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Jornada Laboral:</dt>
+                                            <dd class="col-sm-7">{{ empleado.jornada_laboral|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Horario:</dt>
+                                            <dd class="col-sm-7">{{ empleado.horario_entrada|time:"H:i" }} - {{ empleado.horario_salida|time:"H:i"|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Supervisor:</dt>
+                                            <dd class="col-sm-7">
+                                                {% if empleado.supervisor %}
+                                                    <a href="{% url 'rh:empleado_detail' empleado.supervisor.pk %}">
+                                                        {{ empleado.supervisor.nombre_completo }}
+                                                    </a>
+                                                {% else %}
+                                                    N/A
+                                                {% endif %}
+                                            </dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-header bg-light">
+                                        <h5 class="mb-0"><i class="fas fa-address-book me-2 text-primary"></i>Información de Contacto</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <dl class="row mb-0">
+                                            <dt class="col-sm-5">Correo Electrónico:</dt>
+                                            <dd class="col-sm-7"><a href="mailto:{{ empleado.email }}">{{ empleado.email }}</a></dd>
+                                            
+                                            <dt class="col-sm-5">Teléfono Personal:</dt>
+                                            <dd class="col-sm-7">{{ empleado.telefono_personal|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Teléfono Oficina:</dt>
+                                            <dd class="col-sm-7">{{ empleado.telefono_oficina|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Extensión:</dt>
+                                            <dd class="col-sm-7">{{ empleado.extension|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Redes Sociales:</dt>
+                                            <dd class="col-sm-7">
+                                                {% if empleado.linkedin %}
+                                                    <a href="{{ empleado.linkedin }}" target="_blank" class="me-2"><i class="fab fa-linkedin text-primary"></i></a>
+                                                {% endif %}
+                                                {% if empleado.twitter %}
+                                                    <a href="{{ empleado.twitter }}" target="_blank" class="me-2"><i class="fab fa-twitter text-info"></i></a>
+                                                {% endif %}
+                                                {% if not empleado.linkedin and not empleado.twitter %}
+                                                    N/A
+                                                {% endif %}
+                                            </dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0"><i class="fas fa-chart-pie me-2 text-primary"></i>Estructura Organizacional</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="p-3 bg-light rounded">
+                                            <h6 class="text-center mb-3">Jefatura Directa</h6>
+                                            {% if empleado.supervisor %}
+                                                <div class="text-center">
+                                                    {% if empleado.supervisor.foto_perfil %}
+                                                        <img src="{{ empleado.supervisor.foto_perfil.url }}" class="rounded-circle mb-2" width="80" height="80">
+                                                    {% else %}
+                                                        <div class="rounded-circle bg-secondary text-white d-inline-flex align-items-center justify-content-center mb-2" style="width: 80px; height: 80px;">
+                                                            <i class="fas fa-user fa-2x"></i>
+                                                        </div>
+                                                    {% endif %}
+                                                    <h6>{{ empleado.supervisor.nombre_completo }}</h6>
+                                                    <small class="text-muted">{{ empleado.supervisor.puesto.nombre|default:"Sin puesto" }}</small>
+                                                </div>
+                                            {% else %}
+                                                <p class="text-center text-muted">No asignado</p>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <div class="p-3 bg-light rounded">
+                                            <h6 class="text-center mb-3">Equipo a Cargo</h6>
+                                            {% if empleado.equipo_a_cargo.exists %}
+                                                <div class="d-flex flex-wrap justify-content-center gap-2">
+                                                    {% for subordinado in empleado.equipo_a_cargo.all %}
+                                                        <div class="text-center">
+                                                            {% if subordinado.foto_perfil %}
+                                                                <img src="{{ subordinado.foto_perfil.url }}" class="rounded-circle mb-1" width="60" height="60">
+                                                            {% else %}
+                                                                <div class="rounded-circle bg-secondary text-white d-inline-flex align-items-center justify-content-center mb-1" style="width: 60px; height: 60px;">
+                                                                    <i class="fas fa-user"></i>
+                                                                </div>
+                                                            {% endif %}
+                                                            <small>{{ subordinado.nombre }}</small>
+                                                        </div>
+                                                    {% endfor %}
+                                                </div>
+                                            {% else %}
+                                                <p class="text-center text-muted">No tiene equipo a cargo</p>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <div class="p-3 bg-light rounded">
+                                            <h6 class="text-center mb-3">Compañeros de Departamento</h6>
+                                            {% if empleado.companeros_departamento.exists %}
+                                                <div class="d-flex flex-wrap justify-content-center gap-2">
+                                                    {% for companero in empleado.companeros_departamento.all %}
+                                                        {% if companero.pk != empleado.pk %}
+                                                            <div class="text-center">
+                                                                {% if companero.foto_perfil %}
+                                                                    <img src="{{ companero.foto_perfil.url }}" class="rounded-circle mb-1" width="60" height="60">
+                                                                {% else %}
+                                                                    <div class="rounded-circle bg-secondary text-white d-inline-flex align-items-center justify-content-center mb-1" style="width: 60px; height: 60px;">
+                                                                        <i class="fas fa-user"></i>
+                                                                    </div>
+                                                                {% endif %}
+                                                                <small>{{ companero.nombre }}</small>
+                                                            </div>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </div>
+                                            {% else %}
+                                                <p class="text-center text-muted">No hay compañeros registrados</p>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Personal Tab -->
+                    <div class="tab-pane fade" id="personal" role="tabpanel">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-header bg-light">
+                                        <h5 class="mb-0"><i class="fas fa-user-circle me-2 text-primary"></i>Datos Personales</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <dl class="row mb-0">
+                                            <dt class="col-sm-5">Nombre Completo:</dt>
+                                            <dd class="col-sm-7">{{ empleado.nombre_completo }}</dd>
+                                            
+                                            <dt class="col-sm-5">Fecha de Nacimiento:</dt>
+                                            <dd class="col-sm-7">{{ empleado.fecha_nacimiento|date:"d \d\e F, Y"|default:"N/A" }} ({{ empleado.edad }} años)</dd>
+                                            
+                                            <dt class="col-sm-5">Género:</dt>
+                                            <dd class="col-sm-7">{{ empleado.get_genero_display|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Estado Civil:</dt>
+                                            <dd class="col-sm-7">{{ empleado.get_estado_civil_display|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Nacionalidad:</dt>
+                                            <dd class="col-sm-7">{{ empleado.nacionalidad|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Lugar de Nacimiento:</dt>
+                                            <dd class="col-sm-7">{{ empleado.lugar_nacimiento|default:"N/A" }}</dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                                
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-header bg-light">
+                                        <h5 class="mb-0"><i class="fas fa-home me-2 text-primary"></i>Domicilio</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <dl class="row mb-0">
+                                            <dt class="col-sm-5">Dirección Completa:</dt>
+                                            <dd class="col-sm-7">{{ empleado.direccion|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Colonia:</dt>
+                                            <dd class="col-sm-7">{{ empleado.colonia|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Código Postal:</dt>
+                                            <dd class="col-sm-7">{{ empleado.codigo_postal|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Ciudad:</dt>
+                                            <dd class="col-sm-7">{{ empleado.ciudad|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Estado:</dt>
+                                            <dd class="col-sm-7">{{ empleado.estado|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">País:</dt>
+                                            <dd class="col-sm-7">{{ empleado.pais|default:"N/A" }}</dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-header bg-light">
+                                        <h5 class="mb-0"><i class="fas fa-id-card me-2 text-primary"></i>Identificación Oficial</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <dl class="row mb-0">
+                                            <dt class="col-sm-5">CURP:</dt>
+                                            <dd class="col-sm-7">{{ empleado.curp|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">RFC:</dt>
+                                            <dd class="col-sm-7">{{ empleado.rfc|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">NSS:</dt>
+                                            <dd class="col-sm-7">{{ empleado.nss|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Tipo de Sangre:</dt>
+                                            <dd class="col-sm-7">{{ empleado.tipo_sangre|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Alergias:</dt>
+                                            <dd class="col-sm-7">{{ empleado.alergias|default:"Ninguna registrada" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Enfermedades Crónicas:</dt>
+                                            <dd class="col-sm-7">{{ empleado.enfermedades_cronicas|default:"Ninguna registrada" }}</dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                                
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-header bg-light">
+                                        <h5 class="mb-0"><i class="fas fa-users me-2 text-primary"></i>Información Familiar</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <dl class="row mb-0">
+                                            <dt class="col-sm-5">Nombre del Cónyuge:</dt>
+                                            <dd class="col-sm-7">{{ empleado.nombre_conyuge|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Dependientes:</dt>
+                                            <dd class="col-sm-7">{{ empleado.numero_dependientes|default:"0" }}</dd>
+                                            
+                                            <dt class="col-sm-5">Hijos:</dt>
+                                            <dd class="col-sm-7">
+                                                {% if empleado.hijos.all %}
+                                                    <ul class="list-unstyled mb-0">
+                                                        {% for hijo in empleado.hijos.all %}
+                                                            <li>{{ hijo.nombre }} ({{ hijo.fecha_nacimiento|date:"Y" }})</li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                {% else %}
+                                                    Ninguno registrado
+                                                {% endif %}
+                                            </dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Historial Tab -->
+                    <div class="tab-pane fade" id="historial" role="tabpanel">
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="fas fa-history me-2 text-primary"></i>Historial Laboral</h5>
+                               
+                                    <i class="fas fa-plus me-1"></i> Agregar Evento
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                {% if empleado.historial_laboral_eventos.all %}
+                                    <div class="timeline">
+                                        {% for evento in empleado.historial_laboral_eventos.all|dictsortreversed:"fecha_inicio" %}
+                                            <div class="timeline-item {% if forloop.first %}first{% endif %} {% if forloop.last %}last{% endif %}">
+                                                <div class="timeline-badge {% if evento.tipo_evento == 'A' %}bg-success{% elif evento.tipo_evento == 'P' %}bg-warning{% else %}bg-info{% endif %}">
+                                                    <i class="fas {% if evento.tipo_evento == 'A' %}fa-user-plus{% elif evento.tipo_evento == 'P' %}fa-exchange-alt{% else %}fa-award{% endif %}"></i>
+                                                </div>
+                                                <div class="timeline-card shadow-sm">
+                                                    <div class="timeline-card-header d-flex justify-content-between">
+                                                        <h6>{{ evento.get_tipo_evento_display }}</h6>
+                                                        <span class="badge bg-light text-dark">
+                                                            {{ evento.fecha_inicio|date:"d/m/Y" }} 
+                                                            {% if evento.fecha_fin %} - {{ evento.fecha_fin|date:"d/m/Y" }}{% endif %}
+                                                        </span>
+                                                    </div>
+                                                    <div class="timeline-card-body">
+                                                        <p>{{ evento.descripcion|default:"Sin descripción adicional" }}</p>
+                                                        {% if evento.documento %}
+                                                            <a href="{{ evento.documento.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                                <i class="fas fa-file-download me-1"></i> Ver documento
+                                                            </a>
+                                                        {% endif %}
+                                                    </div>
+                                                    <div class="timeline-card-footer text-end">
+                                                        <small class="text-muted">Registrado por {{ evento.registrado_por.get_full_name }} el {{ evento.created_at|date:"d/m/Y" }}</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="text-center py-4">
+                                        <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                                        <h5>No hay eventos registrados</h5>
+                                        <p class="text-muted">No se han registrado eventos laborales para este empleado</p>
+                                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#nuevoEventoModal">
+                                            <i class="fas fa-plus me-1"></i> Agregar primer evento
+                                        </button>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-header bg-light">
+                                        <h5 class="mb-0"><i class="fas fa-user-graduate me-2 text-primary"></i>Formación Académica</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        {% if empleado.formacion_academica.all %}
+                                            <div class="list-group list-group-flush">
+                                                {% for formacion in empleado.formacion_academica.all %}
+                                                    <div class="list-group-item">
+                                                        <div class="d-flex justify-content-between">
+                                                            <h6 class="mb-1">{{ formacion.titulo }}</h6>
+                                                            <small class="text-muted">{{ formacion.fecha_inicio|date:"Y" }} - {{ formacion.fecha_fin|date:"Y" }}</small>
+                                                        </div>
+                                                        <p class="mb-1 small">{{ formacion.institucion }}</p>
+                                                        <small class="text-muted">{{ formacion.get_nivel_display }}</small>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        {% else %}
+                                            <div class="text-center py-3">
+                                                <i class="fas fa-graduation-cap fa-2x text-muted mb-2"></i>
+                                                <p class="text-muted mb-0">No hay formación académica registrada</p>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-header bg-light">
+                                        <h5 class="mb-0"><i class="fas fa-certificate me-2 text-primary"></i>Certificaciones</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        {% if empleado.certificaciones.all %}
+                                            <div class="list-group list-group-flush">
+                                                {% for cert in empleado.certificaciones.all %}
+                                                    <div class="list-group-item">
+                                                        <div class="d-flex justify-content-between">
+                                                            <h6 class="mb-1">{{ cert.nombre }}</h6>
+                                                            <small class="text-muted">{{ cert.fecha_obtencion|date:"Y" }}</small>
+                                                        </div>
+                                                        <p class="mb-1 small">{{ cert.organizacion }}</p>
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <small class="text-muted">
+                                                                {% if cert.vigencia %}
+                                                                    Vigente hasta {{ cert.fecha_expiracion|date:"d/m/Y" }}
+                                                                {% else %}
+                                                                    Expirada
+                                                                {% endif %}
+                                                            </small>
+                                                            {% if cert.documento %}
+                                                                <a href="{{ cert.documento.url }}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2">
+                                                                    <i class="fas fa-download fa-sm"></i>
+                                                                </a>
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        {% else %}
+                                            <div class="text-center py-3">
+                                                <i class="fas fa-certificate fa-2x text-muted mb-2"></i>
+                                                <p class="text-muted mb-0">No hay certificaciones registradas</p>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Salarios Tab -->
+                    <div class="tab-pane fade" id="salarios" role="tabpanel">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0"><i class="fas fa-chart-line me-2 text-primary"></i>Evolución Salarial</h5>
+                                      
+
+                                    </div>
+                                    <div class="card-body">
+                                        {% if empleado.salarios.all %}
+                                            <div class="table-responsive">
+                                                <table class="table table-hover">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th>Fecha</th>
+                                                            <th class="text-end">Diario</th>
+                                                            <th class="text-end">Mensual</th>
+                                                            <th class="text-end">Anual</th>
+                                                            <th>Variación</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for salario in empleado.salarios.all|dictsortreversed:"fecha_efectiva" %}
+                                                            <tr>
+                                                                <td>{{ salario.fecha_efectiva|date:"d/m/Y" }}</td>
+                                                                <td class="text-end">${{ salario.sueldo_diario|intcomma }}</td>
+                                                                <td class="text-end">${{ salario.sueldo_mensual|intcomma }}</td>
+                                                                <td class="text-end">${{ salario.sueldo_anual|intcomma }}</td>
+                                                                <td>
+                                                                    {% if not forloop.last %}
+                                                                        {% with prev=empleado.salarios.all|dictsortreversed:"fecha_efectiva"|slice:forloop.counter|first %}
+                                                                            {% widthratio salario.sueldo_mensual prev.sueldo_mensual 100 as ratio %}
+                                                                            {% if ratio > 100 %}
+                                                                                <span class="badge bg-success">
+                                                                                    <i class="fas fa-caret-up"></i> {{ ratio|add:"-100" }}%
+                                                                                </span>
+                                                                            {% elif ratio < 100 %}
+                                                                                <span class="badge bg-danger">
+                                                                                    <i class="fas fa-caret-down"></i> {{ 100|add:"-ratio" }}%
+                                                                                </span>
+                                                                            {% else %}
+                                                                                <span class="badge bg-secondary">0%</span>
+                                                                            {% endif %}
+                                                                        {% endwith %}
+                                                                    {% endif %}
+                                                                </td>
+                                                            </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            
+                                            <div class="mt-4">
+                                                <h6 class="mb-3">Resumen Salarial</h6>
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <div class="card bg-light border-0 mb-3">
+                                                            <div class="card-body py-2">
+                                                                <div class="d-flex justify-content-between align-items-center">
+                                                                    <div>
+                                                                        <small class="text-muted">Salario Actual</small>
+                                                                        <h5 class="mb-0">${{ empleado.salario_actual.sueldo_mensual|intcomma }}</h5>
+                                                                    </div>
+                                                                    <i class="fas fa-money-bill-wave fa-2x text-primary opacity-25"></i>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="card bg-light border-0 mb-3">
+                                                            <div class="card-body py-2">
+                                                                <div class="d-flex justify-content-between align-items-center">
+                                                                    <div>
+                                                                        <small class="text-muted">Primer Salario</small>
+                                                                        <h5 class="mb-0">${{ empleado.primer_salario.sueldo_mensual|intcomma }}</h5>
+                                                                    </div>
+                                                                    <i class="fas fa-history fa-2x text-primary opacity-25"></i>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <div class="text-center py-4">
+                                                <i class="fas fa-money-bill-wave fa-3x text-muted mb-3"></i>
+                                                <h5>No hay registros salariales</h5>
+                                                <p class="text-muted">No se han registrado movimientos salariales para este empleado</p>
+                                                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#nuevoSalarioModal">
+                                                    <i class="fas fa-plus me-1"></i> Registrar primer salario
+                                                </button>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-header bg-light">
+                                        <h5 class="mb-0"><i class="fas fa-university me-2 text-primary"></i>Datos Bancarios</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <dl class="row">
+                                            <dt class="col-sm-4">Banco:</dt>
+                                            <dd class="col-sm-8">{{ empleado.banco|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-4">CLABE:</dt>
+                                            <dd class="col-sm-8">{{ empleado.clabe_interbancaria|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-4">No. de Cuenta:</dt>
+                                            <dd class="col-sm-8">{{ empleado.numero_cuenta|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-4">Tipo de Cuenta:</dt>
+                                            <dd class="col-sm-8">{{ empleado.get_tipo_cuenta_display|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-4">Tarjeta Nómina:</dt>
+                                            <dd class="col-sm-8">{{ empleado.numero_tarjeta|default:"N/A" }}</dd>
+                                            
+                                            <dt class="col-sm-4">Última Actualización:</dt>
+                                            <dd class="col-sm-8">{{ empleado.fecha_actualizacion_bancaria|date:"d/m/Y"|default:"N/A" }}</dd>
+                                        </dl>
+                                        
+                                        {% if empleado.comprobante_cuenta %}
+                                            <div class="mt-3">
+                                                <a href="{{ empleado.comprobante_cuenta.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                    <i class="fas fa-file-download me-1"></i> Ver comprobante de cuenta
+                                                </a>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-header bg-light">
+                                        <h5 class="mb-0"><i class="fas fa-gift me-2 text-primary"></i>Prestaciones</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" {% if empleado.prestaciones.vales_despensa %}checked{% endif %} disabled>
+                                                    <label class="form-check-label">Vales de despensa</label>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" {% if empleado.prestaciones.seguro_gastos_medicos %}checked{% endif %} disabled>
+                                                    <label class="form-check-label">Seguro médico</label>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" {% if empleado.prestaciones.fondo_ahorro %}checked{% endif %} disabled>
+                                                    <label class="form-check-label">Fondo de ahorro</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" {% if empleado.prestaciones.caja_ahorro %}checked{% endif %} disabled>
+                                                    <label class="form-check-label">Caja de ahorro</label>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" {% if empleado.prestaciones.plan_pensiones %}checked{% endif %} disabled>
+                                                    <label class="form-check-label">Plan pensiones</label>
+                                                </div>
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" {% if empleado.prestaciones.otras_prestaciones %}checked{% endif %} disabled>
+                                                    <label class="form-check-label">Otras prestaciones</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        {% if empleado.prestaciones.notas %}
+                                            <div class="mt-3">
+                                                <h6>Notas adicionales:</h6>
+                                                <p class="small">{{ empleado.prestaciones.notas }}</p>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Documentos Tab -->
+                    <div class="tab-pane fade" id="documentos" role="tabpanel">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0"><i class="fas fa-file-alt me-2 text-primary"></i>Documentos Personales</h5>
+                                                                                </button>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="list-group list-group-flush">
+                                            {% if empleado.ine_documento %}
+                                                <div class="list-group-item">
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <div>
+                                                            <i class="fas fa-id-card text-primary me-2"></i>
+                                                            <span>INE / Identificación Oficial</span>
+                                                        </div>
+                                                        <div>
+                                                            <a href="{{ empleado.ine_documento.url }}" target="_blank" class="btn btn-sm btn-outline-primary me-1">
+                                                                <i class="fas fa-eye"></i>
+                                                            </a>
+                                                            <a href="{{ empleado.ine_documento.url }}" download class="btn btn-sm btn-outline-secondary">
+                                                                <i class="fas fa-download"></i>
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                    <small class="text-muted">Subido el {{ empleado.ine_documento_upload_date|date:"d/m/Y" }}</small>
+                                                </div>
+                                            {% endif %}
+                                            
+                                            {% if empleado.comprobante_domicilio %}
+                                                <div class="list-group-item">
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <div>
+                                                            <i class="fas fa-home text-primary me-2"></i>
+                                                            <span>Comprobante de Domicilio</span>
+                                                        </div>
+                                                        <div>
+                                                            <a href="{{ empleado.comprobante_domicilio.url }}" target="_blank" class="btn btn-sm btn-outline-primary me-1">
+                                                                <i class="fas fa-eye"></i>
+                                                            </a>
+                                                            <a href="{{ empleado.comprobante_domicilio.url }}" download class="btn btn-sm btn-outline-secondary">
+                                                                <i class="fas fa-download"></i>
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                    <small class="text-muted">Subido el {{ empleado.comprobante_domicilio_upload_date|date:"d/m/Y" }}</small>
+                                                </div>
+                                            {% endif %}
+                                            
+                                            {% if empleado.curriculum_vitae %}
+                                                <div class="list-group-item">
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <div>
+                                                            <i class="fas fa-file-alt text-primary me-2"></i>
+                                                            <span>Curriculum Vitae</span>
+                                                        </div>
+                                                        <div>
+                                                            <a href="{{ empleado.curriculum_vitae.url }}" target="_blank" class="btn btn-sm btn-outline-primary me-1">
+                                                                <i class="fas fa-eye"></i>
+                                                            </a>
+                                                            <a href="{{ empleado.curriculum_vitae.url }}" download class="btn btn-sm btn-outline-secondary">
+                                                                <i class="fas fa-download"></i>
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                    <small class="text-muted">Subido el {{ empleado.curriculum_vitae_upload_date|date:"d/m/Y" }}</small>
+                                                </div>
+                                            {% endif %}
+                                            
+                                            {% if not empleado.ine_documento and not empleado.comprobante_domicilio and not empleado.curriculum_vitae %}
+                                                <div class="text-center py-4">
+                                                    <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                                                    <h5>No hay documentos personales</h5>
+                                                    <p class="text-muted">No se han cargado documentos personales para este empleado</p>
+                                                                                                        </button>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0"><i class="fas fa-file-contract me-2 text-primary"></i>Documentos Laborales</h5>
+
+                                        </button>
+                                    </div>
+                                    <div class="card-body">
+                                        {% if empleado.contrato_laboral %}
+                                            <div class="list-group list-group-flush">
+                                                <div class="list-group-item">
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <div>
+                                                            <i class="fas fa-file-signature text-primary me-2"></i>
+                                                            <span>Contrato Laboral</span>
+                                                        </div>
+                                                        <div>
+                                                            <a href="{{ empleado.contrato_laboral.url }}" target="_blank" class="btn btn-sm btn-outline-primary me-1">
+                                                                <i class="fas fa-eye"></i>
+                                                            </a>
+                                                            <a href="{{ empleado.contrato_laboral.url }}" download class="btn btn-sm btn-outline-secondary">
+                                                                <i class="fas fa-download"></i>
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                    <small class="text-muted">Subido el {{ empleado.contrato_laboral_upload_date|date:"d/m/Y" }}</small>
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <div class="text-center py-4">
+                                                <i class="fas fa-file-signature fa-3x text-muted mb-3"></i>
+                                                <h5>No hay contrato laboral</h5>
+                                                <p class="text-muted">No se ha cargado el contrato laboral de este empleado</p>
+                                                                                                </button>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0"><i class="fas fa-truck-moving me-2 text-primary"></i>Documentos de Operador</h5>
+
+                                        </button>
+                                    </div>
+                                    <div class="card-body">
+                                        {% if empleado.documentos_operador.all %}
+                                            <div class="list-group list-group-flush">
+                                                {% for doc in empleado.documentos_operador.all %}
+                                                    <div class="list-group-item">
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <div>
+                                                                <i class="fas {{ doc.tipo_documento.icono|default:'fa-file' }} text-primary me-2"></i>
+                                                                <span>{{ doc.tipo_documento.nombre }}</span>
+                                                            </div>
+                                                            <div>
+                                                                <a href="{{ doc.archivo.url }}" target="_blank" class="btn btn-sm btn-outline-primary me-1">
+                                                                    <i class="fas fa-eye"></i>
+                                                                </a>
+                                                                <a href="{{ doc.archivo.url }}" download class="btn btn-sm btn-outline-secondary">
+                                                                    <i class="fas fa-download"></i>
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                        <div class="d-flex justify-content-between">
+                                                            <small class="text-muted">Vigencia: {{ doc.fecha_expiracion|date:"d/m/Y" }}</small>
+                                                            <small class="text-muted">Subido el {{ doc.fecha_subida|date:"d/m/Y" }}</small>
+                                                        </div>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        {% else %}
+                                            <div class="text-center py-4">
+                                                <i class="fas fa-truck-moving fa-3x text-muted mb-3"></i>
+                                                <h5>No hay documentos de operador</h5>
+                                                <p class="text-muted">No se han cargado documentos específicos para operadores</p>
+                                                
+                                                    <i class="fas fa-upload me-1"></i> Subir documento
+                                                </button>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Emergencia Tab -->
+                    <div class="tab-pane fade" id="emergencia" role="tabpanel">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-sm mb-4">
+                                    <div class="card-header bg-light">
+                                        <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2 text-primary"></i>Contactos de Emergencia</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        {% if empleado.contactos_emergencia.all %}
+                                            <div class="accordion" id="emergencyContactsAccordion">
+                                                {% for contacto in empleado.contactos_emergencia.all %}
+                                                    <div class="accordion-item">
+                                                        <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+                                                            <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}">
+                                                                {{ contacto.nombre }} ({{ contacto.parentesco }})
+                                                            </button>
+                                                        </h2>
+                                                        <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#emergencyContactsAccordion">
+                                                            <div class="accordion-body">
+                                                                <dl class="row mb-0">
+                                                                    <dt class="col-sm-4">Teléfono:</dt>
+                                                                    <dd class="col-sm-8">{{ contacto.telefono }}</dd>
+                                                                    
+                                                                    <dt class="col-sm-4">Celular:</dt>
+                                                                    <dd class="col-sm-8">{{ contacto.celular|default:"N/A" }}</dd>
+                                                                    
+                                                                    <dt class="col-sm-4">Correo:</dt>
+                                                                    <dd class="col-sm-8">{{ contacto.email|default:"N/A" }}</dd>
+                                                                    
+                                                                    <dt class="col-sm-4">Dirección:</dt>
+                                                                    <dd class="col-sm-8">{{ contacto.direccion|default:"N/A" }}</dd>
+                                                                    
+                                                                    <dt class="col-sm-4">Prioridad:</dt>
+                                                                    <dd class="col-sm-8">
+                                                                        <span class="badge {% if contacto.prioridad == 'P' %}bg-danger{% else %}bg-warning{% endif %}">
+                                                                            {{ contacto.get_prioridad_display }}
+                                                                        </span>
+                                                                    </dd>
+                                                                </dl>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        {% else %}
+                                            <div class="text-center py-4">
+                                                <i class="fas fa-exclamation-triangle fa-3x text-muted mb-3"></i>
+                                                <h5>No hay contactos de emergencia</h5>
+                                                <p class="text-muted">No se han registrado contactos de emergencia para este empleado</p>
+                                                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#nuevoContactoModal">
+                                                    <i class="fas fa-plus me-1"></i> Agregar contacto
+                                                </button>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+
+
+        <!-- Footer Actions -->
+        <div class="mt-4 pt-3 border-top d-flex justify-content-between">
+            <a href="{% url 'rh:lista_empleados' %}" class="btn btn-outline-secondary btn-lg">
+                <i class="fas fa-arrow-left me-2"></i>Regresar a la Lista
+            </a>
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline-secondary btn-lg dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="fas fa-ellipsis-v"></i> Más acciones
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{% url 'rh:empleado_update' empleado.pk %}"><i class="fas fa-edit me-2"></i> Editar información</a></li>
+                    <li><a class="dropdown-item" href="{% url 'rh:empleado_delete' empleado.pk %}"><i class="fas fa-trash-alt me-2"></i> Eliminar empleado</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="#"><i class="fas fa-file-contract me-2"></i> Generar contrato</a></li>
+                    <li><a class="dropdown-item" href="#"><i class="fas fa-envelope me-2"></i> Enviar correo</a></li>
+                    <li><a class="dropdown-item" href="#"><i class="fas fa-exchange-alt me-2"></i> Cambiar de puesto</a></li>
+                    <li><a class="dropdown-item" href="#"><i class="fas fa-user-clock me-2"></i> Registrar baja</a></li>
+                </ul>
+                <a href="{% url 'rh:empleado_update' empleado.pk %}" class="btn btn-primary btn-lg shadow-sm">                   
+                   <i class="fas fa-edit me-2"></i>Editar Empleado
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modals -->
+<div class="modal fade" id="nuevoEventoModal" tabindex="-1" aria-labelledby="nuevoEventoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="nuevoEventoModalLabel"><i class="fas fa-plus-circle me-2"></i>Nuevo Evento Laboral</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="tipo_evento" class="form-label">Tipo de Evento</label>
+                        <select class="form-select" id="tipo_evento" name="tipo_evento" required>
+                            <option value="">Seleccione un tipo</option>
+                            <option value="A">Ascenso</option>
+                            <option value="P">Cambio de Puesto</option>
+                            <option value="R">Reconocimiento</option>
+                            <option value="S">Sanción</option>
+                            <option value="O">Otro</option>
+                        </select>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="fecha_inicio" class="form-label">Fecha Inicio</label>
+                            <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="fecha_fin" class="form-label">Fecha Fin (opcional)</label>
+                            <input type="date" class="form-control" id="fecha_fin" name="fecha_fin">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="descripcion" class="form-label">Descripción</label>
+                        <textarea class="form-control" id="descripcion" name="descripcion" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="documento" class="form-label">Documento (opcional)</label>
+                        <input class="form-control" type="file" id="documento" name="documento">
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar Evento</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="nuevoSalarioModal" tabindex="-1" aria-labelledby="nuevoSalarioModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="nuevoSalarioModalLabel"><i class="fas fa-money-bill-wave me-2"></i>Nuevo Registro Salarial</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="fecha_efectiva" class="form-label">Fecha Efectiva</label>
+                        <input type="date" class="form-control" id="fecha_efectiva" name="fecha_efectiva" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="sueldo_diario" class="form-label">Sueldo Diario</label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" step="0.01" class="form-control" id="sueldo_diario" name="sueldo_diario" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="motivo" class="form-label">Motivo del Ajuste</label>
+                        <select class="form-select" id="motivo" name="motivo" required>
+                            <option value="">Seleccione un motivo</option>
+                            <option value="C">Contratación inicial</option>
+                            <option value="A">Ajuste anual</option>
+                            <option value="P">Promoción</option>
+                            <option value="O">Otro</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="notas" class="form-label">Notas Adicionales</label>
+                        <textarea class="form-control" id="notas" name="notas" rows="2"></textarea>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar Salario</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Custom Timeline CSS */
+    .timeline {
+        position: relative;
+        padding-left: 50px;
+    }
+    
+    .timeline-item {
+        position: relative;
+        padding-bottom: 30px;
+    }
+    
+    .timeline-item.first .timeline-badge:after {
+        display: none;
+    }
+    
+    .timeline-item.last .timeline-badge:before {
+        display: none;
+    }
+    
+    .timeline-badge {
+        position: absolute;
+        left: -50px;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2;
+    }
+    
+    .timeline-badge:before,
+    .timeline-badge:after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        width: 2px;
+        background-color: #dee2e6;
+        transform: translateX(-50%);
+    }
+    
+    .timeline-badge:before {
+        top: -100%;
+        height: 100%;
+    }
+    
+    .timeline-badge:after {
+        bottom: -100%;
+        height: 100%;
+    }
+    
+    .timeline-card {
+        background: #fff;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    
+    .timeline-card-header {
+        padding: 12px 15px;
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .timeline-card-body {
+        padding: 15px;
+    }
+    
+    .timeline-card-footer {
+        padding: 10px 15px;
+        background-color: #f8f9fa;
+        border-top: 1px solid #eee;
+        font-size: 0.85em;
+    }
+    
+    /* Custom tabs */
+    .nav-tabs-custom .nav-link {
+        border: none;
+        color: #6c757d;
+        font-weight: 500;
+        padding: 12px 20px;
+    }
+    
+    .nav-tabs-custom .nav-link.active {
+        color: #0d6efd;
+        background: transparent;
+        border-bottom: 3px solid #0d6efd;
+    }
+    
+    /* Profile image hover effect */
+    .profile-img-container {
+        transition: all 0.3s ease;
+    }
+    
+    .profile-img-container:hover {
+        transform: scale(1.05);
+    }
+</style>
+{% endblock %}

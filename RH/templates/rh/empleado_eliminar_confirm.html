@@ -1,0 +1,56 @@
+{% extends 'rh/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card border-warning">
+        <div class="card-header bg-warning text-white">
+            <h4><i class="fas fa-trash-alt me-2"></i> Mover a Papelera de Reciclaje</h4>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning">
+                <h5><i class="fas fa-exclamation-triangle me-2"></i> ¿Estás seguro?</h5>
+                <p class="mb-0">
+                    El empleado <strong>{{ empleado.nombre_completo }}</strong> será movido a la papelera de reciclaje.
+                    Podrás restaurarlo más tarde si te equivocaste.
+                </p>
+            </div>
+            
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h6>Información del Empleado:</h6>
+                    <p><strong>Nombre:</strong> {{ empleado.nombre_completo }}</p>
+                    <p><strong>Puesto:</strong> {{ empleado.puesto|default:"N/A" }}</p>
+                    <p><strong>Departamento:</strong> {{ empleado.departamento|default:"N/A" }}</p>
+                    <p><strong>Estado:</strong> 
+                        <span class="badge {% if empleado.activo %}bg-success{% else %}bg-danger{% endif %}">
+                            {{ empleado.activo|yesno:"Activo,Inactivo" }}
+                        </span>
+                    </p>
+                </div>
+            </div>
+            
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="motivo_eliminacion" class="form-label">
+                        <i class="fas fa-comment me-1"></i> Motivo de eliminación (opcional):
+                    </label>
+                    <textarea class="form-control" id="motivo_eliminacion" name="motivo_eliminacion" 
+                              rows="3" placeholder="Ej: Registro de prueba, empleado renunció, etc."></textarea>
+                    <div class="form-text">Esta información ayudará a identificar por qué fue eliminado.</div>
+                </div>
+                
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'rh:lista_empleados' %}" class="btn btn-secondary">
+                        <i class="fas fa-times me-1"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-trash-alt me-1"></i> Mover a Papelera
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1593,3 +1593,40 @@ class PrecioMedline(models.Model):
 
     def __str__(self):
         return f"{self.mes} - Cartón: ${self.precio_carton} | Archivo: ${self.precio_archivo}"
+
+
+class ConfiguracionAlertaMerma(models.Model):
+    """
+    Umbral de merma (%) por material. Si la merma supera el umbral,
+    se dispara un correo de alerta. Default global: 1 %.
+    """
+    material = models.OneToOneField(
+        'Material', on_delete=models.CASCADE,
+        related_name='config_alerta_merma',
+        verbose_name="Material"
+    )
+    porcentaje_umbral = models.DecimalField(
+        max_digits=5, decimal_places=2, default=1.00,
+        verbose_name="Umbral de merma (%)"
+    )
+
+    class Meta:
+        verbose_name = 'Configuración Alerta Merma'
+        verbose_name_plural = 'Configuraciones Alerta Merma'
+        ordering = ['material__nombre']
+
+    def __str__(self):
+        return f"{self.material.nombre} — {self.porcentaje_umbral}%"
+
+
+class DestinatarioAlertaMerma(models.Model):
+    """Correos que reciben las alertas de merma."""
+    email = models.EmailField(unique=True, verbose_name="Correo electrónico")
+
+    class Meta:
+        verbose_name = 'Destinatario Alerta Merma'
+        verbose_name_plural = 'Destinatarios Alerta Merma'
+        ordering = ['email']
+
+    def __str__(self):
+        return self.email

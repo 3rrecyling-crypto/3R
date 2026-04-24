@@ -1,0 +1,94 @@
+{% extends 'rh/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card border-danger">
+        <div class="card-header bg-danger text-white">
+            <h4><i class="fas fa-broom me-2"></i> Vaciar Papelera de Reciclaje</h4>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-danger">
+                <h5><i class="fas fa-radiation me-2"></i> ¡OPERACIÓN PELIGROSA!</h5>
+                <p class="mb-0">
+                    Esta acción <strong>ELIMINARÁ PERMANENTEMENTE</strong> 
+                    <strong class="fs-5">{{ total_eliminados }} empleados</strong> de la papelera.
+                </p>
+            </div>
+            
+            <div class="card mb-3 border-danger">
+                <div class="card-body">
+                    <h6>Consecuencias:</h6>
+                    <ul class="mb-0">
+                        <li>Todos los empleados en la papelera serán borrados permanentemente</li>
+                        <li>Se perderán TODOS los datos relacionados con estos empleados</li>
+                        <li>Esta acción NO se puede deshacer</li>
+                        <li>No podrás recuperar NINGÚN registro después</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="alert alert-warning">
+                <h6><i class="fas fa-lightbulb me-1"></i> Recomendación:</h6>
+                <p class="mb-0">
+                    Considera restaurar los empleados importantes antes de vaciar la papelera, 
+                    o eliminar solo los que sean registros de prueba o realmente innecesarios.
+                </p>
+            </div>
+            
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="confirmar1" required>
+                        <label class="form-check-label" for="confirmar1">
+                            He revisado los empleados en la papelera y sé lo que estoy eliminando
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="confirmar2" required>
+                        <label class="form-check-label" for="confirmar2">
+                            Entiendo que esta acción es irreversible y eliminará {{ total_eliminados }} registros permanentemente
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="confirmar3" required>
+                        <label class="form-check-label" for="confirmar3">
+                            Tengo una copia de seguridad de los datos importantes
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'rh:papelera_empleados' %}" class="btn btn-secondary">
+                        <i class="fas fa-times me-1"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-danger" id="vaciarBtn" disabled>
+                        <i class="fas fa-broom me-1"></i> Sí, vaciar papelera
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+const checkboxes = document.querySelectorAll('.form-check-input');
+const vaciarBtn = document.getElementById('vaciarBtn');
+
+function checkAllChecked() {
+    const allChecked = Array.from(checkboxes).every(checkbox => checkbox.checked);
+    vaciarBtn.disabled = !allChecked;
+}
+
+checkboxes.forEach(checkbox => {
+    checkbox.addEventListener('change', checkAllChecked);
+});
+</script>
+{% endblock %}

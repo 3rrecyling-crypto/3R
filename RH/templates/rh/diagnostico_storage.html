@@ -1,0 +1,94 @@
+{% extends 'rh/base.html' %}
+
+{% block rh_title %}Diagnóstico de Storage{% endblock %}
+
+{% block rh_content %}
+<div class="container mt-4">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h4 class="mb-0"><i class="fas fa-database me-2"></i>Diagnóstico de Almacenamiento (Storage)</h4>
+            <span class="badge bg-light text-primary">{{ results.storage_backend }}</span>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i> Esta herramienta ayuda a verificar si las carpetas de plantillas
+                necesarias para generar documentos existen en el sistema de archivos actual (S3 en producción, Disco
+                Local en desarrollo).
+            </div>
+
+            <h5 class="mt-4 mb-3 border-bottom pb-2">Estado de Carpetas Críticas</h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Ruta</th>
+                            <th>Estado</th>
+                            <th>Acción Recomendada</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for folder in results.carpetas_verificadas %}
+                        <tr>
+                            <td><code>{{ folder.path }}</code></td>
+                            <td>
+                                {% if folder.existe %}
+                                <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i> Existe</span>
+                                {% else %}
+                                <span class="badge bg-danger"><i class="fas fa-times-circle me-1"></i> No
+                                    Encontrada</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if not folder.existe %}
+                                {% if folder.path == 'plantillas/operadores' or folder.path ==
+                                'plantillas/administrativos' %}
+                                <span class="text-danger fw-bold">CRÍTICO: Subir plantillas .docx a esta ruta</span>
+                                {% else %}
+                                <span class="text-warning">Revisar configuración de MEDIA_ROOT</span>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-success">Correcto</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <h5 class="mt-4 mb-3 border-bottom pb-2">Archivos Encontrados (Top 50)</h5>
+            <div class="bg-light p-3 rounded" style="max-height: 300px; overflow-y: auto;">
+                {% if results.archivos_encontrados %}
+                <ul class="list-unstyled mb-0">
+                    {% for file in results.archivos_encontrados %}
+                    <li><i class="far fa-file-word text-primary me-2"></i>{{ file }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted italic mb-0">No se encontraron archivos en las carpetas verificadas.</p>
+                {% endif %}
+            </div>
+
+            {% if results.errores %}
+            <h5 class="mt-4 text-danger border-bottom pb-2">Errores Detectados</h5>
+            <div class="alert alert-warning">
+                <ul class="mb-0">
+                    {% for error in results.errores %}
+                    <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <div class="mt-4 pt-3 border-top">
+                <a href="{% url 'rh:dashboard_operadores' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Volver al Dashboard
+                </a>
+                <button onclick="window.location.reload()" class="btn btn-outline-primary ms-2">
+                    <i class="fas fa-sync me-2"></i>Re-intentar Diagnóstico
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

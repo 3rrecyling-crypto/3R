@@ -1,0 +1,236 @@
+{% extends 'rh/base.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header pb-0 d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">{{ page_title }}</h6>
+                        <p class="text-sm mb-0">Gestión de bajas de empleados</p>
+                    </div>
+                    <div>
+                        <a href="{% url 'rh:historial_bajas' %}" class="btn btn-outline-primary btn-sm">
+                            <i class="fa fa-history me-1"></i> Ver Historial Completo
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estadísticas -->
+            <div class="row mb-4">
+                <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+                    <div class="card">
+                        <div class="card-body p-3">
+                            <div class="row">
+                                <div class="col-8">
+                                    <div class="numbers">
+                                        <p class="text-sm mb-0 text-uppercase font-weight-bold">Total Bajas</p>
+                                        <h5 class="font-weight-bolder">{{ total_bajas }}</h5>
+                                    </div>
+                                </div>
+                                <div class="col-4 text-end">
+                                    <div class="icon icon-shape bg-gradient-primary shadow-primary text-center rounded-circle">
+                                        <i class="fa fa-users-slash text-lg opacity-10"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+                    <div class="card">
+                        <div class="card-body p-3">
+                            <div class="row">
+                                <div class="col-8">
+                                    <div class="numbers">
+                                        <p class="text-sm mb-0 text-uppercase font-weight-bold">Recontratables</p>
+                                        <h5 class="font-weight-bolder">{{ recontratables }}</h5>
+                                    </div>
+                                </div>
+                                <div class="col-4 text-end">
+                                    <div class="icon icon-shape bg-gradient-warning shadow-warning text-center rounded-circle">
+                                        <i class="fa fa-user-clock text-lg opacity-10"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+                    <div class="card">
+                        <div class="card-body p-3">
+                            <div class="row">
+                                <div class="col-8">
+                                    <div class="numbers">
+                                        <p class="text-sm mb-0 text-uppercase font-weight-bold">Recontratados</p>
+                                        <h5 class="font-weight-bolder">{{ recontratados }}</h5>
+                                    </div>
+                                </div>
+                                <div class="col-4 text-end">
+                                    <div class="icon icon-shape bg-gradient-success shadow-success text-center rounded-circle">
+                                        <i class="fa fa-user-check text-lg opacity-10"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtros -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">Filtros</h6>
+                </div>
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Tipo de Baja</label>
+                            <select name="tipo_baja" class="form-select">
+                                <option value="">Todos</option>
+                                <option value="voluntaria" {% if filtros.tipo_baja == 'voluntaria' %}selected{% endif %}>Voluntaria</option>
+                                <option value="involuntaria" {% if filtros.tipo_baja == 'involuntaria' %}selected{% endif %}>Involuntaria</option>
+                                <option value="termino_contrato" {% if filtros.tipo_baja == 'termino_contrato' %}selected{% endif %}>Término de Contrato</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label class="form-label">Estado</label>
+                            <select name="estado" class="form-select">
+                                <option value="">Todos</option>
+                                <option value="recontratable" {% if filtros.estado == 'recontratable' %}selected{% endif %}>Recontratables</option>
+                                <option value="recontratado" {% if filtros.estado == 'recontratado' %}selected{% endif %}>Recontratados</option>
+                                <option value="definitiva" {% if filtros.estado == 'definitiva' %}selected{% endif %}>Definitivas</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label class="form-label">Fecha Inicio</label>
+                            <input type="date" name="fecha_inicio" class="form-control" value="{{ filtros.fecha_inicio }}">
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label class="form-label">Fecha Fin</label>
+                            <input type="date" name="fecha_fin" class="form-control" value="{{ filtros.fecha_fin }}">
+                        </div>
+                        
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa fa-filter me-1"></i> Filtrar
+                            </button>
+                            <a href="{% url 'rh:lista_bajas' %}" class="btn btn-secondary">
+                                <i class="fa fa-times me-1"></i> Limpiar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Tabla de Bajas -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Registros de Bajas</h6>
+                </div>
+                <div class="card-body px-0 pt-0 pb-2">
+                    <div class="table-responsive p-0">
+                        <table class="table align-items-center mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Empleado</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Fecha Baja</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Tipo</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Motivo</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Estado</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for baja in bajas %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex px-2 py-1">
+                                            <div>
+                                                <img src="{% if baja.empleado.foto %}{{ baja.empleado.foto.url }}{% else %}{% static 'img/default-avatar.png' %}{% endif %}" 
+                                                     class="avatar avatar-sm me-3" alt="{{ baja.empleado.nombre_completo }}">
+                                            </div>
+                                            <div class="d-flex flex-column justify-content-center">
+                                                <h6 class="mb-0 text-sm">{{ baja.empleado.nombre_completo }}</h6>
+                                                <p class="text-xs text-secondary mb-0">{{ baja.empleado.puesto|default:"Sin puesto" }}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <p class="text-xs font-weight-bold mb-0">{{ baja.fecha_baja|date:"d/m/Y" }}</p>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-sm 
+                                            {% if baja.tipo_baja == 'voluntaria' %}bg-info
+                                            {% elif baja.tipo_baja == 'involuntaria' %}bg-danger
+                                            {% elif baja.tipo_baja == 'termino_contrato' %}bg-warning
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ baja.get_tipo_baja_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <p class="text-xs font-weight-bold mb-0">{{ baja.motivo_principal.nombre|truncatechars:30 }}</p>
+                                    </td>
+                                    <td>
+                                        {% if baja.recontratado %}
+                                            <span class="badge bg-success">Recontratado</span>
+                                        {% elif baja.es_recontratable %}
+                                            <span class="badge bg-warning">Recontratable</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Definitiva</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="align-middle">
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'rh:detalle_baja' pk=baja.id %}" 
+                                               class="btn btn-info btn-sm" 
+                                               data-bs-toggle="tooltip" 
+                                               title="Ver detalles">
+                                                <i class="fa fa-eye"></i>
+                                            </a>
+                                            <a href="{% url 'rh:editar_baja' pk=baja.id %}" 
+                                               class="btn btn-warning btn-sm" 
+                                               data-bs-toggle="tooltip" 
+                                               title="Editar">
+                                                <i class="fa fa-edit"></i>
+                                            </a>
+                                            {% if not baja.recontratado %}
+                                            <a href="{% url 'rh:eliminar_baja' pk=baja.id %}" 
+                                               class="btn btn-danger btn-sm" 
+                                               data-bs-toggle="tooltip" 
+                                               title="Eliminar">
+                                                <i class="fa fa-trash"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4">
+                                        <div class="text-muted">
+                                            <i class="fa fa-inbox fa-2x mb-2"></i>
+                                            <p>No se encontraron registros de bajas</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

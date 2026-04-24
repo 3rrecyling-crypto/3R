@@ -1,0 +1,74 @@
+{% extends 'rh/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card border-danger">
+        <div class="card-header bg-danger text-white">
+            <h4><i class="fas fa-radiation me-2"></i> Eliminar Permanentemente</h4>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-danger">
+                <h5><i class="fas fa-exclamation-triangle me-2"></i> ¡ADVERTENCIA CRÍTICA!</h5>
+                <p class="mb-0">
+                    Esta acción <strong>ELIMINARÁ PERMANENTEMENTE</strong> el empleado del sistema.
+                    <br>
+                    <strong>NO podrás recuperarlo después.</strong>
+                </p>
+            </div>
+            
+            <div class="card mb-3 border-danger">
+                <div class="card-body">
+                    <h6>Información que se perderá permanentemente:</h6>
+                    <ul class="mb-0">
+                        <li>Datos personales del empleado</li>
+                        <li>Historial laboral</li>
+                        <li>Documentos subidos</li>
+                        <li>Contratos</li>
+                        <li>Vacaciones registradas</li>
+                        <li>Préstamos y pagos</li>
+                        <li>Toda la información relacionada</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h6>Empleado a eliminar:</h6>
+                    <p><strong>Nombre:</strong> {{ empleado.nombre_completo }}</p>
+                    <p><strong>ID:</strong> {{ empleado.id }}</p>
+                    <p><strong>Puesto:</strong> {{ empleado.puesto|default:"N/A" }}</p>
+                    <p><strong>En papelera desde:</strong> {{ empleado.fecha_eliminacion|date:"d/m/Y"|default:"N/A" }}</p>
+                </div>
+            </div>
+            
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="confirmar" required>
+                        <label class="form-check-label" for="confirmar">
+                            Entiendo que esta acción es irreversible y eliminará permanentemente todos los datos
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'rh:papelera_empleados' %}" class="btn btn-secondary">
+                        <i class="fas fa-times me-1"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-danger" id="eliminarBtn" disabled>
+                        <i class="fas fa-radiation me-1"></i> Eliminar Permanentemente
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('confirmar').addEventListener('change', function() {
+    document.getElementById('eliminarBtn').disabled = !this.checked;
+});
+</script>
+{% endblock %}

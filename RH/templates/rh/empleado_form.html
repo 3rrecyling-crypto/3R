@@ -1,0 +1,1358 @@
+{# RH/templates/rh/empleado_form.html #}
+{% extends 'rh/base.html' %}
+{% load humanize %}
+
+{% block rh_title %}{% if form.instance.pk %}Editar Empleado{% else %}Nuevo Empleado{% endif %}{% endblock %}
+
+{% block rh_content %}
+<div class="card shadow-lg border-0 rounded-4 bg-white premium-card">
+    <div class="card-header bg-gradient-primary text-white rounded-top-4 py-4 px-4 border-0 premium-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h3 class="mb-0 fw-bold">
+                <i class="fas fa-id-card-alt me-2"></i>
+                {% if form.instance.pk %}
+                Editar Empleado: <span class="text-info">{{ empleado.nombre }} {{ empleado.apellido }}</span>
+                {% else %}
+                Nuevo Empleado
+                {% endif %}
+            </h3>
+            {% if form.instance.pk and form.instance.foto_perfil %}
+            <img src="{{ form.instance.foto_perfil.url }}" alt="Foto de Perfil"
+                class="rounded-circle border border-4 border-white shadow"
+                style="width: 70px; height: 70px; object-fit: cover;">
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body px-4 py-4 bg-premium rounded-bottom-4">
+        {% if form.instance.pk and dashboard_stats %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card-header card-header-gradient mb-3">
+                    <h5 class="mb-0 text-white"><i class="fas fa-chart-line me-2"></i>Resumen del Empleado</h5>
+                </div>
+            </div>
+            <div class="col-xl col-md-6 mb-3">
+                <div class="card border-left-primary shadow-sm h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Sueldo Mensual</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ dashboard_stats.sueldo_mensual }}</div>
+                            </div>
+                            <div class="col-auto"><i class="fas fa-dollar-sign fa-2x text-gray-300"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl col-md-6 mb-3">
+                <div class="card border-left-success shadow-sm h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Días de Vacaciones</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ dashboard_stats.vacaciones_disponibles|intcomma }}</div>
+                            </div>
+                            <div class="col-auto"><i class="fas fa-plane-departure fa-2x text-gray-300"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl col-md-6 mb-3">
+                <div class="card border-left-danger shadow-sm h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Actas Admin.</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ dashboard_stats.actas_administrativas }}</div>
+                            </div>
+                            <div class="col-auto"><i class="fas fa-gavel fa-2x text-gray-300"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl col-md-6 mb-3">
+                <div class="card border-left-warning shadow-sm h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Suspensiones</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ dashboard_stats.suspensiones }}</div>
+                            </div>
+                            <div class="col-auto"><i class="fas fa-user-clock fa-2x text-gray-300"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl col-md-6 mb-3">
+                <div class="card border-left-info shadow-sm h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Permisos</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ dashboard_stats.permisos }}</div>
+                            </div>
+                            <div class="col-auto"><i class="fas fa-calendar-check fa-2x text-gray-300"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xl col-md-6 mb-3">
+                <div class="card border-left-dark shadow-sm h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-dark text-uppercase mb-1">Re-Contrat.</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ dashboard_stats.recontrataciones }}</div>
+                            </div>
+                            <div class="col-auto"><i class="fas fa-user-plus fa-2x text-gray-300"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if all_errors %}
+        <div class="alert alert-danger shadow-sm border-0 rounded-3 premium-alert" role="alert">
+            <h4 class="alert-heading mb-2"><i class="fas fa-exclamation-triangle me-2"></i>¡Error de Validación!</h4>
+            <p class="mb-2">Por favor, corrige los siguientes errores antes de continuar:</p>
+            <ul class="mb-0 ps-3">
+                {% for error in all_errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        
+        <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate autocomplete="off">
+            {% csrf_token %}
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card h-100 border-0 shadow-sm rounded-3 bg-white premium-card">
+                        <div class="card-body text-center">
+                            <div class="position-relative mb-3">
+                                <img id="profile-preview"
+                                    src="{% if form.instance.foto_perfil %}{{ form.instance.foto_perfil.url }}{% else %}https://ui-avatars.com/api/?name={{ form.nombre.value|default:'Empleado' }}+{{ form.apellido.value|default:'' }}&size=200&background=0d6efd&color=fff{% endif %}"
+                                    class="img-thumbnail rounded-circle shadow border-3 border-primary"
+                                    style="width: 200px; height: 200px; object-fit: cover;">
+                                <label for="id_foto_perfil"
+                                    class="btn btn-sm btn-primary position-absolute bottom-0 end-0 rounded-circle shadow"
+                                    style="width: 44px; height: 44px;" data-bs-toggle="tooltip"
+                                    title="Cambiar foto de perfil">
+                                    <i class="fas fa-camera"></i>
+                                </label>
+                                <input type="file" name="foto_perfil" accept="image/*" id="id_foto_perfil"
+                                    class="d-none">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label d-block fw-semibold">Estado del Empleado</label>
+                                <div id="status-indicator-container" class="d-flex justify-content-center gap-2">
+                                    <span id="status-active" class="status-indicator status-active"
+                                        data-bs-toggle="tooltip" title="Empleado activo">Activo</span>
+                                    <span id="status-inactive" class="status-indicator status-inactive"
+                                        data-bs-toggle="tooltip" title="Empleado inactivo">Inactivo</span>
+                                </div>
+                                <div class="d-none">{{ form.activo }}</div>
+                            </div>
+                            <div id="inactive_fields" style="display: none;" class="text-start">
+                                <div class="mb-3">
+                                    <label for="{{ form.motivo_inactivacion.id_for_label }}"
+                                        class="form-label">Motivo</label>
+                                    {{ form.motivo_inactivacion }}
+                                </div>
+                                <div class="mb-3">
+                                    <label for="{{ form.fecha_inactivacion.id_for_label }}"
+                                        class="form-label">Fecha</label>
+                                    {{ form.fecha_inactivacion }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-9">
+                    <div class="card h-100 border-0 shadow-sm rounded-3 bg-white premium-card">
+                        <div class="card-header card-header-gradient rounded-top-3 premium-header">
+                            <h5 class="mb-0 text-white"><i class="fas fa-info-circle me-2"></i>Información Básica</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Nombre(s)</label>
+                                    {{ form.nombre }}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Apellido(s)</label>
+                                    {{ form.apellido }}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Número de Empleado</label>
+                                    {{ form.numero_empleado }}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Puesto</label>
+                                    {{ form.puesto }}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Departamento</label>
+                                    {{ form.departamento }}
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.supervisor.id_for_label }}" class="form-label">Jefe Inmediato /
+                                        Supervisor</label>
+                                    {{ form.supervisor }}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Fecha de Contratación</label>
+                                    {{ form.fecha_contratacion }}
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Correo Electrónico</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                        {{ form.email }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <ul class="nav nav-tabs nav-tabs-custom mb-4" id="employeeTab" role="tablist">
+                <li class="nav-item" role="presentation"><button class="nav-link active" id="personal-tab"
+                        data-bs-toggle="tab" data-bs-target="#personal" type="button" role="tab"><i
+                            class="fas fa-user me-2"></i>Datos Personales</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" id="familia-domicilio-tab"
+                        data-bs-toggle="tab" data-bs-target="#familia-domicilio" type="button" role="tab"><i
+                            class="fas fa-home me-2"></i>Familia y Domicilio</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" id="operativa-tab"
+                        data-bs-toggle="tab" data-bs-target="#operativa" type="button" role="tab"><i
+                            class="fas fa-cogs me-2"></i>Información Operativa</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" id="contratos-tab"
+                        data-bs-toggle="tab" data-bs-target="#contratos" type="button" role="tab"><i
+                            class="fas fa-file-signature me-2"></i>Contratos</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" id="salario-tab" data-bs-toggle="tab"
+                        data-bs-target="#salario" type="button" role="tab"><i
+                            class="fas fa-dollar-sign me-2"></i>Salario</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" id="bancarios-tab"
+                        data-bs-toggle="tab" data-bs-target="#bancarios" type="button" role="tab"><i
+                            class="fas fa-university me-2"></i>Datos Bancarios</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" id="documentos-tab"
+                        data-bs-toggle="tab" data-bs-target="#documentos" type="button" role="tab"><i
+                            class="fas fa-file-contract me-2"></i>Documentos</button></li>
+                <li class="nav-item" role="presentation" id="documentos-operador-tab-li" style="display: none;"><button
+                        class="nav-link" id="documentos-operador-tab" data-bs-toggle="tab"
+                        data-bs-target="#documentos-operador" type="button" role="tab"><i
+                            class="fas fa-truck-moving me-2"></i>Doc. Operador</button></li>
+                <li class="nav-item" role="presentation"><button class="nav-link" id="historial-laboral-tab"
+                        data-bs-toggle="tab" data-bs-target="#historial-laboral" type="button" role="tab"><i
+                            class="fas fa-history me-2"></i>Historial Laboral</button></li>
+            </ul>
+
+            <div class="tab-content" id="employeeTabContent">
+                <div class="tab-pane fade show active" id="personal" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header card-header-gradient">
+                            <h5 class="mb-0 text-white"><i class="fas fa-user-circle me-2"></i>Datos Personales</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6"><label class="form-label">Fecha de Nacimiento</label>{{ form.fecha_nacimiento }}</div>
+                                <div class="col-md-6"><label class="form-label">Teléfono Personal</label>
+                                    <div class="input-group"><span class="input-group-text"><i class="fas fa-phone"></i></span>{{ form.telefono_personal }}</div>
+                                </div>
+                                <div class="col-md-6"><label class="form-label">Estado Civil</label>{{ form.estado_civil }}</div>
+                                <div class="col-md-6"><label class="form-label">Nacionalidad</label>{{ form.nacionalidad }}</div>
+                                <div class="col-md-4"><label class="form-label">CURP</label>{{ form.curp }}</div>
+                                <div class="col-md-4"><label class="form-label">RFC</label>{{ form.rfc }}</div>
+                                <div class="col-md-4"><label class="form-label">NSS</label>{{ form.nss }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="familia-domicilio" role="tabpanel">
+                    <div class="card mb-4">
+                        <div class="card-header card-header-gradient">
+                            <h5 class="mb-0 text-white"><i class="fas fa-map-marker-alt me-2"></i>Domicilio del Empleado</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-12"><label class="form-label">Dirección (Calle y Número)</label>{{ form.direccion }}</div>
+                                <div class="col-md-6"><label class="form-label">Código Postal</label>{{ form.codigo_postal }}</div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Colonia</label>
+                                    <input type="text" name="colonia" id="id_colonia" class="form-control" list="datalist-colonias" value="{{ form.instance.colonia|default_if_none:'' }}">
+                                    <datalist id="datalist-colonias"></datalist>
+                                </div>
+                                <div class="col-md-4"><label class="form-label">Ciudad</label>{{ form.ciudad }}</div>
+                                <div class="col-md-4"><label class="form-label">Estado</label>{{ form.estado }}</div>
+                                <div class="col-md-4"><label class="form-label">País</label>{{ form.pais }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header card-header-gradient">
+                            <h5 class="mb-0 text-white"><i class="fas fa-users me-2"></i>Información Familiar</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-6"><label class="form-label">{{ form.nombre_conyuge.label }}</label>{{ form.nombre_conyuge }}</div>
+                                <div class="col-md-6"><label class="form-label">{{ form.telefono_conyuge.label }}</label>{{ form.telefono_conyuge }}</div>
+                            </div>
+
+                            <h6 class="card-title text-secondary mb-3"><i class="fas fa-child me-2"></i>Hijos</h6>
+                            {{ hijos_formset.management_form }}
+                            <div id="hijos-container">
+                                {% for h_form in hijos_formset %}
+                                <div class="p-2 mb-2 border rounded hijo-form-row">
+                                    <div class="row g-3 align-items-center">
+                                        {{ h_form.id }}
+                                        <div class="col-md-6"><label class="form-label visually-hidden">Nombre</label>{{ h_form.nombre }}</div>
+                                        <div class="col-md-5"><label class="form-label visually-hidden">Fecha Nacimiento</label>{{ h_form.fecha_nacimiento }}</div>
+                                        <div class="col-md-1 text-end">
+                                            {% if h_form.instance.pk %}
+                                            <div class="form-check">{{ h_form.DELETE }}<label class="form-check-label text-danger" for="{{ h_form.DELETE.id_for_label }}">Eliminar</label></div>
+                                            {% else %}
+                                            <button type="button" class="btn btn-outline-danger btn-sm remove-form-row"><i class="fas fa-trash-alt"></i></button>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <button type="button" class="btn btn-outline-primary mt-2 btn-sm" id="add-hijo-entry"><i class="fas fa-plus me-1"></i>Añadir Hijo/a</button>
+
+                            <template id="empty-hijo-form">
+                                {% with h_form=hijos_formset.empty_form %}
+                                <div class="p-2 mb-2 border rounded hijo-form-row">
+                                    <div class="row g-3 align-items-center">
+                                        <div class="col-md-6"><label class="form-label visually-hidden">Nombre</label>{{ h_form.nombre }}</div>
+                                        <div class="col-md-5"><label class="form-label visually-hidden">Fecha Nacimiento</label>{{ h_form.fecha_nacimiento }}</div>
+                                        <div class="col-md-1 text-end"><button type="button" class="btn btn-outline-danger btn-sm remove-form-row"><i class="fas fa-trash-alt"></i></button></div>
+                                    </div>
+                                </div>
+                                {% endwith %}
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header card-header-gradient">
+                            <h5 class="mb-0 text-white"><i class="fas fa-address-book me-2"></i>Referencias Personales</h5>
+                        </div>
+                        <div class="card-body">
+                            <h6 class="card-subtitle my-2 text-muted">Referencia 1</h6>
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-4"><label class="form-label">Nombre Completo</label>{{ form.nombre_referencia_1 }}</div>
+                                <div class="col-md-4"><label class="form-label">Teléfono</label>{{ form.telefono_referencia_1 }}</div>
+                                <div class="col-md-4"><label class="form-label">Relación / Parentesco</label>{{ form.relacion_referencia_1 }}</div>
+                            </div>
+                            <hr>
+                            <h6 class="card-subtitle my-2 text-muted">Referencia 2</h6>
+                            <div class="row g-3">
+                                <div class="col-md-4"><label class="form-label">Nombre Completo</label>{{ form.nombre_referencia_2 }}</div>
+                                <div class="col-md-4"><label class="form-label">Teléfono</label>{{ form.telefono_referencia_2 }}</div>
+                                <div class="col-md-4"><label class="form-label">Relación / Parentesco</label>{{ form.relacion_referencia_2 }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="operativa" role="tabpanel">
+                    <div class="row g-3">
+                        <div class="col-lg-7">
+                            <div class="card h-100">
+                                <div class="card-header card-header-gradient">
+                                    <h5 class="mb-0 text-white"><i class="fas fa-building me-2"></i>Información de Asignación</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">{{ form.empresa.label }}</label>
+                                        {{ form.empresa }}
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">{{ form.tipo_viaje.label }}</label>
+                                        {{ form.tipo_viaje }}
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">{{ form.tipo_carga.label }}</label>
+                                        {{ form.tipo_carga }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-5">
+                            <div class="card h-100">
+                                <div class="card-header card-header-gradient">
+                                    <h5 class="mb-0 text-white"><i class="fas fa-network-wired me-2"></i>Divisiones Operativas</h5>
+                                </div>
+                                <div class="card-body">
+                                    {{ form.division_operativa }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="contratos" role="tabpanel">
+                    <div class="card-header card-header-gradient mb-3">
+                        <h5 class="mb-0 text-white"><i class="fas fa-file-signature me-2"></i>Historial de Contratos</h5>
+                    </div>
+                    {{ contrato_formset.management_form }}
+                    <div id="contracts-container">
+                        {% for c_form in contrato_formset %}
+                        <div class="card mb-3 contract-form-row">
+                            <div class="card-header card-header-gradient">
+                                <h6 class="mb-0 text-white">Registro de Contrato</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3 align-items-end">
+                                    {{ c_form.id }}
+                                    <div class="col-md-4">
+                                        <label class="form-label">Tipo</label>
+                                        {{ c_form.tipo_contrato }}
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Inicio</label>
+                                        {{ c_form.fecha_inicio }}
+                                    </div>
+                                    <div class="col-md-4 contract-end-date-container" style="display: none;">
+                                        <label class="form-label">Fin</label>
+                                        {{ c_form.fecha_fin }}
+                                    </div>
+                                    <div class="col-md-12">
+                                        <label class="form-label">Archivo</label>
+                                        {{ c_form.archivo_contrato }}
+                                        {% if c_form.instance.pk and c_form.instance.archivo_contrato %}
+                                        <a href="{{ c_form.instance.archivo_contrato.url }}" target="_blank" class="btn btn-sm btn-outline-info ms-2">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Comentarios</label>
+                                        {{ c_form.comentarios }}
+                                    </div>
+                                    {% if c_form.instance.pk %}
+                                    <div class="col-12 form-check">
+                                        {{ c_form.DELETE }}
+                                        <label class="form-check-label text-danger" for="{{ c_form.DELETE.id_for_label }}">Eliminar</label>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-outline-primary mt-2" id="add-contract-entry">
+                        <i class="fas fa-plus-circle me-2"></i>Añadir Contrato
+                    </button>
+
+                    <template id="empty-contract-form">
+                        {% with c_form=contrato_formset.empty_form %}
+                        <div class="card mb-3 contract-form-row">
+                            <div class="card-header card-header-gradient">
+                                <h6 class="mb-0 text-white">Nuevo Contrato</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Tipo</label>
+                                        {{ c_form.tipo_contrato }}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Inicio</label>
+                                        {{ c_form.fecha_inicio }}
+                                    </div>
+                                    <div class="col-md-3 contract-end-date-container" style="display: none;">
+                                        <label class="form-label">Fin</label>
+                                        {{ c_form.fecha_fin }}
+                                    </div>
+                                    <div class="col-md-2 d-flex align-items-end">
+                                        <button type="button" class="btn btn-danger btn-sm w-100 remove-form-row">
+                                            <i class="fas fa-trash-alt me-1"></i>Eliminar
+                                        </button>
+                                    </div>
+                                    <div class="col-md-12">
+                                        <label class="form-label">Archivo</label>
+                                        {{ c_form.archivo_contrato }}
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Comentarios</label>
+                                        {{ c_form.comentarios }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endwith %}
+                    </template>
+                </div>
+
+                <div class="tab-pane fade" id="salario" role="tabpanel">
+                    <div class="card-header card-header-gradient mb-3">
+                        <h5 class="mb-0 text-white"><i class="fas fa-dollar-sign me-2"></i>Historial de Salarios</h5>
+                    </div>
+                    {{ salario_formset.management_form }}
+                    <div id="salary-container">
+                        {% for s_form in salario_formset %}
+                        <div class="card mb-3 salary-form-row">
+                            <div class="card-header card-header-gradient">
+                                <h6 class="mb-0 text-white">Registro de Salario</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3 align-items-end">
+                                    {{ s_form.id }}
+                                    <div class="col-md-3"><label class="form-label">Fecha Efectiva</label>{{ s_form.fecha_efectiva }}</div>
+                                    <div class="col-md-3"><label class="form-label">Sueldo Diario</label>
+                                        <div class="input-group"><span class="input-group-text">$</span>{{ s_form.sueldo_diario }}</div>
+                                    </div>
+                                    <div class="col-md-3"><label class="form-label">Sueldo Semanal</label><input type="text" class="form-control salary-display-weekly" readonly></div>
+                                    <div class="col-md-3"><label class="form-label">Sueldo Mensual</label><input type="text" class="form-control salary-display-monthly" readonly></div>
+                                    <div class="col-12"><label class="form-label">Observaciones</label>{{ s_form.observaciones }}</div>
+                                    {% if s_form.instance.pk %}<div class="col-12 form-check">{{ s_form.DELETE }} <label class="form-check-label text-danger" for="{{ s_form.DELETE.id_for_label }}">Eliminar</label></div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-outline-success mt-2" id="add-salary-entry"><i class="fas fa-plus-circle me-2"></i>Añadir Salario</button>
+                    <template id="empty-salary-form">
+                        {% with s_form=salario_formset.empty_form %}
+                        <div class="card mb-3 salary-form-row">
+                            <div class="card-header card-header-gradient">
+                                <h6 class="mb-0 text-white">Nuevo Salario</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-md-3"><label class="form-label">Fecha Efectiva</label>{{ s_form.fecha_efectiva }}</div>
+                                    <div class="col-md-2"><label class="form-label">Sueldo Diario</label>
+                                        <div class="input-group"><span class="input-group-text">$</span>{{ s_form.sueldo_diario }}</div>
+                                    </div>
+                                    <div class="col-md-3"><label class="form-label">Sueldo Semanal</label><input type="text" class="form-control salary-display-weekly" readonly></div>
+                                    <div class="col-md-3"><label class="form-label">Sueldo Mensual</label><input type="text" class="form-control salary-display-monthly" readonly></div>
+                                    <div class="col-md-1 d-flex align-items-end"><button type="button" class="btn btn-danger btn-sm w-100 remove-form-row"><i class="fas fa-trash-alt"></i></button></div>
+                                    <div class="col-12"><label class="form-label">Observaciones</label>{{ s_form.observaciones }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endwith %}
+                    </template>
+                </div>
+
+                <div class="tab-pane fade" id="bancarios" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header card-header-gradient">
+                            <h5 class="mb-0 text-white"><i class="fas fa-university me-2"></i>Información Bancaria</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6"><label class="form-label">Banco</label>{{ form.banco }}</div>
+                                <div class="col-md-6"><label class="form-label">Número de Cuenta</label>{{ form.numero_cuenta }}</div>
+                                <div class="col-md-6"><label class="form-label">{{ form.numero_tarjeta.label }}</label>{{ form.numero_tarjeta }}</div>
+                                <div class="col-md-6"><label class="form-label">CLABE Interbancaria (18 dígitos)</label>
+                                    <div class="input-group"><span class="input-group-text"><i class="fas fa-barcode"></i></span>{{ form.clabe_interbancaria }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="documentos" role="tabpanel">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header card-header-gradient">
+                                    <h6 class="mb-0 text-white"><i class="fas fa-id-card me-2"></i>INE/IFE</h6>
+                                </div>
+                                <div class="card-body">
+                                    {{ form.ine_documento }}
+                                    {% if form.instance.ine_documento %}
+                                    <div class="mt-2">
+                                        <a href="{{ form.instance.ine_documento.url }}" target="_blank" class="btn btn-sm btn-outline-primary w-100">
+                                            <i class="fas fa-eye me-1"></i> Ver
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header card-header-gradient">
+                                    <h6 class="mb-0 text-white"><i class="fas fa-home me-2"></i>Comprobante Domicilio</h6>
+                                </div>
+                                <div class="card-body">
+                                    {{ form.comprobante_domicilio }}
+                                    {% if form.instance.comprobante_domicilio %}
+                                    <div class="mt-2">
+                                        <a href="{{ form.instance.comprobante_domicilio.url }}" target="_blank" class="btn btn-sm btn-outline-primary w-100">
+                                            <i class="fas fa-eye me-1"></i> Ver
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header card-header-gradient">
+                                    <h6 class="mb-0 text-white"><i class="fas fa-file-alt me-2"></i>Curriculum Vitae</h6>
+                                </div>
+                                <div class="card-body">
+                                    {{ form.curriculum_vitae }}
+                                    {% if form.instance.curriculum_vitae %}
+                                    <div class="mt-2">
+                                        <a href="{{ form.instance.curriculum_vitae.url }}" target="_blank" class="btn btn-sm btn-outline-primary w-100">
+                                            <i class="fas fa-eye me-1"></i> Ver
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header card-header-gradient">
+                                    <h6 class="mb-0 text-white"><i class="fas fa-baby me-2"></i>{{ form.acta_nacimiento_documento.label }}</h6>
+                                </div>
+                                <div class="card-body">
+                                    {{ form.acta_nacimiento_documento }}
+                                    {% if form.instance.acta_nacimiento_documento %}
+                                    <div class="mt-2">
+                                        <a href="{{ form.instance.acta_nacimiento_documento.url }}" target="_blank" class="btn btn-sm btn-outline-primary w-100">
+                                            <i class="fas fa-eye me-1"></i> Ver
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header card-header-gradient">
+                                    <h6 class="mb-0 text-white"><i class="fas fa-graduation-cap me-2"></i>{{ form.comprobante_estudios_documento.label }}</h6>
+                                </div>
+                                <div class="card-body">
+                                    {{ form.comprobante_estudios_documento }}
+                                    {% if form.instance.comprobante_estudios_documento %}
+                                    <div class="mt-2">
+                                        <a href="{{ form.instance.comprobante_estudios_documento.url }}" target="_blank" class="btn btn-sm btn-outline-primary w-100">
+                                            <i class="fas fa-eye me-1"></i> Ver
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header card-header-gradient">
+                                    <h6 class="mb-0 text-white"><i class="fas fa-file-invoice-dollar me-2"></i>{{ form.constancia_fiscal_documento.label }}</h6>
+                                </div>
+                                <div class="card-body">
+                                    {{ form.constancia_fiscal_documento }}
+                                    {% if form.instance.constancia_fiscal_documento %}
+                                    <div class="mt-2">
+                                        <a href="{{ form.instance.constancia_fiscal_documento.url }}" target="_blank" class="btn btn-sm btn-outline-primary w-100">
+                                            <i class="fas fa-eye me-1"></i> Ver
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header card-header-gradient">
+                                    <h6 class="mb-0 text-white"><i class="fas fa-handshake me-2"></i>{{ form.carta_recomendacion_1_documento.label }}</h6>
+                                </div>
+                                <div class="card-body">
+                                    {{ form.carta_recomendacion_1_documento }}
+                                    {% if form.instance.carta_recomendacion_1_documento %}
+                                    <div class="mt-2">
+                                        <a href="{{ form.instance.carta_recomendacion_1_documento.url }}" target="_blank" class="btn btn-sm btn-outline-primary w-100">
+                                            <i class="fas fa-eye me-1"></i> Ver
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header card-header-gradient">
+                                    <h6 class="mb-0 text-white"><i class="far fa-handshake me-2"></i>{{ form.carta_recomendacion_2_documento.label }}</h6>
+                                </div>
+                                <div class="card-body">
+                                    {{ form.carta_recomendacion_2_documento }}
+                                    {% if form.instance.carta_recomendacion_2_documento %}
+                                    <div class="mt-2">
+                                        <a href="{{ form.instance.carta_recomendacion_2_documento.url }}" target="_blank" class="btn btn-sm btn-outline-primary w-100">
+                                            <i class="fas fa-eye me-1"></i> Ver
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header card-header-gradient">
+                                    <h6 class="mb-0 text-white"><i class="fas fa-house-user me-2"></i>{{ form.aviso_retencion_infonavit_documento.label }}</h6>
+                                </div>
+                                <div class="card-body">
+                                    {{ form.aviso_retencion_infonavit_documento }}
+                                    {% if form.instance.aviso_retencion_infonavit_documento %}
+                                    <div class="mt-2">
+                                        <a href="{{ form.instance.aviso_retencion_infonavit_documento.url }}" target="_blank" class="btn btn-sm btn-outline-primary w-100">
+                                            <i class="fas fa-eye me-1"></i> Ver
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header card-header-gradient">
+                                    <h6 class="mb-0 text-white"><i class="fas fa-notes-medical me-2"></i>{{ form.semanas_cotizadas_imss_documento.label }}</h6>
+                                </div>
+                                <div class="card-body">
+                                    {{ form.semanas_cotizadas_imss_documento }}
+                                    {% if form.instance.semanas_cotizadas_imss_documento %}
+                                    <div class="mt-2">
+                                        <a href="{{ form.instance.semanas_cotizadas_imss_documento.url }}" target="_blank" class="btn btn-sm btn-outline-primary w-100">
+                                            <i class="fas fa-eye me-1"></i> Ver
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="documentos-operador" role="tabpanel">
+                    <div class="card-header card-header-gradient mb-3">
+                        <h5 class="mb-0 text-white"><i class="fas fa-truck-moving me-2"></i>Documentos del Operador</h5>
+                    </div>
+                    {{ documentos_operador_formset.management_form }}
+                    <div id="operator-documents-container">
+                        {% for doc_form in documentos_operador_formset %}
+                        <div class="card mb-3 document-form-row">
+                            <div class="card-header card-header-gradient">
+                                <h6 class="mb-0 text-white">Registro de Documento</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    {{ doc_form.id }}
+                                    <div class="col-md-6"><label class="form-label">Tipo</label>{{ doc_form.tipo_documento }}</div>
+                                    <div class="col-md-6"><label class="form-label">Archivo</label>{{ doc_form.archivo }}
+                                        {% if doc_form.instance.pk and doc_form.instance.archivo %}
+                                        <a href="{{ doc_form.instance.archivo.url }}" target="_blank" class="btn btn-sm btn-outline-info ms-2">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6"><label class="form-label">Número de Documento</label>{{ doc_form.numero_documento }}</div>
+                                    <div class="col-md-3"><label class="form-label">Expedición</label>{{ doc_form.fecha_expedicion }}</div>
+                                    <div class="col-md-3"><label class="form-label">Vencimiento</label>{{ doc_form.fecha_vencimiento }}</div>
+                                    <div class="col-12"><label class="form-label">Observaciones</label>{{ doc_form.observaciones }}</div>
+                                    {% if doc_form.instance.pk %}
+                                    <div class="col-12 form-check">
+                                        {{ doc_form.DELETE }}
+                                        <label class="form-check-label text-danger" for="{{ doc_form.DELETE.id_for_label }}">Eliminar</label>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-outline-info mt-2" id="add-operator-document"><i class="fas fa-plus-circle me-2"></i> Añadir Documento</button>
+
+                    <template id="empty-operator-form">
+                        {% with doc_form=documentos_operador_formset.empty_form %}
+                        <div class="card mb-3 document-form-row">
+                            <div class="card-header card-header-gradient">
+                                <h6 class="mb-0 text-white">Nuevo Documento de Operador</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-md-5"><label class="form-label">Tipo</label>{{ doc_form.tipo_documento }}</div>
+                                    <div class="col-md-6"><label class="form-label">Archivo</label>{{ doc_form.archivo }}</div>
+                                    <div class="col-md-1"><button type="button" class="btn btn-danger btn-sm w-100 remove-form-row"><i class="fas fa-trash-alt"></i></button></div>
+                                    <div class="col-md-5"><label class="form-label">Número</label>{{ doc_form.numero_documento }}</div>
+                                    <div class="col-md-3"><label class="form-label">Expedición</label>{{ doc_form.fecha_expedicion }}</div>
+                                    <div class="col-md-4"><label class="form-label">Vencimiento</label>{{ doc_form.fecha_vencimiento }}</div>
+                                    <div class="col-12"><label class="form-label">Observaciones</label>{{ doc_form.observaciones }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endwith %}
+                    </template>
+                </div>
+
+                <div class="tab-pane fade" id="historial-laboral" role="tabpanel">
+                    <div class="card-header card-header-gradient mb-3">
+                        <h5 class="mb-0 text-white"><i class="fas fa-history me-2"></i>Registro de Eventos Laborales</h5>
+                    </div>
+                    {{ historial_laboral_formset.management_form }}
+                    <div id="history-container">
+                        {% for h_form in historial_laboral_formset %}
+                        <div class="card mb-3 history-form-row">
+                            <div class="card-header card-header-gradient">
+                                <h6 class="mb-0 text-white">Registro de Evento</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3 align-items-center">
+                                    {{ h_form.id }}
+                                    <div class="col-md-4"><label class="form-label fw-bold">Tipo de Evento</label>{{ h_form.tipo_evento }}</div>
+                                    <div class="col-md-4 field-container" data-field="fecha_inicio"><label class="form-label">Fecha Inicio</label>{{ h_form.fecha_inicio }}</div>
+                                    <div class="col-md-4 field-container" data-field="fecha_fin" style="display: none;"><label class="form-label">Fecha Fin</label>{{ h_form.fecha_fin }}</div>
+                                    <div class="col-md-6 field-container" data-field="puesto" style="display: none;"><label class="form-label">Nuevo Puesto</label>{{ h_form.puesto }}</div>
+                                    <div class="col-md-6 field-container" data-field="departamento" style="display: none;"><label class="form-label">Nuevo Depto.</label>{{ h_form.departamento }}</div>
+                                    <div class="col-12 field-container" data-field="descripcion" style="display: none;"><label class="form-label">Descripción</label>{{ h_form.descripcion }}</div>
+                                    <div class="col-12 field-container" data-field="motivo_salida" style="display: none;"><label class="form-label">Motivo de Salida</label>{{ h_form.motivo_salida }}</div>
+                                    <div class="col-md-8 field-container" data-field="documento_adjunto"><label class="form-label">Documento</label>{{ h_form.documento_adjunto }}
+                                        {% if h_form.instance.pk and h_form.instance.documento_adjunto %}
+                                        <a href="{{ h_form.instance.documento_adjunto.url }}" target="_blank" class="btn btn-sm btn-outline-info ms-2">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                    {% if h_form.instance.pk %}
+                                    <div class="col-md-4 d-flex align-items-end">
+                                        <div class="form-check">
+                                            {{ h_form.DELETE }}
+                                            <label class="form-check-label text-danger" for="{{ h_form.DELETE.id_for_label }}">Eliminar</label>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-outline-warning mt-2" id="add-history-entry"><i class="fas fa-plus-circle me-2"></i>Añadir Evento</button>
+
+                    <template id="empty-history-form">
+                        {% with h_form=historial_laboral_formset.empty_form %}
+                        <div class="card mb-3 history-form-row">
+                            <div class="card-header card-header-gradient">
+                                <h6 class="mb-0 text-white">Nuevo Evento del Historial</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3 align-items-center">
+                                    <div class="col-md-4"><label class="form-label fw-bold">Tipo</label>{{ h_form.tipo_evento }}</div>
+                                    <div class="col-md-3 field-container" data-field="fecha_inicio"><label class="form-label">Inicio</label>{{ h_form.fecha_inicio }}</div>
+                                    <div class="col-md-3 field-container" data-field="fecha_fin" style="display: none;"><label class="form-label">Fin</label>{{ h_form.fecha_fin }}</div>
+                                    <div class="col-md-2 d-flex align-items-end"><button type="button" class="btn btn-danger btn-sm w-100 remove-form-row">Eliminar</button></div>
+                                    <div class="col-md-6 field-container" data-field="puesto" style="display: none;"><label class="form-label">Puesto</label>{{ h_form.puesto }}</div>
+                                    <div class="col-md-6 field-container" data-field="departamento" style="display: none;"><label class="form-label">Depto.</label>{{ h_form.departamento }}</div>
+                                    <div class="col-12 field-container" data-field="descripcion" style="display: none;"><label class="form-label">Descripción</label>{{ h_form.descripcion }}</div>
+                                    <div class="col-12 field-container" data-field="motivo_salida" style="display: none;"><label class="form-label">Motivo</label>{{ h_form.motivo_salida }}</div>
+                                    <div class="col-12 field-container" data-field="documento_adjunto"><label class="form-label">Documento</label>{{ h_form.documento_adjunto }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endwith %}
+                    </template>
+                </div>
+            </div>
+
+            {% if form.instance.pk %}
+            <div class="card mt-4 premium-card">
+                <div class="card-header bg-success text-white premium-header">
+                    <i class="fas fa-file-download me-2"></i> Descargar Documentos
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Genera documentos automáticos con los datos del empleado:</p>
+
+                    <div class="d-grid gap-2 d-md-block">
+                        <a href="{% url 'rh:descargar_documentos_zip' form.instance.pk %}"
+                            class="btn btn-primary btn-lg shadow-sm premium-btn" onclick="showLoading()">
+                            <i class="fas fa-file-archive me-2"></i> Descargar TODOS los documentos (ZIP)
+                        </a>
+
+                        <div class="mt-3">
+                            <h6 class="mb-2">Documentos rápidos:</h6>
+                            <div class="btn-group flex-wrap" role="group">
+                                <a href="{% url 'rh:descargar_documento_individual' form.instance.pk 'contrato-indeterminado' %}"
+                                    class="btn btn-outline-primary m-1 shadow-sm premium-btn">
+                                    <i class="fas fa-file-contract me-1"></i> Contrato
+                                </a>
+                                <a href="{% url 'rh:descargar_documento_individual' form.instance.pk 'aviso-privacidad' %}"
+                                    class="btn btn-outline-primary m-1 shadow-sm premium-btn">
+                                    <i class="fas fa-user-shield me-1"></i> Aviso
+                                </a>
+                                <a href="{% url 'rh:descargar_documento_individual' form.instance.pk 'convenio-confidencialidad' %}"
+                                    class="btn btn-outline-primary m-1 shadow-sm premium-btn">
+                                    <i class="fas fa-file-signature me-1"></i> Convenio
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="mt-4 pt-3 border-top d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+                <a href="{% url 'rh:lista_empleados' %}" class="btn btn-outline-secondary btn-lg shadow-sm premium-btn">
+                    <i class="fas fa-arrow-left me-2"></i>Regresar
+                </a>
+                <div class="d-flex gap-2">
+                    <button type="reset" class="btn btn-outline-danger btn-lg shadow-sm premium-btn">
+                        <i class="fas fa-undo me-2"></i>Limpiar
+                    </button>
+                    <button type="submit" class="btn btn-primary btn-lg shadow-sm premium-btn">
+                        <i class="fas fa-save me-2"></i>Guardar
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ form.media }}
+{{ contrato_formset.media }}
+{{ documentos_operador_formset.media }}
+{{ historial_laboral_formset.media }}
+{{ salario_formset.media }}
+{{ hijos_formset.media }}
+
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<style>
+    body,
+    .bg-premium {
+        /* Fondo azul oscuro degradado como en base.html */
+        background: linear-gradient(120deg, #f8fafc 0%, #e9f5ff 100%) !important;
+    }
+
+    .premium-card {
+        background: #fff !important;
+        border-radius: 1.5rem !important;
+        box-shadow: 0 4px 24px rgba(13, 110, 253, 0.08), 0 1.5px 4px rgba(25, 135, 84, 0.07) !important;
+        border: none !important;
+    }
+
+    .premium-header {
+        background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%) !important;
+        color: #fff !important;
+        border-radius: 1.5rem 1.5rem 0 0 !important;
+        box-shadow: 0 2px 8px rgba(13, 110, 253, 0.08);
+        border: none !important;
+    }
+
+    .premium-btn {
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        box-shadow: 0 2px 8px rgba(13, 110, 253, 0.07) !important;
+        border-radius: 0.5rem !important;
+    }
+
+    .premium-alert {
+        font-size: 1.08em;
+        border-radius: 1rem !important;
+        background: rgba(255, 255, 255, 0.95) !important;
+        border: none !important;
+    }
+
+    .card-header-gradient {
+        background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%) !important;
+        color: white !important;
+        border-bottom: none;
+        border-radius: 0.75rem 0.75rem 0 0;
+        box-shadow: 0 2px 8px rgba(13, 110, 253, 0.08);
+    }
+
+    .card-header-gradient .fas {
+        color: white !important;
+    }
+
+    .status-indicator {
+        display: inline-block;
+        padding: 0.45em 1.1em;
+        font-size: 1em;
+        font-weight: 700;
+        line-height: 1.2;
+        color: #fff;
+        text-align: center;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+        border: 2px solid transparent;
+    }
+
+    .status-active {
+        background-color: #1cc88a;
+    }
+
+    .status-inactive {
+        background-color: #e74a3b;
+    }
+
+    .status-indicator:not(.selected) {
+        background-color: #f8f9fc;
+        color: #6c757d;
+        border-color: #d1d3e2;
+    }
+
+    .status-indicator.selected {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, .15);
+    }
+
+    .nav-tabs-custom .nav-link {
+        border-radius: 0.5rem 0.5rem 0 0;
+        font-weight: 600;
+        color: #0d6efd;
+        background: #f8f9fc;
+        border: none;
+        margin-right: 2px;
+        transition: background 0.2s, color 0.2s;
+    }
+
+    .nav-tabs-custom .nav-link.active {
+        background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%) !important;
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(13, 110, 253, 0.08);
+    }
+
+    .nav-tabs-custom .nav-link i {
+        color: inherit;
+    }
+
+    .form-label {
+        font-weight: 500;
+        color: #495057;
+    }
+
+    .input-group-text {
+        background: #e9ecef;
+        border-radius: 0.5rem 0 0 0.5rem;
+    }
+
+    .form-control,
+    .form-select {
+        border-radius: 0.5rem;
+        box-shadow: none;
+        border: 1.5px solid #dee2e6;
+        transition: border-color 0.2s;
+    }
+
+    .form-control:focus,
+    .form-select:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, .10);
+    }
+
+    .alert-danger {
+        font-size: 1.05em;
+    }
+
+    .btn-lg {
+        padding: 0.7rem 2.2rem;
+        font-size: 1.15rem;
+    }
+
+    .shadow-sm {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07) !important;
+    }
+
+    .rounded-3 {
+        border-radius: 1rem !important;
+    }
+
+    .rounded-4 {
+        border-radius: 1.5rem !important;
+    }
+
+    .rounded-top-3 {
+        border-radius: 1rem 1rem 0 0 !important;
+    }
+
+    .rounded-top-4 {
+        border-radius: 1.5rem 1.5rem 0 0 !important;
+    }
+
+    .rounded-bottom-4 {
+        border-radius: 0 0 1.5rem 1.5rem !important;
+    }
+</style>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Inicializar Select2 para los campos múltiples - CORREGIDO
+        if (typeof $ !== 'undefined') {
+            // Asegurar que Select2 se inicialice correctamente
+            setTimeout(function() {
+                $('#id_tipo_viaje, #id_tipo_carga, #id_division_operativa').each(function() {
+                    if ($(this).data('select2')) {
+                        $(this).select2('destroy');
+                    }
+                });
+                
+                $('#id_tipo_viaje, #id_tipo_carga, #id_division_operativa').select2({
+                    theme: 'bootstrap-5',
+                    width: '100%',
+                    placeholder: 'Seleccione una o más opciones',
+                    allowClear: true,
+                    language: {
+                        noResults: function() {
+                            return "No se encontraron resultados";
+                        },
+                        searching: function() {
+                            return "Buscando...";
+                        }
+                    }
+                });
+            }, 100);
+        } else {
+            console.error('jQuery no está cargado');
+        }
+
+        function setupFormset(containerId, addButtonId, templateId, formsetPrefix, rowClass) {
+            const container = document.getElementById(containerId);
+            const addButton = document.getElementById(addButtonId);
+            const template = document.getElementById(templateId);
+            const totalFormsInput = document.querySelector(`#id_${formsetPrefix}-TOTAL_FORMS`);
+
+            if (!container || !addButton || !template || !totalFormsInput) return;
+
+            addButton.addEventListener('click', () => {
+                let totalForms = parseInt(totalFormsInput.value);
+                const newFormHtml = template.innerHTML.replace(/__prefix__/g, totalForms);
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = newFormHtml;
+                const newFormElement = tempDiv.firstElementChild;
+                container.appendChild(newFormElement);
+                totalFormsInput.value = totalForms + 1;
+
+                const newSelectHistory = newFormElement.querySelector('.history-event-type');
+                if (newSelectHistory) toggleHistoryFields(newSelectHistory);
+                const newSelectContract = newFormElement.querySelector('.contract-type-select');
+                if (newSelectContract) toggleContractFields(newSelectContract);
+            });
+
+            container.addEventListener('click', (e) => {
+                const removeButton = e.target.closest('.remove-form-row');
+                if (removeButton) removeButton.closest(`.${rowClass}`).remove();
+            });
+        }
+
+        function toggleHistoryFields(selectElement) {
+            const formRow = selectElement.closest('.history-form-row');
+            if (!formRow) return;
+            const eventType = selectElement.value;
+            const fields = {
+                fecha_fin: formRow.querySelector('[data-field="fecha_fin"]'),
+                puesto: formRow.querySelector('[data-field="puesto"]'),
+                departamento: formRow.querySelector('[data-field="departamento"]'),
+                descripcion: formRow.querySelector('[data-field="descripcion"]'),
+                motivo_salida: formRow.querySelector('[data-field="motivo_salida"]')
+            };
+            Object.values(fields).forEach(el => { if (el) el.style.display = 'none'; });
+            switch (eventType) {
+                case 'SUSPENSION': case 'INCAPACIDAD':
+                    fields.fecha_fin.style.display = 'block';
+                    fields.descripcion.style.display = 'block';
+                    break;
+                case 'RENUNCIA': case 'BAJA': case 'ABANDONO':
+                    fields.descripcion.style.display = 'block';
+                    fields.motivo_salida.style.display = 'block';
+                    break;
+                case 'CAMBIO_PUESTO':
+                    fields.puesto.style.display = 'block';
+                    fields.departamento.style.display = 'block';
+                    fields.descripcion.style.display = 'block';
+                    break;
+                case 'ACTA_ADMINISTRATIVA': case 'PERMISO': case 'RECONTRATACION':
+                    fields.descripcion.style.display = 'block';
+                    break;
+            }
+        }
+
+        function toggleContractFields(selectElement) {
+            const formRow = selectElement.closest('.contract-form-row');
+            if (!formRow) return;
+            const endDateContainer = formRow.querySelector('.contract-end-date-container');
+            if (endDateContainer) endDateContainer.style.display = selectElement.value === 'DETERMINADO' ? 'block' : 'none';
+        }
+
+        const historyContainer = document.getElementById('history-container');
+        if (historyContainer) {
+            historyContainer.addEventListener('change', e => { if (e.target.classList.contains('history-event-type')) toggleHistoryFields(e.target); });
+            document.querySelectorAll('.history-event-type').forEach(toggleHistoryFields);
+        }
+
+        const contractsContainer = document.getElementById('contracts-container');
+        if (contractsContainer) {
+            contractsContainer.addEventListener('change', e => { if (e.target.classList.contains('contract-type-select')) toggleContractFields(e.target); });
+            document.querySelectorAll('.contract-type-select').forEach(toggleContractFields);
+        }
+
+        setupFormset('operator-documents-container', 'add-operator-document', 'empty-operator-form', 'documentos_operador', 'document-form-row');
+        setupFormset('salary-container', 'add-salary-entry', 'empty-salary-form', 'salarios', 'salary-form-row');
+        setupFormset('history-container', 'add-history-entry', 'empty-history-form', 'historial_laboral', 'history-form-row');
+        setupFormset('contracts-container', 'add-contract-entry', 'empty-contract-form', 'contratos', 'contract-form-row');
+        setupFormset('hijos-container', 'add-hijo-entry', 'empty-hijo-form', 'hijos', 'hijo-form-row');
+
+        const firstInvalidInput = document.querySelector('.is-invalid, .invalid-feedback.d-block');
+        if (firstInvalidInput) {
+            const tabPane = firstInvalidInput.closest('.tab-pane');
+            if (tabPane) {
+                const tabButton = document.querySelector(`button[data-bs-toggle="tab"][data-bs-target="#${tabPane.id}"]`);
+                if (tabButton) new bootstrap.Tab(tabButton).show();
+                firstInvalidInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        const fotoPerfilInput = document.getElementById('id_foto_perfil');
+        if (fotoPerfilInput) fotoPerfilInput.addEventListener('change', e => { if (e.target.files[0]) { const reader = new FileReader(); reader.onload = event => { document.getElementById('profile-preview').src = event.target.result; }; reader.readAsDataURL(e.target.files[0]); } });
+
+        const activoCheckbox = document.getElementById('id_activo_toggle'), inactiveFieldsDiv = document.getElementById('inactive_fields'), statusActive = document.getElementById('status-active'), statusInactive = document.getElementById('status-inactive');
+        function updateStatusUI() {
+            if (!activoCheckbox) return;
+            const isActive = activoCheckbox.checked;
+            inactiveFieldsDiv.style.display = isActive ? 'none' : 'block';
+            statusActive.classList.toggle('selected', isActive);
+            statusInactive.classList.toggle('selected', !isActive);
+        }
+        if (activoCheckbox && inactiveFieldsDiv && statusActive && statusInactive) {
+            statusActive.addEventListener('click', () => { activoCheckbox.checked = true; updateStatusUI(); });
+            statusInactive.addEventListener('click', () => { activoCheckbox.checked = false; updateStatusUI(); });
+            updateStatusUI();
+        }
+
+        const puestoSelect = document.getElementById('id_puesto'), operatorTab = document.getElementById('documentos-operador-tab-li');
+        if (puestoSelect && operatorTab) { const toggle = () => { if (puestoSelect.selectedIndex > -1) operatorTab.style.display = puestoSelect.options[puestoSelect.selectedIndex].text.toUpperCase().includes('OPERADOR') ? 'block' : 'none'; }; puestoSelect.addEventListener('change', toggle); toggle(); }
+
+        function calculateSalaries(dailyInput) {
+            const row = dailyInput.closest('.salary-form-row');
+            if (!row) return;
+            const weekly = row.querySelector('.salary-display-weekly'), monthly = row.querySelector('.salary-display-monthly'), val = parseFloat(dailyInput.value);
+            if (weekly && monthly) { if (!isNaN(val) && val > 0) { weekly.value = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val * 7); monthly.value = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val * 30.4167); } else { weekly.value = ''; monthly.value = ''; } }
+        }
+        document.getElementById('employeeTabContent').addEventListener('input', e => { if (e.target.matches('[name$="-sueldo_diario"]')) calculateSalaries(e.target); });
+        document.querySelectorAll('[name$="-sueldo_diario"]').forEach(calculateSalaries);
+
+        // ==========================================================
+        // --- LÓGICA DE AUTOCOMPLETADO DE CÓDIGO POSTAL (SAT) ---
+        // ==========================================================
+        const inputCP = document.getElementById('id_codigo_postal');
+        const inputEstado = document.getElementById('id_estado');
+        const inputCiudad = document.getElementById('id_ciudad'); 
+        const inputColonia = document.getElementById('id_colonia');
+        const inputPais = document.getElementById('id_pais');
+        const datalist = document.getElementById('datalist-colonias');
+
+        if (inputCP) {
+            const placeholderEstadoOriginal = inputEstado ? inputEstado.placeholder : '';
+            const placeholderCiudadOriginal = inputCiudad ? inputCiudad.placeholder : '';
+
+            inputCP.addEventListener('input', function() {
+                const cp = this.value.trim();
+                
+                if (cp.length === 5) {
+                    if (inputEstado) inputEstado.placeholder = "Buscando...";
+                    if (inputCiudad) inputCiudad.placeholder = "Buscando...";
+                    
+                    fetch(`/viajes/api/buscar-cp/?cp=${cp}`)
+                        .then(response => response.json())
+                        .then(jsonResponse => {
+                            if (jsonResponse.status === 'success' && jsonResponse.data) {
+                                const info = jsonResponse.data; 
+                                
+                                if (inputEstado) inputEstado.value = info.estado || '';
+                                if (inputCiudad) inputCiudad.value = info.municipio || ''; // API devuelve 'municipio'
+                                
+                                if (inputPais) inputPais.value = 'MEX';
+                                
+                                if (datalist) datalist.innerHTML = '';
+                                if (info.colonias && info.colonias.length > 0) {
+                                    info.colonias.forEach(col => {
+                                        const option = document.createElement('option');
+                                        option.value = col;
+                                        if (datalist) datalist.appendChild(option);
+                                    });
+                                    if (inputColonia) {
+                                        // En lugar de autoseleccionar, limpiamos el campo y mostramos un placeholder 
+                                        // para invitar al usuario a abrir la lista.
+                                        inputColonia.value = '';
+                                        inputColonia.placeholder = "▼ Selecciona una colonia...";
+                                        
+                                        // Si solo hay una colonia, la autoseleccionamos por comodidad
+                                        if (info.colonias.length === 1) {
+                                            inputColonia.value = info.colonias[0];
+                                        }
+                                    }
+                                } else {
+                                    if (inputColonia) inputColonia.value = '';
+                                }
+                                
+                                if (inputEstado) inputEstado.placeholder = placeholderEstadoOriginal;
+                                if (inputCiudad) inputCiudad.placeholder = placeholderCiudadOriginal;
+                            } else {
+                                if (inputEstado) { inputEstado.value = ""; inputEstado.placeholder = "CP no encontrado"; }
+                                if (inputCiudad) { inputCiudad.value = ""; inputCiudad.placeholder = "CP no encontrado"; }
+                                if (inputColonia) inputColonia.value = "";
+                                if (inputPais) inputPais.value = "MEX"; 
+                                if (datalist) datalist.innerHTML = '';
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error de red:', error);
+                            if (inputEstado) { inputEstado.value = ""; inputEstado.placeholder = "Error al buscar"; }
+                            if (inputCiudad) { inputCiudad.value = ""; inputCiudad.placeholder = "Error al buscar"; }
+                        });
+                } else {
+                    if (datalist) datalist.innerHTML = '';
+                    if (inputEstado) inputEstado.placeholder = placeholderEstadoOriginal;
+                    if (inputCiudad) inputCiudad.placeholder = placeholderCiudadOriginal;
+                }
+            });
+        }
+        // ==========================================================
+
+        // Función para mostrar indicador de carga al descargar documentos
+        window.showLoading = function() {
+            const downloadBtn = event?.target?.closest('a');
+            if (downloadBtn) {
+                const originalHtml = downloadBtn.innerHTML;
+                downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Generando...';
+                downloadBtn.disabled = true;
+
+                // Restaurar después de 10 segundos (por si hay error)
+                setTimeout(() => {
+                    downloadBtn.innerHTML = originalHtml;
+                    downloadBtn.disabled = false;
+                }, 10000);
+            }
+        };
+
+        // Mejorar tooltips Bootstrap
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+</script>
+{% endblock %}

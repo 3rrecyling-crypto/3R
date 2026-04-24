@@ -1,0 +1,515 @@
+<!-- templates/rh/registrar_pago.html -->
+{% extends 'rh/base.html' %}
+{% load humanize %}
+
+{% block rh_title %}Registrar Pago{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --success-gradient: linear-gradient(135deg, #00b09b, #96c93d);
+        --border-radius: 20px;
+        --card-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+    }
+
+    body {
+        background: #f5f7fb;
+    }
+
+    .register-header {
+        background: var(--success-gradient);
+        border-radius: var(--border-radius);
+        padding: 2rem;
+        margin-bottom: 2rem;
+        color: white;
+        position: relative;
+        overflow: hidden;
+        box-shadow: var(--card-shadow);
+    }
+
+    .register-header h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .register-header p {
+        font-size: 1rem;
+        opacity: 0.9;
+        margin-bottom: 0;
+    }
+
+    .info-card {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+        padding: 1.5rem;
+        height: 100%;
+    }
+
+    .form-card {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+        overflow: hidden;
+    }
+
+    .form-card-header {
+        background: var(--success-gradient);
+        color: white;
+        padding: 1.25rem 1.5rem;
+    }
+
+    .form-card-header h5 {
+        margin: 0;
+        font-weight: 600;
+    }
+
+    .form-card-body {
+        padding: 2rem;
+    }
+
+    .summary-box {
+        background: #f8faff;
+        border-radius: 15px;
+        padding: 1.25rem;
+        margin-top: 1.5rem;
+        border: 1px solid rgba(0, 176, 155, 0.2);
+    }
+
+    .summary-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px dashed #e9ecef;
+    }
+
+    .summary-item:last-child {
+        border-bottom: none;
+    }
+
+    .btn-register {
+        background: var(--success-gradient);
+        color: white;
+        border: none;
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+    }
+
+    .btn-register:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 176, 155, 0.3);
+        color: white;
+    }
+
+    .payment-preview {
+        background: #f8faff;
+        border-radius: 15px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .payment-preview-icon {
+        width: 40px;
+        height: 40px;
+        background: var(--success-gradient);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+    }
+</style>
+{% endblock %}
+
+{% block rh_content %}
+<div class="container-fluid px-4">
+    <!-- Header -->
+    <div class="register-header">
+        <h1>
+            <i class="fas fa-money-bill-wave me-3"></i>
+            Registrar Pago
+        </h1>
+        <p>
+            <i class="fas fa-hand-holding-usd me-2"></i>
+            Préstamo #{{ prestamo.id }} • {{ prestamo.empleado.nombre_completo }}
+        </p>
+    </div>
+
+    <!-- Breadcrumb CORREGIDO: usar pk=prestamo.id -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb bg-white p-3 rounded-3 shadow-sm">
+            <li class="breadcrumb-item">
+                <a href="{% url 'rh:inicio_rh' %}" class="text-decoration-none">
+                    <i class="fas fa-home me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'rh:gestion_prestamos' %}" class="text-decoration-none">
+                    <i class="fas fa-hand-holding-usd me-1"></i>Préstamos
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'rh:detalle_prestamo' pk=prestamo.id %}" class="text-decoration-none">
+                    <i class="fas fa-file-invoice me-1"></i>Préstamo #{{ prestamo.id }}
+                </a>
+            </li>
+            <li class="breadcrumb-item active">
+                <i class="fas fa-money-bill-wave me-1"></i>Registrar Pago
+            </li>
+        </ol>
+    </nav>
+
+    <div class="row g-4">
+        <!-- Columna izquierda: Resumen -->
+        <div class="col-lg-4">
+            <div class="info-card">
+                <h5 class="fw-bold mb-3">
+                    <i class="fas fa-info-circle me-2" style="color: #00b09b;"></i>
+                    Resumen del Préstamo
+                </h5>
+                
+                <div class="mb-3">
+                    <small class="text-muted d-block">Empleado</small>
+                    <strong>{{ prestamo.empleado.nombre_completo }}</strong>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <small class="text-muted d-block">Monto total</small>
+                        <strong class="text-primary fs-5">${{ prestamo.monto_total|intcomma }}</strong>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted d-block">Saldo pendiente</small>
+                        <strong class="text-danger fs-5">${{ prestamo.saldo_pendiente|intcomma }}</strong>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <small class="text-muted d-block">Pago semanal programado</small>
+                    <strong class="text-success fs-4">${{ prestamo.pago_semanal|floatformat:2|intcomma }}</strong>
+                </div>
+
+                <div class="progress mb-2" style="height: 8px;">
+                    <div class="progress-bar bg-success" style="width: {{ prestamo.progreso_pago }}%"></div>
+                </div>
+                <small class="text-muted">{{ prestamo.progreso_pago|floatformat:1 }}% pagado • {{ prestamo.semanas_restantes }} semanas restantes</small>
+
+                <!-- Próximos pagos -->
+                {% if pagos_pendientes %}
+                <hr>
+                <h6 class="fw-bold mb-2">
+                    <i class="fas fa-clock me-2 text-warning"></i>
+                    Próximos pagos
+                </h6>
+                {% for pago in pagos_pendientes|slice:":2" %}
+                <div class="payment-preview">
+                    <div class="payment-preview-icon">
+                        {{ pago.numero_pago }}
+                    </div>
+                    <div>
+                        <small class="text-muted d-block">Semana {{ pago.numero_pago }}</small>
+                        <strong>${{ pago.monto_programado|floatformat:2|intcomma }}</strong>
+                        <br>
+                        <small class="text-muted">{{ pago.fecha_pago|date:"d/m/Y" }}</small>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-success ms-auto" 
+                            onclick="usarMontoProgramado({{ pago.monto_programado }})">
+                        Usar
+                    </button>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Columna derecha: Formulario -->
+        <div class="col-lg-8">
+            <div class="form-card">
+                <div class="form-card-header">
+                    <h5>
+                        <i class="fas fa-edit me-2"></i>
+                        Registrar Nuevo Pago
+                    </h5>
+                </div>
+                <div class="form-card-body">
+                    <form method="post" enctype="multipart/form-data" id="pagoForm">
+                        {% csrf_token %}
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">
+                                    <i class="fas fa-calendar-day me-1"></i>
+                                    Fecha del Pago *
+                                </label>
+                                <input type="date" 
+                                       name="fecha_pago" 
+                                       id="fecha_pago"
+                                       class="form-control form-control-lg" 
+                                       value="{% now 'Y-m-d' %}"
+                                       max="{% now 'Y-m-d' %}"
+                                       required>
+                                <small class="text-muted">Fecha en que se realizó el pago</small>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">
+                                    <i class="fas fa-dollar-sign me-1"></i>
+                                    Monto Pagado *
+                                </label>
+                                <div class="input-group input-group-lg">
+                                    <span class="input-group-text bg-light">$</span>
+                                    <input type="number" 
+                                           name="monto_pagado" 
+                                           id="monto_pagado"
+                                           class="form-control" 
+                                           step="0.01" 
+                                           min="0.01"
+                                           value="{{ prestamo.pago_semanal|floatformat:2 }}"
+                                           required>
+                                </div>
+                                <small class="text-muted">Monto realmente pagado</small>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-comment-alt me-1"></i>
+                                Observaciones
+                            </label>
+                            <textarea name="observaciones" 
+                                      class="form-control" 
+                                      rows="4"
+                                      placeholder="Detalles del pago, número de transacción, semana cubierta, etc."></textarea>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-file-upload me-1"></i>
+                                Comprobante (opcional)
+                            </label>
+                            <input type="file" 
+                                   name="comprobante" 
+                                   class="form-control" 
+                                   accept=".pdf,.jpg,.jpeg,.png">
+                        </div>
+
+                        <!-- Resumen después del pago -->
+                        <div class="summary-box" id="resumenBox">
+                            <h6 class="fw-bold mb-3">
+                                <i class="fas fa-chart-line me-2" style="color: #00b09b;"></i>
+                                Después de este pago
+                            </h6>
+                            <div class="summary-item">
+                                <span class="text-muted">Saldo actual:</span>
+                                <strong>${{ prestamo.saldo_pendiente|floatformat:2|intcomma }}</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span class="text-muted">Nuevo saldo:</span>
+                                <strong class="text-success" id="nuevoSaldo">${{ prestamo.saldo_pendiente|floatformat:2|intcomma }}</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span class="text-muted">Semanas restantes:</span>
+                                <strong class="text-primary" id="nuevasSemanas">{{ prestamo.semanas_restantes }}</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span class="text-muted">Nuevo progreso:</span>
+                                <strong class="text-info" id="nuevoProgreso">{{ prestamo.progreso_pago|floatformat:1 }}%</strong>
+                            </div>
+                        </div>
+
+                        <!-- Botones CORREGIDOS: usar pk=prestamo.id -->
+                        <div class="d-flex justify-content-between mt-4 pt-3 border-top">
+                            <a href="{% url 'rh:detalle_prestamo' pk=prestamo.id %}" class="btn btn-outline-secondary btn-lg">
+                                <i class="fas fa-times me-2"></i>
+                                Cancelar
+                            </a>
+                            <button type="submit" class="btn-register btn-lg" id="btnRegistrar">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Registrar Pago
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Elementos del DOM
+    const montoInput = document.getElementById('monto_pagado');
+    const fechaInput = document.getElementById('fecha_pago');
+    const nuevoSaldo = document.getElementById('nuevoSaldo');
+    const nuevasSemanas = document.getElementById('nuevasSemanas');
+    const nuevoProgreso = document.getElementById('nuevoProgreso');
+    const pagoForm = document.getElementById('pagoForm');
+    
+    // Datos del préstamo (pasados desde Django)
+    const saldoActual = parseFloat('{{ prestamo.saldo_pendiente|default:"0" }}'.replace(/,/g, '')) || 0;
+    const montoTotal = parseFloat('{{ prestamo.monto_total|default:"0" }}'.replace(/,/g, '')) || 0;
+    const montoPagadoActual = parseFloat('{{ prestamo.monto_pagado|default:"0" }}'.replace(/,/g, '')) || 0;
+    const pagoSemanal = parseFloat('{{ prestamo.pago_semanal|default:"0" }}'.replace(/,/g, '')) || 0;
+    
+    console.log('Datos del préstamo:', { saldoActual, montoTotal, montoPagadoActual, pagoSemanal });
+    
+    // Función para actualizar resumen
+    function actualizarResumen() {
+        const monto = parseFloat(montoInput.value) || 0;
+        
+        // Calcular nuevo saldo
+        let nuevoSaldoCalculado = saldoActual - monto;
+        if (nuevoSaldoCalculado < 0) nuevoSaldoCalculado = 0;
+        
+        // Calcular nuevo monto pagado
+        const nuevoMontoPagado = montoPagadoActual + monto;
+        
+        // Calcular nuevo progreso
+        let nuevoProgresoCalculado = 0;
+        if (montoTotal > 0) {
+            nuevoProgresoCalculado = (nuevoMontoPagado / montoTotal) * 100;
+            if (nuevoProgresoCalculado > 100) nuevoProgresoCalculado = 100;
+        }
+        
+        // Calcular nuevas semanas restantes
+        let nuevasSemanasCalculadas = 0;
+        if (pagoSemanal > 0 && nuevoSaldoCalculado > 0) {
+            nuevasSemanasCalculadas = Math.ceil(nuevoSaldoCalculado / pagoSemanal);
+        }
+        
+        // Actualizar DOM con formato
+        if (nuevoSaldo) {
+            nuevoSaldo.textContent = '$' + nuevoSaldoCalculado.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+        
+        if (nuevasSemanas) {
+            nuevasSemanas.textContent = nuevasSemanasCalculadas;
+        }
+        
+        if (nuevoProgreso) {
+            nuevoProgreso.textContent = nuevoProgresoCalculado.toFixed(1) + '%';
+        }
+    }
+    
+    // Event listener para cambios en el monto
+    if (montoInput) {
+        montoInput.addEventListener('input', actualizarResumen);
+        actualizarResumen(); // Calcular estado inicial
+    }
+    
+    // Función para usar monto programado
+    window.usarMontoProgramado = function(monto) {
+        if (montoInput) {
+            montoInput.value = monto.toFixed(2);
+            actualizarResumen();
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Monto seleccionado',
+                text: `Se ha establecido el monto de $${monto.toFixed(2)}`,
+                timer: 2000,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end'
+            });
+        }
+    };
+    
+    // Validación y confirmación antes de enviar
+    if (pagoForm) {
+        pagoForm.addEventListener('submit', function(e) {
+            e.preventDefault(); // Prevenir envío automático
+            
+            const monto = parseFloat(montoInput?.value) || 0;
+            const fecha = fechaInput?.value;
+            
+            // Validaciones básicas
+            if (!fecha) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Fecha requerida',
+                    text: 'Debe seleccionar la fecha del pago.',
+                    confirmButtonColor: '#00b09b'
+                });
+                return;
+            }
+            
+            if (monto <= 0) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Monto inválido',
+                    text: 'El monto debe ser mayor a cero.',
+                    confirmButtonColor: '#00b09b'
+                });
+                return;
+            }
+            
+            // Calcular nuevo saldo para mostrar
+            const nuevoSaldoCalculado = Math.max(0, saldoActual - monto);
+            const semanasRestantes = pagoSemanal > 0 ? Math.ceil(nuevoSaldoCalculado / pagoSemanal) : 0;
+            
+            // Formatear fecha para mostrar
+            let fechaFormateada = fecha;
+            try {
+                const fechaObj = new Date(fecha + 'T12:00:00');
+                fechaFormateada = fechaObj.toLocaleDateString('es-MX', { 
+                    day: '2-digit', 
+                    month: '2-digit', 
+                    year: 'numeric' 
+                });
+            } catch (e) {
+                console.error('Error formateando fecha:', e);
+            }
+            
+            // Mostrar confirmación con SweetAlert2
+            Swal.fire({
+                title: '¿Confirmar registro de pago?',
+                html: `
+                    <div style="text-align: left; padding: 0.5rem;">
+                        <p style="margin: 0.5rem 0;"><strong>📅 Fecha:</strong> ${fechaFormateada}</p>
+                        <p style="margin: 0.5rem 0;"><strong>💰 Monto:</strong> <span style="color: #00b09b; font-weight: bold;">$${monto.toFixed(2)}</span></p>
+                        <p style="margin: 0.5rem 0;"><strong>📊 Nuevo saldo:</strong> $${nuevoSaldoCalculado.toFixed(2)}</p>
+                        <p style="margin: 0.5rem 0;"><strong>⏱️ Semanas restantes:</strong> ${semanasRestantes}</p>
+                    </div>
+                `,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#00b09b',
+                cancelButtonColor: '#d33',
+                confirmButtonText: '<i class="fas fa-check me-2"></i>Sí, registrar',
+                cancelButtonText: '<i class="fas fa-times me-2"></i>Cancelar',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // ENVIAR EL FORMULARIO DIRECTAMENTE
+                    console.log('Enviando formulario...');
+                    pagoForm.submit();
+                }
+            });
+        });
+    } else {
+        console.error('No se encontró el formulario con id="pagoForm"');
+    }
+    
+    // Establecer fecha máxima (hoy) para el input de fecha
+    if (fechaInput) {
+        const hoy = new Date().toISOString().split('T')[0];
+        fechaInput.setAttribute('max', hoy);
+        
+        // Si no hay valor, establecer hoy
+        if (!fechaInput.value) {
+            fechaInput.value = hoy;
+        }
+    }
+});
+</script>
+{% endblock %}

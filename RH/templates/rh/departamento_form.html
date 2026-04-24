@@ -1,0 +1,48 @@
+{# RH/templates/rh/departamento_form.html #}
+{# This template extends the base template for the RH application. #}
+{% extends 'rh/base.html' %}
+
+{# Defines the specific title for the RH page. #}
+{# The title changes based on whether a department instance exists (editing) or not (creating). #}
+{% block rh_title %}{% if form.instance.pk %}Editar Departamento{% else %}Nuevo Departamento{% endif %}{% endblock %}
+
+{# Main content block for the RH application. #}
+{% block rh_content %}
+    {# Card container for the form, providing consistent styling. #}
+    <div class="card shadow-sm">
+        {# Card header with dynamic title and info background. #}
+        <div class="card-header bg-info text-white">
+            <h4 class="mb-0">{% if form.instance.pk %}Editar Departamento{% else %}Nuevo Departamento{% endif %}</h4>
+        </div>
+        {# Card body containing the form. #}
+        <div class="card-body">
+            {# The form itself, using POST method for submission. #}
+            <form method="post">
+                {# CSRF token for security in Django forms. #}
+                {% csrf_token %}
+                {# Loop through each field in the form. #}
+                {% for field in form %}
+                    {# Container for each form field, with Bootstrap margin-bottom. #}
+                    <div class="mb-3">
+                        {# Label for the form field, linked by ID. #}
+                        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                        {# Renders the form field widget (input, select, textarea, etc.). #}
+                        {{ field }}
+                        {# Displays help text if available for the field. #}
+                        {% if field.help_text %}
+                            <div class="form-text">{{ field.help_text }}</div>
+                        {% endif %}
+                        {# Displays any validation errors for the field. #}
+                        {% for error in field.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+                {# Submit button for saving the department. #}
+                <button type="submit" class="btn btn-success mt-3">Guardar Departamento</button>
+                {# Cancel button, redirects to the department list. #}
+                <a href="{% url 'rh:lista_departamentos' %}" class="btn btn-secondary mt-3">Cancelar</a>
+            </form>
+        </div>
+    </div>
+{% endblock %}

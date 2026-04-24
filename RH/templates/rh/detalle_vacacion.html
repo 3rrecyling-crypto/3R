@@ -1,0 +1,434 @@
+{# RH/templates/rh/detalle_vacacion.html #}
+{% extends 'rh/base.html' %}
+{% load humanize %}
+
+{% block rh_title %}Detalle de Vacación{% endblock %}
+
+{% block rh_content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'rh:gestion_vacaciones' %}">Vacaciones</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Detalle</li>
+                </ol>
+            </nav>
+            <h2 class="fw-bold mb-0">
+                <i class="fas fa-umbrella-beach me-2" style="color: #2ecc71;"></i>
+                Detalle de Vacación
+            </h2>
+        </div>
+        <div>
+            {% if vacacion.estado == 'PENDIENTE' and user.is_superuser %}
+            <a href="{% url 'rh:aprobar_vacacion' vacacion.pk %}" class="btn btn-primary">
+                <i class="fas fa-check me-1"></i> Aprobar/Rechazar
+            </a>
+            {% endif %}
+            <a href="{% url 'rh:gestion_vacaciones' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Volver
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Información Principal -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="fas fa-info-circle me-2"></i> Información de la Solicitud
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Empleado</label>
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                         style="width: 40px; height: 40px; font-weight: bold;">
+                                        {{ vacacion.empleado.nombre|slice:":1" }}{{ vacacion.empleado.apellido|slice:":1" }}
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">{{ vacacion.empleado.nombre_completo }}</h6>
+                                        <small class="text-muted">
+                                            {{ vacacion.empleado.puesto.nombre|default:"Sin puesto" }} • 
+                                            {{ vacacion.empleado.departamento.nombre|default:"Sin departamento" }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Estado</label>
+                                <div>
+                                    {% if vacacion.estado == 'PENDIENTE' %}
+                                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning px-3 py-2">
+                                            <i class="fas fa-clock me-1"></i> PENDIENTE
+                                        </span>
+                                    {% elif vacacion.estado == 'APROBADO' %}
+                                        <span class="badge bg-success bg-opacity-25 text-success border border-success px-3 py-2">
+                                            <i class="fas fa-check me-1"></i> APROBADO
+                                        </span>
+                                    {% elif vacacion.estado == 'RECHAZADO' %}
+                                        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger px-3 py-2">
+                                            <i class="fas fa-times me-1"></i> RECHAZADO
+                                        </span>
+                                    {% elif vacacion.estado == 'GOZADO' %}
+                                        <span class="badge bg-info bg-opacity-25 text-info border border-info px-3 py-2">
+                                            <i class="fas fa-umbrella-beach me-1"></i> GOZADO
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Tipo de Vacación</label>
+                                <p class="mb-0 fw-bold">{{ vacacion.get_tipo_vacacion_display }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Período Correspondiente</label>
+                                <p class="mb-0 fw-bold">{{ vacacion.periodo_correspondiente }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Fecha de Inicio</label>
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-calendar-day text-primary me-2"></i>
+                                    <p class="mb-0 fw-bold">{{ vacacion.fecha_inicio|date:"d/m/Y" }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Fecha de Fin</label>
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-calendar-check text-primary me-2"></i>
+                                    <p class="mb-0 fw-bold">{{ vacacion.fecha_fin|date:"d/m/Y" }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Días Solicitados</label>
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-calendar-alt text-primary me-2"></i>
+                                    <p class="mb-0 fw-bold">{{ vacacion.dias_solicitados }} días</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Días Laborables</label>
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-briefcase text-primary me-2"></i>
+                                    <p class="mb-0 fw-bold">{{ vacacion.dias_laborables|default:vacacion.dias_solicitados }} días</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Días Restantes</label>
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-hourglass-half text-primary me-2"></i>
+                                    <p class="mb-0 fw-bold">
+                                        {% if vacacion.dias_restantes %}
+                                            {{ vacacion.dias_restantes }} días
+                                        {% else %}
+                                            En curso o finalizado
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Fecha de Solicitud</label>
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-paper-plane text-primary me-2"></i>
+                                    <p class="mb-0 fw-bold">{{ vacacion.fecha_solicitud|date:"d/m/Y" }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if vacacion.observaciones %}
+                    <div class="mb-3">
+                        <label class="form-label text-muted small mb-1">Observaciones</label>
+                        <div class="border rounded p-3 bg-light">
+                            <p class="mb-0">{{ vacacion.observaciones|linebreaks }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Documentos -->
+            {% if vacacion.documento_solicitud or vacacion.documento_aprobacion %}
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="fas fa-file-alt me-2"></i> Documentos
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% if vacacion.documento_solicitud %}
+                        <div class="col-md-6">
+                            <div class="card border">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-file-upload text-primary me-2"></i>Solicitud
+                                    </h6>
+                                    <p class="card-text small text-muted mb-2">
+                                        Subido el: {{ vacacion.fecha_creacion|date:"d/m/Y H:i" }}
+                                    </p>
+                                    <a href="{{ vacacion.documento_solicitud.url }}" 
+                                       class="btn btn-sm btn-outline-primary" target="_blank">
+                                        <i class="fas fa-download me-1"></i> Descargar
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if vacacion.documento_aprobacion %}
+                        <div class="col-md-6">
+                            <div class="card border">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-file-check text-success me-2"></i>Aprobación
+                                    </h6>
+                                    <p class="card-text small text-muted mb-2">
+                                        Aprobado el: {{ vacacion.fecha_aprobacion|date:"d/m/Y" }}
+                                    </p>
+                                    <a href="{{ vacacion.documento_aprobacion.url }}" 
+                                       class="btn btn-sm btn-outline-success" target="_blank">
+                                        <i class="fas fa-download me-1"></i> Descargar
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Información Adicional -->
+        <div class="col-lg-4">
+            <!-- Información del Empleado -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="fas fa-user me-2"></i> Información del Empleado
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        {% if vacacion.empleado.foto_perfil %}
+                            <img src="{{ vacacion.empleado.foto_perfil.url }}" 
+                                 alt="{{ vacacion.empleado.nombre_completo }}"
+                                 class="rounded-circle mb-3" 
+                                 style="width: 80px; height: 80px; object-fit: cover;">
+                        {% else %}
+                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" 
+                                 style="width: 80px; height: 80px; font-size: 2rem; font-weight: bold;">
+                                {{ vacacion.empleado.nombre|slice:":1" }}{{ vacacion.empleado.apellido|slice:":1" }}
+                            </div>
+                        {% endif %}
+                        <h6 class="mb-1">{{ vacacion.empleado.nombre_completo }}</h6>
+                        <p class="text-muted small mb-2">
+                            {{ vacacion.empleado.numero_empleado|default:"Sin número" }}
+                        </p>
+                    </div>
+                    
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item border-0 px-0 py-2">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Edad</span>
+                                <span class="fw-bold">{{ vacacion.empleado.edad }} años</span>
+                            </div>
+                        </div>
+                        <div class="list-group-item border-0 px-0 py-2">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Antigüedad</span>
+                                <span class="fw-bold">{{ vacacion.empleado.antiguedad }} años</span>
+                            </div>
+                        </div>
+                        <div class="list-group-item border-0 px-0 py-2">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Empresa</span>
+                                <span class="fw-bold">{{ vacacion.empleado.get_empresa_display }}</span>
+                            </div>
+                        </div>
+                        <div class="list-group-item border-0 px-0 py-2">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Email</span>
+                                <span class="fw-bold text-truncate" style="max-width: 150px;">
+                                    {{ vacacion.empleado.email|default:"No especificado" }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <a href="{% url 'rh:empleado_detail' vacacion.empleado.pk %}" 
+                           class="btn btn-outline-primary w-100">
+                            <i class="fas fa-id-card me-1"></i> Ver Ficha Completa
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información de Aprobación -->
+            {% if vacacion.aprobado_por or vacacion.fecha_aprobacion %}
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="fas fa-user-check me-2"></i> Información de Aprobación
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if vacacion.aprobado_por %}
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-3" 
+                             style="width: 40px; height: 40px; font-weight: bold;">
+                            {{ vacacion.aprobado_por.first_name|slice:":1" }}{{ vacacion.aprobado_por.last_name|slice:":1" }}
+                        </div>
+                        <div>
+                            <h6 class="mb-0">{{ vacacion.aprobado_por.get_full_name }}</h6>
+                            <small class="text-muted">{{ vacacion.aprobado_por.email }}</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if vacacion.fecha_aprobacion %}
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-calendar-check text-success me-3"></i>
+                        <div>
+                            <p class="mb-0 fw-bold">Fecha de Aprobación</p>
+                            <p class="mb-0 text-muted">{{ vacacion.fecha_aprobacion|date:"d/m/Y" }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Información del Sistema -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="fas fa-cog me-2"></i> Información del Sistema
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item border-0 px-0 py-2">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Creado por</span>
+                                <span class="fw-bold">
+                                    {% if vacacion.creado_por %}
+                                        {{ vacacion.creado_por.get_full_name }}
+                                    {% else %}
+                                        Sistema
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="list-group-item border-0 px-0 py-2">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Fecha creación</span>
+                                <span class="fw-bold">{{ vacacion.fecha_creacion|date:"d/m/Y H:i" }}</span>
+                            </div>
+                        </div>
+                        <div class="list-group-item border-0 px-0 py-2">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Última modificación</span>
+                                <span class="fw-bold">{{ vacacion.fecha_modificacion|date:"d/m/Y H:i" }}</span>
+                            </div>
+                        </div>
+                        <div class="list-group-item border-0 px-0 py-2">
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">ID de registro</span>
+                                <span class="fw-bold">#{{ vacacion.id }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Acciones -->
+    <div class="card border-0 shadow-sm mt-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between">
+                <div>
+                    {% if vacacion.estado == 'PENDIENTE' %}
+                    <span class="badge bg-warning bg-opacity-25 text-warning border border-warning px-3 py-2">
+                        <i class="fas fa-exclamation-circle me-1"></i> Esperando aprobación
+                    </span>
+                    {% elif vacacion.estado == 'APROBADO' %}
+                    <span class="badge bg-success bg-opacity-25 text-success border border-success px-3 py-2">
+                        <i class="fas fa-check-circle me-1"></i> Aprobada y programada
+                    </span>
+                    {% elif vacacion.estado == 'GOZADO' %}
+                    <span class="badge bg-info bg-opacity-25 text-info border border-info px-3 py-2">
+                        <i class="fas fa-umbrella-beach me-1"></i> Vacaciones gozadas
+                    </span>
+                    {% endif %}
+                </div>
+                <div>
+                    {% if vacacion.estado == 'PENDIENTE' and user.is_superuser %}
+                    <a href="{% url 'rh:aprobar_vacacion' vacacion.pk %}" class="btn btn-primary">
+                        <i class="fas fa-check me-1"></i> Aprobar/Rechazar
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'rh:gestion_vacaciones' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Volver a la lista
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    border-radius: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.08) !important;
+}
+.list-group-item {
+    background-color: transparent;
+}
+.border {
+    border-color: #e9ecef !important;
+}
+</style>
+{% endblock %}

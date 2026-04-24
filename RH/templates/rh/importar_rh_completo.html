@@ -1,0 +1,114 @@
+<!-- templates/rh/importar_rh_completo.html -->
+{% extends 'rh/base.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }} - Sistema RH{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-file-import me-2"></i>
+                        {{ page_title }}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5><i class="fas fa-info-circle me-2"></i>Instrucciones de Importación</h5>
+                        <ul class="mb-0">
+                            <li>Utiliza el archivo Excel generado por la opción "Exportar Todo"</li>
+                            <li>El archivo debe tener las siguientes pestañas:
+                                <ul>
+                                    <li>Empleados</li>
+                                    <li>Salarios</li>
+                                    <li>Contratos</li>
+                                    <li>Historial Laboral</li>
+                                    <li>Bajas</li>
+                                    <li>Vacaciones</li>
+                                    <li>Préstamos</li>
+                                    <li>Pagos Préstamos</li>
+                                    <li>Documentos Operador</li>
+                                    <li>Hijos</li>
+                                    <li>Catálogos</li>
+                                </ul>
+                            </li>
+                            <li>Los datos existentes con el mismo ID serán actualizados</li>
+                            <li>La importación puede tardar varios minutos dependiendo del tamaño</li>
+                        </ul>
+                    </div>
+                    
+                    <form method="post" enctype="multipart/form-data" class="mt-4">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label for="archivo_excel" class="form-label">
+                                <strong>Seleccionar archivo Excel (.xlsx)</strong>
+                            </label>
+                            <input type="file" class="form-control" id="archivo_excel" 
+                                   name="archivo_excel" accept=".xlsx" required>
+                            <div class="form-text">
+                                Máximo 50MB. Archivo generado por "Exportar Todo"
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-warning">
+                            <h6><i class="fas fa-exclamation-triangle me-2"></i>Advertencia</h6>
+                            <p class="mb-0">
+                                Esta operación <strong>sobrescribirá</strong> datos existentes con los mismos IDs.
+                                Se recomienda hacer un backup antes de proceder.
+                            </p>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'rh:inicio_rh' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary" onclick="mostrarCarga()">
+                                <i class="fas fa-file-import me-2"></i>Importar Datos
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de carga -->
+<div class="modal fade" id="modalCarga" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-spinner fa-spin me-2"></i>Importando Datos
+                </h5>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="spinner-border text-primary mb-3" role="status" style="width: 4rem; height: 4rem;">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+                <h5>Procesando archivo Excel</h5>
+                <p class="text-muted">Por favor espera, esto puede tardar varios minutos...</p>
+                <div class="progress mb-3">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function mostrarCarga() {
+    const archivo = document.getElementById('archivo_excel').files[0];
+    if (archivo) {
+        $('#modalCarga').modal('show');
+        return true;
+    }
+    return false;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,262 @@
+{# RH/templates/rh/aprobar_vacacion.html #}
+{% extends 'rh/base.html' %}
+
+{% block rh_title %}Aprobar Vacación{% endblock %}
+
+{% block rh_content %}
+<div class="container">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'rh:gestion_vacaciones' %}">Vacaciones</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'rh:detalle_vacacion' vacacion.pk %}">Detalle</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Aprobar</li>
+                </ol>
+            </nav>
+            <h2 class="fw-bold mb-0">
+                <i class="fas fa-check-circle me-2 text-success"></i>
+                Aprobar/Rechazar Vacación
+            </h2>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="fas fa-file-alt me-2"></i> Solicitud de Vacación
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Resumen de la solicitud -->
+                    <div class="alert alert-info mb-4">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-info-circle me-2"></i> Información de la solicitud
+                        </h6>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <p class="mb-1"><strong>Empleado:</strong> {{ vacacion.empleado.nombre_completo }}</p>
+                                <p class="mb-1"><strong>Puesto:</strong> {{ vacacion.empleado.puesto.nombre|default:"N/A" }}</p>
+                                <p class="mb-1"><strong>Departamento:</strong> {{ vacacion.empleado.departamento.nombre|default:"N/A" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-1"><strong>Período:</strong> {{ vacacion.periodo_correspondiente }}</p>
+                                <p class="mb-1"><strong>Días solicitados:</strong> {{ vacacion.dias_solicitados }}</p>
+                                <p class="mb-1"><strong>Fecha solicitud:</strong> {{ vacacion.fecha_solicitud|date:"d/m/Y" }}</p>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-12">
+                                <p class="mb-0">
+                                    <strong>Periodo:</strong> 
+                                    {{ vacacion.fecha_inicio|date:"d/m/Y" }} al {{ vacacion.fecha_fin|date:"d/m/Y" }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Formulario de aprobación -->
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Estado de la solicitud</label>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check card border mb-3">
+                                        <input class="form-check-input" type="radio" name="estado" 
+                                               id="estado_aprobado" value="APROBADO" required
+                                               style="position: absolute; left: 20px; top: 20px;">
+                                        <label class="form-check-label card-body" for="estado_aprobado">
+                                            <div class="d-flex align-items-center">
+                                                <div class="icon-circle bg-success-subtle text-success me-3">
+                                                    <i class="fas fa-check"></i>
+                                                </div>
+                                                <div>
+                                                    <h6 class="mb-1 text-success">Aprobar Solicitud</h6>
+                                                    <p class="small text-muted mb-0">
+                                                        La vacación será aprobada y programada.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check card border mb-3">
+                                        <input class="form-check-input" type="radio" name="estado" 
+                                               id="estado_rechazado" value="RECHAZADO" required
+                                               style="position: absolute; left: 20px; top: 20px;">
+                                        <label class="form-check-label card-body" for="estado_rechazado">
+                                            <div class="d-flex align-items-center">
+                                                <div class="icon-circle bg-danger-subtle text-danger me-3">
+                                                    <i class="fas fa-times"></i>
+                                                </div>
+                                                <div>
+                                                    <h6 class="mb-1 text-danger">Rechazar Solicitud</h6>
+                                                    <p class="small text-muted mb-0">
+                                                        La vacación será rechazada y notificada.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Observaciones -->
+                        <div class="mb-4">
+                            <label for="observaciones" class="form-label fw-bold">
+                                <i class="fas fa-comment me-1"></i> Observaciones / Comentarios
+                            </label>
+                            <textarea class="form-control" id="observaciones" name="observaciones" 
+                                      rows="4" placeholder="Agrega comentarios sobre la aprobación o rechazo..."
+                                      required></textarea>
+                            <div class="form-text">
+                                Estas observaciones se guardarán en el registro de la vacación.
+                            </div>
+                        </div>
+
+                        <!-- Documento de aprobación -->
+                        <div class="mb-4">
+                            <label for="documento_aprobacion" class="form-label fw-bold">
+                                <i class="fas fa-file-upload me-1"></i> Documento de Aprobación (Opcional)
+                            </label>
+                            <input type="file" class="form-control" id="documento_aprobacion" 
+                                   name="documento_aprobacion" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                            <div class="form-text">
+                                Puedes subir un documento formal de aprobación (PDF, Word, imagen).
+                            </div>
+                        </div>
+
+                        <!-- Advertencia -->
+                        <div class="alert alert-warning mb-4">
+                            <h6 class="alert-heading">
+                                <i class="fas fa-exclamation-triangle me-2"></i> ¡Atención!
+                            </h6>
+                            <p class="mb-0">
+                                Esta acción cambiará el estado de la solicitud de vacaciones. 
+                                Una vez aprobada o rechazada, el empleado será notificado y el 
+                                estado no podrá ser cambiado sin autorización especial.
+                            </p>
+                        </div>
+
+                        <!-- Botones de acción -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'rh:detalle_vacacion' vacacion.pk %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-check me-1"></i> Confirmar Decisión
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Información adicional -->
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="fas fa-calendar-check me-2"></i> Historial de Vacaciones del Empleado
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Período</th>
+                                    <th>Días</th>
+                                    <th>Estado</th>
+                                    <th>Fecha</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for historico in vacacion.empleado.historico_vacaciones.all|slice:":5" %}
+                                <tr>
+                                    <td>{{ historico.año }}</td>
+                                    <td>{{ historico.dias_tomados }} / {{ historico.dias_correspondientes }}</td>
+                                    <td>
+                                        {% if historico.dias_pendientes > 0 %}
+                                            <span class="badge bg-success">Disponible</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Completo</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ historico.fecha_actualizacion|date:"d/m/Y" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-3">
+                                        No hay historial de vacaciones registrado.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.icon-circle {
+    width: 45px;
+    height: 45px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+.form-check .card {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.form-check .card:hover {
+    border-color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.05);
+}
+.form-check-input:checked + .card {
+    border-color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.1);
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Validación antes de enviar
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(e) {
+        const estadoSeleccionado = document.querySelector('input[name="estado"]:checked');
+        const observaciones = document.getElementById('observaciones').value.trim();
+        
+        if (!estadoSeleccionado) {
+            e.preventDefault();
+            alert('Por favor selecciona un estado (Aprobar o Rechazar)');
+            return false;
+        }
+        
+        if (!observaciones) {
+            e.preventDefault();
+            alert('Por favor agrega observaciones sobre tu decisión');
+            return false;
+        }
+        
+        // Confirmación final
+        const accion = estadoSeleccionado.value === 'APROBADO' ? 'APROBAR' : 'RECHAZAR';
+        if (!confirm(`¿Estás seguro de ${accion} esta solicitud de vacaciones?`)) {
+            e.preventDefault();
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}

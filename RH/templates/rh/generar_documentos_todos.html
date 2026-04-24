@@ -1,0 +1,176 @@
+{% extends 'rh/base.html' %}
+
+{% block rh_title %}Generar Documentos para Todos los Empleados{% endblock %}
+
+{% block rh_content %}
+<div class="card shadow-lg">
+    <div class="card-header bg-gradient-primary text-white">
+        <h3 class="mb-0"><i class="fas fa-file-archive me-2"></i>Generar Documentos para Todos los Empleados</h3>
+    </div>
+    
+    <div class="card-body">
+        <div class="alert alert-info mb-4">
+            <h5><i class="fas fa-info-circle me-2"></i>¿Qué hace esta función?</h5>
+            <p class="mb-0">
+                Generará automáticamente los 6 documentos Word personalizados para <strong>TODOS los empleados activos</strong> 
+                ({{ total_empleados }} empleados). Los documentos se comprimirán en un archivo ZIP para su descarga.
+            </p>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-list-check me-2"></i>Documentos que se generarán</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item">
+                                <i class="fas fa-shield-alt text-success me-2"></i>
+                                <strong>Aviso de Privacidad</strong>
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-file-signature text-success me-2"></i>
+                                <strong>Convenio de Confidencialidad</strong>
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-file-contract text-success me-2"></i>
+                                <strong>Contrato de Trabajo</strong>
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-envelope text-success me-2"></i>
+                                <strong>Autorización Correo SAT</strong>
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-handshake text-success me-2"></i>
+                                <strong>Carta Adhesión al Plan</strong>
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-briefcase text-success me-2"></i>
+                                <strong>Descripción de Puesto</strong>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Consideraciones importantes</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-warning">
+                            <h6><i class="fas fa-clock me-2"></i>Tiempo de procesamiento</h6>
+                            <p class="small mb-2">Este proceso puede tomar varios minutos dependiendo del número de empleados.</p>
+                        </div>
+                        
+                        <div class="alert alert-light">
+                            <h6><i class="fas fa-database me-2"></i>Requisitos de datos</h6>
+                            <ul class="small mb-0">
+                                <li>Los empleados deben tener nombre y apellido</li>
+                                <li>Se usarán los datos actuales en el sistema</li>
+                                <li>Los documentos faltantes se omitirán</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center py-4">
+            <div id="loading" class="d-none">
+                <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">Generando documentos...</span>
+                </div>
+                <h4 class="mt-3 text-primary">Generando documentos...</h4>
+                <p class="text-muted">Esto puede tomar varios minutos. Por favor, no cierre esta ventana.</p>
+                <div class="progress mt-3">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" style="width: 100%"></div>
+                </div>
+            </div>
+            
+            <div id="startSection">
+                <button id="generateBtn" class="btn btn-primary btn-lg px-5 py-3">
+                    <i class="fas fa-play-circle me-2"></i>Iniciar Generación Masiva
+                </button>
+                <p class="text-muted mt-2">
+                    <small>Se generarán aproximadamente {{ total_empleados|multiply:6 }} documentos individuales</small>
+                </p>
+            </div>
+            
+            <div id="resultSection" class="d-none mt-4">
+                <div class="alert alert-success">
+                    <h4><i class="fas fa-check-circle me-2"></i>¡Documentos generados exitosamente!</h4>
+                    <p id="resultMessage"></p>
+                </div>
+                
+                <a id="downloadLink" href="#" class="btn btn-success btn-lg px-5 py-3">
+                    <i class="fas fa-download me-2"></i>Descargar Archivo ZIP
+                </a>
+                
+                <div class="mt-3">
+                    <a href="{% url 'rh:descargar_documentos_todos' %}" class="btn btn-outline-primary">
+                        <i class="fas fa-list me-2"></i>Ver lista de empleados
+                    </a>
+                    <a href="{% url 'rh:lista_empleados' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Volver a la lista
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const generateBtn = document.getElementById('generateBtn');
+    const loading = document.getElementById('loading');
+    const startSection = document.getElementById('startSection');
+    const resultSection = document.getElementById('resultSection');
+    const resultMessage = document.getElementById('resultMessage');
+    const downloadLink = document.getElementById('downloadLink');
+    
+    generateBtn.addEventListener('click', function() {
+        // Mostrar loading, ocultar botón
+        startSection.classList.add('d-none');
+        loading.classList.remove('d-none');
+        
+        // Hacer la solicitud AJAX
+        fetch('{% url "rh:generar_documentos_todos" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Ocultar loading
+            loading.classList.add('d-none');
+            
+            if (data.success) {
+                // Mostrar resultados
+                resultMessage.innerHTML = `
+                    Se generaron documentos para <strong>${data.empleados_procesados}</strong> empleados.<br>
+                    ${data.empleados_sin_datos > 0 ? `<span class="text-warning">${data.empleados_sin_datos} empleados no pudieron ser procesados.</span>` : ''}
+                `;
+                downloadLink.href = data.zip_url;
+                resultSection.classList.remove('d-none');
+            } else {
+                alert('Error al generar documentos');
+                startSection.classList.remove('d-none');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            loading.classList.add('d-none');
+            startSection.classList.remove('d-none');
+            alert('Error al procesar la solicitud');
+        });
+    });
+});
+</script>
+{% endblock %}

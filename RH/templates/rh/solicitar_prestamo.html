@@ -1,0 +1,1399 @@
+{# RH/templates/rh/solicitar_prestamo.html #}
+{% extends 'rh/base.html' %}
+{% load humanize %}
+{% load filters_extras %}
+{% load crispy_forms_tags %}
+
+{% block rh_title %}Solicitar Préstamo{% endblock %}
+
+{% block rh_content %}
+<style>
+    :root {
+        --prestamo-color: #9b59b6;
+        --prestamo-light: rgba(155, 89, 182, 0.1);
+        --prestamo-dark: #8e44ad;
+        --interes-color: #e74c3c;
+        --pago-color: #3498db;
+    }
+
+    .prestamo-card {
+        border-left: 4px solid var(--prestamo-color);
+        border-radius: 12px;
+        box-shadow: 0 5px 25px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+    }
+
+    .calculator-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border-radius: 10px;
+        padding: 1.5rem;
+        border: 1px solid #e9ecef;
+        margin-bottom: 1.5rem;
+    }
+
+    .calculator-result {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        border: 2px solid var(--prestamo-light);
+        text-align: center;
+    }
+
+    .result-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--prestamo-color);
+        line-height: 1;
+        margin-bottom: 0.5rem;
+    }
+
+    .result-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .slider-container {
+        padding: 0 1rem;
+    }
+
+    .slider-value {
+        background: var(--prestamo-light);
+        color: var(--prestamo-color);
+        padding: 0.25rem 0.75rem;
+        border-radius: 50rem;
+        font-weight: 600;
+        display: inline-block;
+        min-width: 80px;
+        text-align: center;
+    }
+
+    .input-group-icon {
+        background: var(--prestamo-light);
+        border: 1px solid #dee2e6;
+        color: var(--prestamo-color);
+        padding: 0.375rem 0.75rem;
+    }
+
+    .payment-schedule {
+        background: white;
+        border-radius: 10px;
+        padding: 1rem;
+        border: 1px solid #e9ecef;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .payment-row {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        border-bottom: 1px solid #f0f0f0;
+        transition: all 0.2s ease;
+    }
+
+    .payment-row:hover {
+        background: #f8f9fa;
+    }
+
+    .payment-row:last-child {
+        border-bottom: none;
+    }
+
+    .payment-number {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: var(--prestamo-light);
+        color: var(--prestamo-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.85rem;
+        margin-right: 1rem;
+    }
+
+    .payment-details {
+        flex: 1;
+    }
+
+    .payment-amount {
+        font-weight: 600;
+        color: var(--prestamo-color);
+    }
+
+    .payment-date {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+
+    .limit-indicator {
+        height: 6px;
+        background: #e9ecef;
+        border-radius: 3px;
+        margin: 0.5rem 0;
+        position: relative;
+    }
+
+    .limit-bar {
+        height: 100%;
+        border-radius: 3px;
+        background: linear-gradient(90deg, #2ecc71, #f39c12, #e74c3c);
+        transition: width 0.3s ease;
+    }
+
+    .limit-marker {
+        position: absolute;
+        top: -3px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: white;
+        border: 2px solid #6c757d;
+        transform: translateX(-50%);
+    }
+
+    .limit-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+
+    .info-panel {
+        background: #f8f9fa;
+        border-left: 4px solid var(--prestamo-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .info-panel i {
+        color: var(--prestamo-color);
+    }
+
+    .employee-financial {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        border: 1px solid #e9ecef;
+    }
+
+    .financial-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .financial-item:last-child {
+        border-bottom: none;
+    }
+
+    .financial-label {
+        color: #6c757d;
+    }
+
+    .financial-value {
+        font-weight: 600;
+        color: var(--prestamo-color);
+    }
+
+    .btn-solicitar {
+        background: linear-gradient(135deg, var(--prestamo-color), var(--prestamo-dark));
+        color: white;
+        border: none;
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .btn-solicitar:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(155, 89, 182, 0.3);
+        color: white;
+    }
+
+    .step-indicator {
+        display: flex;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    .step {
+        display: flex;
+        align-items: center;
+        flex-direction: column;
+        position: relative;
+        flex: 1;
+    }
+
+    .step-number {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #e9ecef;
+        color: #6c757d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        z-index: 1;
+    }
+
+    .step.active .step-number {
+        background: var(--prestamo-color);
+        color: white;
+    }
+
+    .step.completed .step-number {
+        background: var(--prestamo-dark);
+        color: white;
+    }
+
+    .step-line {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        right: -50%;
+        height: 2px;
+        background: #e9ecef;
+        z-index: 0;
+    }
+
+    .step:last-child .step-line {
+        display: none;
+    }
+
+    .step.completed .step-line {
+        background: var(--prestamo-color);
+    }
+
+    .step-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        text-align: center;
+    }
+
+    .step.active .step-label {
+        color: var(--prestamo-color);
+        font-weight: 600;
+    }
+
+    .employee-selection-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        border: 1px solid #e9ecef;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .employee-selection-card:hover {
+        border-color: var(--prestamo-color);
+        box-shadow: 0 5px 15px rgba(155, 89, 182, 0.1);
+    }
+
+    .search-box {
+        position: relative;
+        margin-bottom: 1rem;
+    }
+
+    .search-box .form-control {
+        padding-left: 2.5rem;
+    }
+
+    .search-box i {
+        position: absolute;
+        left: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+    }
+
+    .employee-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .employee-item {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+    }
+
+    .employee-item:hover {
+        background: #f8f9fa;
+        border-color: #e9ecef;
+    }
+
+    .employee-item.selected {
+        background: var(--prestamo-light);
+        border-color: var(--prestamo-color);
+    }
+
+    .employee-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--prestamo-light);
+        color: var(--prestamo-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 1rem;
+        flex-shrink: 0;
+    }
+
+    .employee-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .employee-name {
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 0.25rem;
+    }
+
+    .employee-details {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+
+    .employee-salary {
+        font-weight: 600;
+        color: var(--prestamo-color);
+        font-size: 0.9rem;
+        white-space: nowrap;
+        margin-left: 1rem;
+    }
+
+    .week-indicator {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        background: var(--prestamo-light);
+        border-radius: 50rem;
+        font-size: 0.85rem;
+        color: var(--prestamo-color);
+        margin-left: 0.5rem;
+    }
+
+    .week-indicator i {
+        font-size: 0.75rem;
+        margin-right: 0.25rem;
+    }
+</style>
+
+<div class="container">
+    <!-- Paso a paso -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="step-indicator">
+                <div class="step {% if not empleado %}active{% else %}completed{% endif %}">
+                    <div class="step-number">1</div>
+                    <div class="step-line"></div>
+                    <div class="step-label">Seleccionar Empleado</div>
+                </div>
+                <div class="step {% if empleado %}active{% endif %}">
+                    <div class="step-number">2</div>
+                    <div class="step-line"></div>
+                    <div class="step-label">Datos del Préstamo</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-line"></div>
+                    <div class="step-label">Confirmación</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Encabezado -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="{% url 'rh:inicio_rh' %}">Dashboard</a></li>
+                            <li class="breadcrumb-item"><a href="{% url 'rh:gestion_prestamos' %}">Préstamos</a></li>
+                            <li class="breadcrumb-item active" aria-current="page">Nuevo Préstamo</li>
+                        </ol>
+                    </nav>
+                    <h2 class="fw-bold text-dark mb-0">
+                        <i class="fas fa-hand-holding-usd me-2" style="color: var(--prestamo-color);"></i>
+                        Solicitar Préstamo
+                        <span class="week-indicator">
+                            <i class="fas fa-calendar-week"></i>
+                            Sistema por semanas
+                        </span>
+                    </h2>
+                    <p class="text-muted mb-0">Complete el formulario para solicitar un préstamo por semanas (1-52 semanas)</p>
+                </div>
+                <div>
+                    <a href="{% url 'rh:gestion_prestamos' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Volver
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Columna izquierda: Información y selección de empleado -->
+        <div class="col-lg-4 mb-4">
+            {% if not empleado %}
+            <!-- Selección de empleado -->
+            <div class="card prestamo-card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="fw-bold m-0 text-dark">
+                        <i class="fas fa-users me-2"></i>
+                        Seleccionar Empleado
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="employeeSearch" class="form-control" placeholder="Buscar empleado...">
+                    </div>
+
+                    <div class="employee-list" id="employeeList">
+                        {% for emp in empleados %}
+                        <div class="employee-item" data-employee-id="{{ emp.id }}"
+                            data-employee-name="{{ emp.nombre_completo }}"
+                            data-employee-puesto="{{ emp.puesto.nombre|default:'Sin puesto' }}"
+                            data-employee-departamento="{{ emp.departamento.nombre|default:'Sin departamento' }}"
+                            data-employee-sueldo="{{ emp.salario_actual.sueldo_mensual|default:'0' }}">
+                            <div class="employee-avatar">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="employee-info">
+                                <div class="employee-name">{{ emp.nombre_completo }}</div>
+                                <div class="employee-details">
+                                    {{ emp.puesto.nombre|default:"Sin puesto" }} • {{ emp.departamento.nombre|default:"Sin departamento" }}
+                                </div>
+                            </div>
+                            <div class="employee-salary">
+                                ${{ emp.salario_actual.sueldo_mensual|default:0|floatformat:2|intcomma }}/mes
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-center py-4 text-muted">
+                            <i class="fas fa-users-slash fa-2x mb-3"></i>
+                            <p>No hay empleados disponibles</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mt-3 text-center">
+                        <p class="text-muted small mb-2">
+                            <i class="fas fa-lightbulb me-1"></i>
+                            Seleccione un empleado para continuar con la solicitud de préstamo
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <!-- Información del empleado seleccionado -->
+            <div class="card prestamo-card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-bottom py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="fw-bold m-0 text-dark">
+                            <i class="fas fa-user-tie me-2"></i>
+                            Información Financiera
+                        </h5>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="cambiarEmpleado()">
+                            <i class="fas fa-exchange-alt me-1"></i> Cambiar
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Información del empleado -->
+                    <div class="employee-financial mb-4">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="employee-avatar">
+                                <i class="fas fa-user-tie"></i>
+                            </div>
+                            <div>
+                                <h5 class="fw-bold mb-1" id="selectedEmployeeName">{{ empleado.nombre_completo }}</h5>
+                                <p class="text-muted mb-0 small" id="selectedEmployeeDetails">
+                                    {{ empleado.puesto.nombre|default:"Sin puesto" }} • {{ empleado.departamento.nombre|default:"Sin departamento" }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="financial-item">
+                            <span class="financial-label">Sueldo Mensual</span>
+                            <span class="financial-value" id="selectedEmployeeSalary">
+                                ${{ salario_actual.sueldo_mensual|default:0|floatformat:2|intcomma }}
+                            </span>
+                        </div>
+
+                        <div class="financial-item">
+                            <span class="financial-label">Límite de Préstamo</span>
+                            <span class="financial-value" id="selectedEmployeeLimit">
+                                ${{ limite_maximo|default:0|floatformat:2|intcomma }}
+                            </span>
+                        </div>
+
+                        <div class="financial-item">
+                            <span class="financial-label">Pago Máximo Mensual</span>
+                            <span class="financial-value" id="selectedEmployeeMaxPayment">
+                                ${{ pago_maximo_mensual|default:0|floatformat:2|intcomma }}
+                            </span>
+                        </div>
+
+                        <div class="financial-item">
+                            <span class="financial-label">Préstamos Activos</span>
+                            <span class="financial-value" id="selectedEmployeeLoans">
+                                {{ prestamos_activos|default:"0" }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Indicador de límites -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold mb-3">
+                            <i class="fas fa-tachometer-alt me-2"></i>
+                            Límites de Préstamo
+                        </h6>
+                        <div class="limit-indicator">
+                            <div class="limit-bar" id="limitBar" style="width: 0%"></div>
+                            <div class="limit-marker" id="limitMarker" style="left: 33%"></div>
+                            <div class="limit-marker" style="left: 67%"></div>
+                        </div>
+                        <div class="limit-labels">
+                            <span>Bajo</span>
+                            <span>Moderado</span>
+                            <span>Alto</span>
+                        </div>
+                        <div class="mt-2 small text-muted text-center" id="limitText">
+                            Ingrese el monto para ver el nivel de riesgo
+                        </div>
+                    </div>
+
+                    <!-- Información importante -->
+                    <div class="info-panel">
+                        <div class="d-flex align-items-start">
+                            <i class="fas fa-exclamation-triangle mt-1 me-2"></i>
+                            <div>
+                                <h6 class="fw-bold mb-1">Políticas de Préstamos</h6>
+                                <p class="small mb-0">
+                                    • Máximo 3 meses de sueldo<br>
+                                    • Pago mensual ≤ 40% del sueldo<br>
+                                    • Plazo: 1 a 52 semanas<br>
+                                    • Requiere contrato firmado<br>
+                                    • Aprobación de RH y Finanzas
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Préstamos existentes -->
+                    {% if prestamos_activos > 0 %}
+                    <div class="alert alert-warning small">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Este empleado ya tiene {{ prestamos_activos }} préstamo(s) activo(s).
+                        Verifique su capacidad de pago antes de aprobar uno nuevo.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Columna derecha: Formulario y calculadora -->
+        <div class="col-lg-8">
+            {% if empleado %}
+            <form method="post" enctype="multipart/form-data" id="prestamoForm">
+                {% csrf_token %}
+                <input type="hidden" name="empleado" value="{{ empleado.id }}">
+
+                <div class="card prestamo-card border-0 shadow-sm">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h5 class="fw-bold m-0 text-dark">
+                            <i class="fas fa-calculator me-2"></i>
+                            Calculadora de Préstamo
+                            <span class="badge bg-primary ms-2">Semanas</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+
+                        <!-- Calculadora interactiva -->
+                        <div class="calculator-card">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Monto del Préstamo</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">$</span>
+                                            <input type="number"
+                                                class="form-control {% if form.monto_total.errors %}is-invalid{% endif %}"
+                                                id="montoInput" name="monto_total" step="1000" min="1000"
+                                                max="{{ limite_maximo|default:'100000' }}" step="1000"
+                                                value="{{ form.monto_total.value|default:'5000' }}">
+                                            <span class="input-group-text">MXN</span>
+                                        </div>
+                                        {% if form.monto_total.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in form.monto_total.errors %}
+                                            <i class="fas fa-exclamation-circle me-1"></i> {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+                                        <div class="slider-container mt-2">
+                                            <input type="range" class="form-range" id="montoSlider" min="1000"
+                                                max="{{ limite_maximo|default:'100000' }}" step="1000" value="5000">
+                                            <div class="d-flex justify-content-between mt-1">
+                                                <small class="text-muted">$1,000</small>
+                                                <span class="slider-value" id="montoValue">$5,000</span>
+                                                <small class="text-muted">${{ limite_maximo|default:100000|intcomma }}</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="calculator-result">
+                                        <div class="result-number" id="pagoSemanal">$0.00</div>
+                                        <div class="result-label">Pago Semanal</div>
+                                        <hr class="my-2">
+                                        <div class="small">
+                                            <div class="d-flex justify-content-between">
+                                                <span>Interés total:</span>
+                                                <span class="fw-bold" id="interesTotal">$0.00</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between">
+                                                <span>Total a pagar:</span>
+                                                <span class="fw-bold" id="totalPagar">$0.00</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between mt-1">
+                                                <small class="text-muted">Equivalente mensual:</small>
+                                                <small class="fw-bold text-primary"
+                                                    id="pagoMensualEquivalente">$0.00</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Plazo en semanas (1-52)</label>
+                                        <div class="input-group">
+                                            <input type="number"
+                                                class="form-control {% if form.plazo_semanas.errors %}is-invalid{% endif %}"
+                                                id="plazoInput" name="plazo_semanas" min="1" max="52"
+                                                value="{{ form.plazo_semanas.value|default:'12' }}">
+                                            <span class="input-group-text">
+                                                <i class="fas fa-calendar-week"></i>
+                                            </span>
+                                        </div>
+                                        {% if form.plazo_semanas.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in form.plazo_semanas.errors %}
+                                            <i class="fas fa-exclamation-circle me-1"></i> {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+                                        <div class="slider-container mt-2">
+                                            <input type="range" class="form-range" id="plazoSlider" min="1" max="52"
+                                                step="1" value="12">
+                                            <div class="d-flex justify-content-between mt-1">
+                                                <small class="text-muted">1 sem</small>
+                                                <span class="slider-value" id="plazoValue">12 sem</span>
+                                                <small class="text-muted">52 sem</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-text d-flex justify-content-between">
+                                            <span id="equivalenciaMeses">≈ 2.8 meses</span>
+                                            <span id="equivalenciaAnios">≈ 0.23 años</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Tasa de Interés (%)</label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="tasaInput" name="tasa_interes"
+                                                step="0.1" min="0" max="20" value="0">
+                                            <span class="input-group-text">% anual</span>
+                                        </div>
+                                        <div class="slider-container mt-2">
+                                            <input type="range" class="form-range" id="tasaSlider" min="0" max="20"
+                                                step="0.5" value="0">
+                                            <div class="d-flex justify-content-between mt-1">
+                                                <small class="text-muted">0%</small>
+                                                <span class="slider-value" id="tasaValue">0%</span>
+                                                <small class="text-muted">20%</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Campos del formulario (usando el form de Django) -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">
+                                    <i class="fas fa-tags me-1"></i>
+                                    Tipo de Préstamo
+                                </label>
+                                {{ form.tipo_prestamo }}
+                                {% if form.tipo_prestamo.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ form.tipo_prestamo.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">
+                                    <i class="fas fa-calendar-day me-1"></i>
+                                    Fecha Primer Pago *
+                                </label>
+                                {{ form.fecha_primer_pago }}
+                                {% if form.fecha_primer_pago.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ form.fecha_primer_pago.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-file-alt me-1"></i>
+                                Concepto del Préstamo *
+                            </label>
+                            {{ form.concepto }}
+                            <div class="form-text">
+                                Describa el motivo o destino del préstamo
+                            </div>
+                            {% if form.concepto.errors %}
+                            <div class="text-danger small mt-1">
+                                {{ form.concepto.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-comment-alt me-1"></i>
+                                Observaciones
+                            </label>
+                            {{ form.observaciones }}
+                            <div class="form-text">
+                                Detalles adicionales o condiciones especiales
+                            </div>
+                            {% if form.observaciones.errors %}
+                            <div class="text-danger small mt-1">
+                                {{ form.observaciones.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-file-upload me-1"></i>
+                                Documento de Solicitud (Opcional)
+                            </label>
+                            {{ form.documento_solicitud }}
+                            <div class="form-text">
+                                Puede adjuntar solicitud formal o documentación de respaldo
+                            </div>
+                            {% if form.documento_solicitud.errors %}
+                            <div class="text-danger small mt-1">
+                                {{ form.documento_solicitud.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Tabla de pagos SEMANALES -->
+                        <div class="payment-schedule mb-4">
+                            <h6 class="fw-bold mb-3">
+                                <i class="fas fa-calendar-check me-2"></i>
+                                Cronograma de Pagos Semanales
+                            </h6>
+                            <div id="pagosContainer">
+                                <div class="text-center py-4 text-muted">
+                                    <i class="fas fa-calculator fa-2x mb-2 opacity-25"></i>
+                                    <p class="mb-0">Configure los parámetros para ver el cronograma semanal</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Validación de límites -->
+                        <div class="alert" id="limitAlert" style="display: none;">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            <span id="alertMessage"></span>
+                        </div>
+
+                        <!-- Botones de acción -->
+                        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                            <a href="{% url 'rh:gestion_prestamos' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-1"></i> Cancelar
+                            </a>
+                            <div>
+                                <button type="button" class="btn btn-outline-primary me-2" onclick="calcularPrestamo()">
+                                    <i class="fas fa-sync-alt me-1"></i> Recalcular
+                                </button>
+                                <button type="submit" class="btn btn-solicitar" name="aprobar_ahora" value="false">
+                                    <i class="fas fa-paper-plane me-1"></i> Enviar Solicitud
+                                </button>
+                                {% if perms.rh.approve_prestamo %}
+                                <button type="submit" class="btn btn-success ms-2" name="aprobar_ahora" value="true">
+                                    <i class="fas fa-check-circle me-1"></i> Aprobar Ahora
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+            {% else %}
+            <!-- Mensaje cuando no hay empleado seleccionado -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center py-5">
+                    <div class="mb-4">
+                        <i class="fas fa-money-check-alt fa-4x text-muted opacity-25"></i>
+                    </div>
+                    <h5 class="fw-bold text-muted mb-3">Seleccione un Empleado</h5>
+                    <p class="text-muted mb-4">
+                        Para continuar con la solicitud de préstamo, debe seleccionar primero el empleado
+                        en la columna izquierda.
+                    </p>
+                    <div class="d-inline-block">
+                        <select class="form-select" id="quickEmployeeSelect">
+                            <option value="">Seleccionar empleado...</option>
+                            {% for emp in empleados %}
+                            <option value="{{ emp.id }}">{{ emp.nombre_completo }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Elementos del DOM
+        const montoInput = document.getElementById('montoInput');
+        const montoSlider = document.getElementById('montoSlider');
+        const montoValue = document.getElementById('montoValue');
+        const plazoInput = document.getElementById('plazoInput');
+        const plazoSlider = document.getElementById('plazoSlider');
+        const plazoValue = document.getElementById('plazoValue');
+        const tasaInput = document.getElementById('tasaInput');
+        const tasaSlider = document.getElementById('tasaSlider');
+        const tasaValue = document.getElementById('tasaValue');
+        const pagoSemanalElement = document.getElementById('pagoSemanal');
+        const pagoMensualEquivalenteElement = document.getElementById('pagoMensualEquivalente');
+        const interesTotal = document.getElementById('interesTotal');
+        const totalPagar = document.getElementById('totalPagar');
+        const equivalenciaMeses = document.getElementById('equivalenciaMeses');
+        const equivalenciaAnios = document.getElementById('equivalenciaAnios');
+        const limitBar = document.getElementById('limitBar');
+        const limitMarker = document.getElementById('limitMarker');
+        const limitText = document.getElementById('limitText');
+        const limitAlert = document.getElementById('limitAlert');
+        const alertMessage = document.getElementById('alertMessage');
+        const pagosContainer = document.getElementById('pagosContainer');
+        const employeeSearch = document.getElementById('employeeSearch');
+        const employeeList = document.getElementById('employeeList');
+        const employeeItems = employeeList ? employeeList.querySelectorAll('.employee-item') : [];
+        const quickEmployeeSelect = document.getElementById('quickEmployeeSelect');
+
+        // Variables de límites
+        let limiteMaximo = parseFloat('{{ limite_maximo|default:"100000" }}'.replace(/,/g, '')) || 100000;
+        let pagoMaximoMensual = parseFloat('{{ pago_maximo_mensual|default:"0" }}'.replace(/,/g, '')) || 0;
+        let sueldoMensual = parseFloat('{{ salario_actual.sueldo_mensual|default:"0" }}'.replace(/,/g, '')) || 0;
+
+        // Constantes para cálculos
+        const SEMANAS_POR_MES = 4.33;
+        const SEMANAS_POR_ANIO = 52;
+
+        // Buscador de empleados
+        if (employeeSearch) {
+            employeeSearch.addEventListener('input', function () {
+                const searchTerm = this.value.toLowerCase();
+
+                employeeItems.forEach(item => {
+                    const name = item.dataset.employeeName.toLowerCase();
+                    const puesto = item.dataset.employeePuesto.toLowerCase();
+                    const departamento = item.dataset.employeeDepartamento.toLowerCase();
+
+                    if (name.includes(searchTerm) ||
+                        puesto.includes(searchTerm) ||
+                        departamento.includes(searchTerm)) {
+                        item.style.display = 'flex';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        // Selección de empleado
+        if (employeeItems.length > 0) {
+            employeeItems.forEach(item => {
+                item.addEventListener('click', function () {
+                    const employeeId = this.dataset.employeeId;
+                    seleccionarEmpleado(employeeId, this);
+                });
+            });
+        }
+
+        // Selección rápida de empleado
+        if (quickEmployeeSelect) {
+            quickEmployeeSelect.addEventListener('change', function () {
+                if (this.value) {
+                    seleccionarEmpleado(this.value);
+                }
+            });
+        }
+
+        // Función para seleccionar empleado
+        function seleccionarEmpleado(employeeId, clickedElement = null) {
+            if (!employeeId) {
+                console.error('❌ employeeId no proporcionado');
+                return;
+            }
+
+            // Resaltar empleado seleccionado
+            if (clickedElement) {
+                const allItems = document.querySelectorAll('.employee-item');
+                allItems.forEach(item => item.classList.remove('selected'));
+                clickedElement.classList.add('selected');
+            }
+
+            // Redirigir a la página del formulario con el empleado seleccionado
+            const baseUrl = window.location.origin;
+            window.location.href = `${baseUrl}/RH/prestamos/solicitar/?empleado_id=${employeeId}`;
+        }
+
+        // Función para cambiar empleado
+        window.cambiarEmpleado = function () {
+            const baseUrl = window.location.origin;
+            window.location.href = `${baseUrl}/RH/prestamos/solicitar/`;
+        };
+
+        // Sincronizar inputs y sliders
+        if (montoInput) {
+            montoInput.addEventListener('input', function () {
+                const value = parseFloat(this.value) || 0;
+                montoSlider.value = value;
+                montoValue.textContent = '$' + value.toLocaleString('es-MX', { minimumFractionDigits: 0 });
+                calcularPrestamo();
+                actualizarEquivalencias();
+            });
+
+            montoSlider.addEventListener('input', function () {
+                const value = parseFloat(this.value) || 0;
+                montoInput.value = value;
+                montoValue.textContent = '$' + value.toLocaleString('es-MX', { minimumFractionDigits: 0 });
+                calcularPrestamo();
+                actualizarEquivalencias();
+            });
+        }
+
+        if (plazoInput) {
+            plazoInput.addEventListener('input', function () {
+                const value = parseInt(this.value) || 1;
+                // Asegurar que esté entre 1 y 52
+                if (value < 1) this.value = 1;
+                if (value > 52) this.value = 52;
+                plazoSlider.value = this.value;
+                plazoValue.textContent = this.value + ' sem';
+                calcularPrestamo();
+                actualizarEquivalencias();
+            });
+
+            plazoSlider.addEventListener('input', function () {
+                plazoInput.value = this.value;
+                plazoValue.textContent = this.value + ' sem';
+                calcularPrestamo();
+                actualizarEquivalencias();
+            });
+        }
+
+        if (tasaInput) {
+            tasaInput.addEventListener('input', function () {
+                tasaSlider.value = this.value;
+                tasaValue.textContent = this.value + '%';
+                calcularPrestamo();
+            });
+
+            tasaSlider.addEventListener('input', function () {
+                tasaInput.value = this.value;
+                tasaValue.textContent = this.value + '%';
+                calcularPrestamo();
+            });
+        }
+
+        // Función para calcular equivalencias
+        function actualizarEquivalencias() {
+            if (!plazoInput) return;
+
+            const semanas = parseInt(plazoInput.value) || 1;
+            const meses = (semanas / SEMANAS_POR_MES).toFixed(1);
+            const anios = (semanas / SEMANAS_POR_ANIO).toFixed(2);
+
+            if (equivalenciaMeses) {
+                equivalenciaMeses.textContent = `≈ ${meses} meses`;
+            }
+
+            if (equivalenciaAnios) {
+                equivalenciaAnios.textContent = `≈ ${anios} años`;
+            }
+        }
+
+        // Función para calcular el préstamo SEMANAL
+        window.calcularPrestamo = function () {
+            if (!montoInput || !plazoInput || !tasaInput) return;
+
+            const monto = parseFloat(montoInput.value) || 0;
+            const semanas = parseInt(plazoInput.value) || 1;
+            const tasaAnual = parseFloat(tasaInput.value) || 0;
+
+            // Calcular pago semanal
+            let pagoSemanalCalculado = 0;
+            let interesTotalCalculado = 0;
+            let totalAPagar = 0;
+
+            if (tasaAnual > 0) {
+                // Convertir tasa anual a tasa semanal
+                const tasaSemanal = tasaAnual / 100 / SEMANAS_POR_ANIO;
+
+                // Fórmula de amortización para pagos semanales
+                const factor = Math.pow(1 + tasaSemanal, semanas);
+                pagoSemanalCalculado = monto * tasaSemanal * factor / (factor - 1);
+                interesTotalCalculado = (pagoSemanalCalculado * semanas) - monto;
+            } else {
+                // Sin interés: división simple
+                pagoSemanalCalculado = monto / semanas;
+                interesTotalCalculado = 0;
+            }
+
+            totalAPagar = monto + interesTotalCalculado;
+
+            // Calcular equivalente mensual
+            const pagoMensualEquivalente = pagoSemanalCalculado * SEMANAS_POR_MES;
+
+            // Actualizar display
+            if (pagoSemanalElement) {
+                pagoSemanalElement.textContent = '$' + pagoSemanalCalculado.toFixed(2);
+            }
+
+            if (pagoMensualEquivalenteElement) {
+                pagoMensualEquivalenteElement.textContent = '$' + pagoMensualEquivalente.toFixed(2);
+            }
+
+            if (interesTotal) {
+                interesTotal.textContent = '$' + interesTotalCalculado.toFixed(2);
+            }
+
+            if (totalPagar) {
+                totalPagar.textContent = '$' + totalAPagar.toFixed(2);
+            }
+
+            // Actualizar indicador de límites
+            actualizarIndicadorLimites(monto, pagoMensualEquivalente);
+
+            // Generar tabla de pagos semanales
+            generarTablaPagosSemanales(monto, semanas, tasaAnual, pagoSemanalCalculado);
+
+            // Actualizar equivalencias
+            actualizarEquivalencias();
+        };
+
+        // Actualizar indicador de límites
+        function actualizarIndicadorLimites(monto, pagoMensualEquivalente) {
+            if (!limitBar) return;
+
+            const porcentajeMonto = (monto / limiteMaximo) * 100;
+            const porcentajePago = (pagoMensualEquivalente / pagoMaximoMensual) * 100;
+
+            // Usar el peor escenario
+            const porcentaje = Math.max(porcentajeMonto, porcentajePago * 3); // Ajustar escala
+
+            limitBar.style.width = Math.min(porcentaje, 100) + '%';
+            if (limitMarker) {
+                limitMarker.style.left = Math.min(porcentaje, 100) + '%';
+            }
+
+            // Color y mensaje según nivel
+            let nivelRiesgo = '';
+            let colorClase = '';
+            let alertaMostrar = false;
+            let mensajeAlerta = '';
+
+            if (porcentaje <= 33) {
+                limitBar.style.background = 'linear-gradient(90deg, #2ecc71, #f39c12)';
+                nivelRiesgo = 'Riesgo bajo';
+                colorClase = 'text-success';
+            } else if (porcentaje <= 67) {
+                limitBar.style.background = 'linear-gradient(90deg, #f39c12, #e74c3c)';
+                nivelRiesgo = 'Riesgo moderado';
+                colorClase = 'text-warning';
+
+                if (pagoMensualEquivalente > pagoMaximoMensual * 0.8) {
+                    alertaMostrar = true;
+                    mensajeAlerta = 'El pago mensual equivalente está cerca del límite máximo permitido.';
+                }
+            } else {
+                limitBar.style.background = 'linear-gradient(90deg, #e74c3c, #c0392b)';
+                nivelRiesgo = 'Riesgo alto';
+                colorClase = 'text-danger';
+
+                if (monto > limiteMaximo) {
+                    alertaMostrar = true;
+                    mensajeAlerta = `El monto excede el límite máximo de $${limiteMaximo.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
+                } else if (pagoMensualEquivalente > pagoMaximoMensual) {
+                    alertaMostrar = true;
+                    mensajeAlerta = `El pago mensual equivalente excede el 40% del sueldo ($${pagoMaximoMensual.toLocaleString('es-MX', { minimumFractionDigits: 2 })})`;
+                } else {
+                    alertaMostrar = true;
+                    mensajeAlerta = 'El préstamo está en el límite superior de riesgo.';
+                }
+            }
+
+            if (limitText) {
+                limitText.textContent = nivelRiesgo;
+                limitText.className = `mt-2 small ${colorClase} text-center`;
+            }
+
+            mostrarAlerta(alertaMostrar, mensajeAlerta);
+        }
+
+        // Mostrar/ocultar alerta
+        function mostrarAlerta(mostrar, mensaje = '') {
+            if (!limitAlert) return;
+
+            if (mostrar) {
+                limitAlert.style.display = 'block';
+                limitAlert.className = 'alert alert-warning border';
+                alertMessage.textContent = mensaje;
+            } else {
+                limitAlert.style.display = 'none';
+            }
+        }
+
+        // Generar tabla de pagos SEMANALES
+        function generarTablaPagosSemanales(monto, semanas, tasaAnual, pagoSemanal) {
+            if (!pagosContainer) return;
+
+            let html = '';
+            let saldo = monto;
+            const tasaSemanal = tasaAnual / 100 / SEMANAS_POR_ANIO;
+            const fechaPrimerPagoInput = document.querySelector('input[name="fecha_primer_pago"]');
+            let fechaPago = fechaPrimerPagoInput ? new Date(fechaPrimerPagoInput.value) : new Date();
+
+            // Si no hay fecha válida, usar la de hoy + 7 días (mínimo)
+            if (isNaN(fechaPago.getTime())) {
+                fechaPago = new Date();
+                fechaPago.setDate(fechaPago.getDate() + 7);
+            }
+
+            // Calcular fecha de hoy para comparación
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+
+            for (let semana = 1; semana <= semanas; semana++) {
+                // Calcular interés de la semana
+                const interesSemana = saldo * tasaSemanal;
+                const capitalSemana = pagoSemanal - interesSemana;
+                saldo -= capitalSemana;
+
+                if (saldo < 0) saldo = 0;
+
+                // Formatear fecha
+                const fechaFormateada = fechaPago.toLocaleDateString('es-MX', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short'
+                });
+
+                // Determinar estado del pago
+                let estadoClase = '';
+                let estadoTexto = '';
+
+                if (fechaPago < hoy) {
+                    estadoClase = 'text-danger';
+                    estadoTexto = ' (Vencido)';
+                } else if (semana === 1) {
+                    estadoClase = 'text-primary';
+                    estadoTexto = ' (Primer pago)';
+                }
+
+                html += `
+                    <div class="payment-row">
+                        <div class="payment-number">${semana}</div>
+                        <div class="payment-details">
+                            <div class="payment-amount ${estadoClase}">
+                                $${pagoSemanal.toFixed(2)}${estadoTexto}
+                            </div>
+                            <div class="payment-date">
+                                ${fechaFormateada} | 
+                                Capital: $${capitalSemana.toFixed(2)} | 
+                                Interés: $${interesSemana.toFixed(2)} |
+                                Saldo: $${saldo.toFixed(2)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Avanzar UNA SEMANA (7 días)
+                fechaPago.setDate(fechaPago.getDate() + 7);
+
+                // Limitar visualización a 12 semanas para no saturar
+                if (semana >= 12 && semanas > 12) break;
+            }
+
+            if (semanas > 12) {
+                const semanasRestantes = semanas - 12;
+                html += `
+                    <div class="payment-row text-center text-muted">
+                        <div class="payment-number">...</div>
+                        <div class="payment-details">
+                            <div class="payment-amount">${semanasRestantes} pagos más</div>
+                            <div class="payment-date">Pago final: $${saldo.toFixed(2)}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Agregar resumen
+            html += `
+                <div class="payment-row border-top pt-2">
+                    <div class="payment-number">
+                        <i class="fas fa-chart-bar"></i>
+                    </div>
+                    <div class="payment-details">
+                        <div class="d-flex justify-content-between small">
+                            <span>Total semanas:</span>
+                            <strong>${semanas}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between small">
+                            <span>Total a pagar:</span>
+                            <strong>$${(pagoSemanal * semanas).toFixed(2)}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between small">
+                            <span>Interés total:</span>
+                            <strong class="${tasaAnual > 0 ? 'text-danger' : 'text-success'}">$${((pagoSemanal * semanas) - monto).toFixed(2)}</strong>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            pagosContainer.innerHTML = html;
+        }
+
+        // Establecer fecha mínima para primer pago (mínimo 7 días desde hoy)
+        const fechaPrimerPago = document.querySelector('input[name="fecha_primer_pago"]');
+        if (fechaPrimerPago) {
+            const hoy = new Date();
+            const fechaMinima = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 7);
+            fechaPrimerPago.min = fechaMinima.toISOString().split('T')[0];
+
+            // Si no hay valor, establecer fecha sugerida (14 días desde hoy)
+            if (!fechaPrimerPago.value) {
+                const fechaSugerida = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 14);
+                fechaPrimerPago.value = fechaSugerida.toISOString().split('T')[0];
+            }
+
+            fechaPrimerPago.addEventListener('change', function () {
+                calcularPrestamo();
+            });
+        }
+
+        // Validación del formulario
+        const form = document.getElementById('prestamoForm');
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                const monto = parseFloat(montoInput.value) || 0;
+                const semanas = parseInt(plazoInput.value) || 1;
+                const tasaAnual = parseFloat(tasaInput.value) || 0;
+
+                // Calcular pago semanal
+                let pagoSemanalCalculado = 0;
+                if (tasaAnual > 0) {
+                    const tasaSemanal = tasaAnual / 100 / SEMANAS_POR_ANIO;
+                    const factor = Math.pow(1 + tasaSemanal, semanas);
+                    pagoSemanalCalculado = monto * tasaSemanal * factor / (factor - 1);
+                } else {
+                    pagoSemanalCalculado = monto / semanas;
+                }
+
+                const pagoMensualEquivalente = pagoSemanalCalculado * SEMANAS_POR_MES;
+
+                // Validar límites
+                if (monto > limiteMaximo) {
+                    e.preventDefault();
+                    alert(`❌ Error: El monto máximo permitido es $${limiteMaximo.toLocaleString('es-MX', { minimumFractionDigits: 2 })} (3 meses de sueldo).`);
+                    montoInput.focus();
+                    return;
+                }
+
+                if (pagoMensualEquivalente > pagoMaximoMensual) {
+                    e.preventDefault();
+                    const pagoMaximoSemanal = pagoMaximoMensual / SEMANAS_POR_MES;
+                    const semanasMinimas = Math.ceil(monto / pagoMaximoSemanal);
+
+                    alert(`❌ Error: El pago mensual equivalente ($${pagoMensualEquivalente.toFixed(2)}) excede el 40% del sueldo ($${pagoMaximoMensual.toFixed(2)}).\n\n` +
+                        `Solución: Aumente el plazo a al menos ${Math.min(semanasMinimas, 52)} semanas ` +
+                        `para reducir el pago semanal a $${pagoMaximoSemanal.toFixed(2)}.`);
+                    plazoInput.focus();
+                    return;
+                }
+
+                const conceptoInput = document.querySelector('input[name="concepto"]');
+                if (conceptoInput && !conceptoInput.value.trim()) {
+                    e.preventDefault();
+                    alert('⚠️ Por favor, complete el concepto del préstamo.');
+                    conceptoInput.focus();
+                    return;
+                }
+
+                // Confirmación final con información detallada
+                const totalInteres = (pagoSemanalCalculado * semanas) - monto;
+                const mesesAproximados = (semanas / SEMANAS_POR_MES).toFixed(1);
+
+                if (!confirm(`✅ ¿Confirmar solicitud de préstamo?\n\n` +
+                    `• Monto: $${monto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}\n` +
+                    `• Plazo: ${semanas} semanas (≈${mesesAproximados} meses)\n` +
+                    `• Pago semanal: $${pagoSemanalCalculado.toFixed(2)}\n` +
+                    `• Pago mensual equivalente: $${pagoMensualEquivalente.toFixed(2)}\n` +
+                    `• Interés total: $${totalInteres.toFixed(2)}\n` +
+                    `• Total a pagar: $${(monto + totalInteres).toFixed(2)}`)) {
+                    e.preventDefault();
+                }
+            });
+        }
+
+        // Calcular al cargar la página
+        if (montoInput) {
+            actualizarEquivalencias();
+            calcularPrestamo();
+        }
+    });
+</script>
+{% endblock %}

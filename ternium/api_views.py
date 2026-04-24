@@ -11,8 +11,9 @@ from .models import Empresa, Material, Lugar, LineaTransporte, Operador, Unidad,
 import json
 from django.shortcuts import get_object_or_404
 from .models import (
-    Remision, Empresa, Material, Lugar, ConfiguracionManifiesto, 
-    HistorialRemision, EvidenciaRemision, DetalleRemision
+    Remision, Empresa, Material, Lugar, ConfiguracionManifiesto,
+    HistorialRemision, EvidenciaRemision, DetalleRemision,
+    ConfiguracionAlertaMerma, DestinatarioAlertaMerma,
 )
 
 import datetime
@@ -100,61 +101,84 @@ from django.conf import settings
 
 def enviar_alerta_merma(remision):
     """
-    Calcula la diferencia entre carga y descarga. 
-    Si la merma es mayor a un porcentaje tolerado, envía una alerta por email.
+    Evalúa la merma por cada material del detalle.
+    El umbral se lee de ConfiguracionAlertaMerma (default 1 % si no existe
+    configuración para ese material). Si algún material supera su umbral,
+    se envía un correo de alerta agrupando todos los materiales afectados.
     """
-    UMBRAL_TOLERANCIA_MERMA_PCT = 3.0  # Tolerancia del 3%
-    
-    total_carga = float(remision.total_peso_ld or 0)
-    total_descarga = float(remision.total_peso_dlv or 0)
-    
-    # Sumar el rechazo a la descarga para que no se cuente como "merma" (ya que regresó al patio)
-    total_rechazo = sum(float(det.peso_rechazado or 0) for det in remision.detalles.all())
-    total_real_entregado = total_descarga + total_rechazo
-    
-    # Si no hay carga, no podemos calcular porcentaje de pérdida
-    if total_carga <= 0:
+    UMBRAL_DEFAULT = 1.0
+
+    alertas = []
+
+    for det in remision.detalles.all():
+        if not det.material:
+            continue
+
+        peso_ld = float(det.peso_ld or 0)
+        if peso_ld <= 0:
+            continue
+
+        peso_dlv = float(det.peso_dlv or 0)
+        peso_rechazado = float(det.peso_rechazado or 0)
+        merma_kg = peso_ld - (peso_dlv + peso_rechazado)
+
+        if merma_kg <= 0:
+            continue
+
+        pct_merma = (merma_kg / peso_ld) * 100
+
+        try:
+            umbral = float(det.material.config_alerta_merma.porcentaje_umbral)
+        except ConfiguracionAlertaMerma.DoesNotExist:
+            umbral = UMBRAL_DEFAULT
+
+        if pct_merma > umbral:
+            alertas.append({
+                'material': det.material.nombre,
+                'peso_ld': peso_ld,
+                'peso_dlv': peso_dlv,
+                'peso_rechazado': peso_rechazado,
+                'merma_kg': merma_kg,
+                'pct_merma': pct_merma,
+                'umbral': umbral,
+            })
+
+    if not alertas:
         return
 
-    # Diferencia (Merma = Lo que faltó)
-    merma_kg = total_carga - total_real_entregado
-    
-    # Si la merma es positiva, hubo pérdida. Calculamos el porcentaje.
-    if merma_kg > 0:
-        pct_merma = (merma_kg / total_carga) * 100
-        
-        # Si supera el umbral, disparamos la alerta
-        if pct_merma > UMBRAL_TOLERANCIA_MERMA_PCT:
-            asunto = f"⚠️ ALERTA DE MERMA: Remisión {remision.remision} ({pct_merma:.2f}%)"
-            mensaje = (
-                f"Se ha detectado una merma inusual en la remisión {remision.remision}.\n\n"
-                f"DETALLES OPERATIVOS:\n"
-                f"- Origen: {remision.origen.nombre if remision.origen else 'N/A'}\n"
-                f"- Destino: {remision.destino.nombre if remision.destino else 'N/A'}\n"
-                f"- Operador: {remision.operador.nombre if remision.operador else remision.operador_manual or 'N/A'}\n\n"
-                f"REPORTE DE PESOS:\n"
-                f"- Total Carga (LD): {total_carga:.2f} Kg\n"
-                f"- Total Descarga (DLV): {total_descarga:.2f} Kg\n"
-                f"- Total Rechazo (Retorno): {total_rechazo:.2f} Kg\n"
-                f"- MERMA REGISTRADA: {merma_kg:.2f} Kg\n"
-                f"- PORCENTAJE DE MERMA: {pct_merma:.2f}%\n\n"
-                f"Por favor, revise esta remisión en el sistema para realizar la auditoría correspondiente."
-            )
-            
-            # Lista de correos que recibirán la alerta (ajústalo a tus necesidades)
-            destinatarios = ['@3recycling.com', '@3recycling.com']
-            
-            try:
-                send_mail(
-                    subject=asunto,
-                    message=mensaje,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=destinatarios,
-                    fail_silently=True,  # Cambia a False en desarrollo si quieres ver los errores de SMTP
-                )
-                print(f"✅ Alerta de merma enviada para la remisión {remision.remision}")
-            except Exception as e:
-                print(f"❌ Error al enviar alerta de merma: {e}")
+    lineas = "\n".join(
+        f"  • {a['material']}: {a['merma_kg']:.2f} Kg perdidos "
+        f"({a['pct_merma']:.2f}% — umbral: {a['umbral']}%)"
+        for a in alertas
+    )
+
+    asunto = f"⚠️ ALERTA DE MERMA: Remisión {remision.remision} ({len(alertas)} material(es))"
+    mensaje = (
+        f"Se detectó merma inusual en la remisión {remision.remision}.\n\n"
+        f"DETALLES OPERATIVOS:\n"
+        f"  Origen:   {remision.origen.nombre if remision.origen else 'N/A'}\n"
+        f"  Destino:  {remision.destino.nombre if remision.destino else 'N/A'}\n"
+        f"  Operador: {remision.operador.nombre if remision.operador else remision.operador_manual or 'N/A'}\n\n"
+        f"MATERIALES CON MERMA SUPERIOR AL UMBRAL:\n{lineas}\n\n"
+        f"Por favor revise esta remisión en el sistema."
+    )
+
+    destinatarios = list(DestinatarioAlertaMerma.objects.values_list('email', flat=True))
+    if not destinatarios:
+        print(f"⚠️ Sin destinatarios configurados para alertas de merma — remisión {remision.remision}")
+        return
+
+    try:
+        send_mail(
+            subject=asunto,
+            message=mensaje,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=destinatarios,
+            fail_silently=True,
+        )
+        print(f"✅ Alerta de merma enviada para la remisión {remision.remision}")
+    except Exception as e:
+        print(f"❌ Error al enviar alerta de merma: {e}")
 
 def asignar_folio_medline(remision):
     fecha_base = remision.fecha or timezone.now().date()
@@ -2695,3 +2719,240 @@ def api_admin_usuario_permisos(request, pk):
             usuario.user_permissions.set(perms_to_set)
         return JsonResponse({'ok': True, 'message': f'Usuario {usuario.username} actualizado'})
     return JsonResponse({'error': 'Metodo no permitido'}, status=405)
+
+
+# =========================================================================
+# CONFIGURACIÓN ALERTAS DE MERMA (CRUD)
+# ─────────────────────────────────────────────────────────────────────────
+# GET  /api/admin/alertas-merma/?q=<material>   → lista con buscador
+# POST /api/admin/alertas-merma/                → crear/actualizar umbral
+# PUT  /api/admin/alertas-merma/<pk>/           → editar umbral
+# DELETE /api/admin/alertas-merma/<pk>/         → eliminar config (vuelve al default 1%)
+# =========================================================================
+
+def _alerta_to_dict(cfg):
+    return {
+        'id': cfg.id,
+        'material_id': cfg.material_id,
+        'material_nombre': cfg.material.nombre,
+        'porcentaje_umbral': float(cfg.porcentaje_umbral),
+    }
+
+
+@csrf_exempt
+@login_required
+def api_alertas_merma(request):
+    """Lista de configuraciones + creación."""
+    if not request.user.is_superuser:
+        return JsonResponse({'error': 'FORBIDDEN'}, status=403)
+
+    if request.method == 'GET':
+        q = request.GET.get('q', '').strip()
+        qs = ConfiguracionAlertaMerma.objects.select_related('material').order_by('material__nombre')
+        if q:
+            qs = qs.filter(material__nombre__icontains=q)
+
+        # Incluir también materiales sin configuración (con default 1%)
+        include_all = request.GET.get('include_all', '') == '1'
+        if include_all:
+            configurados_ids = set(qs.values_list('material_id', flat=True))
+            materiales_qs = Material.objects.order_by('nombre')
+            if q:
+                materiales_qs = materiales_qs.filter(nombre__icontains=q)
+            resultados = list(qs.values('id', 'material_id', 'porcentaje_umbral'))
+            for mat in materiales_qs:
+                if mat.id not in configurados_ids:
+                    resultados.append({
+                        'id': None,
+                        'material_id': mat.id,
+                        'material_nombre': mat.nombre,
+                        'porcentaje_umbral': 1.0,
+                        'es_default': True,
+                    })
+            # Re-enrich with material_nombre for configured ones
+            cfg_dict = {c.material_id: c for c in qs}
+            data = []
+            for mat in materiales_qs:
+                if mat.id in {r['material_id'] for r in resultados if r.get('id')}:
+                    cfg = cfg_dict[mat.id]
+                    data.append({**_alerta_to_dict(cfg), 'es_default': False})
+                else:
+                    data.append({'id': None, 'material_id': mat.id, 'material_nombre': mat.nombre, 'porcentaje_umbral': 1.0, 'es_default': True})
+            return JsonResponse({'results': data})
+
+        return JsonResponse({'results': [_alerta_to_dict(c) for c in qs]})
+
+    if request.method == 'POST':
+        body, err = _json_body(request)
+        if err:
+            return err
+        material_id = body.get('material_id') or body.get('material')
+        porcentaje = body.get('porcentaje_umbral', 1.0)
+        if not material_id:
+            return JsonResponse({'error': 'material_id es requerido'}, status=400)
+        try:
+            porcentaje = float(porcentaje)
+            if porcentaje < 0 or porcentaje > 100:
+                raise ValueError
+        except (ValueError, TypeError):
+            return JsonResponse({'error': 'porcentaje_umbral debe ser un número entre 0 y 100'}, status=400)
+        material = get_object_or_404(Material, pk=material_id)
+        cfg, _ = ConfiguracionAlertaMerma.objects.update_or_create(
+            material=material,
+            defaults={'porcentaje_umbral': porcentaje},
+        )
+        return JsonResponse(_alerta_to_dict(cfg), status=201)
+
+    return JsonResponse({'error': 'Metodo no permitido'}, status=405)
+
+
+@csrf_exempt
+@login_required
+def api_alerta_merma_detail(request, pk):
+    """Editar o eliminar una configuración específica."""
+    if not request.user.is_superuser:
+        return JsonResponse({'error': 'FORBIDDEN'}, status=403)
+
+    cfg = get_object_or_404(ConfiguracionAlertaMerma, pk=pk)
+
+    if request.method == 'GET':
+        return JsonResponse(_alerta_to_dict(cfg))
+
+    if request.method in ('PUT', 'PATCH'):
+        body, err = _json_body(request)
+        if err:
+            return err
+        porcentaje = body.get('porcentaje_umbral', cfg.porcentaje_umbral)
+        try:
+            porcentaje = float(porcentaje)
+            if porcentaje < 0 or porcentaje > 100:
+                raise ValueError
+        except (ValueError, TypeError):
+            return JsonResponse({'error': 'porcentaje_umbral debe ser un número entre 0 y 100'}, status=400)
+        cfg.porcentaje_umbral = porcentaje
+        cfg.save()
+        return JsonResponse(_alerta_to_dict(cfg))
+
+    if request.method == 'DELETE':
+        cfg.delete()
+        return JsonResponse({'ok': True, 'detail': 'Configuración eliminada. El material usará el umbral default (1%).'})
+
+    return JsonResponse({'error': 'Metodo no permitido'}, status=405)
+
+
+# =========================================================================
+# DESTINATARIOS DE ALERTAS DE MERMA (CRUD)
+# GET    /api/admin/alertas-merma/correos/        → lista
+# POST   /api/admin/alertas-merma/correos/        → agregar { email }
+# DELETE /api/admin/alertas-merma/correos/<pk>/   → eliminar
+# =========================================================================
+
+@csrf_exempt
+@login_required
+def api_correos_alerta_merma(request):
+    if not request.user.is_superuser:
+        return JsonResponse({'error': 'FORBIDDEN'}, status=403)
+
+    if request.method == 'GET':
+        qs = DestinatarioAlertaMerma.objects.all()
+        return JsonResponse({'results': [{'id': d.id, 'email': d.email} for d in qs]})
+
+    if request.method == 'POST':
+        body, err = _json_body(request)
+        if err:
+            return err
+        email = (body.get('email') or '').strip().lower()
+        if not email or '@' not in email:
+            return JsonResponse({'error': 'Correo inválido'}, status=400)
+        if DestinatarioAlertaMerma.objects.filter(email=email).exists():
+            return JsonResponse({'error': 'Este correo ya está registrado'}, status=400)
+        dest = DestinatarioAlertaMerma.objects.create(email=email)
+        return JsonResponse({'id': dest.id, 'email': dest.email}, status=201)
+
+    return JsonResponse({'error': 'Metodo no permitido'}, status=405)
+
+
+@csrf_exempt
+@login_required
+def api_correo_alerta_merma_detail(request, pk):
+    if not request.user.is_superuser:
+        return JsonResponse({'error': 'FORBIDDEN'}, status=403)
+
+    dest = get_object_or_404(DestinatarioAlertaMerma, pk=pk)
+
+    if request.method == 'DELETE':
+        dest.delete()
+        return JsonResponse({'ok': True})
+
+    return JsonResponse({'error': 'Metodo no permitido'}, status=405)
+
+
+# =========================================================================
+# ADMIN — DESTRUCCIÓN FISCAL (ConfiguracionManifiesto)
+# =========================================================================
+
+def _ser_config_manifiesto(c):
+    return {
+        'id': c.id,
+        'origen_id': c.origen_id,
+        'origen_nombre': c.origen.nombre,
+        'material_id': c.material_id,
+        'material_nombre': c.material.nombre,
+    }
+
+
+@csrf_exempt
+@login_required
+def api_destruccion_fiscal(request):
+    if not request.user.is_superuser:
+        return JsonResponse({'error': 'FORBIDDEN'}, status=403)
+
+    if request.method == 'GET':
+        qs = ConfiguracionManifiesto.objects.select_related('origen', 'material').order_by('origen__nombre', 'material__nombre')
+        return JsonResponse({'results': [_ser_config_manifiesto(c) for c in qs]})
+
+    if request.method == 'POST':
+        body, err = _json_body(request)
+        if err:
+            return err
+        origen_id = body.get('origen_id')
+        material_id = body.get('material_id')
+        if not origen_id or not material_id:
+            return JsonResponse({'error': 'Se requieren origen_id y material_id'}, status=400)
+        if ConfiguracionManifiesto.objects.filter(origen_id=origen_id, material_id=material_id).exists():
+            return JsonResponse({'error': 'Esta combinación ya existe'}, status=400)
+        origen = get_object_or_404(Lugar, pk=origen_id)
+        material = get_object_or_404(Material, pk=material_id)
+        c = ConfiguracionManifiesto.objects.create(origen=origen, material=material)
+        c.refresh_from_db()
+        return JsonResponse(_ser_config_manifiesto(c), status=201)
+
+    return JsonResponse({'error': 'Metodo no permitido'}, status=405)
+
+
+@csrf_exempt
+@login_required
+def api_destruccion_fiscal_detail(request, pk):
+    if not request.user.is_superuser:
+        return JsonResponse({'error': 'FORBIDDEN'}, status=403)
+
+    c = get_object_or_404(ConfiguracionManifiesto, pk=pk)
+
+    if request.method == 'DELETE':
+        c.delete()
+        return JsonResponse({'ok': True})
+
+    return JsonResponse({'error': 'Metodo no permitido'}, status=405)
+
+
+@login_required
+def api_destruccion_fiscal_catalogos(request):
+    if not request.user.is_superuser:
+        return JsonResponse({'error': 'FORBIDDEN'}, status=403)
+
+    origenes = Lugar.objects.filter(tipo__in=['ORIGEN', 'AMBOS']).order_by('nombre').values('id', 'nombre')
+    materiales = Material.objects.order_by('nombre').values('id', 'nombre')
+    return JsonResponse({
+        'origenes': list(origenes),
+        'materiales': list(materiales),
+    })

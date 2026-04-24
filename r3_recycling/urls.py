@@ -45,6 +45,10 @@ urlpatterns = [
 
     # 5. Otros Módulos
     path('herramientas/', include('herramientas.urls')),
+    path('rh/', include('RH.urls')),
+
+    # 6. API REST v1 (Next.js / React)
+    path('api/v1/', include('api.urls')),
 
     # 6. Ruta General / Bienvenida (IMPORTANTE: Esta va al FINAL)
     # Al entrar a "midominio.com/", Django probará todas las de arriba.

@@ -1,0 +1,44 @@
+{# rh/partials/_semaphore_table.html #}
+
+{% if documentos %}
+<div class="table-responsive">
+    <table class="table table-bordered table-hover" id="dataTable" width="100%" cellspacing="0">
+        <thead class="table-light">
+            <tr>
+                <th>Empleado</th>
+                <th>Documento / Contrato (Comentario)</th>
+                <th>Fecha de Vencimiento</th>
+                <th class="text-center">Días Restantes</th>
+                <th class="text-center">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in documentos %}
+            {# AÑADIMOS LA CLASE DE COLOR A LA FILA DE LA TABLA #}
+            <tr class="align-middle {{ color_class }}">
+                <td>
+                    <a href="{% url 'rh:empleado_update' item.empleado.pk %}" class="text-dark fw-bold">
+                        {{ item.empleado.nombre }} {{ item.empleado.apellido }}
+                    </a>
+                </td>
+                <td>
+                    {{ item.nombre_item }}
+                    {% if item.comentarios %}
+                        <span class="text-muted small">({{ item.comentarios }})</span>
+                    {% endif %}
+                </td>
+                <td>{{ item.fecha_vencimiento|date:"d/M/Y" }}</td>
+                <td class="text-center fw-bold">{{ item.dias_restantes }}</td>
+                <td class="text-center">
+                    <a href="{% url 'rh:empleado_update' item.empleado.pk %}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-eye"></i> Ver Empleado
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-center text-muted mt-3">No hay documentos en esta categoría.</p>
+{% endif %}

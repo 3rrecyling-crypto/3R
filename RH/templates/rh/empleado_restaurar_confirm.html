@@ -1,0 +1,43 @@
+{% extends 'rh/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card border-success">
+        <div class="card-header bg-success text-white">
+            <h4><i class="fas fa-undo me-2"></i> Restaurar Empleado</h4>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-success">
+                <h5><i class="fas fa-check-circle me-2"></i> Restaurar desde la papelera</h5>
+                <p class="mb-0">
+                    El empleado será restaurado a la lista principal de empleados.
+                </p>
+            </div>
+            
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h6>Información del Empleado:</h6>
+                    <p><strong>Nombre:</strong> {{ empleado.nombre_completo }}</p>
+                    <p><strong>Puesto:</strong> {{ empleado.puesto|default:"N/A" }}</p>
+                    <p><strong>Departamento:</strong> {{ empleado.departamento|default:"N/A" }}</p>
+                    <p><strong>Eliminado el:</strong> {{ empleado.fecha_eliminacion|date:"d/m/Y H:i"|default:"N/A" }}</p>
+                    <p><strong>Motivo:</strong> {{ empleado.motivo_eliminacion|default:"Sin motivo especificado" }}</p>
+                </div>
+            </div>
+            
+            <form method="post">
+                {% csrf_token %}
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'rh:papelera_empleados' %}" class="btn btn-secondary">
+                        <i class="fas fa-times me-1"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-undo me-1"></i> Restaurar Empleado
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

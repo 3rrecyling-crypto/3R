@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ficha de Empleado - {{ empleado.nombre_completo }}</title>
+    <style>
+        /* Estilos generales */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 10pt;
+            color: #333;
+            line-height: 1.4;
+            background-color: #f8f9fa;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        /* Encabezado */
+        .header {
+            background: linear-gradient(135deg, #1a2a6c, #2a5298);
+            color: white;
+            padding: 25px 30px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header::after {
+            content: "";
+            position: absolute;
+            top: -20px;
+            right: -20px;
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+        
+        .header::before {
+            content: "";
+            position: absolute;
+            bottom: -30px;
+            left: -30px;
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+        
+        .header-main {
+            font-size: 24pt;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .header-sub {
+            font-size: 10pt;
+            opacity: 0.9;
+        }
+        
+        .header-right {
+            position: absolute;
+            top: 25px;
+            right: 30px;
+            text-align: right;
+        }
+        
+        .logo {
+            font-size: 16pt;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+        
+        /* Perfil */
+        .profile-section {
+            display: flex;
+            padding: 25px 30px;
+            border-bottom: 1px solid #eaeaea;
+            background: #fff;
+        }
+        
+        .profile-photo-container {
+            flex: 0 0 150px;
+            text-align: center;
+            margin-right: 25px;
+        }
+        
+        .profile-photo {
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            border: 4px solid #2a5298;
+            object-fit: cover;
+            margin-bottom: 10px;
+        }
+        
+        .profile-info {
+            flex: 1;
+        }
+        
+        .profile-name {
+            font-size: 18pt;
+            font-weight: 700;
+            color: #1a2a6c;
+            margin-bottom: 5px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #eaeaea;
+        }
+        
+        .profile-position {
+            font-size: 13pt;
+            color: #2a5298;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .profile-id {
+            background: #f1f6ff;
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 9pt;
+            font-weight: 600;
+            color: #2a5298;
+        }
+        
+        /* Secciones */
+        .section-title {
+            font-size: 14pt;
+            font-weight: 700;
+            color: #1a2a6c;
+            padding: 12px 30px;
+            background: linear-gradient(to right, #f1f6ff, transparent);
+            border-bottom: 1px solid #eaeaea;
+            margin-top: 5px;
+        }
+        
+        .section-content {
+            padding: 20px 30px;
+        }
+        
+        /* Layout de columnas */
+        .column-layout {
+            display: flex;
+            flex-wrap: wrap;
+            margin: 0 -15px;
+        }
+        
+        .column {
+            flex: 1;
+            min-width: 300px;
+            padding: 0 15px;
+            margin-bottom: 20px;
+        }
+        
+        /* Tablas de información */
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .info-table td {
+            padding: 8px 5px;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: top;
+        }
+        
+        .info-table td.label {
+            font-weight: 600;
+            color: #555;
+            width: 35%;
+        }
+        
+        /* Tablas completas */
+        .full-width-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 9pt;
+        }
+        
+        .full-width-table th {
+            background: #2a5298;
+            color: white;
+            font-weight: 600;
+            padding: 10px;
+            text-align: left;
+        }
+        
+        .full-width-table td {
+            border: 1px solid #e0e0e0;
+            padding: 8px 10px;
+        }
+        
+        .full-width-table tr:nth-child(even) {
+            background-color: #f9fafc;
+        }
+        
+        /* Tarjetas de información */
+        .info-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+        
+        .info-card-title {
+            font-weight: 600;
+            color: #2a5298;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px dashed #e0e0e0;
+        }
+        
+        /* Estados */
+        .status-active {
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        .status-inactive {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            font-size: 9px;
+            font-weight: 700;
+            color: white;
+            text-align: center;
+            border-radius: 12px;
+            margin: 2px;
+        }
+        
+        .badge-primary {
+            background-color: #2a5298;
+        }
+        
+        .badge-success {
+            background-color: #28a745;
+        }
+        
+        .badge-warning {
+            background-color: #ffc107;
+            color: #333;
+        }
+        
+        /* Pie de página */
+        .footer {
+            text-align: center;
+            padding: 15px;
+            font-size: 8pt;
+            color: #777;
+            border-top: 1px solid #eaeaea;
+            background: #f8f9fa;
+        }
+        
+        /* Utilidades */
+        .text-center {
+            text-align: center;
+        }
+        
+        .mt-20 {
+            margin-top: 20px;
+        }
+        
+        .mb-15 {
+            margin-bottom: 15px;
+        }
+        
+        .no-data {
+            text-align: center;
+            color: #888;
+            padding: 20px;
+            font-style: italic;
+            background: #f9f9f9;
+            border-radius: 6px;
+        }
+        
+        /* Elementos decorativos */
+        .watermark {
+            position: absolute;
+            opacity: 0.03;
+            font-size: 120pt;
+            font-weight: 800;
+            color: #1a2a6c;
+            transform: rotate(-45deg);
+            top: 30%;
+            left: 10%;
+            z-index: -1;
+        }
+        
+        /* Para PDF */
+        @media print {
+            body {
+                padding: 0;
+                background: white;
+            }
+            
+            .container {
+                box-shadow: none;
+                border-radius: 0;
+            }
+            
+            .watermark {
+                opacity: 0.03;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="watermark">CONFIDENCIAL</div>
+        
+        <!-- Encabezado -->
+        <div class="header">
+            <div class="header-main">Ficha Confidencial de Empleado</div>
+            <div class="header-sub">Sistema de Gestión de Recursos Humanos</div>
+            <div class="header-right">
+                <div class="logo">COMPANY NAME</div>
+                <div class="header-sub">Generado el: {% now "d/m/Y H:i" %}</div>
+            </div>
+        </div>
+        
+        <!-- Perfil -->
+        <div class="profile-section">
+            <div class="profile-photo-container">
+                {% if empleado.foto_perfil and empleado.foto_perfil.url %}
+                    <img src="{{ empleado.foto_perfil.url }}" class="profile-photo" alt="Foto">
+                {% else %}
+                    <div class="profile-photo" style="background-color:#e0e0e0; display:flex; align-items:center; justify-content:center; color:#999; font-weight:bold;">
+                        Sin Foto
+                    </div>
+                {% endif %}
+                <div class="profile-id">ID: {{ empleado.numero_empleado|default:"N/A" }}</div>
+            </div>
+            <div class="profile-info">
+                <div class="profile-name">{{ empleado.nombre_completo }}</div>
+                <div class="profile-position">{{ empleado.puesto.nombre|default:"Sin Puesto" }}</div>
+                
+                <table class="info-table">
+                    <tr>
+                        <td class="label">Departamento:</td>
+                        <td>{{ empleado.departamento.nombre|default:"N/A" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Email:</td>
+                        <td>{{ empleado.email }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Estado:</td>
+                        <td>
+                            {% if empleado.activo %}
+                                <span class="status-active">● Activo</span>
+                            {% else %}
+                                <span class="status-inactive">● Inactivo desde {{ empleado.fecha_inactivacion|date:"d/m/Y" }}</span>
+                                {% if empleado.motivo_inactivacion %}
+                                    <br><small>({{ empleado.motivo_inactivacion.motivo }})</small>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Información Laboral y Personal -->
+        <div class="section-title">Información General del Empleado</div>
+        <div class="section-content">
+            <div class="column-layout">
+                <div class="column">
+                    <h3 class="info-card-title">Información Laboral</h3>
+                    <table class="info-table">
+                        <tr>
+                            <td class="label">Contratación:</td>
+                            <td>{{ empleado.fecha_contratacion|date:"d/m/Y" }} (Antigüedad: {{ empleado.antiguedad }} años)</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Empresa:</td>
+                            <td>{{ empleado.get_empresa_display|default:"N/A" }}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Jefe Directo:</td>
+                            <td>{{ empleado.supervisor.nombre_completo|default:"N/A" }}</td>
+                        </tr>
+                        {% if empleado.salario_actual %}
+                        <tr>
+                            <td class="label">Salario Actual:</td>
+                            <td>
+                                ${{ empleado.salario_actual.sueldo_diario|floatformat:2 }} diarios<br>
+                                <small>(${{ empleado.salario_actual.sueldo_mensual|floatformat:2 }} mensuales)</small>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                    
+                    <h3 class="info-card-title mt-20">Información Operativa</h3>
+                    <table class="info-table">
+                        <tr>
+                            <td class="label">Tipo de Viaje:</td>
+                            <td>
+                                {% for viaje in empleado.tipo_viaje.all %}
+                                    <span class="badge badge-primary">{{ viaje.nombre }}</span>
+                                {% empty %}
+                                    N/A
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="label">Tipo de Carga:</td>
+                            <td>
+                                {% for carga in empleado.tipo_carga.all %}
+                                    <span class="badge badge-success">{{ carga.nombre }}</span>
+                                {% empty %}
+                                    N/A
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="label">Divisiones:</td>
+                            <td>
+                                {% for division in empleado.division_operativa.all %}
+                                    <span class="badge badge-warning">{{ division.nombre }}</span>
+                                {% empty %}
+                                    N/A
+                                {% endfor %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div class="column">
+                    <h3 class="info-card-title">Información Personal</h3>
+                    <table class="info-table">
+                        <tr>
+                            <td class="label">Nacimiento:</td>
+                            <td>{{ empleado.fecha_nacimiento|date:"d/m/Y" }} ({{ empleado.edad }} años)</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Teléfono:</td>
+                            <td>{{ empleado.telefono_personal|default:"N/A" }}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Estado Civil:</td>
+                            <td>{{ empleado.get_estado_civil_display|default:"N/A" }}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Nacionalidad:</td>
+                            <td>{{ empleado.nacionalidad|default:"N/A" }}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Domicilio:</td>
+                            <td>
+                                {{ empleado.direccion|default:"N/A" }}, Col. {{ empleado.colonia|default:"N/A" }}<br>
+                                C.P. {{ empleado.codigo_postal|default:"N/A" }}, {{ empleado.ciudad|default:"N/A" }}, {{ empleado.estado|default:"N/A" }}
+                            </td>
+                        </tr>
+                    </table>
+                    
+                    <h3 class="info-card-title mt-20">Información Fiscal</h3>
+                    <table class="info-table">
+                        <tr>
+                            <td class="label">CURP:</td>
+                            <td>{{ empleado.curp|default:"N/A" }}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">RFC:</td>
+                            <td>{{ empleado.rfc|default:"N/A" }}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">NSS:</td>
+                            <td>{{ empleado.nss|default:"N/A" }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Información Bancaria y Contactos -->
+        <div class="section-title">Información Bancaria y de Contacto</div>
+        <div class="section-content">
+            <div class="column-layout">
+                <div class="column">
+                    <div class="info-card">
+                        <div class="info-card-title">Datos Bancarios</div>
+                        <table class="info-table">
+                            <tr>
+                                <td class="label">Banco:</td>
+                                <td>{{ empleado.banco|default:"N/A" }}</td>
+                            </tr>
+                            <tr>
+                                <td class="label">Cuenta:</td>
+                                <td>{{ empleado.numero_cuenta|default:"N/A" }}</td>
+                            </tr>
+                            <tr>
+                                <td class="label">CLABE:</td>
+                                <td>{{ empleado.clabe_interbancaria|default:"N/A" }}</td>
+                            </tr>
+                            <tr>
+                                <td class="label">Tarjeta:</td>
+                                <td>{{ empleado.numero_tarjeta|default:"N/A" }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                <div class="column">
+                    <div class="info-card">
+                        <div class="info-card-title">Contactos de Emergencia</div>
+                        <table class="info-table">
+                            <tr>
+                                <td class="label">Referencia 1:</td>
+                                <td>
+                                    {{ empleado.nombre_referencia_1|default:"N/A" }}<br>
+                                    <small>{{ empleado.relacion_referencia_1|default:"N/A" }} - {{ empleado.telefono_referencia_1|default:"N/A" }}</small>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="label">Referencia 2:</td>
+                                <td>
+                                    {{ empleado.nombre_referencia_2|default:"N/A" }}<br>
+                                    <small>{{ empleado.relacion_referencia_2|default:"N/A" }} - {{ empleado.telefono_referencia_2|default:"N/A" }}</small>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Información Familiar -->
+        {% if empleado.hijos.all %}
+        <div class="section-title">Información Familiar (Hijos)</div>
+        <div class="section-content">
+            <table class="full-width-table">
+                <thead>
+                    <tr>
+                        <th>Nombre Completo</th>
+                        <th>Fecha de Nacimiento</th>
+                        <th>Edad</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for hijo in empleado.hijos.all %}
+                    <tr>
+                        <td>{{ hijo.nombre }}</td>
+                        <td>{{ hijo.fecha_nacimiento|date:"d/m/Y" }}</td>
+                        <td>{% if hijo.edad is not None %}{{ hijo.edad }} años{% else %}N/A{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        
+        <!-- Historial de Salarios -->
+        {% if empleado.salarios.all %}
+        <div class="section-title">Historial de Salarios</div>
+        <div class="section-content">
+            <table class="full-width-table">
+                <thead>
+                    <tr>
+                        <th>Fecha Efectiva</th>
+                        <th>Sueldo Diario</th>
+                        <th>Sueldo Mensual (Aprox.)</th>
+                        <th>Observaciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for salario in empleado.salarios.all %}
+                    <tr>
+                        <td>{{ salario.fecha_efectiva|date:"d/m/Y" }}</td>
+                        <td>${{ salario.sueldo_diario|floatformat:2 }}</td>
+                        <td>${{ salario.sueldo_mensual|floatformat:2 }}</td>
+                        <td>{{ salario.observaciones|default:"" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        
+        <!-- Historial de Contratos -->
+        {% if empleado.contratos.all %}
+        <div class="section-title">Historial de Contratos</div>
+        <div class="section-content">
+            <table class="full-width-table">
+                <thead>
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Inicio</th>
+                        <th>Fin</th>
+                        <th>Duración</th>
+                        <th>Archivo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for contrato in empleado.contratos.all %}
+                    <tr>
+                        <td>{{ contrato.get_tipo_contrato_display }}</td>
+                        <td>{{ contrato.fecha_inicio|date:"d/m/Y" }}</td>
+                        <td>{{ contrato.fecha_fin|date:"d/m/Y"|default:"Indefinido" }}</td>
+                        <td>{{ contrato.duracion }}</td>
+                        <td>{% if contrato.archivo_contrato %}Adjunto{% else %}N/A{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        
+        <!-- Documentación de Operador -->
+        {% if "operador" in empleado.puesto.nombre|lower and empleado.documentos_operador.all %}
+        <div class="section-title">Documentación de Operador</div>
+        <div class="section-content">
+            <table class="full-width-table">
+                <thead>
+                    <tr>
+                        <th>Tipo de Documento</th>
+                        <th>Número</th>
+                        <th>Expedición</th>
+                        <th>Vencimiento</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in empleado.documentos_operador.all %}
+                    <tr>
+                        <td>{{ doc.tipo_documento.nombre }}</td>
+                        <td>{{ doc.numero_documento|default:"N/A" }}</td>
+                        <td>{{ doc.fecha_expedicion|date:"d/m/Y"|default:"N/A" }}</td>
+                        <td>{{ doc.fecha_vencimiento|date:"d/m/Y"|default:"N/A" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        
+        <!-- Checklist de Documentación -->
+        <div class="section-title">Checklist de Documentación General</div>
+        <div class="section-content">
+            <table class="full-width-table">
+                <thead>
+                    <tr>
+                        <th style="width:70%">Documento</th>
+                        <th style="width:30%">Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Identificación Oficial (INE)</td>
+                        <td>{% if empleado.ine_documento %}<span class="status-active">Entregado</span>{% else %}<span class="status-inactive">Pendiente</span>{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <td>Comprobante de Domicilio</td>
+                        <td>{% if empleado.comprobante_domicilio %}<span class="status-active">Entregado</span>{% else %}<span class="status-inactive">Pendiente</span>{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <td>Currículum Vitae</td>
+                        <td>{% if empleado.curriculum_vitae %}<span class="status-active">Entregado</span>{% else %}<span class="status-inactive">Pendiente</span>{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <td>Acta de Nacimiento</td>
+                        <td>{% if empleado.acta_nacimiento_documento %}<span class="status-active">Entregado</span>{% else %}<span class="status-inactive">Pendiente</span>{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <td>Comprobante de Estudios</td>
+                        <td>{% if empleado.comprobante_estudios_documento %}<span class="status-active">Entregado</span>{% else %}<span class="status-inactive">Pendiente</span>{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <td>Constancia Fiscal (RFC)</td>
+                        <td>{% if empleado.constancia_fiscal_documento %}<span class="status-active">Entregado</span>{% else %}<span class="status-inactive">Pendiente</span>{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <td>Semanas Cotizadas IMSS</td>
+                        <td>{% if empleado.semanas_cotizadas_imss_documento %}<span class="status-active">Entregado</span>{% else %}<span class="status-inactive">Pendiente</span>{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <td>Aviso de Retención INFONAVIT</td>
+                        <td>{% if empleado.aviso_retencion_infonavit_documento %}<span class="status-active">Entregado</span>{% else %}<span class="status-inactive">Pendiente</span>{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <td>Carta de Recomendación 1</td>
+                        <td>{% if empleado.carta_recomendacion_1_documento %}<span class="status-active">Entregado</span>{% else %}<span class="status-inactive">Pendiente</span>{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <td>Carta de Recomendación 2</td>
+                        <td>{% if empleado.carta_recomendacion_2_documento %}<span class="status-active">Entregado</span>{% else %}<span class="status-inactive">Pendiente</span>{% endif %}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pie de página -->
+        <div class="footer">
+            Documento confidencial para uso interno | {{ empleado.nombre_completo }} | Página <span class="pagenumber"></span>
+        </div>
+    </div>
+</body>
+</html>

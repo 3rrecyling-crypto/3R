@@ -1,0 +1,944 @@
+{# RH/templates/rh/home.html #}
+{% extends 'rh/base.html' %}
+{% load humanize %}
+
+{% block rh_title %}Panel Ejecutivo - Recursos Humanos{% endblock %}
+
+{% block rh_content %}
+<style>
+    /* PALETA DE COLORES SOFT & FLAT */
+    :root {
+        --rh-bg-main: #f8fafc;
+        --rh-text-main: #334155;
+        --rh-text-muted: #64748b;
+        --rh-border: #e2e8f0;
+        
+        --soft-blue: #eff6ff;   --accent-blue: #3b82f6;
+        --soft-green: #f0fdf4;  --accent-green: #22c55e;
+        --soft-purple: #faf5ff; --accent-purple: #a855f7;
+        --soft-orange: #fff7ed; --accent-orange: #f97316;
+        --soft-red: #fef2f2;    --accent-red: #ef4444;
+        --soft-teal: #f0fdfa;   --accent-teal: #14b8a6;
+        --soft-slate: #f1f5f9;  --accent-slate: #64748b;
+        
+        --solid-navy: #1e293b;
+        --solid-emerald: #059669;
+    }
+
+    .dashboard-container { color: var(--rh-text-main); }
+    
+    .card {
+        border: 1px solid var(--rh-border);
+        border-radius: 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        background-color: #ffffff;
+    }
+
+    .text-primary-custom { color: var(--solid-navy) !important; }
+    
+    .bg-soft-blue { background-color: var(--soft-blue) !important; color: var(--accent-blue) !important; }
+    .bg-soft-green { background-color: var(--soft-green) !important; color: var(--accent-green) !important; }
+    .bg-soft-purple { background-color: var(--soft-purple) !important; color: var(--accent-purple) !important; }
+    .bg-soft-orange { background-color: var(--soft-orange) !important; color: var(--accent-orange) !important; }
+    .bg-soft-red { background-color: var(--soft-red) !important; color: var(--accent-red) !important; }
+    .bg-soft-teal { background-color: var(--soft-teal) !important; color: var(--accent-teal) !important; }
+    .bg-soft-slate { background-color: var(--soft-slate) !important; color: var(--accent-slate) !important; }
+
+    .border-top-blue { border-top: 4px solid var(--accent-blue) !important; }
+    .border-top-green { border-top: 4px solid var(--accent-green) !important; }
+    .border-top-slate { border-top: 4px solid var(--accent-slate) !important; }
+    .border-top-teal { border-top: 4px solid var(--accent-teal) !important; }
+    .border-top-purple { border-top: 4px solid var(--accent-purple) !important; }
+    .border-top-orange { border-top: 4px solid var(--accent-orange) !important; }
+
+    .hover-scale { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+    .hover-scale:hover { transform: translateY(-4px); box-shadow: 0 12px 24px -10px rgba(0,0,0,0.1) !important; }
+    
+    .icon-circle {
+        width: 48px; height: 48px;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 14px;
+        font-size: 1.25rem;
+    }
+
+    .quick-action-card {
+        background: #ffffff;
+        border: 1px solid var(--rh-border);
+        border-radius: 16px;
+        padding: 1.25rem 1rem;
+        text-align: center;
+        transition: all 0.2s;
+        height: 100%;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        text-decoration: none;
+    }
+    .quick-action-card:hover { border-color: var(--accent-blue); background-color: var(--soft-blue); text-decoration: none; }
+    
+    .quick-action-icon-box {
+        width: 50px; height: 50px;
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 0.75rem;
+        transition: transform 0.2s;
+    }
+    .quick-action-card:hover .quick-action-icon-box { transform: scale(1.1); }
+    .quick-action-text { font-size: 0.85rem; font-weight: 600; color: var(--rh-text-main); line-height: 1.3; }
+    
+    .thin-scroll::-webkit-scrollbar { width: 5px; }
+    .thin-scroll::-webkit-scrollbar-track { background: transparent; }
+    .thin-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    
+    .pointer-events-none { pointer-events: none; }
+    .sticky-top { position: -webkit-sticky; position: sticky; top: 0; z-index: 1020; }
+    .ls-1 { letter-spacing: 0.5px; }
+    
+    .progress-flat { height: 6px; border-radius: 8px; background-color: var(--rh-border); overflow: hidden; }
+    .progress-bar-flat-green { background-color: var(--accent-green); height: 100%; border-radius: 8px;}
+    .progress-bar-flat-slate { background-color: var(--accent-slate); height: 100%; border-radius: 8px;}
+    .progress-bar-flat-teal { background-color: var(--accent-teal); height: 100%; border-radius: 8px;}
+    .progress-bar-flat-purple { background-color: var(--accent-purple); height: 100%; border-radius: 8px;}
+
+    /* ESTILO PARA PESTAÑAS OSCURAS CON LETRA BLANCA */
+    .nav-tabs-dark { border-bottom: 2px solid rgba(255,255,255,0.1) !important; }
+    .nav-tabs-dark .nav-link {
+        border: none;
+        color: rgba(255,255,255,0.7) !important; /* Texto gris claro (inactivas) */
+        font-weight: 600;
+        padding: 0.75rem 1.25rem;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+    }
+    .nav-tabs-dark .nav-link:hover { color: #ffffff !important; }
+    .nav-tabs-dark .nav-link.active {
+        color: #ffffff !important; /* TEXTO BLANCO */
+        border-bottom: 2px solid var(--accent-blue) !important;
+        background-color: transparent !important;
+    }
+    
+    .mini-stats {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
+        background-color: var(--soft-slate);
+        color: var(--accent-slate);
+        font-weight: 600;
+    }
+    
+    .btn-soft-orange { background-color: var(--soft-orange); color: var(--accent-orange); border: none; font-weight: 600; }
+    .btn-soft-orange:hover { background-color: #ffedd5; color: #c2410c; }
+    .btn-soft-purple { background-color: var(--soft-purple); color: var(--accent-purple); border: none; font-weight: 600; }
+    .btn-soft-purple:hover { background-color: #f3e8ff; color: #7e22ce; }
+    .btn-soft-teal { background-color: var(--soft-teal); color: var(--accent-teal); border: none; font-weight: 600; }
+    .btn-soft-teal:hover { background-color: #ccfbf1; color: #0f766e; }
+
+    /* Efecto al pasar mouse sobre el enlace de empleado */
+    .link-empleado-alerta { color: var(--solid-navy); transition: color 0.2s; }
+    .link-empleado-alerta:hover { color: var(--accent-blue); text-decoration: underline !important; }
+</style>
+
+<div class="dashboard-container pb-5">
+    
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <small class="text-uppercase fw-bold ls-1" style="color: var(--accent-blue);">Transportes Migmar &bull; Portal Corporativo</small>
+            <h2 class="fw-bold text-primary-custom mb-0 mt-1">Dashboard Recursos Humanos</h2>
+            <p class="text-muted mb-0 mt-1">
+                <i class="fas fa-chart-pie me-1"></i> 
+                Estadísticas y gestión en tiempo real
+            </p>
+        </div>
+        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+            <div class="d-inline-flex align-items-center px-4 py-2 bg-white rounded-pill border" style="box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                <div class="icon-circle bg-soft-blue me-3" style="width: 32px; height: 32px; font-size: 0.9rem;">
+                    <i class="far fa-calendar-alt"></i>
+                </div>
+                <span class="fw-bold text-dark">{{ today|date:"l, d F Y"|capfirst }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="card h-100 border-top-blue hover-scale">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="text-muted small fw-bold text-uppercase ls-1">Plantilla Total</h6>
+                            <h2 class="display-6 fw-bold text-dark mb-0">{{ total_empleados|default:0 }}</h2>
+                            <div class="mt-2">
+                                <span class="badge bg-soft-blue px-2 py-1 rounded-1">
+                                    {{ total_departamentos }} Departamentos
+                                </span>
+                            </div>
+                        </div>
+                        <div class="icon-circle bg-soft-blue"><i class="fas fa-users"></i></div>
+                    </div>
+                    <div class="mt-4 pt-3 border-top">
+                        <div class="row text-center">
+                            <div class="col-6 border-end">
+                                <small class="text-muted d-block fw-bold">Activos</small>
+                                <strong class="fs-5" style="color: var(--accent-green);">{{ empleados_activos|default:0 }}</strong>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block fw-bold">Inactivos</small>
+                                <strong class="fs-5" style="color: var(--accent-slate);">{{ empleados_inactivos|default:0 }}</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card h-100 border-top-green hover-scale">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted text-uppercase small fw-bold ls-1">Personal Activo</h6>
+                            <h2 class="display-6 fw-bold mb-0" style="color: var(--accent-green);">{{ empleados_activos|default:0 }}</h2>
+                            <div class="mt-2">
+                                <span class="badge bg-soft-green px-2 py-1 rounded-1">
+                                    {{ empleados_activos_porcentaje }}% Operatividad
+                                </span>
+                            </div>
+                        </div>
+                        <div class="icon-circle bg-soft-green"><i class="fas fa-user-check"></i></div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="d-flex justify-content-between small mb-2 fw-bold">
+                            <span style="color: var(--accent-green);">{{ empleados_activos_porcentaje }}%</span>
+                            <span class="text-muted">Operatividad</span>
+                        </div>
+                        <div class="progress-flat">
+                            <div class="progress-bar-flat-green" style="width: {{ empleados_activos_porcentaje|stringformat:'d' }}%"></div>
+                        </div>
+                    </div>
+                    <div class="mt-3 pt-2">
+                        <small class="text-muted"><i class="fas fa-info-circle me-1"></i> Excluye empleados en papelera</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card h-100 border-top-slate hover-scale">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted text-uppercase small fw-bold ls-1">Personal Inactivo</h6>
+                            <h2 class="display-6 fw-bold mb-0" style="color: var(--accent-slate);">{{ empleados_inactivos|default:0 }}</h2>
+                            <div class="mt-2">
+                                <span class="badge bg-soft-slate px-2 py-1 rounded-1">
+                                    {{ empleados_inactivos_porcentaje }}% Inactividad
+                                </span>
+                            </div>
+                        </div>
+                        <div class="icon-circle bg-soft-slate"><i class="fas fa-user-times"></i></div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="d-flex justify-content-between small mb-2 fw-bold">
+                            <span style="color: var(--accent-slate);">{{ empleados_inactivos_porcentaje }}%</span>
+                            <span class="text-muted">Inactividad</span>
+                        </div>
+                        <div class="progress-flat">
+                            <div class="progress-bar-flat-slate" style="width: {{ empleados_inactivos_porcentaje|stringformat:'d' }}%"></div>
+                        </div>
+                    </div>
+                    <div class="mt-3 pt-2">
+                        <small class="text-muted"><i class="fas fa-info-circle me-1"></i> Bajas y renuncias</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card h-100 hover-scale" style="background-color: var(--solid-navy); color: white; border: none;">
+                <div class="card-body">
+                    <h6 class="text-uppercase small fw-bold mb-3 ls-1" style="color: #94a3b8;">Operadores por Empresa</h6>
+                    <div class="row g-2 mt-2">
+                        <div class="col-6">
+                            <div class="text-center p-3 rounded-3" style="background: rgba(255,255,255,0.05);">
+                                <div class="h3 fw-bold mb-1 text-white">{{ operadores_migmar|default:0 }}</div>
+                                <small style="color: #94a3b8; font-weight: 600;">MIGMAR</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center p-3 rounded-3" style="background: rgba(255,255,255,0.05);">
+                                <div class="h3 fw-bold mb-1 text-white">{{ operadores_marco|default:0 }}</div>
+                                <small style="color: #94a3b8; font-weight: 600;">MARCO M.</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-3 border-top" style="border-color: rgba(255,255,255,0.1) !important;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span style="color: #cbd5e1; font-size: 0.9rem;">Total Operadores</span>
+                            <strong class="fs-5 text-white">{{ operadores_migmar|add:operadores_marco }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="card h-100 border-top-teal hover-scale">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted text-uppercase small fw-bold ls-1">Vacaciones</h6>
+                            <h2 class="display-6 fw-bold mb-0" style="color: var(--accent-teal);">{{ vacaciones_activas|default:0 }}</h2>
+                            <div class="mt-2">
+                                <span class="badge bg-soft-teal px-2 py-1 rounded-1">
+                                    {{ vacaciones_pendientes|default:0 }} pendientes
+                                </span>
+                            </div>
+                        </div>
+                        <div class="icon-circle bg-soft-teal"><i class="fas fa-umbrella-beach"></i></div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="d-flex justify-content-between small mb-2 fw-bold">
+                            <span style="color: var(--accent-teal);">{{ vacaciones_progreso|floatformat:0 }}%</span>
+                            <span class="text-muted">Progreso Año</span>
+                        </div>
+                        <div class="progress-flat">
+                            <div class="progress-bar-flat-teal" style="width: {{ vacaciones_progreso|default:50 }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card h-100 border-top-purple hover-scale">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted text-uppercase small fw-bold ls-1">Préstamos Activos</h6>
+                            <h2 class="display-6 fw-bold mb-0" style="color: var(--accent-purple);">{{ prestamos_activos|default:0 }}</h2>
+                            <div class="mt-2">
+                                <span class="badge bg-soft-purple px-2 py-1 rounded-1 fw-bold">
+                                    ${{ total_prestamos_activos|intcomma|default:"0" }} Saldo
+                                </span>
+                            </div>
+                        </div>
+                        <div class="icon-circle bg-soft-purple"><i class="fas fa-hand-holding-usd"></i></div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="d-flex justify-content-between small mb-2 fw-bold">
+                            <span style="color: var(--accent-purple);">{{ prestamos_progreso|floatformat:0 }}%</span>
+                            <span class="text-muted">Pagado Total</span>
+                        </div>
+                        <div class="progress-flat">
+                            <div class="progress-bar-flat-purple" style="width: {{ prestamos_progreso|default:30 }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card h-100 border-top-orange hover-scale">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted text-uppercase small fw-bold ls-1">Papelera</h6>
+                            <h2 class="display-6 fw-bold mb-0" style="color: var(--accent-orange);">{{ total_eliminados|default:0 }}</h2>
+                            <div class="mt-2">
+                                <span class="badge bg-soft-orange px-2 py-1 rounded-1">
+                                    Empleados Eliminados
+                                </span>
+                            </div>
+                        </div>
+                        <div class="icon-circle bg-soft-orange"><i class="fas fa-trash-restore"></i></div>
+                    </div>
+                    <div class="mt-4 pt-2">
+                        <a href="{% url 'rh:papelera_empleados' %}" class="btn btn-soft-orange w-100 rounded-pill">
+                            <i class="fas fa-eye me-1"></i> Ver Papelera
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if user.is_superuser %}
+        <div class="col-md-6 col-xl-3">
+            <div class="card h-100 hover-scale" style="background-color: var(--solid-emerald); color: white; border: none;">
+                <div class="card-body">
+                    <h6 class="text-uppercase small fw-bold mb-4 ls-1" style="color: #a7f3d0;">Administración BD</h6>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <a href="{% url 'rh:exportar_rh_completo' %}" class="text-white text-decoration-none d-block">
+                                <div class="text-center p-2 rounded-3" style="background: rgba(255,255,255,0.1); transition: background 0.2s;">
+                                    <div class="h3 mb-2"><i class="fas fa-cloud-download-alt"></i></div>
+                                    <small style="font-weight: 600;">Exportar</small>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'rh:importar_rh_completo' %}" class="text-white text-decoration-none d-block">
+                                <div class="text-center p-2 rounded-3" style="background: rgba(255,255,255,0.1); transition: background 0.2s;">
+                                    <div class="h3 mb-2"><i class="fas fa-cloud-upload-alt"></i></div>
+                                    <small style="font-weight: 600;">Importar</small>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="row g-4">
+        <div class="col-xl-8">
+            <div class="card mb-4">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h6 class="fw-bold m-0" style="color: var(--white);"><i class="fas fa-th-large me-2"></i>Centro de Comando</h6>
+                    <span class="badge bg-soft-blue text-dark rounded-pill">Acciones Rápidas</span>
+                </div>
+                <div class="card-body bg-soft-slate p-4 rounded-bottom">
+                    <div class="row g-3">
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <a href="{% url 'rh:empleado_create' %}" class="quick-action-card hover-scale">
+                                <div class="quick-action-icon-box bg-soft-blue"><i class="fas fa-user-plus"></i></div>
+                                <div class="quick-action-text">Nuevo<br>Empleado</div>
+                            </a>
+                        </div>
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <a href="{% url 'rh:lista_empleados' %}" class="quick-action-card hover-scale">
+                                <div class="quick-action-icon-box bg-soft-slate"><i class="fas fa-address-book"></i></div>
+                                <div class="quick-action-text">Directorio<br>General</div>
+                            </a>
+                        </div>
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <a href="#" class="quick-action-card hover-scale" data-bs-toggle="modal" data-bs-target="#modalChecadas">
+                                <div class="quick-action-icon-box bg-soft-orange"><i class="fas fa-clock"></i></div>
+                                <div class="quick-action-text">Procesar<br>Checadas</div>
+                            </a>
+                        </div>
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <a href="{% url 'rh:historial_bajas' %}" class="quick-action-card hover-scale">
+                                <div class="quick-action-icon-box bg-soft-red"><i class="fas fa-user-slash"></i></div>
+                                <div class="quick-action-text">Historial<br>de Bajas</div>
+                            </a>
+                        </div>
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <a href="{% url 'rh:gestion_vacaciones' %}" class="quick-action-card hover-scale">
+                                <div class="quick-action-icon-box bg-soft-teal"><i class="fas fa-umbrella-beach"></i></div>
+                                <div class="quick-action-text">Gestión<br>Vacaciones</div>
+                            </a>
+                        </div>
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <a href="{% url 'rh:gestion_prestamos' %}" class="quick-action-card hover-scale">
+                                <div class="quick-action-icon-box bg-soft-purple"><i class="fas fa-hand-holding-usd"></i></div>
+                                <div class="quick-action-text">Gestión<br>Préstamos</div>
+                            </a>
+                        </div>
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <a href="{% url 'rh:papelera_empleados' %}" class="quick-action-card hover-scale">
+                                <div class="quick-action-icon-box bg-soft-orange"><i class="fas fa-trash-restore"></i></div>
+                                <div class="quick-action-text">Papelera<br>Reciclaje</div>
+                            </a>
+                        </div>
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <a href="{% url 'rh:semaforo_documentos' %}" class="quick-action-card hover-scale">
+                                <div class="quick-action-icon-box" style="background-color: #fef08a; color: #a16207;"><i class="fas fa-traffic-light"></i></div>
+                                <div class="quick-action-text">Semáforo<br>Vencimientos</div>
+                            </a>
+                        </div>
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <a href="{% url 'rh:reporte_documentacion_operador' %}" class="quick-action-card hover-scale">
+                                <div class="quick-action-icon-box bg-soft-slate"><i class="fas fa-folder-open"></i></div>
+                                <div class="quick-action-text">Faltantes<br>Operador</div>
+                            </a>
+                        </div>
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <a href="{% url 'rh:descargar_documentos_todos' %}" class="quick-action-card hover-scale">
+                                <div class="quick-action-icon-box bg-soft-blue"><i class="fas fa-file-archive"></i></div>
+                                <div class="quick-action-text">Documentos<br>Masivos</div>
+                            </a>
+                        </div>
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <a href="{% url 'rh:dashboard_operadores' %}" class="quick-action-card hover-scale">
+                                <div class="quick-action-icon-box bg-soft-blue"><i class="fas fa-tachometer-alt"></i></div>
+                                <div class="quick-action-text">Dashboard<br>Operadores</div>
+                            </a>
+                        </div>
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <a href="{% url 'rh:vacantes_dashboard' %}" class="quick-action-card hover-scale">
+                                <div class="quick-action-icon-box bg-soft-green"><i class="fas fa-chair"></i></div>
+                                <div class="quick-action-text">Gestión<br>Vacantes</div>
+                            </a>
+                        </div>
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <a href="{% url 'rh:export_empleados_excel' %}" class="quick-action-card hover-scale">
+                                <div class="quick-action-icon-box bg-soft-green"><i class="fas fa-file-excel"></i></div>
+                                <div class="quick-action-text">Exportar<br>Excel</div>
+                            </a>
+                        </div>
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <a href="{% url 'rh:puesto_create' %}" class="quick-action-card hover-scale">
+                                <div class="quick-action-icon-box bg-soft-slate"><i class="fas fa-briefcase"></i></div>
+                                <div class="quick-action-text">Nuevo<br>Puesto</div>
+                            </a>
+                        </div>
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <a href="{% url 'rh:departamento_create' %}" class="quick-action-card hover-scale">
+                                <div class="quick-action-icon-box bg-soft-teal"><i class="fas fa-building"></i></div>
+                                <div class="quick-action-text">Nuevo<br>Depto.</div>
+                            </a>
+                        </div>
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <a href="{% url 'rh:lista_departamentos' %}" class="quick-action-card hover-scale">
+                                <div class="quick-action-icon-box bg-soft-slate"><i class="fas fa-sitemap"></i></div>
+                                <div class="quick-action-text">Lista de<br>Deptos/Puestos</div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-lg-8">
+                    <div class="card h-100">
+                        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                            <h6 class="fw-bold m-0 text-white">Distribución de Personal</h6>
+                            <div class="mini-stats">
+                                <i class="fas fa-users me-1"></i> Total: {{ total_empleados }}
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row align-items-center h-100">
+                                <div class="col-md-5 mb-3 mb-md-0 position-relative">
+                                    <div style="height: 220px;">
+                                        <canvas id="deptChart"></canvas>
+                                    </div>
+                                    <div class="position-absolute top-50 start-50 translate-middle text-center pointer-events-none">
+                                        <div class="h3 fw-bold text-dark mb-0">{{ total_departamentos }}</div>
+                                        <div class="small text-muted text-uppercase" style="font-size: 0.65rem; font-weight: 600;">Deptos</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-7">
+                                    <div class="thin-scroll pe-2" style="max-height: 240px; overflow-y: auto;">
+                                        {% if departamento_distribucion %}
+                                            <table class="table table-sm table-borderless align-middle mb-0">
+                                                <thead class="text-muted small text-uppercase border-bottom sticky-top bg-white">
+                                                    <tr>
+                                                        <th class="fw-bold pb-2">Departamento</th>
+                                                        <th class="fw-bold pb-2 text-end">Cant.</th>
+                                                        <th class="fw-bold pb-2 text-end">%</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for dept in departamento_distribucion %}
+                                                    <tr class="border-bottom" style="border-color: var(--rh-border) !important;">
+                                                        <td class="py-2">
+                                                            <div class="d-flex align-items-center">
+                                                                <span class="rounded-circle me-2 shadow-sm" 
+                                                                    style="width: 10px; height: 10px; background-color: {% cycle '#3b82f6' '#22c55e' '#a855f7' '#eab308' '#ef4444' '#64748b' '#14b8a6' '#f97316' '#06b6d4' '#f43f5e' %};">
+                                                                </span>
+                                                                <span class="fw-bold text-secondary small text-truncate" style="max-width: 140px;" title="{{ dept.nombre }}">
+                                                                    {{ dept.nombre }}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td class="text-end py-2">
+                                                            <span class="fw-bold text-dark">{{ dept.count }}</span>
+                                                        </td>
+                                                        <td class="text-end py-2 text-muted small">
+                                                            {% widthratio dept.count total_empleados 100 %}%
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        {% else %}
+                                            <div class="text-center py-5 text-muted">
+                                                <i class="fas fa-chart-pie fa-2x mb-2" style="color: #cbd5e1;"></i>
+                                                <p class="small">No hay empleados asignados para mostrar la distribución.</p>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4">
+                    <div class="card h-100" style="background-color: var(--accent-blue); color: white; border: none;">
+                        <div class="card-body d-flex flex-column">
+                            <div class="text-center mb-4 mt-2">
+                                <div class="icon-circle bg-white text-primary mx-auto mb-3" style="width: 56px; height: 56px; font-size: 1.5rem; color: var(--accent-blue) !important;">
+                                    <i class="fas fa-birthday-cake"></i>
+                                </div>
+                                <h5 class="fw-bold text-white mb-0">Hoy, {{ today|date:"d M" }}</h5>
+                                <p class="text-white-50 small mb-0 fw-bold">{{ cumpleanos_hoy|length }} cumpleaños</p>
+                            </div>
+                            
+                            <div class="bg-white bg-opacity-10 rounded-3 p-3 flex-grow-1 thin-scroll" style="overflow-y: auto; max-height: 200px;">
+                                {% if cumpleanos_hoy %}
+                                    {% for item in cumpleanos_hoy %}
+                                        <div class="d-flex align-items-center mb-3 pb-3 border-bottom border-light border-opacity-25 last-no-border">
+                                            <div class="bg-white rounded-circle d-flex align-items-center justify-content-center fw-bold me-3 shadow-sm" style="width:40px; height:40px; min-width:40px; color: var(--accent-blue);">
+                                                {{ item.empleado.nombre|slice:":1" }}
+                                            </div>
+                                            <div class="flex-grow-1">
+                                                <div class="fw-bold lh-1 text-white mb-1">{{ item.empleado.nombre }} {{ item.empleado.apellido }}</div>
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <span class="badge bg-white bg-opacity-25 text-white rounded-pill" style="font-size: 0.7rem;">{{ item.edad_a_cumplir }} Años</span>
+                                                    <small class="text-white-50 text-truncate ms-2" style="max-width: 90px;">{{ item.empleado.puesto.nombre }}</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="text-center h-100 d-flex align-items-center justify-content-center opacity-75">
+                                        <div>
+                                            <i class="fas fa-gift fa-2x mb-2"></i>
+                                            <p class="small mb-0 fw-bold">No hay cumpleaños<br>registrados hoy.</p>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <a href="{% url 'rh:cumpleanos_rh' %}" class="btn btn-light w-100 mt-4 rounded-pill fw-bold" style="color: var(--accent-blue);">
+                                Ver Calendario Completo
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4">
+            <div class="card h-100">
+                <div class="card-header py-0 sticky-top" style="background-color: var(--solid-navy); border-radius: 16px 16px 0 0;">
+                    <ul class="nav nav-tabs-dark w-100 d-flex m-0" id="alertTabs" role="tablist">
+                        <li class="nav-item flex-fill text-center" role="presentation">
+                            <button class="nav-link active w-100" id="alertas-tab" data-bs-toggle="tab" data-bs-target="#alertas" type="button" role="tab">
+                                <i class="fas fa-bell me-1"></i> Alertas
+                                {% if alertas_rh %}
+                                    <span class="badge bg-soft-red text-danger rounded-pill ms-1">{{ alertas_rh|length }}</span>
+                                {% endif %}
+                            </button>
+                        </li>
+                        <li class="nav-item flex-fill text-center" role="presentation">
+                            <button class="nav-link w-100" id="vacaciones-tab" data-bs-toggle="tab" data-bs-target="#vacaciones" type="button" role="tab">
+                                <i class="fas fa-umbrella-beach me-1"></i> Vacaciones
+                            </button>
+                        </li>
+                        <li class="nav-item flex-fill text-center" role="presentation">
+                            <button class="nav-link w-100" id="prestamos-tab" data-bs-toggle="tab" data-bs-target="#prestamos" type="button" role="tab">
+                                <i class="fas fa-hand-holding-usd me-1"></i> Préstamos
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="tab-content flex-grow-1" style="max-height: 700px; overflow-y: auto;">
+                    
+                    <div class="tab-pane fade show active thin-scroll" id="alertas" role="tabpanel">
+                        {% if alertas_rh %}
+                            <div class="list-group list-group-flush">
+                                {% for alerta in alertas_rh %}
+                                <div class="list-group-item border-0 py-3 px-4 border-bottom" style="border-color: var(--rh-border) !important;">
+                                    <div class="d-flex">
+                                        <div class="me-3 mt-1">
+                                            {% if alerta.tipo == 'danger' %}
+                                                <div class="icon-circle bg-soft-red text-danger" style="width:38px; height:38px; font-size:1rem;">
+                                                    <i class="fas fa-exclamation-triangle"></i>
+                                                </div>
+                                            {% elif alerta.tipo == 'warning' %}
+                                                <div class="icon-circle bg-soft-orange text-warning" style="width:38px; height:38px; font-size:1rem;">
+                                                    <i class="fas fa-clock"></i>
+                                                </div>
+                                            {% else %}
+                                                <div class="icon-circle bg-soft-blue text-primary" style="width:38px; height:38px; font-size:1rem;">
+                                                    <i class="fas fa-info-circle"></i>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <strong class="text-dark" style="font-size: 0.95rem;">{{ alerta.titulo }}</strong>
+                                                <span class="text-muted" style="font-size: 0.75rem; font-weight: 600;">{{ alerta.fecha|date:"d/m/Y" }}</span>
+                                            </div>
+                                            
+                                            <p class="mb-2 lh-sm fw-bold" style="font-size: 0.85rem;">
+                                                {% if alerta.empleado_id %}
+                                                    <a href="{% url 'rh:empleado_update' alerta.empleado_id %}" class="text-decoration-none link-empleado-alerta" title="Clic para editar perfil">
+                                                        {{ alerta.descripcion }} <i class="fas fa-external-link-alt ms-1 text-muted" style="font-size: 0.7rem;"></i>
+                                                    </a>
+                                                {% else %}
+                                                    <span class="text-dark">{{ alerta.descripcion }}</span>
+                                                {% endif %}
+                                            </p>
+
+                                            <div class="d-flex flex-wrap gap-2">
+                                                {% if alerta.empresa %}
+                                                <span class="badge bg-light text-dark border shadow-sm px-2 py-1" style="font-size: 0.7rem;">
+                                                    <i class="fas fa-industry me-1 text-primary"></i> {{ alerta.empresa }}
+                                                </span>
+                                                {% endif %}
+                                                {% if alerta.division %}
+                                                <span class="badge bg-light text-dark border shadow-sm px-2 py-1" style="font-size: 0.7rem;">
+                                                    <i class="fas fa-map-marker-alt me-1 text-success"></i> {{ alerta.division }}
+                                                </span>
+                                                {% endif %}
+                                                {% if alerta.departamento %}
+                                                <span class="badge bg-light text-dark border shadow-sm px-2 py-1" style="font-size: 0.7rem;">
+                                                    <i class="fas fa-building me-1 text-secondary"></i> {{ alerta.departamento }}
+                                                </span>
+                                                {% endif %}
+                                                {% if alerta.puesto %}
+                                                <span class="badge bg-light text-dark border shadow-sm px-2 py-1" style="font-size: 0.7rem;">
+                                                    <i class="fas fa-briefcase me-1" style="color: var(--accent-orange);"></i> {{ alerta.puesto }}
+                                                </span>
+                                                {% endif %}
+                                                {% if alerta.categoria %}
+                                                <span class="badge bg-soft-slate text-muted border-0 fw-bold px-2 py-1" style="font-size: 0.7rem;">
+                                                    <i class="fas fa-{{ alerta.icono|default:'tag' }} me-1"></i> {{ alerta.categoria }}
+                                                </span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-center py-5 px-4 h-100 d-flex flex-column justify-content-center">
+                                <div class="mb-3">
+                                    <div class="icon-circle bg-soft-green mx-auto text-success" style="width: 70px; height: 70px; font-size: 2rem;">
+                                        <i class="fas fa-check"></i>
+                                    </div>
+                                </div>
+                                <h6 class="fw-bold text-dark">¡Todo al día!</h6>
+                                <p class="small text-muted mb-0">No hay contratos por vencer ni documentos caducados.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="tab-pane fade thin-scroll" id="vacaciones" role="tabpanel">
+                        {% if proximas_vacaciones %}
+                            <div class="list-group list-group-flush">
+                                {% for vacacion in proximas_vacaciones %}
+                                <div class="list-group-item border-0 py-3 px-4 border-bottom" style="border-color: var(--rh-border) !important;">
+                                    <div class="d-flex align-items-center">
+                                        <div class="me-3">
+                                            <div class="icon-circle bg-soft-teal text-teal" style="width:42px; height:42px; font-size:1rem; color: var(--accent-teal);">
+                                                <i class="fas fa-plane-departure"></i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                                <strong class="text-dark" style="font-size: 0.9rem;">{{ vacacion.empleado.nombre_completo }}</strong>
+                                                <span class="badge bg-soft-slate text-dark fw-bold">{{ vacacion.dias }} días</span>
+                                            </div>
+                                            <div class="text-muted mb-2" style="font-size: 0.8rem; font-weight: 500;">
+                                                <i class="far fa-calendar me-1"></i>{{ vacacion.fecha_inicio|date:"d M" }} - {{ vacacion.fecha_fin|date:"d M y" }}
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                {% if vacacion.estado == 'aprobado' %}
+                                                    <span class="badge bg-soft-green text-success px-2 py-1">Aprobado</span>
+                                                {% elif vacacion.estado == 'pendiente' %}
+                                                    <span class="badge bg-soft-orange text-warning px-2 py-1">Pendiente</span>
+                                                {% elif vacacion.estado == 'rechazado' %}
+                                                    <span class="badge bg-soft-red text-danger px-2 py-1">Rechazado</span>
+                                                {% endif %}
+                                                <small class="text-muted fw-bold">{{ vacacion.dias_restantes }}d restantes</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div class="p-3 bg-white sticky-bottom border-top" style="border-color: var(--rh-border) !important;">
+                                <a href="{% url 'rh:solicitar_vacacion' %}" class="btn btn-soft-teal w-100 rounded-pill">
+                                    <i class="fas fa-plus me-1"></i> Nueva Solicitud
+                                </a>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-5 px-4 h-100 d-flex flex-column justify-content-center">
+                                <div class="mb-3">
+                                    <div class="icon-circle bg-soft-teal mx-auto" style="width: 70px; height: 70px; font-size: 2rem; color: var(--accent-teal);">
+                                        <i class="fas fa-umbrella-beach"></i>
+                                    </div>
+                                </div>
+                                <h6 class="fw-bold text-dark">Sin próximas vacaciones</h6>
+                                <p class="small text-muted">No hay descansos programados para los próximos días.</p>
+                                <a href="{% url 'rh:solicitar_vacacion' %}" class="btn btn-soft-teal rounded-pill mt-2 mx-auto">
+                                    <i class="fas fa-plus me-1"></i> Crear Solicitud
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="tab-pane fade thin-scroll" id="prestamos" role="tabpanel">
+                        {% if prestamos_pendientes %}
+                            <div class="list-group list-group-flush">
+                                {% for prestamo in prestamos_pendientes %}
+                                <div class="list-group-item border-0 py-3 px-4 border-bottom" style="border-color: var(--rh-border) !important;">
+                                    <div class="d-flex align-items-center">
+                                        <div class="me-3">
+                                            <div class="icon-circle bg-soft-purple" style="width:42px; height:42px; font-size:1rem; color: var(--accent-purple);">
+                                                <i class="fas fa-wallet"></i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                                <strong class="text-dark" style="font-size: 0.9rem;">{{ prestamo.empleado.nombre_completo }}</strong>
+                                                <span class="badge bg-soft-purple text-purple px-2 py-1 fw-bold" style="color: var(--accent-purple);">${{ prestamo.monto_total|intcomma }}</span>
+                                            </div>
+                                            <div class="text-muted mb-2" style="font-size: 0.8rem; font-weight: 500;">
+                                                <i class="fas fa-calendar-alt me-1"></i>Plazo: {{ prestamo.plazo_meses }} meses
+                                            </div>
+                                            <div class="progress-flat mb-2" style="height: 5px;">
+                                                <div class="progress-bar-flat-purple" style="width: {{ prestamo.progreso_pago }}%"></div>
+                                            </div>
+                                            <div class="d-flex justify-content-between" style="font-size: 0.75rem;">
+                                                <span class="text-muted fw-bold">Pagado: ${{ prestamo.monto_pagado|intcomma }}</span>
+                                                <span class="fw-bold" style="color: var(--accent-purple);">Resta: ${{ prestamo.saldo_pendiente|intcomma }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div class="p-3 bg-white sticky-bottom border-top" style="border-color: var(--rh-border) !important;">
+                                <a href="{% url 'rh:solicitar_prestamo' %}" class="btn btn-soft-purple w-100 rounded-pill">
+                                    <i class="fas fa-plus me-1"></i> Nuevo Préstamo
+                                </a>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-5 px-4 h-100 d-flex flex-column justify-content-center">
+                                <div class="mb-3">
+                                    <div class="icon-circle bg-soft-purple mx-auto" style="width: 70px; height: 70px; font-size: 2rem; color: var(--accent-purple);">
+                                        <i class="fas fa-hand-holding-usd"></i>
+                                    </div>
+                                </div>
+                                <h6 class="fw-bold text-dark">No hay préstamos activos</h6>
+                                <p class="small text-muted">La nómina está limpia de deducciones por préstamos actuales.</p>
+                                <a href="{% url 'rh:solicitar_prestamo' %}" class="btn btn-soft-purple mt-2 mx-auto rounded-pill">
+                                    <i class="fas fa-plus me-1"></i> Otorgar Préstamo
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="card-footer bg-soft-slate text-center py-2 border-0" style="border-radius: 0 0 16px 16px;">
+                    <small class="text-muted fw-bold" style="font-size: 0.75rem;">
+                        <i class="fas fa-sync-alt me-1"></i>
+                        Actualizado: {{ today|date:"d/m/Y" }} <span id="current-time"></span>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalChecadas" tabindex="-1" aria-labelledby="modalChecadasLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 20px; border: none;">
+            <form action="{% url 'rh:procesar_checadas' %}" method="POST" class="needs-validation" enctype="multipart/form-data" novalidate>
+                {% csrf_token %}
+                <div class="modal-header bg-soft-orange border-0" style="border-radius: 20px 20px 0 0;">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-circle bg-white shadow-sm me-3" style="color: var(--accent-orange); width: 40px; height: 40px;">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <h5 class="modal-title fw-bold text-dark" id="modalChecadasLabel">Procesar Checadas</h5>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-muted mb-4" style="font-size: 0.9rem;">Sube el archivo Excel original descargado del checador. El sistema calculará retardos y tiempos extra y te devolverá un archivo estructurado.</p>
+                    <div class="mb-3">
+                        <label for="archivo_excel" class="form-label fw-bold" style="color: var(--rh-text-main);">Archivo Excel (.xlsx, .xls)</label>
+                        <input class="form-control form-control-lg bg-soft-slate border-0" type="file" id="archivo_excel" name="archivo_excel" accept=".xlsx, .xls" required>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 p-4 pt-0">
+                    <button type="button" class="btn text-muted fw-bold" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-soft-orange px-4 py-2 rounded-pill shadow-sm">
+                        <i class="fas fa-cogs me-1"></i> Procesar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function updateTime() {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('current-time').textContent = timeString;
+    }
+    updateTime();
+    setInterval(updateTime, 60000);
+
+    const ctx = document.getElementById('deptChart');
+    if (ctx) {
+        const palette = ['#3b82f6', '#22c55e', '#a855f7', '#eab308', '#ef4444', '#64748b', '#14b8a6', '#f97316', '#06b6d4', '#f43f5e'];
+        const data = {
+            labels: [{% for dept in departamento_distribucion %}"{{ dept.nombre }}"{% if not forloop.last %}, {% endif %}{% endfor %}],
+            datasets: [{
+                data: [{% for dept in departamento_distribucion %}{{ dept.count }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+                backgroundColor: palette,
+                borderWidth: 2, 
+                borderColor: '#ffffff',
+                hoverOffset: 6
+            }]
+        };
+        new Chart(ctx.getContext('2d'), {
+            type: 'doughnut',
+            data: data,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '72%', 
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#1e293b',
+                        padding: 12,
+                        cornerRadius: 8,
+                        titleFont: { family: 'Inter, sans-serif', size: 13 },
+                        bodyFont: { family: 'Inter, sans-serif', size: 14, weight: 'bold' },
+                        displayColors: true,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) { label += ': '; }
+                                let value = context.raw;
+                                let total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                let percentage = total > 0 ? Math.round((value / total) * 100) + '%' : '0%';
+                                return label + value + ' (' + percentage + ')';
+                            }
+                        }
+                    }
+                },
+                layout: { padding: 0 }
+            }
+        });
+    }
+    
+    var forms = document.querySelectorAll('.needs-validation')
+    Array.prototype.slice.call(forms).forEach(function (form) {
+      form.addEventListener('submit', function (event) {
+        if (!form.checkValidity()) {
+          event.preventDefault()
+          event.stopPropagation()
+        }
+        form.classList.add('was-validated')
+      }, false)
+    });
+});
+</script>
+{% endblock %}

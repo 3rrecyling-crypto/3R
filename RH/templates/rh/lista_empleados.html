@@ -1,0 +1,568 @@
+{# RH/templates/rh/lista_empleados.html #}
+{% extends 'rh/base.html' %}
+
+{% block rh_title %}Gestión de Empleados - Recursos Humanos{% endblock %}
+
+{% block rh_content %}
+<div class="container-fluid px-4 pb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4 py-3 border-bottom">
+        <div>
+            <h1 class="h3 fw-bold text-dark mb-1">
+                <i class="fas fa-users me-2 text-primary"></i>Gestión de Empleados
+            </h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb bg-transparent p-0 mb-0">
+                    <li class="breadcrumb-item"><a href="{% url 'rh:lista_empleados' %}" class="text-decoration-none">Inicio</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Empleados</li>
+                </ol>
+            </nav>
+        </div>
+        <a href="{% url 'rh:empleado_create' %}" class="btn btn-primary btn-lg shadow-sm rounded-pill px-4 transition-300 hover-elevate">
+            <i class="fas fa-user-plus me-2"></i>Nuevo Empleado
+        </a>
+    </div>
+
+    <div class="row mb-4 g-3">
+        <div class="col-lg-6 col-md-6">
+            <div class="card shadow-sm border-0 h-100 rounded-4 hover-elevate transition-300">
+                <div class="card-body text-center d-flex flex-column justify-content-center py-4">
+                    <div class="mb-2"><i class="fas fa-users fa-2x text-secondary opacity-50"></i></div>
+                    <h5 class="card-title text-muted mb-1 fs-6 text-uppercase fw-semibold">Total de Empleados</h5>
+                    <p class="h2 fw-bold text-dark mb-0">{{ total_empleados|default:"0" }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 col-md-6">
+            <div class="card shadow-sm border-0 h-100 rounded-4 hover-elevate transition-300">
+                <div class="card-body text-center d-flex flex-column justify-content-center py-4">
+                    <div class="mb-2"><i class="fas fa-user-check fa-2x text-success opacity-50"></i></div>
+                    <h5 class="card-title text-success mb-1 fs-6 text-uppercase fw-semibold">Empleados Activos</h5>
+                    <p class="h2 fw-bold text-dark mb-0">{{ empleados_activos|default:"0" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4 border-0 rounded-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center border-bottom py-3 rounded-top-4">
+            <h2 class="h6 mb-0 fw-bold text-white">
+                <i class="fas fa-filter me-2 text-white"></i>Filtros de Búsqueda
+            </h2>
+            <button class="btn btn-sm btn-light text-secondary rounded-pill fw-medium border shadow-sm" type="button" data-bs-toggle="collapse" data-bs-target="#filtersCollapse" aria-expanded="true" aria-controls="filtersCollapse">
+                <i class="fas fa-chevron-down me-1"></i>Ocultar / Mostrar
+            </button>
+        </div>
+        <div class="collapse show" id="filtersCollapse">
+            <div class="card-body p-4">
+                <form method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="id_nombre_filter" class="form-label small fw-bold text-muted mb-1">Nombre o Apellido</label>
+                        <div class="input-group input-group-sm shadow-sm rounded">
+                            <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+                            <input type="text" class="form-control border-start-0 ps-0" id="id_nombre_filter" name="nombre" value="{{ request.GET.nombre }}" placeholder="Ej. Juan Pérez">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="id_departamento_filter" class="form-label small fw-bold text-muted mb-1">Departamento</label>
+                        <select class="form-select form-select-sm shadow-sm" id="id_departamento_filter" name="departamento">
+                            <option value="">Todos los departamentos</option>
+                            {% for depto in departamentos %}
+                            <option value="{{ depto.id }}" {% if request.GET.departamento == depto.id|stringformat:"s" %}selected{% endif %}>
+                                {{ depto.nombre }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="id_puesto_filter" class="form-label small fw-bold text-muted mb-1">Puesto</label>
+                        <select class="form-select form-select-sm shadow-sm" id="id_puesto_filter" name="puesto">
+                            <option value="">Todos los puestos</option>
+                            {% for puesto in puestos %}
+                            <option value="{{ puesto.id }}" {% if request.GET.puesto == puesto.id|stringformat:"s" %}selected{% endif %}>
+                                {{ puesto.nombre }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="id_fecha_inicio_filter" class="form-label small fw-bold text-muted mb-1">Contratación desde</label>
+                        <input type="date" class="form-control form-control-sm shadow-sm" id="id_fecha_inicio_filter" name="fecha_inicio" value="{{ request.GET.fecha_inicio }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="id_fecha_fin_filter" class="form-label small fw-bold text-muted mb-1">Contratación hasta</label>
+                        <input type="date" class="form-control form-control-sm shadow-sm" id="id_fecha_fin_filter" name="fecha_fin" value="{{ request.GET.fecha_fin }}">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label for="id_tipo_viaje_filter" class="form-label small fw-bold text-muted mb-1">Tipo de Viaje</label>
+                        <select class="form-select form-select-sm shadow-sm" id="id_tipo_viaje_filter" name="tipo_viaje">
+                            <option value="">Todos los tipos</option>
+                            {% for tv in tipos_viaje %}
+                            <option value="{{ tv.id }}" {% if request.GET.tipo_viaje == tv.id|stringformat:"s" %}selected{% endif %}>
+                                {{ tv.nombre }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="id_empresa_filter" class="form-label small fw-bold text-muted mb-1">Empresa</label>
+                        <select class="form-select form-select-sm shadow-sm" id="id_empresa_filter" name="empresa">
+                            <option value="">Todas las empresas</option>
+                            {% for value, label in empresas %}
+                            <option value="{{ value }}" {% if request.GET.empresa == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-12 mt-4 pt-3 border-top d-flex flex-wrap align-items-center justify-content-between">
+                        <div>
+                            <button type="submit" class="btn btn-primary btn-sm rounded-pill px-4 me-2 shadow-sm transition-300">
+                                <i class="fas fa-search me-1"></i> Aplicar Filtros
+                            </button>
+                            <a href="{% url 'rh:lista_empleados' %}" class="btn btn-light border btn-sm rounded-pill px-4 text-secondary shadow-sm transition-300">
+                                <i class="fas fa-eraser me-1"></i> Limpiar
+                            </a>
+                        </div>
+                        
+                        <div>
+                            <a href="{% url 'rh:export_empleados_excel' %}?{{ request.GET.urlencode }}" 
+                               class="btn btn-success btn-sm rounded-pill px-4 shadow-sm transition-300 hover-elevate" 
+                               data-bs-toggle="tooltip" 
+                               data-bs-placement="top"
+                               title="Exporta los resultados actuales, Omitiendo rango de Fechas">
+                                <i class="fas fa-file-excel me-1"></i> Exportar a Excel
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center border-bottom py-3">
+            <h2 class="h6 mb-0 fw-bold text-white">
+                <i class="fas fa-list-ul me-2 text-white"></i>Directorio de Personal
+                <span class="badge bg-primary bg-opacity-10 text-white rounded-pill ms-2 px-3">{{ page_obj.paginator.count }} registros</span>
+            </h2>
+            <div class="dropdown">
+                <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3" aria-labelledby="exportDropdown">
+                    <li><h6 class="dropdown-header text-uppercase text-muted"><i class="fas fa-cogs me-1"></i> Acciones en Lote</h6></li>
+                    <li><a class="dropdown-item py-2" href="{% url 'rh:descargar_documentos_todos' %}">
+                        <i class="fas fa-file-archive me-2 text-primary"></i>Descargar Word (Todos)
+                    </a></li>
+                    <li><a class="dropdown-item py-2" href="{% url 'rh:generar_documentos_todos' %}">
+                        <i class="fas fa-magic me-2 text-warning"></i>Generar Batch (Proceso)
+                    </a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card-body p-0">
+            {% if empleados %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th scope="col" class="py-3 text-center text-muted fw-bold" style="width: 60px;">No.</th>
+                            <th scope="col" class="sortable py-3 text-secondary small fw-bold text-uppercase" data-sort="nombre">
+                                <span class="d-flex align-items-center">
+                                    Nombre Completo
+                                    <i class="fas fa-sort{% if request.GET.sort == 'nombre' and request.GET.direction == 'asc' %} fa-sort-up text-primary{% elif request.GET.sort == 'nombre' and request.GET.direction == 'desc' %} fa-sort-down text-primary{% else %} opacity-25{% endif %} ms-2"></i>
+                                </span>
+                            </th>
+                            <th scope="col" class="sortable py-3 text-secondary small fw-bold text-uppercase" data-sort="puesto__nombre">
+                                <span class="d-flex align-items-center">
+                                    Puesto / Departamento
+                                    <i class="fas fa-sort{% if request.GET.sort == 'puesto__nombre' and request.GET.direction == 'asc' %} fa-sort-up text-primary{% elif request.GET.sort == 'puesto__nombre' and request.GET.direction == 'desc' %} fa-sort-down text-primary{% else %} opacity-25{% endif %} ms-2"></i>
+                                </span>
+                            </th>
+                            <th scope="col" class="py-3 text-secondary small fw-bold text-uppercase">Docs. Oficiales</th>
+                            <th scope="col" class="sortable py-3 text-secondary small fw-bold text-uppercase" data-sort="fecha_contratacion">
+                                <span class="d-flex align-items-center">
+                                    Antigüedad
+                                    <i class="fas fa-sort{% if request.GET.sort == 'fecha_contratacion' and request.GET.direction == 'asc' %} fa-sort-up text-primary{% elif request.GET.sort == 'fecha_contratacion' and request.GET.direction == 'desc' %} fa-sort-down text-primary{% else %} opacity-25{% endif %} ms-2"></i>
+                                </span>
+                            </th>
+                            <th scope="col" class="py-3 text-secondary small fw-bold text-uppercase text-center">Nacimiento</th>
+                            <th scope="col" class="sortable py-3 text-secondary small fw-bold text-uppercase" data-sort="empresa">
+                                <span class="d-flex align-items-center">
+                                    Empresa
+                                    <i class="fas fa-sort{% if request.GET.sort == 'empresa' and request.GET.direction == 'asc' %} fa-sort-up text-primary{% elif request.GET.sort == 'empresa' and request.GET.direction == 'desc' %} fa-sort-down text-primary{% else %} opacity-25{% endif %} ms-2"></i>
+                                </span>
+                            </th>
+                            <th scope="col" class="text-center py-3 text-secondary small fw-bold text-uppercase">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="border-top-0">
+                        {% for empleado in empleados %}
+                        <tr class="transition-300">
+                            <td class="py-3 fw-bold text-muted text-center bg-light bg-opacity-50">
+                                #{{ empleado.indice_descendente }}
+                            </td>
+                            
+                            <td class="py-3">
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar me-3 shadow-sm">
+                                        <span class="avatar-initial bg-primary bg-gradient text-white fw-bold rounded-circle">
+                                            {{ empleado.nombre|first }}{{ empleado.apellido|first }}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold text-dark">{{ empleado.nombre }} {{ empleado.apellido }}</div>
+                                        <div class="text-muted small"><i class="fas fa-envelope me-1 opacity-50"></i>{{ empleado.email|default:"Sin correo" }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-3">
+                                <div class="fw-semibold text-dark">{{ empleado.puesto.nombre|default:"Sin Puesto asignado" }}</div>
+                                <div class="small text-primary"><i class="fas fa-building me-1 opacity-50"></i>{{ empleado.departamento.nombre|default:"Sin Departamento" }}</div>
+                            </td>
+                            <td class="py-3">
+                                <div class="small text-muted mb-1"><span class="fw-semibold text-dark">CURP:</span> {{ empleado.curp|default:"---" }}</div>
+                                <div class="small text-muted mb-1"><span class="fw-semibold text-dark">RFC:</span> {{ empleado.rfc|default:"---" }}</div>
+                                <div class="small text-muted"><span class="fw-semibold text-dark">NSS:</span> {{ empleado.nss|default:"---" }}</div>
+                            </td>
+                            <td class="py-3">
+                                <div class="fw-medium text-dark"><i class="far fa-calendar-check me-1 text-success opacity-75"></i>{{ empleado.fecha_contratacion|date:"d M Y" }}</div>
+                                <div class="small text-muted mt-1">{{ empleado.dias_laborados|default:"0" }} días laborados</div>
+                            </td>
+                            <td class="py-3 text-center">
+                                <div class="fw-medium text-dark">{{ empleado.fecha_nacimiento|date:"d M Y"|default:"---" }}</div>
+                                {% if empleado.age is not None %}
+                                    <span class="badge bg-light text-secondary border mt-1">{{ empleado.age }} años</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3">
+                                {% if empleado.empresa %}
+                                    <span class="badge bg-dark bg-opacity-10 text-dark border">{{ empleado.get_empresa_display }}</span>
+                                {% else %}
+                                    <span class="text-muted small">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center py-3">
+                                <div class="btn-group shadow-sm" role="group">
+                                    <a href="{% url 'rh:empleado_detail' empleado.pk %}" class="btn btn-light border text-info px-3" data-bs-toggle="tooltip" title="Ver Ficha">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'rh:empleado_update' empleado.pk %}" class="btn btn-light border text-warning px-3" data-bs-toggle="tooltip" title="Editar Información">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-light border text-primary dropdown-toggle px-3" data-bs-toggle="dropdown" data-bs-boundary="window" aria-expanded="false" title="Descargar Documentos">
+                                            <i class="fas fa-file-word"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-3">
+                                            <li><h6 class="dropdown-header text-uppercase text-muted"><i class="fas fa-folder-open me-1"></i> Expediente de {{ empleado.nombre }}</h6></li>
+                                            <li>
+                                                <a class="dropdown-item py-2" href="{% url 'rh:descargar_documentos_zip' empleado.pk %}" onclick="showLoading()">
+                                                    <i class="fas fa-file-archive me-2 text-primary"></i>Descargar Todo (ZIP)
+                                                </a>
+                                            </li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <a class="dropdown-item" href="{% url 'rh:descargar_documento_individual' empleado.pk 'contrato-indeterminado' %}" onclick="showLoading()">
+                                                    <i class="fas fa-file-contract me-2 text-success"></i>Contrato Indeterminado
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" href="{% url 'rh:descargar_documento_individual' empleado.pk 'aviso-privacidad' %}" onclick="showLoading()">
+                                                    <i class="fas fa-shield-alt me-2 text-info"></i>Aviso de Privacidad
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" href="{% url 'rh:generar_pdf_empleado' empleado.pk %}" target="_blank">
+                                                    <i class="fas fa-file-pdf me-2 text-danger"></i>Generar Ficha PDF
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5 my-4">
+                <div class="mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center bg-light rounded-circle" style="width: 100px; height: 100px;">
+                        <i class="fas fa-search fa-3x text-muted opacity-50"></i>
+                    </div>
+                </div>
+                <h4 class="fw-bold text-dark mb-2">No encontramos ningún empleado</h4>
+                <p class="text-muted mb-4">Intenta borrar los filtros o agregar un registro nuevo a la base de datos.</p>
+                <div class="d-flex justify-content-center gap-3">
+                    <a href="{% url 'rh:lista_empleados' %}" class="btn btn-outline-secondary rounded-pill px-4">
+                        <i class="fas fa-eraser me-2"></i>Limpiar Filtros
+                    </a>
+                    <a href="{% url 'rh:empleado_create' %}" class="btn btn-primary rounded-pill px-4 shadow-sm">
+                        <i class="fas fa-plus me-2"></i>Crear Empleado
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        {% if is_paginated %}
+        <div class="card-footer bg-white border-top py-4 rounded-bottom-4">
+            <nav aria-label="Navegación de páginas">
+                <ul class="pagination justify-content-center mb-0 gap-1">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link rounded-circle border-0 text-secondary bg-light" href="?page=1{% if query_string %}&{{ query_string }}{% endif %}" title="Primera">
+                            <i class="fas fa-angle-double-left"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link rounded-circle border-0 text-secondary bg-light" href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" title="Anterior">
+                            <i class="fas fa-angle-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <li class="page-item active" aria-current="page">
+                            <span class="page-link rounded-circle border-0 shadow-sm fw-bold">{{ num }}</span>
+                        </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link rounded-circle border-0 text-secondary" href="?page={{ num }}{% if query_string %}&{{ query_string }}{% endif %}">{{ num }}</a>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link rounded-circle border-0 text-secondary bg-light" href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}" title="Siguiente">
+                            <i class="fas fa-angle-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link rounded-circle border-0 text-secondary bg-light" href="?page={{ page_obj.paginator.num_pages }}{% if query_string %}&{{ query_string }}{% endif %}" title="Última">
+                            <i class="fas fa-angle-double-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+                <div class="text-center text-muted small mt-3 fw-medium">
+                    Mostrando resultados del <span class="text-dark">{{ page_obj.start_index }}</span> al <span class="text-dark">{{ page_obj.end_index }}</span> (de {{ page_obj.paginator.count }} totales)
+                </div>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock rh_content %}
+
+{% block extra_js %}
+<script>
+// Función para mostrar loading (Spinner elegante) actualizado
+function showLoading() {
+    const spinner = document.createElement('div');
+    spinner.id = 'loading-spinner';
+    spinner.innerHTML = `
+        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(5px); 
+                    z-index: 9999; display: flex; flex-direction: column; 
+                    align-items: center; justify-content: center; transition: all 0.3s ease;">
+            <div class="spinner-border text-primary" style="width: 3.5rem; height: 3.5rem; border-width: 0.25rem;" role="status">
+                <span class="visually-hidden">Generando...</span>
+            </div>
+            <div class="mt-4 text-center text-dark px-4">
+                <h4 class="fw-bold mb-2">Preparando sus Documentos</h4>
+                <p class="text-muted">La descarga iniciará en un momento.</p>
+                
+                <button onclick="hideLoading()" class="btn btn-outline-secondary rounded-pill mt-3 shadow-sm btn-sm">
+                    <i class="fas fa-times me-1"></i> Cerrar mensaje
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(spinner);
+    
+    // Auto-remover después de 4 segundos
+    setTimeout(() => {
+        hideLoading();
+    }, 4000);
+    
+    // Si el usuario cambia de pestaña o se abre el cuadro de guardar, se oculta al regresar
+    window.addEventListener('focus', hideLoading, { once: true });
+}
+
+function hideLoading() {
+    const spinner = document.getElementById('loading-spinner');
+    if (spinner) {
+        spinner.style.opacity = '0';
+        setTimeout(() => spinner.remove(), 300);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar Tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl, {
+            trigger: 'hover focus',
+            animation: true
+        })
+    });
+    
+    // Lógica de Ordenamiento al clickear columnas
+    document.querySelectorAll('.sortable').forEach(function(header) {
+        header.addEventListener('click', function() {
+            const sortField = this.dataset.sort;
+            const currentUrl = new URL(window.location.href);
+            let sortDirection = currentUrl.searchParams.get('direction') || 'desc';
+
+            if (currentUrl.searchParams.get('sort') === sortField) {
+                sortDirection = (sortDirection === 'asc') ? 'desc' : 'asc';
+            } else {
+                sortDirection = (sortField === 'id') ? 'desc' : 'asc';
+            }
+            
+            currentUrl.searchParams.set('sort', sortField);
+            currentUrl.searchParams.set('direction', sortDirection);
+            currentUrl.searchParams.set('page', '1'); 
+            window.location.href = currentUrl.toString();
+        });
+
+        // Marcar la columna activa visualmente
+        const currentSort = new URL(window.location.href).searchParams.get('sort');
+        if (header.dataset.sort === currentSort) {
+            header.classList.add('active-sort');
+        }
+    });
+
+    // Eventos para botones de descarga
+    const docButtons = document.querySelectorAll('a[href*="descargar_documentos"], a[href*="descargar_documento_individual"]');
+    docButtons.forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            if (!this.href.includes('generar_pdf_empleado')) {
+                showLoading();
+            }
+        });
+    });
+});
+</script>
+{% endblock extra_js %}
+
+{% block extra_css %}
+<style>
+    /* Avatares Modernos */
+    .avatar {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 45px !important; 
+        height: 45px !important;
+        overflow: hidden; 
+    }
+    .avatar-initial {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        font-size: 1rem;
+        letter-spacing: 1px;
+    }
+
+    /* Columnas Sortables */
+    .sortable {
+        cursor: pointer;
+        user-select: none;
+        transition: background-color 0.2s ease;
+    }
+    .sortable:hover {
+        background-color: rgba(0,0,0,0.02);
+    }
+    .sortable .fa-sort,
+    .sortable .fa-sort-up,
+    .sortable .fa-sort-down {
+        transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    /* Comportamiento de Filas (Hover) con Fix de Z-Index */
+    .table-hover tbody tr.transition-300 {
+        transition: all 0.3s ease;
+        position: relative; /* 1. Habilitamos position para que funcione z-index */
+    }
+    .table-hover tbody tr:hover,
+    .table-hover tbody tr:focus-within {
+        background-color: rgba(13, 110, 253, 0.04);
+        transform: translateY(-2px);
+        box-shadow: inset 3px 0 0 0 var(--bs-primary), 0 4px 6px -1px rgba(0,0,0,0.05);
+        z-index: 1050; /* 3. Forzamos la fila actual a estar por encima de las demás */
+    }
+
+    /* Fix de respaldo para garantizar compatibilidad en Safari/Chrome */
+    td.text-center.py-3 { position: relative; }
+    td.text-center.py-3:focus-within { z-index: 1060; }
+
+    /* Utilidades de Transición y Sombras */
+    .transition-300 {
+        transition: all 0.3s ease !important;
+    }
+    .hover-elevate:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+
+    /* Botones Agrupados de Tabla */
+    .btn-group.shadow-sm .btn {
+        transition: all 0.2s ease;
+    }
+    .btn-group.shadow-sm .btn:hover {
+        background-color: #f8f9fa;
+        filter: brightness(0.95);
+    }
+
+    /* Personalización del Select y Inputs en Filtro */
+    .form-control:focus, .form-select:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+    }
+    
+    /* Paginación minimalista */
+    .page-link {
+        width: 38px;
+        height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    .page-item.active .page-link {
+        background-color: var(--bs-primary);
+        color: white;
+    }
+    .page-link:hover:not(.active) {
+        background-color: #e9ecef;
+        transform: translateY(-1px);
+    }
+
+    /* FIXES AÑADIDOS AHORA */
+    /* Fuerza a la tabla a no recortar elementos emergentes en el eje Y */
+    .table-responsive {
+        overflow: visible !important;
+    }
+
+    /* Le damos máxima prioridad a los botones que el usuario está usando */
+    .btn-group.shadow-sm:hover,
+    .btn-group.shadow-sm:focus-within {
+        z-index: 1050;
+    }
+
+    /* Forzamos a que el menú desplegable tenga prioridad global */
+    .dropdown-menu {
+        z-index: 9999 !important;
+    }
+</style>
+{% endblock extra_css %}

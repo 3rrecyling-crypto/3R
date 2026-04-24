@@ -230,4 +230,15 @@ urlpatterns = [
     path('api/admin/usuarios/', api_views.api_admin_usuarios, name='api_admin_usuarios'),
     path('api/admin/usuarios/<int:pk>/permisos/', api_views.api_admin_usuario_permisos, name='api_admin_usuario_permisos'),
 
+    # ── Alertas de Merma — correos primero para no colisionar con <int:pk> ──
+    path('api/admin/alertas-merma/correos/', api_views.api_correos_alerta_merma, name='api_correos_alerta_merma'),
+    path('api/admin/alertas-merma/correos/<int:pk>/', api_views.api_correo_alerta_merma_detail, name='api_correo_alerta_merma_detail'),
+    path('api/admin/alertas-merma/', api_views.api_alertas_merma, name='api_alertas_merma'),
+    path('api/admin/alertas-merma/<int:pk>/', api_views.api_alerta_merma_detail, name='api_alerta_merma_detail'),
+
+    # ── Destrucción Fiscal (ConfiguracionManifiesto) ─────────────────────
+    path('api/admin/destruccion-fiscal/catalogos/', api_views.api_destruccion_fiscal_catalogos, name='api_destruccion_fiscal_catalogos'),
+    path('api/admin/destruccion-fiscal/', api_views.api_destruccion_fiscal, name='api_destruccion_fiscal'),
+    path('api/admin/destruccion-fiscal/<int:pk>/', api_views.api_destruccion_fiscal_detail, name='api_destruccion_fiscal_detail'),
+
 ]

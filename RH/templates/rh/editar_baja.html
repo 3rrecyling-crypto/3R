@@ -1,0 +1,105 @@
+{% extends 'rh/base.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header pb-0 d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">{{ page_title }}</h6>
+                        <p class="text-sm mb-0">Actualiza la información de la baja</p>
+                    </div>
+                    <div>
+                        <a href="{% url 'rh:detalle_baja' pk=baja.id %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fa fa-arrow-left me-1"></i> Cancelar
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="alert alert-info">
+                                <i class="fa fa-info-circle me-2"></i>
+                                Estás editando la baja de <strong>{{ baja.empleado.nombre_completo }}</strong>. 
+                                Fecha de baja original: {{ baja.fecha_baja|date:"d/m/Y" }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        {% if form.errors %}
+                        <div class="alert alert-danger">
+                            <i class="fa fa-exclamation-triangle me-2"></i>
+                            Por favor corrige los errores en el formulario.
+                        </div>
+                        {% endif %}
+                        
+                        <div class="row">
+                            <!-- Si tu formulario tiene campos, muéstralos aquí -->
+                            <!-- Dependiendo de tu BajaEmpleadoForm, podrías necesitar algo como: -->
+                            
+                            {% for field in form %}
+                            <div class="col-md-{% if field.name in 'descripcion,comentarios' %}12{% else %}6{% endif %} mb-3">
+                                <label for="{{ field.id_for_label }}" class="form-label">
+                                    {{ field.label }}
+                                    {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                                </label>
+                                
+                                {{ field }}
+                                
+                                {% if field.help_text %}
+                                <small class="form-text text-muted">{{ field.help_text }}</small>
+                                {% endif %}
+                                
+                                {% if field.errors %}
+                                <div class="text-danger small">
+                                    {{ field.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                            
+                            <!-- Si no usas Django forms, aquí va tu HTML personalizado -->
+                        </div>
+                        
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between">
+                                    <a href="{% url 'rh:detalle_baja' pk=baja.id %}" class="btn btn-secondary">
+                                        <i class="fa fa-times me-2"></i> Cancelar
+                                    </a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fa fa-save me-2"></i> Guardar Cambios
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Puedes agregar scripts para mejorar la experiencia de edición
+    document.addEventListener('DOMContentLoaded', function() {
+        // Ejemplo: Deshabilitar campos si ya fue recontratado
+        {% if baja.recontratado %}
+        const formInputs = document.querySelectorAll('input, select, textarea');
+        formInputs.forEach(input => {
+            input.disabled = true;
+        });
+        {% endif %}
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,1138 @@
+{# RH/templates/rh/gestion_vacaciones.html #}
+{% extends 'rh/base.html' %}
+{% load humanize %}
+
+{% block rh_title %}Gestión de Vacaciones{% endblock %}
+
+{% block rh_content %}
+<style>
+    :root {
+        --vacaciones-color: #2ecc71;
+        --vacaciones-light: rgba(46, 204, 113, 0.1);
+        --vacaciones-dark: #27ae60;
+        --pendiente-color: #f39c12;
+        --aprobado-color: #27ae60;
+        --rechazado-color: #e74c3c;
+        --gozado-color: #3498db;
+        --historico-color: #9b59b6;
+    }
+
+    .vacaciones-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 50rem;
+    }
+
+    .badge-pendiente {
+        background-color: var(--pendiente-color);
+        color: white;
+    }
+
+    .badge-aprobado {
+        background-color: var(--aprobado-color);
+        color: white;
+    }
+
+    .badge-rechazado {
+        background-color: var(--rechazado-color);
+        color: white;
+    }
+
+    .badge-gozado {
+        background-color: var(--gozado-color);
+        color: white;
+    }
+
+    .badge-cancelado {
+        background-color: #95a5a6;
+        color: white;
+    }
+
+    .badge-historico {
+        background-color: var(--historico-color);
+        color: white;
+    }
+
+    .card-vacaciones {
+        border-left: 4px solid var(--vacaciones-color);
+        transition: all 0.3s ease;
+    }
+
+    .card-vacaciones:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+    }
+
+    .estado-indicator {
+        width: 10px;
+        height: 100%;
+        position: absolute;
+        left: 0;
+        top: 0;
+        border-radius: 4px 0 0 4px;
+    }
+
+    .estado-pendiente {
+        background-color: var(--pendiente-color);
+    }
+
+    .estado-aprobado {
+        background-color: var(--aprobado-color);
+    }
+
+    .estado-rechazado {
+        background-color: var(--rechazado-color);
+    }
+
+    .estado-gozado {
+        background-color: var(--gozado-color);
+    }
+
+    .estado-historico {
+        background-color: var(--historico-color);
+    }
+
+    .calendar-icon {
+        background: var(--vacaciones-light);
+        color: var(--vacaciones-color);
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .progress-vacaciones {
+        height: 6px;
+        border-radius: 3px;
+        background-color: #f0f0f0;
+    }
+
+    .progress-vacaciones-bar {
+        background: linear-gradient(90deg, var(--vacaciones-color), var(--vacaciones-dark));
+        border-radius: 3px;
+    }
+
+    .filter-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        padding: 1.5rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.25rem;
+        border: 1px solid #e9ecef;
+        transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+        border-color: var(--vacaciones-color);
+        box-shadow: 0 5px 15px rgba(46, 204, 113, 0.1);
+    }
+
+    .stat-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .stat-number {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1;
+        margin-bottom: 0.5rem;
+    }
+
+    .vacaciones-table th {
+        font-weight: 600;
+        color: #495057;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-top: none;
+    }
+
+    .vacaciones-table td {
+        vertical-align: middle;
+        padding: 1rem 0.75rem;
+    }
+
+    .action-buttons .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        border-radius: 4px;
+    }
+
+    .empty-state {
+        padding: 3rem 1rem;
+        text-align: center;
+        color: #6c757d;
+    }
+
+    .empty-state-icon {
+        font-size: 3rem;
+        color: #dee2e6;
+        margin-bottom: 1rem;
+    }
+
+    /* Estilos para el dropdown de histórico */
+    .dropdown-historico .dropdown-menu {
+        min-width: 220px;
+    }
+
+    .dropdown-historico .dropdown-item:hover {
+        background-color: rgba(155, 89, 182, 0.1);
+    }
+
+    .btn-historico {
+        background: linear-gradient(135deg, var(--historico-color) 0%, #8e44ad 100%);
+        border: none;
+        color: white;
+    }
+
+    .btn-historico:hover {
+        background: linear-gradient(135deg, #8e44ad 0%, var(--historico-color) 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(155, 89, 182, 0.3);
+    }
+</style>
+
+<div class="container-fluid">
+    <!-- Header con título y botones -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="{% url 'rh:inicio_rh' %}">Dashboard</a></li>
+                            <li class="breadcrumb-item active" aria-current="page">Vacaciones</li>
+                        </ol>
+                    </nav>
+                    <h2 class="h3 mb-0 fw-bold text-dark">
+                        <i class="fas fa-umbrella-beach me-2" style="color: var(--vacaciones-color);"></i>
+                        Gestión de Vacaciones
+                    </h2>
+                    <p class="text-muted mb-0">Administra las solicitudes de vacaciones de todo el personal</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <!-- Dropdown para Registro Histórico -->
+                    <div class="dropdown dropdown-historico">
+                        <button class="btn btn-historico dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-history me-2"></i>Registro Histórico
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item" href="{% url 'rh:solicitar_vacacion' %}?modo_historico=true">
+                                    <i class="fas fa-calendar-plus me-2 text-purple"></i>Nuevo Registro Histórico
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="#" onclick="mostrarSeleccionEmpleado(); return false;">
+                                    <i class="fas fa-chart-line me-2 text-purple"></i>Ver Históricos
+                                </a>
+                            </li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li>
+                                <a class="dropdown-item text-muted" href="#">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <small>Registra vacaciones de años anteriores</small>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <a href="{% url 'rh:solicitar_vacacion' %}" class="btn btn-success">
+                        <i class="fas fa-plus me-1"></i> Nueva Solicitud
+                    </a>
+
+                    {% if filtros_aplicados %}
+                    <a href="{% url 'rh:gestion_vacaciones' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times me-1"></i> Limpiar Filtros
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="filter-card">
+                <h6 class="mb-3 fw-bold text-dark">
+                    <i class="fas fa-filter me-2"></i>Filtrar Vacaciones
+                </h6>
+                <form method="get" class="row g-3">
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold">Estado</label>
+                        <select name="estado" class="form-select form-select-sm">
+                            <option value="">Todos los estados</option>
+                            {% for estado in estados_vacacion %}
+                            <option value="{{ estado.0 }}" {% if filtros_aplicados.estado == estado.0 %}selected{% endif %}>
+                                {{ estado.1 }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold">Empleado</label>
+                        <select name="empleado" class="form-select form-select-sm">
+                            <option value="">Todos los empleados</option>
+                            {% for empleado in empleados %}
+                            <option value="{{ empleado.id }}" {% if filtros_aplicados.empleado_id == empleado.id|stringformat:"s" %}selected{% endif %}>{{ empleado.nombre_completo }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold">Departamento</label>
+                        <select name="departamento" class="form-select form-select-sm">
+                            <option value="">Todos los departamentos</option>
+                            {% for departamento in departamentos %}
+                            <option value="{{ departamento.id }}" {% if filtros_aplicados.departamento_id == departamento.id|stringformat:"s" %}selected{% endif %}>{{ departamento.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold">Año</label>
+                        <select name="año" class="form-select form-select-sm">
+                            <option value="">Todos los años</option>
+                            {% now "Y" as current_year %}
+                            <option value="2020" {% if request.GET.año == '2020' %}selected{% endif %}>2020</option>
+                            <option value="2021" {% if request.GET.año == '2021' %}selected{% endif %}>2021</option>
+                            <option value="2022" {% if request.GET.año == '2022' %}selected{% endif %}>2022</option>
+                            <option value="2023" {% if request.GET.año == '2023' %}selected{% endif %}>2023</option>
+                            <option value="2024" {% if request.GET.año == '2024' %}selected{% endif %}>2024</option>
+                            <option value="2025" {% if request.GET.año == '2025' %}selected{% endif %}>2025</option>
+                            <option value="2026" {% if request.GET.año == '2026' %}selected{% endif %}>2026</option>
+                            <option value="2027" {% if request.GET.año == '2027' %}selected{% endif %}>2027</option>
+                            <option value="2028" {% if request.GET.año == '2028' %}selected{% endif %}>2028</option>
+                            <option value="2029" {% if request.GET.año == '2029' %}selected{% endif %}>2029</option>
+                            <option value="2030" {% if request.GET.año == '2030' %}selected{% endif %}>2030</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Desde</label>
+                                <input type="date" name="fecha_inicio" value="{{ filtros_aplicados.fecha_inicio }}"
+                                    class="form-control form-control-sm">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Hasta</label>
+                                <input type="date" name="fecha_fin" value="{{ filtros_aplicados.fecha_fin }}"
+                                    class="form-control form-control-sm">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <i class="fas fa-search me-1"></i> Aplicar Filtros
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="row mb-4">
+        <div class="col-md-2 mb-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-success bg-opacity-10 text-success">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="stat-number text-success">{{ total_vacaciones|default:0 }}</div>
+                <h6 class="text-muted small mb-0">Total Solicitudes</h6>
+            </div>
+        </div>
+        <div class="col-md-2 mb-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-warning bg-opacity-10 text-warning">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-number text-warning">{{ pendientes|default:0 }}</div>
+                <h6 class="text-muted small mb-0">Pendientes</h6>
+            </div>
+        </div>
+        <div class="col-md-2 mb-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-success bg-opacity-10 text-success">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-number text-success">{{ aprobadas|default:0 }}</div>
+                <h6 class="text-muted small mb-0">Aprobadas</h6>
+            </div>
+        </div>
+        <div class="col-md-2 mb-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-info bg-opacity-10 text-info">
+                    <i class="fas fa-umbrella-beach"></i>
+                </div>
+                <div class="stat-number text-info">{{ gozadas|default:0 }}</div>
+                <h6 class="text-muted small mb-0">Gozadas</h6>
+            </div>
+        </div>
+        <div class="col-md-2 mb-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-purple bg-opacity-10 text-purple">
+                    <i class="fas fa-history"></i>
+                </div>
+                <div class="stat-number text-purple">{{ vacaciones_historicas|default:0 }}</div>
+                <h6 class="text-muted small mb-0">Históricas</h6>
+            </div>
+        </div>
+        <div class="col-md-2 mb-3">
+            <div class="stat-card">
+                <div class="stat-icon bg-secondary bg-opacity-10 text-secondary">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-number text-secondary">{{ empleados.count|default:0 }}</div>
+                <h6 class="text-muted small mb-0">Empleados</h6>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Vacaciones -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="fw-bold m-0 text-dark">
+                            <i class="fas fa-list me-2"></i>
+                            Solicitudes de Vacaciones
+                            <span class="badge bg-light text-dark border ms-2">{{ vacaciones.count|default:0 }}</span>
+                        </h6>
+                        <div class="d-flex align-items-center gap-2">
+                            <!-- Botón para ver vacaciones próximas -->
+                            <a href="?estado=APROBADO" class="btn btn-sm btn-outline-info">
+                                <i class="fas fa-calendar-day me-1"></i> Ver Próximas
+                            </a>
+
+                            <!-- Botón para exportar a Excel -->
+                            <a href="{% url 'rh:reporte_vacaciones_excel' %}{% if filtros_aplicados %}?{% for key, value in filtros_aplicados.items %}{% if value %}{{ key }}={{ value }}{% if not forloop.last %}&{% endif %}{% endif %}{% endfor %}{% endif %}"
+                                class="btn btn-sm btn-outline-success">
+                                <i class="fas fa-file-excel me-1"></i> Exportar Excel
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body p-0">
+                    {% if vacaciones %}
+                    <div class="table-responsive">
+                        <table class="table table-hover vacaciones-table mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="ps-4">Empleado</th>
+                                    <th>Periodo</th>
+                                    <th>Fechas</th>
+                                    <th class="text-center">Días</th>
+                                    <th>Estado</th>
+                                    <th>Solicitado</th>
+                                    <th class="text-end pe-4">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for vacacion in vacaciones %}
+                                <tr class="position-relative">
+                                    <td class="ps-4">
+                                        <div class="d-flex align-items-center">
+                                            <div class="calendar-icon me-3">
+                                                {% if vacacion.tipo_vacacion == 'HISTORICO' %}
+                                                <i class="fas fa-history" style="color: var(--historico-color);"></i>
+                                                {% else %}
+                                                <i class="fas fa-calendar-alt"></i>
+                                                {% endif %}
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold">{{ vacacion.empleado.nombre_completo }}</div>
+                                                <small class="text-muted">
+                                                    {% if vacacion.empleado.departamento %}
+                                                        {{ vacacion.empleado.departamento.nombre }}
+                                                    {% else %}
+                                                        Sin departamento
+                                                    {% endif %}
+                                                    {% if vacacion.tipo_vacacion == 'HISTORICO' %}
+                                                    <span class="badge bg-purple bg-opacity-10 text-purple border border-purple border-1 ms-1">
+                                                        <i class="fas fa-history fa-xs me-1"></i>Histórico
+                                                    </span>
+                                                    {% endif %}
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="fw-bold">{{ vacacion.periodo_correspondiente|default:"-" }}</span>
+                                        <br>
+                                        <small class="text-muted">
+                                            {{ vacacion.fecha_inicio|date:"Y" }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex flex-column">
+                                            <small class="text-muted">Inicio:</small>
+                                            <span class="fw-bold">{{ vacacion.fecha_inicio|date:"d/m/Y" }}</span>
+                                            <small class="text-muted">Fin:</small>
+                                            <span class="fw-bold">{{ vacacion.fecha_fin|date:"d/m/Y" }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="fw-bold fs-5">{{ vacacion.dias_solicitados|default:0 }}</div>
+                                        <small class="text-muted">días</small>
+                                    </td>
+                                    <td>
+                                        {% if vacacion.tipo_vacacion == 'HISTORICO' %}
+                                        <span class="badge vacaciones-badge badge-historico">
+                                            <i class="fas fa-history me-1"></i> Histórico
+                                        </span>
+                                        <br>
+                                        <small class="text-muted mt-1">
+                                            <i class="fas fa-calendar-alt"></i>
+                                            {{ vacacion.fecha_inicio|date:"Y" }}
+                                        </small>
+                                        {% elif vacacion.estado == 'PENDIENTE' %}
+                                        <span class="badge vacaciones-badge badge-pendiente">
+                                            <i class="fas fa-clock me-1"></i> {{ vacacion.get_estado_display }}
+                                        </span>
+                                        {% elif vacacion.estado == 'APROBADO' %}
+                                        <span class="badge vacaciones-badge badge-aprobado">
+                                            <i class="fas fa-check-circle me-1"></i> {{ vacacion.get_estado_display }}
+                                        </span>
+                                        {% elif vacacion.estado == 'RECHAZADO' %}
+                                        <span class="badge vacaciones-badge badge-rechazado">
+                                            <i class="fas fa-times-circle me-1"></i> {{ vacacion.get_estado_display }}
+                                        </span>
+                                        {% elif vacacion.estado == 'GOZADO' %}
+                                        <span class="badge vacaciones-badge badge-gozado">
+                                            <i class="fas fa-umbrella-beach me-1"></i> {{ vacacion.get_estado_display }}
+                                        </span>
+                                        {% else %}
+                                        <span class="badge vacaciones-badge badge-cancelado">
+                                            {{ vacacion.get_estado_display|default:"-" }}
+                                        </span>
+                                        {% endif %}
+                                        {% if vacacion.esta_proxima %}
+                                        <br>
+                                        <small class="text-success mt-1">
+                                            <i class="fas fa-exclamation-circle"></i> Próxima
+                                        </small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ vacacion.fecha_solicitud|date:"d/m/Y" }}
+                                        <br>
+                                        <small class="text-muted">
+                                            hace {{ vacacion.fecha_solicitud|timesince }}
+                                        </small>
+                                        {% if vacacion.aprobado_por %}
+                                        <br>
+                                        <small class="text-muted">
+                                            Por: 
+                                            {% if vacacion.aprobado_por.get_full_name %}
+                                                {{ vacacion.aprobado_por.get_full_name }}
+                                            {% else %}
+                                                {{ vacacion.aprobado_por.username }}
+                                            {% endif %}
+                                        </small>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <div class="action-buttons">
+                                            <a href="{% url 'rh:detalle_vacacion' vacacion.id %}"
+                                                class="btn btn-sm btn-outline-primary" title="Ver detalles">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+
+                                            {% if vacacion.estado == 'PENDIENTE' and vacacion.tipo_vacacion != 'HISTORICO' %}
+                                            <a href="{% url 'rh:aprobar_vacacion' vacacion.id %}" class="btn btn-sm btn-outline-success" title="Aprobar/Rechazar">
+                                                <i class="fas fa-check"></i>
+                                            </a>
+                                            {% endif %}
+
+                                            {% if vacacion.documento_solicitud %}
+                                            <a href="{{ vacacion.documento_solicitud.url }}"
+                                                class="btn btn-sm btn-outline-info" title="Ver documento"
+                                                target="_blank">
+                                                <i class="fas fa-file-pdf"></i>
+                                            </a>
+                                            {% endif %}
+
+                                            <!-- Botón especial para registrar vacaciones históricas para este empleado -->
+                                            {% if vacacion.tipo_vacacion != 'HISTORICO' %}
+                                            <a href="{% url 'rh:solicitar_vacacion' %}?modo_historico=true&empleado_id={{ vacacion.empleado.id }}"
+                                                class="btn btn-sm btn-outline-purple"
+                                                title="Registrar histórico para este empleado">
+                                                <i class="fas fa-history"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <i class="fas fa-umbrella-beach"></i>
+                        </div>
+                        <h5 class="text-muted mb-2">No hay solicitudes de vacaciones</h5>
+                        <p class="text-muted mb-3">
+                            {% if filtros_aplicados %}
+                            No se encontraron resultados con los filtros aplicados.
+                            {% else %}
+                            Aún no hay solicitudes de vacaciones registradas.
+                            {% endif %}
+                        </p>
+                        <div class="d-flex justify-content-center gap-2">
+                            <a href="{% url 'rh:solicitar_vacacion' %}" class="btn btn-success">
+                                <i class="fas fa-plus me-1"></i> Crear Primera Solicitud
+                            </a>
+                            <a href="{% url 'rh:solicitar_vacacion' %}?modo_historico=true" class="btn btn-purple">
+                                <i class="fas fa-history me-1"></i> Registrar Histórico
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if vacaciones.has_other_pages %}
+                <div class="card-footer bg-white border-top py-3">
+                    <nav aria-label="Paginación">
+                        <ul class="pagination justify-content-center mb-0">
+                            {% if vacaciones.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link"
+                                    href="?page={{ vacaciones.previous_page_number }}{% for key, value in filtros_aplicados.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                    <i class="fas fa-chevron-left"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+
+                            {% for num in vacaciones.paginator.page_range %}
+                            {% if vacaciones.number == num %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                            {% elif num > vacaciones.number|add:'-3' and num < vacaciones.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link"
+                                    href="?page={{ num }}{% for key, value in filtros_aplicados.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{
+                                    num }}</a>
+                            </li>
+                            {% endif %}
+                            {% endfor %}
+
+                            {% if vacaciones.has_next %}
+                            <li class="page-item">
+                                <a class="page-link"
+                                    href="?page={{ vacaciones.next_page_number }}{% for key, value in filtros_aplicados.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                    <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Información adicional -->
+    <div class="row mt-4">
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="fw-bold m-0 text-dark">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Información sobre Vacaciones
+                        </h6>
+                        <a href="#" class="btn btn-sm btn-outline-purple" data-bs-toggle="modal"
+                            data-bs-target="#modalReglasVacaciones">
+                            <i class="fas fa-question-circle me-1"></i> Ver Reglas Completas
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold mb-3">Días por Antigüedad:</h6>
+                            <ul class="list-unstyled">
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    1 año: <strong>12 días</strong>
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    2 años: <strong>14 días</strong>
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    3 años: <strong>16 días</strong>
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    4 años: <strong>18 días</strong>
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    5 años: <strong>20 días</strong>
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    +5 años: <strong>20 días + 2 por cada 5 años adicionales</strong>
+                                </li>
+                            </ul>
+                            <div class="alert alert-warning border-0 bg-warning-subtle mt-3">
+                                <div class="d-flex">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-exclamation-triangle text-warning"></i>
+                                    </div>
+                                    <div class="flex-grow-1 ms-3">
+                                        <small class="fw-bold">Registro Histórico:</small>
+                                        <p class="mb-0 small">
+                                            Para registrar vacaciones de años anteriores, use el botón
+                                            <i class="fas fa-history text-purple"></i>
+                                            <strong>Registro Histórico</strong>.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-bold mb-3">Flujo de Aprobación:</h6>
+                            <div class="d-flex align-items-center justify-content-around mb-3">
+                                <div class="text-center">
+                                    <div class="bg-warning bg-opacity-10 text-warning rounded-circle d-flex align-items-center justify-content-center"
+                                        style="width: 40px; height: 40px;">
+                                        <i class="fas fa-clock"></i>
+                                    </div>
+                                    <small class="d-block mt-1">Pendiente</small>
+                                </div>
+                                <i class="fas fa-arrow-right text-muted"></i>
+                                <div class="text-center">
+                                    <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center"
+                                        style="width: 40px; height: 40px;">
+                                        <i class="fas fa-check"></i>
+                                    </div>
+                                    <small class="d-block mt-1">Aprobado</small>
+                                </div>
+                                <i class="fas fa-arrow-right text-muted"></i>
+                                <div class="text-center">
+                                    <div class="bg-info bg-opacity-10 text-info rounded-circle d-flex align-items-center justify-content-center"
+                                        style="width: 40px; height: 40px;">
+                                        <i class="fas fa-umbrella-beach"></i>
+                                    </div>
+                                    <small class="d-block mt-1">Gozado</small>
+                                </div>
+                            </div>
+                            <div class="mt-4">
+                                <h6 class="fw-bold mb-2">Registro Histórico:</h6>
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="text-center me-3">
+                                        <div class="bg-purple bg-opacity-10 text-purple rounded-circle d-flex align-items-center justify-content-center"
+                                            style="width: 40px; height: 40px;">
+                                            <i class="fas fa-history"></i>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p class="small mb-0">
+                                            Permite registrar vacaciones de años anteriores que no fueron registradas en
+                                            su momento.
+                                            Se marcan automáticamente como <strong>Históricas</strong>.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h6 class="fw-bold m-0 text-dark">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        Estadísticas Rápidas
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <small class="text-muted">Vacaciones Activas</small>
+                            <small class="fw-bold">{{ vacaciones_activas|default:0 }}</small>
+                        </div>
+                        <div class="progress-vacaciones">
+                            <div class="progress-vacaciones-bar"
+                                style="width: {% if total_vacaciones > 0 %}{% widthratio vacaciones_activas total_vacaciones 100 %}%{% else %}0%{% endif %}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <small class="text-muted">Tasa de Aprobación</small>
+                            <small class="fw-bold text-success">
+                                {% if total_vacaciones > 0 %}
+                                {% widthratio aprobadas total_vacaciones 100 %}%
+                                {% else %}
+                                0%
+                                {% endif %}
+                            </small>
+                        </div>
+                        <div class="progress-vacaciones">
+                            <div class="progress-vacaciones-bar"
+                                style="width: {% if total_vacaciones > 0 %}{% widthratio aprobadas total_vacaciones 100 %}%{% else %}0%{% endif %}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <small class="text-muted">Registros Históricos</small>
+                            <small class="fw-bold text-purple">
+                                {% if total_vacaciones > 0 %}
+                                {% widthratio vacaciones_historicas|default:0 total_vacaciones 100 %}%
+                                {% else %}
+                                0%
+                                {% endif %}
+                            </small>
+                        </div>
+                        <div class="progress-vacaciones">
+                            <div class="progress-vacaciones-bar bg-purple"
+                                style="width: {% if total_vacaciones > 0 %}{% widthratio vacaciones_historicas|default:0 total_vacaciones 100 %}%{% else %}0%{% endif %}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-center mt-4">
+                        <a href="{% url 'rh:reporte_vacaciones_excel' %}"
+                            class="btn btn-outline-success btn-sm w-100 mb-2">
+                            <i class="fas fa-download me-1"></i> Reporte Completo
+                        </a>
+                        <a href="{% url 'rh:solicitar_vacacion' %}?modo_historico=true"
+                            class="btn btn-outline-purple btn-sm w-100">
+                            <i class="fas fa-history me-1"></i> Registro Histórico
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para reglas de vacaciones -->
+<div class="modal fade" id="modalReglasVacaciones" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-book me-2"></i>Reglas y Políticas de Vacaciones
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="fw-bold mb-3">Política General:</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="fas fa-calendar-check text-success me-2"></i>
+                                <strong>Anticipación:</strong> 15 días mínimo
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-user-clock text-success me-2"></i>
+                                <strong>Antigüedad mínima:</strong> 1 año completo
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-file-contract text-success me-2"></i>
+                                <strong>Documentación:</strong> Opcional
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-sync-alt text-success me-2"></i>
+                                <strong>Periodo:</strong> Enero - Diciembre
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="fw-bold mb-3">Registro Histórico:</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="fas fa-history text-purple me-2"></i>
+                                <strong>Propósito:</strong> Registrar vacaciones pasadas
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-calendar-alt text-purple me-2"></i>
+                                <strong>Límite temporal:</strong> Hasta 5 años atrás
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check-circle text-purple me-2"></i>
+                                <strong>Estado automático:</strong> Marcado como "Histórico"
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-chart-bar text-purple me-2"></i>
+                                <strong>Contabilización:</strong> Afecta histórico del empleado
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="alert alert-info mt-3">
+                    <div class="d-flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-lightbulb"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="alert-heading mb-2">Recomendación</h6>
+                            <p class="mb-0 small">
+                                Use el <strong>Registro Histórico</strong> para completar información de años
+                                anteriores.
+                                Estas vacaciones se mostrarán diferenciadas y no requieren aprobación.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <a href="{% url 'rh:solicitar_vacacion' %}?modo_historico=true" class="btn btn-purple">
+                    <i class="fas fa-history me-1"></i> Ir a Registro Histórico
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Inicializar tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+
+        // Filtrar por año cuando se selecciona
+        const añoSelect = document.querySelector('select[name="año"]');
+        if (añoSelect) {
+            añoSelect.addEventListener('change', function () {
+                if (this.value) {
+                    // Mostrar loading
+                    const submitBtn = document.querySelector('button[type="submit"]');
+                    const originalHtml = submitBtn.innerHTML;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Filtrando...';
+                    submitBtn.disabled = true;
+
+                    // Enviar formulario automáticamente después de un breve delay
+                    setTimeout(() => {
+                        this.closest('form').submit();
+                    }, 300);
+                }
+            });
+        }
+
+        // Configurar fechas mínimas/máximas en los filtros
+        const fechaInicioInput = document.querySelector('input[name="fecha_inicio"]');
+        const fechaFinInput = document.querySelector('input[name="fecha_fin"]');
+
+        if (fechaInicioInput && fechaFinInput) {
+            fechaInicioInput.addEventListener('change', function () {
+                if (this.value) {
+                    fechaFinInput.min = this.value;
+                }
+            });
+
+            fechaFinInput.addEventListener('change', function () {
+                if (this.value && fechaInicioInput.value && this.value < fechaInicioInput.value) {
+                    alert('La fecha de fin no puede ser anterior a la fecha de inicio');
+                    this.value = '';
+                }
+            });
+        }
+
+        // Mostrar modal de ayuda para registro histórico
+        const historicoLinks = document.querySelectorAll('[href*="modo_historico=true"]');
+        historicoLinks.forEach(link => {
+            link.addEventListener('click', function (e) {
+                // Si es la primera vez que se usa, mostrar confirmación
+                if (!localStorage.getItem('historico_explained')) {
+                    e.preventDefault();
+
+                    if (confirm('¿Está seguro de registrar vacaciones históricas?\n\n' +
+                        '• Se permiten fechas hasta 5 años atrás\n' +
+                        '• No requiere aprobación\n' +
+                        '• Se marcará automáticamente como "Histórico"\n' +
+                        '• Afectará el historial del empleado\n\n' +
+                        '¿Continuar?')) {
+                        localStorage.setItem('historico_explained', 'true');
+                        window.location.href = this.href;
+                    }
+                }
+            });
+        });
+
+        // Botón para ver próximas vacaciones
+        const proximasBtn = document.querySelector('a[href*="estado=APROBADO"]');
+        if (proximasBtn) {
+            proximasBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                const hoy = new Date().toISOString().split('T')[0];
+                const mesDespues = new Date();
+                mesDespues.setMonth(mesDespues.getMonth() + 1);
+                const mesDespuesStr = mesDespues.toISOString().split('T')[0];
+
+                // Establecer fechas en el formulario
+                if (fechaInicioInput && fechaFinInput) {
+                    fechaInicioInput.value = hoy;
+                    fechaFinInput.value = mesDespuesStr;
+                }
+
+                // Seleccionar estado APROBADO
+                const estadoSelect = document.querySelector('select[name="estado"]');
+                if (estadoSelect) {
+                    estadoSelect.value = 'APROBADO';
+                }
+
+                // Enviar formulario
+                document.querySelector('form').submit();
+            });
+        }
+
+        // Función para mostrar selección de empleado para ver históricos
+        window.mostrarSeleccionEmpleado = function() {
+            const empleadoId = prompt('Ingrese el ID (UUID) del empleado para ver su histórico de vacaciones:');
+            if (empleadoId) {
+                const uuidPlaceholder = '00000000-0000-0000-0000-000000000000';
+                const url = "{% url 'rh:historico_vacaciones' empleado_id='00000000-0000-0000-0000-000000000000' %}";
+                window.location.href = url.replace(uuidPlaceholder, empleadoId);
+            }
+        };
+    });
+</script>
+
+<style>
+    /* Estilos adicionales para el modo histórico */
+    .text-purple {
+        color: #9b59b6;
+    }
+
+    .bg-purple {
+        background-color: #9b59b6;
+    }
+
+    .btn-purple {
+        background-color: #9b59b6;
+        border-color: #9b59b6;
+        color: white;
+    }
+
+    .btn-purple:hover {
+        background-color: #8e44ad;
+        border-color: #8e44ad;
+        color: white;
+    }
+
+    .btn-outline-purple {
+        color: #9b59b6;
+        border-color: #9b59b6;
+    }
+
+    .btn-outline-purple:hover {
+        background-color: #9b59b6;
+        border-color: #9b59b6;
+        color: white;
+    }
+
+    .bg-purple.bg-opacity-10 {
+        background-color: rgba(155, 89, 182, 0.1);
+    }
+
+    .border-purple {
+        border-color: #9b59b6 !important;
+    }
+
+    /* Mejorar visibilidad de las vacaciones históricas */
+    tr[class*="position-relative"]:hover {
+        background-color: rgba(155, 89, 182, 0.05) !important;
+    }
+
+    /* Resaltar badge histórico */
+    .badge-historico {
+        background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+        border: none;
+    }
+
+    /* Estilos para el modal */
+    .modal-header {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .modal-title i.fas.fa-book {
+        color: var(--vacaciones-color);
+    }
+
+    /* Animación para el botón de histórico */
+    @keyframes pulse-historico {
+        0% {
+            box-shadow: 0 0 0 0 rgba(155, 89, 182, 0.7);
+        }
+
+        70% {
+            box-shadow: 0 0 0 10px rgba(155, 89, 182, 0);
+        }
+
+        100% {
+            box-shadow: 0 0 0 0 rgba(155, 89, 182, 0);
+        }
+    }
+
+    .btn-historico {
+        animation: pulse-historico 2s infinite;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .d-flex.justify-content-between.align-items-center {
+            flex-direction: column;
+            align-items: flex-start !important;
+        }
+
+        .d-flex.gap-2 {
+            margin-top: 1rem;
+            width: 100%;
+            justify-content: flex-start;
+        }
+
+        .dropdown-historico {
+            margin-bottom: 0.5rem;
+        }
+
+        .btn-historico,
+        .btn-success {
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card .stat-number {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}

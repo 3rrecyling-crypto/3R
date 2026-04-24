@@ -1,0 +1,138 @@
+{# RH/templates/rh/auditoria_datos.html #}
+{% extends 'rh/base.html' %}
+
+{% block rh_title %}Auditoría de Calidad de Datos{% endblock %}
+
+{% block rh_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-microscope me-3 text-info"></i>Auditoría de Perfiles Operativos</h1>
+    <a href="{% url 'rh:dashboard_operadores' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Volver al Dashboard
+    </a>
+</div>
+
+<div class="row mb-5">
+    <div class="col-md-4">
+        <div class="card bg-gradient-info text-white shadow-sm border-0 rounded-4 h-100">
+            <div class="card-body text-center p-4">
+                <h5 class="text-white-50 mb-3">Total Empleados Activos</h5>
+                <div class="display-4 fw-bold mb-2">{{ total_activos }}</div>
+                <i class="fas fa-users fa-3x opacity-25"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-gradient-warning text-dark shadow-sm border-0 rounded-4 h-100">
+            <div class="card-body text-center p-4">
+                <h5 class="text-dark-50 mb-3">Perfiles Incompletos</h5>
+                <div class="display-4 fw-bold mb-2 text-danger">{{ total_incompletos }}</div>
+                <i class="fas fa-user-edit fa-3x opacity-25"></i>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-white shadow-sm border-0 rounded-4 h-100">
+            <div class="card-body text-center p-4">
+                <h5 class="text-muted mb-3">Salud de la Información</h5>
+                <div class="h1 fw-bold mb-2 {% if total_activos > 0 %}
+                        {% with perc=total_incompletos|add:" 0"|divisibleby:total_activos %} {# Simple logic to
+                    simulate completion percentage if needed #} {% endwith %} {% endif %}">
+                    {% widthratio total_incompletos total_activos 100 as perc %}
+                    {{ 100|add:perc|add:"-perc"|add:"-perc" }}%
+                </div>
+                <div class="progress" style="height: 10px;">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ 100|add:" -perc" }}%">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+    <div class="card-header bg-dark text-white py-3">
+        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Detalle de Empleados con Datos Pendientes</h5>
+    </div>
+    <div class="card-body p-0">
+        {% if reporte %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th>Empleado</th>
+                        <th>Empresa</th>
+                        <th>Puesto</th>
+                        <th>Campos Faltantes</th>
+                        <th class="text-center">Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in reporte %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-circle me-3 bg-secondary text-white">
+                                    {{ item.empleado.nombre|first }}{{ item.empleado.apellido|first }}
+                                </div>
+                                <div>
+                                    <div class="fw-bold">{{ item.empleado.nombre }} {{ item.empleado.apellido }}</div>
+                                    <small class="text-muted">ID: {{ item.empleado.id|stringformat:".8s" }}...</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>{{ item.empleado.get_empresa_display }}</td>
+                        <td>{{ item.empleado.puesto.nombre }}</td>
+                        <td>
+                            {% for faltante in item.faltantes %}
+                            <span
+                                class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill me-1">
+                                {{ faltante }}
+                            </span>
+                            {% endfor %}
+                        </td>
+                        <td class="text-center">
+                            <a href="{% url 'rh:empleado_update' item.empleado.pk %}"
+                                class="btn btn-sm btn-primary rounded-pill px-3">
+                                <i class="fas fa-edit me-1"></i> Corregir
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <div class="display-1 text-success mb-3"><i class="fas fa-check-double"></i></div>
+            <h3 class="text-muted">¡Excelente! Todos los perfiles están completos.</h3>
+            <p class="text-muted">No hay empleados activos con datos operativos faltantes.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .bg-gradient-info {
+        background: linear-gradient(135deg, #17a2b8, #117a8b) !important;
+    }
+
+    .bg-gradient-warning {
+        background: linear-gradient(135deg, #ffc107, #e0a800) !important;
+    }
+
+    .avatar-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 0.9rem;
+    }
+
+    .bg-danger-subtle {
+        background-color: #f8d7da !important;
+    }
+</style>
+{% endblock %}

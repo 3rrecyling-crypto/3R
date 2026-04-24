@@ -1,0 +1,82 @@
+{% extends "rh/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow-lg">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0"><i class="fas fa-file-import me-2"></i>Importación Masiva de Empleados</h4>
+                    <a href="{% url 'rh:lista_empleados' %}" class="btn btn-light btn-sm">
+                        <i class="fas fa-arrow-left me-1"></i> Volver al Listado
+                    </a>
+                </div>
+                <div class="card-body p-5">
+                    
+                    <div class="alert alert-info border-start border-info border-4 mb-4">
+                        <h5 class="alert-heading"><i class="fas fa-cloud-upload-alt me-2"></i>Vinculación con Amazon S3</h5>
+                        <p>Si ya has subido manualmente las carpetas de fotos y documentos a tu Bucket S3, el sistema puede vincularlos automáticamente. Sigue estas reglas en tu Excel:</p>
+                        <hr>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-camera"></i> Fotos de Perfil</h6>
+                                <p class="small text-muted">
+                                    El sistema buscará en la carpeta: <code>empleados_fotos/</code><br>
+                                    En la columna <strong>"Nombre Archivo Foto"</strong> escribe solo el nombre:<br>
+                                    Ejemplo: <code>juan_perez_1001.jpg</code>
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-id-card"></i> Documentos INE</h6>
+                                <p class="small text-muted">
+                                    El sistema buscará en la carpeta: <code>empleados_documentos/ine/</code><br>
+                                    En la columna <strong>"Nombre Archivo INE"</strong> escribe solo el nombre:<br>
+                                    Ejemplo: <code>ine_juan_perez.pdf</code>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4 border-light bg-light">
+                        <div class="card-body d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title">Paso 1: Obtener Plantilla</h5>
+                                <p class="card-text text-muted mb-0">Descarga el formato Excel requerido para la carga de datos.</p>
+                            </div>
+                            <a href="{% url 'rh:descargar_plantilla' %}" class="btn btn-success">
+                                <i class="fas fa-file-excel me-2"></i> Descargar Plantilla .xlsx
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="card border-light">
+                        <div class="card-body">
+                            <h5 class="card-title mb-3">Paso 2: Subir Archivo Completado</h5>
+                            <form method="post" enctype="multipart/form-data">
+                                {% csrf_token %}
+                                
+                                <div class="mb-4 text-center p-5 border border-2 border-dashed rounded">
+                                    <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                                    <br>
+                                    <label for="excel_file" class="form-label h5 text-muted" style="cursor: pointer;">
+                                        Haz clic aquí para seleccionar tu archivo Excel
+                                    </label>
+                                    <input type="file" name="excel_file" id="excel_file" class="form-control w-75 mx-auto mt-3" accept=".xlsx" required>
+                                </div>
+
+                                <div class="d-grid gap-2">
+                                    <button type="submit" class="btn btn-primary btn-lg">
+                                        <i class="fas fa-check-circle me-2"></i> Procesar Importación
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

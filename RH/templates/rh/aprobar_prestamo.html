@@ -1,0 +1,580 @@
+<!-- templates/rh/aprobar_prestamo.html -->
+{% extends 'rh/base.html' %}
+{% load humanize %}
+{% load filters_extras %}
+
+{% block rh_title %}Aprobar Préstamo{% endblock %}
+
+{% block rh_content %}
+<style>
+    .decision-card {
+        border-radius: 12px;
+        box-shadow: 0 5px 25px rgba(0,0,0,0.08);
+        border: none;
+    }
+    
+    .btn-aprobar {
+        background: linear-gradient(135deg, #2ecc71, #27ae60);
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-aprobar:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(46, 204, 113, 0.3);
+        color: white;
+    }
+    
+    .btn-rechazar {
+        background: linear-gradient(135deg, #e74c3c, #c0392b);
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-rechazar:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(231, 76, 60, 0.3);
+        color: white;
+    }
+    
+    .info-card {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        border-left: 4px solid #3498db;
+    }
+    
+    .warning-card {
+        background: #fff3cd;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        border-left: 4px solid #f39c12;
+    }
+    
+    .stat-badge {
+        background: #e9ecef;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-weight: 600;
+        text-align: center;
+    }
+    
+    .stat-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #2c3e50;
+    }
+    
+    .week-badge {
+        background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+        color: #00b894;
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        margin-left: 0.5rem;
+    }
+    
+    .month-equivalent {
+        font-size: 0.75rem;
+        color: #6c757d;
+        display: block;
+        margin-top: 0.25rem;
+    }
+</style>
+
+<div class="container">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'rh:inicio_rh' %}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'rh:gestion_prestamos' %}">Préstamos</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Aprobar Préstamo</li>
+                </ol>
+            </nav>
+            <h2 class="fw-bold text-dark mb-0">
+                <i class="fas fa-gavel me-2 text-primary"></i>
+                Aprobar / Rechazar Préstamo
+                <span class="week-badge">Sistema por semanas</span>
+            </h2>
+            <p class="text-muted mb-0">Revise los detalles antes de tomar una decisión (Plazo en semanas)</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Información del préstamo -->
+        <div class="col-lg-8 mb-4">
+            <div class="card decision-card">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="fw-bold m-0 text-dark">
+                        <i class="fas fa-file-invoice-dollar me-2"></i>
+                        Detalles del Préstamo
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Información básica -->
+                    <div class="info-card">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <h6 class="fw-bold text-muted mb-2">Empleado</h6>
+                                <div class="d-flex align-items-center">
+                                    <div style="width: 40px; height: 40px; background: #e9ecef; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 1rem;">
+                                        <i class="fas fa-user text-muted"></i>
+                                    </div>
+                                    <div>
+                                        <h5 class="fw-bold mb-1">{{ prestamo.empleado.nombre_completo }}</h5>
+                                        <p class="text-muted mb-0 small">
+                                            {{ prestamo.empleado.puesto.nombre|default:"Sin puesto" }}
+                                            <br>
+                                            {{ prestamo.empleado.departamento.nombre|default:"Sin departamento" }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <h6 class="fw-bold text-muted mb-2">Tipo de Préstamo</h6>
+                                <h4 class="fw-bold text-primary">{{ prestamo.get_tipo_prestamo_display }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Estadísticas -->
+                    <div class="row mb-4">
+                        <div class="col-md-3 mb-3">
+                            <div class="stat-badge">
+                                <div class="stat-label">Monto Total</div>
+                                <div class="stat-value">${{ prestamo.monto_total|intcomma }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="stat-badge">
+                                <div class="stat-label">Pago Semanal</div>
+                                <div class="stat-value">${{ prestamo.pago_semanal|floatformat:2|intcomma }}</div>
+                                <span class="month-equivalent">
+                                    ≈ ${{ prestamo.pago_mensual_aproximado|default:prestamo.pago_semanal|multiply:4.33|floatformat:2|intcomma }}/mes
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="stat-badge">
+                                <div class="stat-label">Plazo</div>
+                                <div class="stat-value">
+                                    {{ prestamo.plazo_semanas }}
+                                    <span class="week-badge">semanas</span>
+                                </div>
+                                <span class="month-equivalent">
+                                    ≈ {{ prestamo.get_plazo_equivalente_meses|default:"0.0" }} meses
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="stat-badge">
+                                <div class="stat-label">Interés Anual</div>
+                                <div class="stat-value">{{ prestamo.tasa_interes }}%</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Concepto y observaciones -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-muted mb-2">Concepto</h6>
+                        <div class="alert alert-light">
+                            {{ prestamo.concepto }}
+                        </div>
+                    </div>
+                    
+                    {% if prestamo.observaciones %}
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-muted mb-2">Observaciones</h6>
+                        <div class="alert alert-light">
+                            {{ prestamo.observaciones|linebreaks }}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Plan de pagos SEMANALES -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-muted mb-2">
+                            <i class="fas fa-calendar-week me-2"></i>
+                            Plan de Pagos Semanales
+                        </h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th># Semana</th>
+                                        <th>Fecha Programada</th>
+                                        <th class="text-end">Pago Semanal</th>
+                                        <th class="text-end">Total Pagado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% with pago_semanal=prestamo.pago_semanal %}
+                                    {% with total_semanas=prestamo.plazo_semanas %}
+                                    {% with fecha_inicio=prestamo.fecha_primer_pago %}
+                                    
+                                    {% for semana in "x"|rjust:total_semanas %}
+                                    <tr>
+                                        <td>
+                                            Semana {{ forloop.counter }}
+                                            <span class="week-badge">sem {{ forloop.counter }}</span>
+                                        </td>
+                                        <td>
+                                            {% if fecha_inicio %}
+                                                {% with fecha_semana=fecha_inicio|add_weeks:forloop.counter0 %}
+                                                    {{ fecha_semana|date:"d/m/Y" }}
+                                                {% endwith %}
+                                            {% else %}
+                                                Por definir
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">${{ pago_semanal|floatformat:2|intcomma }}</td>
+                                        <td class="text-end">${{ pago_semanal|multiply:forloop.counter|floatformat:2|intcomma }}</td>
+                                    </tr>
+                                    {% if forloop.counter == 12 and total_semanas > 12 %}
+                                    <tr class="table-secondary">
+                                        <td colspan="4" class="text-center fw-bold">
+                                            ... {{ total_semanas|add:"-12" }} semanas más ...
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                    {% endfor %}
+                                    
+                                    {% endwith %}
+                                    {% endwith %}
+                                    {% endwith %}
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-active">
+                                        <td colspan="3" class="fw-bold">Total a Pagar ({{ prestamo.plazo_semanas }} semanas)</td>
+                                        <td class="text-end fw-bold">
+                                            ${{ prestamo.monto_total|floatformat:2|intcomma }}
+                                        </td>
+                                    </tr>
+                                    <tr class="table-secondary">
+                                        <td colspan="3" class="small text-muted">Interés total ({{ prestamo.tasa_interes }}% anual)</td>
+                                        <td class="text-end small text-muted">
+                                            ${{ prestamo.total_interes|floatformat:2|intcomma }}
+                                        </td>
+                                    </tr>
+                                    <tr class="table-active">
+                                        <td colspan="3" class="fw-bold">Total General</td>
+                                        <td class="text-end fw-bold text-primary">
+                                            ${{ prestamo.monto_total|add:prestamo.total_interes|floatformat:2|intcomma }}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <div class="alert alert-info small mt-2">
+                            <i class="fas fa-info-circle me-2"></i>
+                            El plan de pagos se generará automáticamente con pagos semanales después de la aprobación.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Panel de decisión -->
+        <div class="col-lg-4">
+            <div class="card decision-card">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="fw-bold m-0 text-dark">
+                        <i class="fas fa-clipboard-check me-2"></i>
+                        Tomar Decisión
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Verificación de límites -->
+                    <div class="warning-card">
+                        <h6 class="fw-bold mb-3">
+                            <i class="fas fa-balance-scale me-2"></i>
+                            Verificación de Límites
+                        </h6>
+                        
+                        {% with empleado=prestamo.empleado %}
+                        {% with salario=empleado.salario_actual.sueldo_mensual|default:0 %}
+                        {% with limite_maximo=salario|multiply:3 %}
+                        {% with pago_maximo=salario|multiply:0.4 %}
+                        {% with pago_mensual_equivalente=prestamo.pago_semanal|multiply:4.33 %}
+                        
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="small">Monto solicitado:</span>
+                                <span class="small fw-bold">${{ prestamo.monto_total|intcomma }}</span>
+                            </div>
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar {% if prestamo.monto_total > limite_maximo %}bg-danger{% elif prestamo.monto_total > limite_maximo|multiply:0.8 %}bg-warning{% else %}bg-success{% endif %}" 
+                                     style="width: {% widthratio prestamo.monto_total limite_maximo 100 %}%"></div>
+                            </div>
+                            <div class="d-flex justify-content-between mt-1">
+                                <small class="text-muted">Límite: ${{ limite_maximo|floatformat:0|intcomma }}</small>
+                                <small class="text-muted">
+                                    {% if prestamo.monto_total > limite_maximo %}
+                                        <span class="text-danger">EXCEDIDO</span>
+                                    {% else %}
+                                        {% widthratio prestamo.monto_total limite_maximo 100 %}%
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="small">Pago mensual equivalente:</span>
+                                <span class="small fw-bold">${{ pago_mensual_equivalente|floatformat:2|intcomma }}</span>
+                            </div>
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar {% if pago_mensual_equivalente > pago_maximo %}bg-danger{% elif pago_mensual_equivalente > pago_maximo|multiply:0.8 %}bg-warning{% else %}bg-success{% endif %}" 
+                                     style="width: {% widthratio pago_mensual_equivalente pago_maximo 100 %}%"></div>
+                            </div>
+                            <div class="d-flex justify-content-between mt-1">
+                                <small class="text-muted">Máximo (40%): ${{ pago_maximo|floatformat:0|intcomma }}</small>
+                                <small class="text-muted">
+                                    {% if pago_mensual_equivalente > pago_maximo %}
+                                        <span class="text-danger">EXCEDIDO</span>
+                                    {% else %}
+                                        {% widthratio pago_mensual_equivalente pago_maximo 100 %}%
+                                    {% endif %}
+                                </small>
+                            </div>
+                            <div class="small text-muted text-center mt-1">
+                                (Pago semanal: ${{ prestamo.pago_semanal|floatformat:2 }} × 4.33)
+                            </div>
+                        </div>
+                        
+                        {% if prestamo.monto_total > limite_maximo or pago_mensual_equivalente > pago_maximo %}
+                        <div class="alert alert-danger small mb-0">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            Este préstamo excede los límites establecidos en las políticas.
+                        </div>
+                        {% endif %}
+                        
+                        {% endwith %}
+                        {% endwith %}
+                        {% endwith %}
+                        {% endwith %}
+                        {% endwith %}
+                    </div>
+                    
+                    <!-- Formulario de decisión -->
+                    <form method="post" id="decisionForm">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <h6 class="fw-bold text-muted mb-2">Observaciones de Decisión</h6>
+                            <textarea name="observaciones" class="form-control" rows="4" 
+                                      placeholder="Agregue comentarios sobre la decisión (opcional)..."></textarea>
+                        </div>
+                        
+                        <!-- Botones de decisión -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" name="estado" value="APROBADO" 
+                                    class="btn-aprobar btn-lg" id="btnAprobar">
+                                <i class="fas fa-check-circle me-2"></i>
+                                APROBAR PRÉSTAMO
+                            </button>
+                            
+                            <button type="submit" name="estado" value="RECHAZADO"
+                                    class="btn-rechazar btn-lg" id="btnRechazar">
+                                <i class="fas fa-times-circle me-2"></i>
+                                RECHAZAR PRÉSTAMO
+                            </button>
+                            
+                            <a href="{% url 'rh:gestion_prestamos' %}" 
+                               class="btn btn-outline-secondary btn-lg">
+                                <i class="fas fa-arrow-left me-2"></i>
+                                REGRESAR
+                            </a>
+                        </div>
+                        
+                        <!-- Campo oculto para el estado (será llenado por JavaScript) -->
+                        <input type="hidden" name="estado_final" id="estadoFinal" value="">
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Información adicional -->
+            <div class="card decision-card mt-4">
+                <div class="card-body">
+                    <h6 class="fw-bold text-muted mb-3">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Información Adicional
+                    </h6>
+                    <ul class="list-unstyled small">
+                        <li class="mb-2">
+                            <i class="fas fa-user-check text-success me-2"></i>
+                            Solicitado por: {{ prestamo.creado_por.get_full_name|default:prestamo.creado_por.username }}
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-calendar-day text-info me-2"></i>
+                            Fecha solicitud: {{ prestamo.fecha_solicitud|date:"d/m/Y" }}
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-calendar-check text-primary me-2"></i>
+                            Primer pago: {{ prestamo.fecha_primer_pago|date:"d/m/Y" }}
+                            <span class="badge bg-light text-dark ms-1">Semana 1</span>
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-calendar-times text-warning me-2"></i>
+                            Último pago estimado: 
+                            {% if prestamo.fecha_primer_pago and prestamo.plazo_semanas %}
+                                {% with ultima_semana=prestamo.fecha_primer_pago|add_weeks:prestamo.plazo_semanas|add:"-1" %}
+                                    {{ ultima_semana|date:"d/m/Y" }}
+                                    <span class="badge bg-light text-dark ms-1">Semana {{ prestamo.plazo_semanas }}</span>
+                                {% endwith %}
+                            {% else %}
+                                Por definir
+                            {% endif %}
+                        </li>
+                        <li class="mb-0">
+                            <i class="fas fa-file-pdf text-danger me-2"></i>
+                            {% if prestamo.documento_solicitud %}
+                            <a href="{{ prestamo.documento_solicitud.url }}" target="_blank">
+                                Ver documento de solicitud
+                            </a>
+                            {% else %}
+                            <span class="text-muted">Sin documento adjunto</span>
+                            {% endif %}
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmación -->
+<div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Confirmar Decisión</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="confirmMessage"></div>
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Esta acción no se puede deshacer. Se registrará en el historial del empleado.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmAction">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('decisionForm');
+    const btnAprobar = document.getElementById('btnAprobar');
+    const btnRechazar = document.getElementById('btnRechazar');
+    const estadoFinal = document.getElementById('estadoFinal');
+    const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    const confirmMessage = document.getElementById('confirmMessage');
+    const confirmAction = document.getElementById('confirmAction');
+    
+    let decision = '';
+    
+    // Manejar clic en Aprobar
+    btnAprobar.addEventListener('click', function(e) {
+        e.preventDefault();
+        decision = 'APROBADO';
+        estadoFinal.value = decision;
+        mostrarConfirmacion(decision);
+    });
+    
+    // Manejar clic en Rechazar
+    btnRechazar.addEventListener('click', function(e) {
+        e.preventDefault();
+        decision = 'RECHAZADO';
+        estadoFinal.value = decision;
+        mostrarConfirmacion(decision);
+    });
+    
+    function mostrarConfirmacion(tipo) {
+        const plazoElement = document.querySelector('.stat-badge:nth-child(3) .stat-value');
+        const plazoTexto = plazoElement ? plazoElement.textContent.trim() : '0 semanas';
+        const pagoSemanalElement = document.querySelector('.stat-badge:nth-child(2) .stat-value');
+        const pagoSemanal = pagoSemanalElement ? pagoSemanalElement.textContent.trim() : '$0.00';
+        const montoTotalElement = document.querySelector('.stat-badge:nth-child(1) .stat-value');
+        const montoTotal = montoTotalElement ? montoTotalElement.textContent.trim() : '$0.00';
+        
+        if (tipo === 'APROBADO') {
+            confirmMessage.innerHTML = `
+                <div class="text-center">
+                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                    <h5 class="fw-bold mb-2">¿Aprobar este préstamo?</h5>
+                    <p class="mb-2">
+                        <strong>Detalles:</strong><br>
+                        • Monto: ${montoTotal}<br>
+                        • Plazo: ${plazoTexto}<br>
+                        • Pago semanal: ${pagoSemanal}<br>
+                        • Total semanas: {{ prestamo.plazo_semanas }}
+                    </p>
+                    <p class="mb-0 small text-muted">
+                        Se creará un plan de pagos semanales y se iniciará el proceso de desembolso.
+                    </p>
+                </div>
+            `;
+        } else {
+            confirmMessage.innerHTML = `
+                <div class="text-center">
+                    <i class="fas fa-times-circle fa-3x text-danger mb-3"></i>
+                    <h5 class="fw-bold mb-2">¿Rechazar este préstamo?</h5>
+                    <p class="mb-2">
+                        <strong>Detalles del préstamo rechazado:</strong><br>
+                        • Monto: ${montoTotal}<br>
+                        • Plazo: ${plazoTexto}<br>
+                        • Empleado: {{ prestamo.empleado.nombre_completo }}
+                    </p>
+                    <p class="mb-0 small text-muted">
+                        El empleado será notificado y la solicitud será archivada como rechazada.
+                    </p>
+                </div>
+            `;
+        }
+        
+        // Mostrar modal
+        confirmModal.show();
+    }
+    
+    // Confirmar acción
+    confirmAction.addEventListener('click', function() {
+        // Enviar formulario
+        form.submit();
+    });
+    
+    // Agregar tooltip para mostrar equivalencia en meses
+    const plazoBadge = document.querySelector('.stat-badge:nth-child(3)');
+    if (plazoBadge) {
+        const semanas = parseInt('{{ prestamo.plazo_semanas }}') || 0;
+        if (semanas > 0) {
+            const meses = (semanas / 4.33).toFixed(1);
+            const anios = (semanas / 52).toFixed(2);
+            plazoBadge.title = `${semanas} semanas = ${meses} meses ≈ ${anios} años`;
+        }
+    }
+});
+</script>
+{% endblock %}

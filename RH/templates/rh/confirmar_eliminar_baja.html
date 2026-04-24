@@ -1,0 +1,97 @@
+{% extends 'rh/base.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h6 class="mb-0 text-white">
+                        <i class="fa fa-exclamation-triangle me-2"></i> Confirmar Eliminación
+                    </h6>
+                </div>
+                
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <div class="icon icon-shape bg-gradient-danger text-white rounded-circle shadow mb-3" style="width: 80px; height: 80px; display: inline-flex; align-items: center; justify-content: center;">
+                            <i class="fa fa-trash fa-2x"></i>
+                        </div>
+                        
+                        <h4 class="text-danger mb-3">¿Eliminar registro de baja?</h4>
+                        
+                        <div class="alert alert-warning">
+                            <i class="fa fa-exclamation-circle me-2"></i>
+                            Esta acción <strong>NO</strong> se puede deshacer.
+                        </div>
+                    </div>
+                    
+                    <div class="card border mb-4">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="avatar avatar-lg me-3">
+                                    <img src="{% if baja.empleado.foto %}{{ baja.empleado.foto.url }}{% else %}{% static 'img/default-avatar.png' %}{% endif %}" 
+                                         alt="{{ baja.empleado.nombre_completo }}" 
+                                         class="rounded-circle">
+                                </div>
+                                <div>
+                                    <h5 class="mb-0">{{ baja.empleado.nombre_completo }}</h5>
+                                    <p class="text-sm text-muted mb-0">
+                                        {{ baja.empleado.puesto|default:"Sin puesto" }}
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Fecha de Baja:</strong></p>
+                                    <p class="text-muted">{{ baja.fecha_baja|date:"d/m/Y" }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-1"><strong>Tipo de Baja:</strong></p>
+                                    <p class="text-muted">{{ baja.get_tipo_baja_display }}</p>
+                                </div>
+                                <div class="col-md-12">
+                                    <p class="mb-1"><strong>Motivo:</strong></p>
+                                    <p class="text-muted">{{ baja.motivo_principal.nombre|default:"No especificado" }}</p>
+                                </div>
+                                {% if baja.descripcion %}
+                                <div class="col-md-12">
+                                    <p class="mb-1"><strong>Descripción:</strong></p>
+                                    <p class="text-muted">{{ baja.descripcion|truncatechars:100 }}</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-danger">
+                        <i class="fa fa-exclamation-triangle me-2"></i>
+                        <strong>Advertencia:</strong> Se eliminarán:
+                        <ul class="mb-0 mt-2">
+                            <li>El registro completo de la baja</li>
+                            <li>El documento adjunto (si existe)</li>
+                            <li>Todos los datos relacionados con esta baja</li>
+                        </ul>
+                    </div>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-danger btn-lg">
+                                <i class="fa fa-trash me-2"></i> Sí, Eliminar Permanentemente
+                            </button>
+                            <a href="{% url 'rh:detalle_baja' pk=baja.id %}" class="btn btn-outline-secondary">
+                                <i class="fa fa-times me-2"></i> Cancelar y Volver
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
