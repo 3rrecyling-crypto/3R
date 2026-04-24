@@ -62,6 +62,9 @@ BEGIN
     END LOOP;
 
     -- 2) Convertir RH_empleado.id de integer a uuid (tabla vacía -> gen_random_uuid() es seguro)
+    --    Django 5+ crea la PK como IDENTITY column, hay que quitar la IDENTITY antes
+    --    del cambio de tipo. IF EXISTS cubre el caso SERIAL / sin identity.
+    ALTER TABLE "RH_empleado" ALTER COLUMN "id" DROP IDENTITY IF EXISTS;
     ALTER TABLE "RH_empleado" ALTER COLUMN "id" DROP DEFAULT;
     ALTER TABLE "RH_empleado" ALTER COLUMN "id" TYPE uuid USING gen_random_uuid();
     ALTER TABLE "RH_empleado" ALTER COLUMN "id" SET DEFAULT gen_random_uuid();
