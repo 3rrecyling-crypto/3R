@@ -26,7 +26,7 @@ def _parse_put_multipart(request):
 
 from .models import (
     Empleado, Salario, TipoViaje, TipoCarga, DivisionOperativa,
-    Departamento, Puesto, Vacacion, HistoricoVacaciones,
+    Departamento, Puesto, Vacacion, HistoricoVacaciones, Prestamo,
 )
 
 
@@ -542,4 +542,120 @@ def api_rh_empleado_balance_vacaciones(request, pk):
         'dias_tomados': dias_tomados,
         'dias_pendientes_solicitud': dias_pendientes_solicitud,
         'restantes': restantes,
+    })
+
+
+# ── Préstamos — crear / detalle desde Next.js ───────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_rh_prestamo_crear(request):
+    """POST /rh/api/prestamos/crear/ — crea un préstamo y lo deja APROBADO."""
+    err = _require_auth(request)
+    if err:
+        return err
+    try:
+        data = request.POST
+        empleado_id = data.get('empleado_id')
+        if not empleado_id:
+            return JsonResponse({'error': 'Falta el empleado.'}, status=400)
+        empleado = get_object_or_404(Empleado, pk=empleado_id)
+
+        try:
+            monto = Decimal(str(data.get('monto_total') or '0'))
+        except Exception:
+            return JsonResponse({'error': 'Monto inválido.'}, status=400)
+        if monto <= 0:
+            return JsonResponse({'error': 'El monto debe ser mayor a cero.'}, status=400)
+
+        try:
+            plazo = int(data.get('plazo_semanas') or 0)
+        except (ValueError, TypeError):
+            plazo = 0
+        if plazo < 1 or plazo > 52:
+            return JsonResponse({'error': 'El plazo debe estar entre 1 y 52 semanas.'}, status=400)
+
+        try:
+            tasa = Decimal(str(data.get('tasa_interes') or '0'))
+        except Exception:
+            tasa = Decimal('0')
+
+        fecha_primer_pago_str = (data.get('fecha_primer_pago') or '').strip()
+        if not fecha_primer_pago_str:
+            return JsonResponse({'error': 'Falta la fecha del primer pago.'}, status=400)
+        try:
+            fecha_primer_pago = datetime.strptime(fecha_primer_pago_str, '%Y-%m-%d').date()
+        except ValueError:
+            return JsonResponse({'error': 'Formato de fecha inválido (AAAA-MM-DD).'}, status=400)
+
+        concepto = (data.get('concepto') or '').strip()
+        if not concepto:
+            return JsonResponse({'error': 'El concepto es obligatorio.'}, status=400)
+
+        with transaction.atomic():
+            p = Prestamo.objects.create(
+                empleado=empleado,
+                tipo_prestamo=data.get('tipo_prestamo', 'PERSONAL'),
+                monto_total=monto,
+                tasa_interes=tasa,
+                plazo_semanas=plazo,
+                fecha_primer_pago=fecha_primer_pago,
+                concepto=concepto,
+                estado='APROBADO',
+                fecha_aprobacion=date.today(),
+                observaciones=(data.get('observaciones') or '').strip() or None,
+            )
+            if request.FILES.get('documento_solicitud'):
+                p.documento_solicitud = request.FILES['documento_solicitud']
+                p.save(update_fields=['documento_solicitud'])
+            if request.FILES.get('contrato'):
+                p.contrato = request.FILES['contrato']
+                p.save(update_fields=['contrato'])
+        return JsonResponse({
+            'id': p.id,
+            'empleado': p.empleado.nombre_completo,
+            'monto_total': str(p.monto_total),
+            'plazo_semanas': p.plazo_semanas,
+            'estado': p.estado.lower(),
+        }, status=201)
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': f'{type(exc).__name__}: {exc}'}, status=400)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "DELETE"])
+def api_rh_prestamo_detail(request, pk):
+    """GET/DELETE /rh/api/prestamos/<pk>/ — detalle o eliminación."""
+    err = _require_auth(request)
+    if err:
+        return err
+    p = get_object_or_404(Prestamo.objects.select_related('empleado', 'empleado__departamento'), pk=pk)
+    if request.method == 'DELETE':
+        p.delete()
+        return JsonResponse({'ok': True})
+    return JsonResponse({
+        'id': p.id,
+        'empleado_id': str(p.empleado.id),
+        'empleado': p.empleado.nombre_completo,
+        'departamento': p.empleado.departamento.nombre if p.empleado.departamento_id else '',
+        'puesto': p.empleado.puesto.nombre if getattr(p.empleado, 'puesto_id', None) else '',
+        'tipo_prestamo': p.tipo_prestamo,
+        'tipo': p.get_tipo_prestamo_display() if hasattr(p, 'get_tipo_prestamo_display') else '',
+        'monto_total': str(p.monto_total),
+        'monto_pagado': str(p.monto_pagado),
+        'saldo_pendiente': str(p.saldo_pendiente),
+        'tasa_interes': str(p.tasa_interes),
+        'plazo_semanas': p.plazo_semanas,
+        'fecha_primer_pago': str(p.fecha_primer_pago) if p.fecha_primer_pago else '',
+        'fecha_solicitud': str(p.fecha_solicitud) if p.fecha_solicitud else '',
+        'fecha_aprobacion': str(p.fecha_aprobacion) if p.fecha_aprobacion else '',
+        'estado': p.estado.lower(),
+        'estado_display': p.get_estado_display() if hasattr(p, 'get_estado_display') else p.estado,
+        'concepto': p.concepto or '',
+        'observaciones': p.observaciones or '',
+        'pago_semanal': str(getattr(p, 'pago_semanal', 0) or 0),
+        'documento_solicitud_url': p.documento_solicitud.url if p.documento_solicitud else None,
+        'contrato_url': p.contrato.url if p.contrato else None,
     })

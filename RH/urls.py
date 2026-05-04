@@ -9,6 +9,7 @@ from .api_nextjs import (
     api_departamentos_list, api_departamento_detail,
     api_puestos_crear, api_puesto_detail,
     api_rh_vacacion_crear, api_rh_vacacion_detail, api_rh_empleado_balance_vacaciones,
+    api_rh_prestamo_crear, api_rh_prestamo_detail,
 )
 from django.http import HttpResponse
 
@@ -136,6 +137,8 @@ urlpatterns = [
     path('api/vacaciones/<int:pk>/', api_rh_vacacion_detail, name='api_vacacion_detail'),
     path('api/empleados/<uuid:pk>/vacaciones-balance/', api_rh_empleado_balance_vacaciones, name='api_empleado_vacaciones_balance'),
     path('api/prestamos/', views.api_rh_prestamos, name='api_prestamos'),
+    path('api/prestamos/crear/', api_rh_prestamo_crear, name='api_prestamo_crear'),
+    path('api/prestamos/<int:pk>/', api_rh_prestamo_detail, name='api_prestamo_detail'),
     # Alias de descarga para Next.js
     path('descargar-documentos-zip/<uuid:pk>/', descargar_documentos_empleado, name='descargar_documentos_zip_alias'),
     path('descargar-documento-individual/<uuid:pk>/<str:tipo_documento>/', descargar_documento_individual, name='descargar_documento_individual_alias'),
