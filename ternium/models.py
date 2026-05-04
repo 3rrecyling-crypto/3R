@@ -717,9 +717,9 @@ class Remision(models.Model):
         verbose_name_plural = "Remisiones"
         ordering = ['-fecha', '-creado_en']
         indexes = [models.Index(fields=['status']), models.Index(fields=['fecha'])]
-        
+
         unique_together = ('empresa', 'remision')
-        
+
         permissions = [
             ("can_audit_remision", "Puede auditar remisiones"),
             ("view_ternium_module", "Puede acceder al módulo Ternium"),
@@ -732,6 +732,11 @@ class Remision(models.Model):
             ("acceso_bancos", "Acceso a Flujo Bancario"),
             ("acceso_dashboard", "Acceso a Dashboard Principal"),
             ("acceso_diesel", "Acceso a Control Diésel"),
+            ("ver_dashboard_trane", "Puede ver el Dashboard TRANE"),
+            ("exportar_dashboard_trane", "Puede exportar reportes del Dashboard TRANE"),
+            ("acceso_dashboard_remisiones", "Acceso al Dashboard de Remisiones"),
+            ("ver_kpis_remisiones", "Puede ver KPIs y métricas de remisiones"),
+            ("exportar_remisiones", "Puede exportar reportes de remisiones a Excel"),
         ]
 
 class Cliente(models.Model):
