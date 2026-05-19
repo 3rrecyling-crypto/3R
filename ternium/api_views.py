@@ -2074,12 +2074,23 @@ def _json_body(request):
     except Exception:
         return None, JsonResponse({'error': 'JSON invalido'}, status=400)
 
-def _perm_check(request, perm):
+def _perm_check(request, perm, *, alt=None):
+    """
+    Verifica que el usuario tenga `perm`. Si se pasa `alt` (str o lista),
+    también se aceptan esos permisos como bypass.
+    Uso típico: dentro del módulo de Viajes queremos que un usuario con
+    `ternium.acceso_viajes` pueda editar lugares/unidades/etc. al vuelo
+    sin necesidad de tener cada permiso granular del catálogo.
+    """
     if request.user.is_superuser:
         return None
-    if not request.user.has_perm(perm):
-        return JsonResponse({'error': 'FORBIDDEN', 'detail': f'Permiso requerido: {perm}'}, status=403)
-    return None
+    if request.user.has_perm(perm):
+        return None
+    if alt:
+        alts = [alt] if isinstance(alt, str) else list(alt)
+        if any(request.user.has_perm(p) for p in alts):
+            return None
+    return JsonResponse({'error': 'FORBIDDEN', 'detail': f'Permiso requerido: {perm}'}, status=403)
 
 # ── EMPRESAS ─────────────────────────────────────────────────────────────
 @csrf_exempt
@@ -2196,7 +2207,9 @@ def api_cat_lugar_detail(request, pk):
     if request.method == 'GET':
         return JsonResponse(_lugar_to_dict(l))
     if request.method in ('PUT', 'PATCH'):
-        err = _perm_check(request, 'ternium.change_lugar')
+        # Editar lugar también se hace desde dentro del detalle de un viaje
+        # (al editar una parada). Aceptamos acceso_viajes como bypass.
+        err = _perm_check(request, 'ternium.change_lugar', alt='ternium.acceso_viajes')
         if err: return err
         body, err = _json_body(request)
         if err: return err
@@ -2450,7 +2463,9 @@ def api_cat_unidad_detail(request, pk):
     if request.method == 'GET':
         return JsonResponse(_unidad_to_dict(u))
     if request.method in ('PUT', 'PATCH'):
-        err = _perm_check(request, 'ternium.change_unidad')
+        # Editar la unidad también se hace desde el detalle de un viaje
+        # (tarjetas de Unidad / SCT). Aceptamos acceso_viajes como bypass.
+        err = _perm_check(request, 'ternium.change_unidad', alt='ternium.acceso_viajes')
         if err: return err
         body, err = _json_body(request)
         if err: return err

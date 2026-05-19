@@ -325,22 +325,36 @@ from rest_framework.permissions import AllowAny
 # Decorador vital para que Django le envíe el token CSRF a Next.js
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class LoginAPIView(APIView):
-    permission_classes = [AllowAny] # Permite acceso a usuarios no logueados
+    # IMPORTANTE: si dejamos SessionAuthentication aquí y el navegador
+    # manda una cookie de sesión vieja/expirada, DRF exige CSRF y el
+    # login falla con 403 antes de llegar a validar las credenciales.
+    # El usuario ve "credenciales incorrectas" aunque sean correctas.
+    # Para el login dejamos vacía la lista de auth — solo nos importa
+    # validar usuario/password y crear la sesión.
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
     def post(self, request):
         username = request.data.get('username')
         password = request.data.get('password')
-        
+
         user = authenticate(request, username=username, password=password)
-        
+
         if user is not None:
-            login(request, user) # Esto es lo que genera la cookie de sesión real
+            # Si había una sesión previa anónima/expirada, la limpiamos
+            # antes de loggear al nuevo usuario para evitar arrastrar
+            # datos viejos.
+            try:
+                request.session.flush()
+            except Exception:
+                pass
+            login(request, user)  # Genera la cookie de sesión nueva
             return Response({
-                "detail": "Login exitoso", 
+                "detail": "Login exitoso",
                 "username": user.username
             })
         else:
             return Response(
-                {"detail": "Credenciales inválidas"}, 
+                {"detail": "Credenciales inválidas"},
                 status=status.HTTP_401_UNAUTHORIZED
             )

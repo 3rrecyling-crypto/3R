@@ -203,6 +203,8 @@ def _viaje_dict(v, full=False):
         'estado': v.estado,
         'observaciones': v.observaciones or '',
         'sueldo_operador': str(v.sueldo_operador or 0),
+        'eco_remolque': v.eco_remolque or '',
+        'placa_remolque': v.placa_remolque or '',
         'mismo_origen_destino': v.mismo_origen_destino,
         'creado_en': v.creado_en.isoformat() if v.creado_en else '',
         'kms_totales': str(v.kms_totales),
@@ -412,6 +414,8 @@ def api_viaje_crear(request):
                 empresa=empresa,
                 estado=body.get('estado', 'PLANIFICADO'),
                 observaciones=(body.get('observaciones') or '').strip() or None,
+                eco_remolque=(body.get('eco_remolque') or '').strip() or None,
+                placa_remolque=(body.get('placa_remolque') or '').strip() or None,
                 creado_por=request.user if request.user.is_authenticated else None,
             )
             # Paradas iniciales: origen (orden 1) y destino (orden 2)
@@ -445,7 +449,7 @@ def api_viaje_detail(request, pk):
             body = json.loads(request.body or '{}')
         except ValueError:
             body = dict(request.POST.items())
-        for k in ('folio_carga', 'observaciones', 'estado'):
+        for k in ('folio_carga', 'observaciones', 'estado', 'eco_remolque', 'placa_remolque'):
             if k in body:
                 setattr(v, k, (body[k] or '').strip() or (None if k != 'estado' else v.estado))
         if 'fecha_viaje' in body and body['fecha_viaje']:
@@ -684,7 +688,7 @@ def api_viaje_pdf(request, pk):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=letter,
-        leftMargin=12*mm, rightMargin=12*mm,
+        leftMargin=8*mm, rightMargin=8*mm,
         topMargin=10*mm, bottomMargin=14*mm,
         title=f"Carta de Traslado {v.id_viaje}",
         author="3R Recycling",
@@ -768,7 +772,7 @@ def api_viaje_pdf(request, pk):
         [Paragraph('VIAJE', label_st)],
         [Paragraph(str(v.numero_viaje or v.id), value_st)],
     ]
-    doc_block = Table(doc_block_data, colWidths=[52*mm])
+    doc_block = Table(doc_block_data, colWidths=[56*mm])
     doc_block.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), GRAY_HEADER),
         ('BACKGROUND', (0,2), (-1,2), GRAY_HEADER),
@@ -783,7 +787,7 @@ def api_viaje_pdf(request, pk):
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
     ]))
 
-    head = Table([[logo, empresa_block, doc_block]], colWidths=[40*mm, 94*mm, 52*mm])
+    head = Table([[logo, empresa_block, doc_block]], colWidths=[40*mm, 104*mm, 56*mm])
     head.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('LEFTPADDING', (0,0), (-1,-1), 4),
@@ -793,14 +797,14 @@ def api_viaje_pdf(request, pk):
     ]))
     story.append(head)
     # Línea divisoria sutil bajo el header
-    divider = Table([['']], colWidths=[186*mm], rowHeights=[0.4])
+    divider = Table([['']], colWidths=[200*mm], rowHeights=[0.4])
     divider.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), GRAY_LINE)]))
     story.append(Spacer(1, 4))
     story.append(divider)
     story.append(Spacer(1, 6))
 
     # ─── Helper: título de sección centrado en gris (más alto, mejor jerarquía)
-    PAGE_W = 186*mm
+    PAGE_W = 200*mm
     def section_title(text):
         t = Table([[Paragraph(text, s_section)]], colWidths=[PAGE_W])
         t.setStyle(TableStyle([
@@ -845,7 +849,7 @@ def api_viaje_pdf(request, pk):
     cli = Table([
         [Paragraph('Razón Social', s_cellh), Paragraph('RFC', s_cellh), Paragraph('Dirección', s_cellh)],
         [Paragraph(empresa_nombre, s_cell), Paragraph(empresa_rfc, s_cellc), Paragraph(', '.join(empresa_dir_lineas), s_cell)],
-    ], colWidths=[40*mm, 30*mm, 116*mm])
+    ], colWidths=[46*mm, 32*mm, 122*mm])
     cli.setStyle(table_style_v2(3))
     story.append(cli)
 
@@ -872,10 +876,10 @@ def api_viaje_pdf(request, pk):
             Paragraph(u.nombre_aseguradora or '', s_cellc),
             Paragraph(u.no_poliza_seguro or '', s_cellc),
             Paragraph(str(u.year or ''), s_cellc),
-            Paragraph(u.eco_remolque_1 or '', s_cellc),
-            Paragraph(u.placa_remolque_1 or '', s_cellc),
+            Paragraph(v.eco_remolque or u.eco_remolque_1 or '', s_cellc),
+            Paragraph(v.placa_remolque or u.placa_remolque_1 or '', s_cellc),
         ],
-    ], colWidths=[18*mm, 18*mm, 20*mm, 23*mm, 28*mm, 23*mm, 20*mm, 19*mm, 17*mm], repeatRows=1)
+    ], colWidths=[19*mm, 19*mm, 19*mm, 25*mm, 32*mm, 25*mm, 15*mm, 22*mm, 24*mm], repeatRows=1)
     auto.setStyle(table_style_v2(9))
     story.append(auto)
 
@@ -892,7 +896,7 @@ def api_viaje_pdf(request, pk):
             Paragraph(op.nombre_completo, s_cell),
             Paragraph(numero_lic or '—', s_cellc),
         ],
-    ], colWidths=[40*mm, 110*mm, 36*mm])
+    ], colWidths=[44*mm, 118*mm, 38*mm])
     fig.setStyle(table_style_v2(3))
     story.append(fig)
 
@@ -926,7 +930,7 @@ def api_viaje_pdf(request, pk):
             Paragraph(p.lugar.direccion_completa() or '—', s_cell),
             Paragraph(p.fecha_hora.strftime('%d/%m/%Y %H:%M') if p.fecha_hora else '—', s_cellc),
         ])
-    ub = Table(ub_rows, colWidths=[22*mm, 28*mm, 48*mm, 62*mm, 26*mm], repeatRows=1)
+    ub = Table(ub_rows, colWidths=[24*mm, 30*mm, 52*mm, 66*mm, 28*mm], repeatRows=1)
     ub.setStyle(table_style_v2(5))
     story.append(ub)
 
@@ -987,15 +991,15 @@ def api_viaje_pdf(request, pk):
 
     mc = Table(mc_rows, colWidths=[
         22*mm,   # Clave / Producto
-        26*mm,   # Descripción
-        26*mm,   # Medida (texto SAT)
-        12*mm,   # Cantidad
-        12*mm,   # Peso (kg)
-        18*mm,   # Remitente
-        16*mm,   # ID Ubic (fits OR000004 en una línea)
-        26*mm,   # Destinatario (fits "PATIO SANTA ROSA")
-        16*mm,   # ID Ubic
-        12*mm,   # KMs
+        30*mm,   # Descripción
+        28*mm,   # Medida (texto SAT)
+        13*mm,   # Cantidad
+        13*mm,   # Peso (kg)
+        22*mm,   # Remitente
+        17*mm,   # ID Ubic (fits OR000004 en una línea)
+        30*mm,   # Destinatario (fits "PATIO SANTA ROSA")
+        17*mm,   # ID Ubic
+        8*mm,    # KMs
     ], repeatRows=1)
     mc.setStyle(table_style_v2(10))
     story.append(mc)

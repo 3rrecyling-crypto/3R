@@ -1698,6 +1698,8 @@ class Viaje(models.Model):
                                 related_name='viajes', verbose_name="Empresa")
     sueldo_operador = models.DecimalField("Sueldo del operador", max_digits=12, decimal_places=2,
                                            default=0, help_text="Pago al operador por este viaje")
+    eco_remolque = models.CharField("Eco. Remolque", max_length=50, blank=True, null=True)
+    placa_remolque = models.CharField("Placa Remolque", max_length=50, blank=True, null=True)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='PLANIFICADO')
     observaciones = models.TextField(blank=True, null=True)
     creado_por = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True,

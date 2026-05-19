@@ -274,6 +274,12 @@ if not DEBUG:
     CSRF_COOKIE_SAMESITE = "None"
     SESSION_COOKIE_SAMESITE = "None"
     SESSION_COOKIE_DOMAIN = ".3recycling.com.mx"
+    # IMPORTANTE: el CSRF cookie debe vivir en el mismo dominio padre que
+    # la cookie de sesión. Si no, app.3recycling.com.mx no puede leerla
+    # y los POST/PUT/DELETE fallan con 403 "CSRF Failed" — sobre todo en
+    # /diesel/api/login/ cuando queda una cookie de sesión expirada del
+    # lado del navegador.
+    CSRF_COOKIE_DOMAIN = ".3recycling.com.mx"
 else:
     # --- CONFIGURACIÓN PARA DESARROLLO LOCAL (127.0.0.1) ---
     SESSION_COOKIE_SECURE = False
