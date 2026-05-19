@@ -1781,77 +1781,96 @@ def export_reportes_especificos(request):
     return response
 
 
+@csrf_exempt
 @require_POST
 def exportar_zip_medline(request):
     """
-    Exporta en un archivo ZIP todas las Boletas de Salida de remisiones
-    cuyo origen sea MEDLINE. Busca en toda la base de datos sin filtros de fecha/folio.
-    El nombre de cada archivo usa: {remision}_{folio_ld}_{folio_dlv}
+    Exporta en un archivo ZIP las Boletas de Salida de remisiones cuyo
+    origen sea MEDLINE, filtradas opcionalmente por:
+      - rango de fechas: fecha_inicio, fecha_fin (sobre Remision.fecha)
+      - rango de folios: folio_inicio, folio_fin (sobre Remision.folio_medline,
+        con respaldo en Remision.remision si folio_medline está vacío)
+    Devuelve siempre JSON en caso de error (consumido desde la SPA Next.js).
     """
-    # 1. Filtro base: Origen MEDLINE y que tengan archivo físico registrado (toda la BD)
     queryset = Remision.objects.filter(
         origen__nombre__icontains='MEDLINE'
     ).exclude(boleta_salida_medline__exact='').exclude(boleta_salida_medline__isnull=True)
 
-    # Validar si la consulta regresó resultados antes de procesar
-    if not queryset.exists():
-        messages.warning(request, "No se encontraron boletas de salida MEDLINE en la base de datos.")
-        return redirect('remision_lista')
+    fecha_inicio = (request.POST.get('fecha_inicio') or request.GET.get('fecha_inicio') or '').strip()
+    fecha_fin    = (request.POST.get('fecha_fin')    or request.GET.get('fecha_fin')    or '').strip()
+    folio_inicio = (request.POST.get('folio_inicio') or request.GET.get('folio_inicio') or '').strip()
+    folio_fin    = (request.POST.get('folio_fin')    or request.GET.get('folio_fin')    or '').strip()
 
-    # 2. Creación del ZIP en memoria
+    if fecha_inicio and fecha_fin:
+        try:
+            queryset = queryset.filter(fecha__range=(fecha_inicio, fecha_fin))
+        except Exception:
+            return JsonResponse({'error': 'Rango de fechas inválido. Usa formato YYYY-MM-DD.'}, status=400)
+
+    if folio_inicio and folio_fin:
+        queryset = queryset.filter(
+            Q(folio_medline__gte=folio_inicio, folio_medline__lte=folio_fin) |
+            Q(remision__gte=folio_inicio, remision__lte=folio_fin)
+        )
+
+    if not queryset.exists():
+        return JsonResponse({
+            'error': 'No se encontraron boletas MEDLINE con archivo adjunto para los filtros indicados.'
+        }, status=404)
+
     buffer = BytesIO()
     archivos_agregados = 0
+    errores_lectura = []
 
     with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
         for remision in queryset:
             archivo = remision.boleta_salida_medline
+            if not (archivo and hasattr(archivo, 'name') and archivo.name):
+                continue
+            try:
+                ext = archivo.name.split('.')[-1] if '.' in archivo.name else 'pdf'
+                folio_ld_part   = remision.folio_ld  or 'SinFolioCarga'
+                folio_dlv_part  = remision.folio_dlv or 'SinFolioDescarga'
+                remision_part   = remision.remision or remision.folio_medline or str(remision.pk)
+                nuevo_nombre    = f"{remision_part}_{folio_ld_part}_{folio_dlv_part}.{ext}"
 
-            if archivo and hasattr(archivo, 'name') and archivo.name:
+                file_data = None
                 try:
-                    # Nombre del archivo: {remision}_{folio_ld}_{folio_dlv}
-                    ext = archivo.name.split('.')[-1]
-                    folio_ld_part = remision.folio_ld or 'SinFolioCarga'
-                    folio_dlv_part = remision.folio_dlv or 'SinFolioDescarga'
-                    remision_part = remision.remision or remision.folio_medline or str(remision.pk)
-                    nuevo_nombre = f"{remision_part}_{folio_ld_part}_{folio_dlv_part}.{ext}"
-
-                    file_data = None
-
-                    # INTENTO A: Lectura directa desde el Storage (Recomendado para S3)
+                    with archivo.open('rb') as f:
+                        file_data = f.read()
+                except Exception:
                     try:
-                        with archivo.open('rb') as f:
-                            file_data = f.read()
-                    except Exception:
-                        # INTENTO B: Descarga vía URL pública (Fallback si falla el IAM/Storage)
-                        try:
-                            req = urllib.request.Request(
-                                archivo.url,
-                                headers={'User-Agent': 'Mozilla/5.0'}
-                            )
-                            with urllib.request.urlopen(req) as response:
-                                file_data = response.read()
-                        except Exception as e_url:
-                            print(f"Error crítico leyendo archivo {nuevo_nombre}: {e_url}")
+                        req = urllib.request.Request(archivo.url, headers={'User-Agent': 'Mozilla/5.0'})
+                        with urllib.request.urlopen(req, timeout=30) as response:
+                            file_data = response.read()
+                    except Exception as e_url:
+                        errores_lectura.append(f"{nuevo_nombre}: {e_url}")
+                        continue
 
-                    # Si obtuvimos datos, agregamos al ZIP
-                    if file_data:
-                        zip_file.writestr(nuevo_nombre, file_data)
-                        archivos_agregados += 1
+                if file_data:
+                    zip_file.writestr(nuevo_nombre, file_data)
+                    archivos_agregados += 1
+            except Exception as e:
+                errores_lectura.append(f"id={remision.id}: {e}")
+                continue
 
-                except Exception as e:
-                    print(f"Error procesando remisión {remision.id}: {e}")
-                    continue
-
-    # 4. Verificación final de integridad
     if archivos_agregados == 0:
-        messages.error(request, "Se encontraron registros, pero no fue posible leer los archivos físicos en S3.")
-        return redirect('remision_lista')
+        return JsonResponse({
+            'error': 'Se encontraron registros pero no fue posible leer los archivos en S3.',
+            'detalles': errores_lectura[:10],
+        }, status=502)
 
-    # 5. Retornar respuesta de descarga
     buffer.seek(0)
-    response = HttpResponse(buffer.getvalue(), content_type='application/zip')
-    response['Content-Disposition'] = 'attachment; filename="Boletas_Salida_MEDLINE.zip"'
+    filename_parts = ['Boletas_MEDLINE']
+    if fecha_inicio and fecha_fin:
+        filename_parts.append(f'{fecha_inicio}_a_{fecha_fin}')
+    elif folio_inicio and folio_fin:
+        filename_parts.append(f'{folio_inicio}_a_{folio_fin}')
+    filename = '_'.join(filename_parts) + '.zip'
 
+    response = HttpResponse(buffer.getvalue(), content_type='application/zip')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response['X-Archivos-Agregados'] = str(archivos_agregados)
     return response
 
 
@@ -2363,6 +2382,15 @@ def _unidad_to_dict(u):
         'insurance_due_date': str(u.insurance_due_date) if u.insurance_due_date else '',
         'circulation_license': u.circulation_license or '',
         'license_due_date': str(u.license_due_date) if u.license_due_date else '',
+        # SCT / Carta Porte
+        'permiso_sct': u.permiso_sct or '',
+        'no_permiso_sct': u.no_permiso_sct or '',
+        'nombre_aseguradora': u.nombre_aseguradora or '',
+        'no_poliza_seguro': u.no_poliza_seguro or '',
+        'eco_remolque_1': u.eco_remolque_1 or '',
+        'placa_remolque_1': u.placa_remolque_1 or '',
+        'eco_remolque_2': u.eco_remolque_2 or '',
+        'placa_remolque_2': u.placa_remolque_2 or '',
         'notes': u.notes or '',
         'empresas': _empresas_ids(u),
     }
@@ -2370,9 +2398,17 @@ def _unidad_to_dict(u):
 def _unidad_from_body(u, body):
     for field in ('internal_id', 'license_plate', 'make_model', 'color', 'vin',
                   'asset_type', 'ownership', 'operational_status',
-                  'insurance_policy', 'circulation_license', 'notes'):
+                  'insurance_policy', 'circulation_license',
+                  'permiso_sct', 'no_permiso_sct',
+                  'nombre_aseguradora', 'no_poliza_seguro',
+                  'eco_remolque_1', 'placa_remolque_1',
+                  'eco_remolque_2', 'placa_remolque_2',
+                  'notes'):
         if field in body:
-            setattr(u, field, body[field] or None)
+            val = body[field]
+            if isinstance(val, str):
+                val = val.strip()
+            setattr(u, field, val or None)
     for date_field in ('acquisition_date', 'insurance_due_date', 'license_due_date'):
         if date_field in body:
             setattr(u, date_field, body[date_field] or None)

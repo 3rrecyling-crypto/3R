@@ -27,6 +27,7 @@ def _parse_put_multipart(request):
 from .models import (
     Empleado, Salario, TipoViaje, TipoCarga, DivisionOperativa,
     Departamento, Puesto, Vacacion, HistoricoVacaciones, Prestamo,
+    TipoDocumentoOperador, DocumentoOperador,
 )
 
 
@@ -132,16 +133,87 @@ def _empleado_to_dict(e):
         'documentos_operador': [
             {
                 'id': d.id,
-                'tipo_documento': d.tipo_documento or '',
+                'tipo_documento': d.tipo_documento.nombre if d.tipo_documento_id else '',
                 'numero_documento': d.numero_documento or '',
                 'fecha_expedicion': str(d.fecha_expedicion) if d.fecha_expedicion else '',
                 'fecha_vencimiento': str(d.fecha_vencimiento) if d.fecha_vencimiento else '',
                 'observaciones': d.observaciones or '',
-                'archivo_url': d.archivo.url if d.archivo else None,
+                'archivo_url': d.archivo.url if d.archivo and hasattr(d.archivo, 'url') else None,
             }
-            for d in e.documentos_operador.all()
+            for d in e.documentos_operador.select_related('tipo_documento').all()
         ] if hasattr(e, 'documentos_operador') else [],
     }
+
+
+def _parse_fecha(v):
+    if not v: return None
+    if isinstance(v, (date, datetime)):
+        return v.date() if isinstance(v, datetime) else v
+    try:
+        return datetime.strptime(str(v)[:10], '%Y-%m-%d').date()
+    except Exception:
+        return None
+
+
+def _save_documentos_operador(empleado, post_data, files_data):
+    """Guarda/actualiza/elimina DocumentoOperador a partir del JSON enviado.
+    Los archivos se reciben en campos 'doc_op_archivo_<idx>' (idx = posición en el JSON).
+    """
+    raw = post_data.get('documentos_operador_json')
+    if raw is None:
+        return  # no se enviaron documentos, dejar como estaba
+    try:
+        items = json.loads(raw or '[]')
+        if not isinstance(items, list):
+            items = []
+    except Exception:
+        return
+
+    existentes = {d.id: d for d in empleado.documentos_operador.all()}
+    ids_finales = set()
+
+    for idx, item in enumerate(items):
+        nombre_tipo = (item.get('tipo_documento') or '').strip().upper()
+        if not nombre_tipo:
+            continue
+        tipo = TipoDocumentoOperador.objects.filter(nombre__iexact=nombre_tipo).first()
+        if not tipo:
+            tipo = TipoDocumentoOperador.objects.create(nombre=nombre_tipo)
+
+        numero = (item.get('numero_documento') or '').strip() or None
+        f_exp = _parse_fecha(item.get('fecha_expedicion'))
+        f_venc = _parse_fecha(item.get('fecha_vencimiento'))
+        obs = (item.get('observaciones') or '').strip() or None
+        archivo = files_data.get(f'doc_op_archivo_{idx}')
+
+        doc_id = item.get('id')
+        if doc_id and int(doc_id) in existentes:
+            doc = existentes[int(doc_id)]
+            doc.tipo_documento = tipo
+            doc.numero_documento = numero
+            doc.fecha_expedicion = f_exp
+            doc.fecha_vencimiento = f_venc
+            doc.observaciones = obs
+            if archivo:
+                doc.archivo = archivo
+            doc.save()
+            ids_finales.add(doc.id)
+        else:
+            kwargs = dict(
+                empleado=empleado, tipo_documento=tipo,
+                numero_documento=numero,
+                fecha_expedicion=f_exp, fecha_vencimiento=f_venc,
+                observaciones=obs,
+            )
+            if archivo:
+                kwargs['archivo'] = archivo
+            doc = DocumentoOperador.objects.create(**kwargs)
+            ids_finales.add(doc.id)
+
+    # eliminar los que ya no vienen
+    for old_id, old_doc in existentes.items():
+        if old_id not in ids_finales:
+            old_doc.delete()
 
 
 def _apply_empleado_fields(empleado, data):
@@ -216,6 +288,8 @@ def api_rh_crear_empleado(request):
             if divs:
                 empleado.division_operativa.set(DivisionOperativa.objects.filter(id__in=divs))
 
+            _save_documentos_operador(empleado, request.POST, request.FILES)
+
         return JsonResponse(_empleado_to_dict(empleado), status=201)
     except Exception as exc:
         return JsonResponse({'error': str(exc)}, status=400)
@@ -241,6 +315,7 @@ def api_rh_empleado_detail(request, pk):
             empleado.tipo_viaje.set(TipoViaje.objects.filter(id__in=post_data.getlist('tipo_viaje')))
             empleado.tipo_carga.set(TipoCarga.objects.filter(id__in=post_data.getlist('tipo_carga')))
             empleado.division_operativa.set(DivisionOperativa.objects.filter(id__in=post_data.getlist('division_operativa')))
+            _save_documentos_operador(empleado, post_data, files_data)
         return JsonResponse(_empleado_to_dict(empleado))
     except Exception as exc:
         return JsonResponse({'error': str(exc)}, status=400)

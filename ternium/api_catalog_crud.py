@@ -265,9 +265,26 @@ def api_cat_material_detail(request, pk):
     return JsonResponse({'error': 'Metodo no permitido'}, status=405)
 
 # ── UNIDADES ─────────────────────────────────────────────────────────────
+_UNIDAD_TEXT_FIELDS = (
+    'internal_id', 'license_plate', 'make_model', 'color', 'vin',
+    'asset_type', 'ownership', 'operational_status',
+    'insurance_policy', 'circulation_license',
+    'permiso_sct', 'no_permiso_sct',
+    'nombre_aseguradora', 'no_poliza_seguro',
+    'eco_remolque_1', 'placa_remolque_1', 'eco_remolque_2', 'placa_remolque_2',
+    'notes',
+)
+_UNIDAD_DATE_FIELDS = ('acquisition_date', 'insurance_due_date', 'license_due_date')
+
 def _unidad_to_dict(u):
-    return {'id': u.id, 'internal_id': u.internal_id, 'license_plate': u.license_plate or '',
-            'make_model': u.make_model or '', 'asset_type': u.asset_type, 'operational_status': u.operational_status}
+    out = {'id': u.id}
+    for f in _UNIDAD_TEXT_FIELDS:
+        out[f] = getattr(u, f, None) or ''
+    for f in _UNIDAD_DATE_FIELDS:
+        v = getattr(u, f, None)
+        out[f] = v.isoformat() if v else ''
+    out['year'] = u.year or ''
+    return out
 
 @csrf_exempt
 @login_required
@@ -282,18 +299,27 @@ def api_cat_unidades(request):
         if err: return err
         body, err = _json_body(request)
         if err: return err
-        internal_id = body.get('internal_id', '').strip()
+        internal_id = (body.get('internal_id') or '').strip()
         if not internal_id:
             return JsonResponse({'error': 'El ID interno es requerido'}, status=400)
         if Unidad.objects.filter(internal_id__iexact=internal_id).exists():
             return JsonResponse({'error': 'Ya existe una unidad con ese ID'}, status=400)
-        u = Unidad.objects.create(
-            internal_id=internal_id,
-            license_plate=body.get('license_plate', '') or None,
-            make_model=body.get('make_model', '') or None,
-            asset_type=body.get('asset_type', 'TRACTOR'),
-            operational_status=body.get('operational_status', 'ACTIVO'),
-        )
+        kwargs = {'internal_id': internal_id}
+        for f in _UNIDAD_TEXT_FIELDS:
+            if f == 'internal_id': continue
+            if f in body:
+                v = (body.get(f) or '').strip() if isinstance(body.get(f), str) else body.get(f)
+                kwargs[f] = v or None
+        for f in _UNIDAD_DATE_FIELDS:
+            if f in body and body[f]:
+                kwargs[f] = body[f]
+        if body.get('year') not in (None, '', 0):
+            try: kwargs['year'] = int(body['year'])
+            except Exception: pass
+        kwargs.setdefault('asset_type', 'TRACTOR')
+        kwargs.setdefault('operational_status', 'ACTIVO')
+        kwargs.setdefault('ownership', 'PROPIA')
+        u = Unidad.objects.create(**kwargs)
         return JsonResponse(_unidad_to_dict(u), status=201)
     return JsonResponse({'error': 'Metodo no permitido'}, status=405)
 
@@ -308,8 +334,18 @@ def api_cat_unidad_detail(request, pk):
         if err: return err
         body, err = _json_body(request)
         if err: return err
-        for field in ('internal_id', 'license_plate', 'make_model', 'asset_type', 'operational_status'):
-            if field in body: setattr(u, field, body[field] or None)
+        for f in _UNIDAD_TEXT_FIELDS:
+            if f in body:
+                v = body[f]
+                if isinstance(v, str):
+                    v = v.strip()
+                setattr(u, f, v or None)
+        for f in _UNIDAD_DATE_FIELDS:
+            if f in body:
+                setattr(u, f, body[f] or None)
+        if 'year' in body:
+            try: u.year = int(body['year']) if body['year'] not in (None, '') else None
+            except Exception: u.year = None
         u.save()
         return JsonResponse(_unidad_to_dict(u))
     if request.method == 'DELETE':

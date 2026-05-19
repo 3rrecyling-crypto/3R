@@ -22,12 +22,46 @@ def _require_auth(request):
     return None
 
 
+def _licencia_federal_de_empleado(emp):
+    """
+    Devuelve (numero, fecha_vencimiento_iso) buscando en RH.DocumentoOperador
+    un documento cuyo tipo sea 'LICENCIA FEDERAL' (prioritario) o 'LICENCIA'.
+    Toma el de mayor fecha_expedicion (o el más reciente por id).
+    """
+    try:
+        docs = list(
+            emp.documentos_operador
+               .select_related('tipo_documento')
+               .filter(tipo_documento__nombre__icontains='LICENCIA')
+        )
+    except Exception:
+        return ('', '')
+    if not docs:
+        return ('', '')
+
+    def _rank(d):
+        nombre = (d.tipo_documento.nombre or '').upper()
+        prio = 0 if 'FEDERAL' in nombre else 1
+        fecha = d.fecha_expedicion or d.fecha_vencimiento
+        return (prio, -(fecha.toordinal() if fecha else 0), -d.id)
+
+    docs.sort(key=_rank)
+    elegido = docs[0]
+    numero = (elegido.numero_documento or '').strip()
+    venc = elegido.fecha_vencimiento.isoformat() if elegido.fecha_vencimiento else ''
+    return (numero, venc)
+
+
 def _empleado_lite(emp):
+    numero_lic, venc_lic = _licencia_federal_de_empleado(emp)
+    legacy_num = getattr(emp, 'numero_licencia', '') or getattr(emp, 'licencia', '') or ''
     return {
         'id': str(emp.id),
         'nombre': emp.nombre_completo,
         'rfc': getattr(emp, 'rfc', '') or '',
-        'numero_licencia': getattr(emp, 'numero_licencia', '') or getattr(emp, 'licencia', '') or '',
+        'numero_licencia': numero_lic or legacy_num or '',
+        'licencia_vencimiento': venc_lic,
+        'licencia_fuente': 'RH/DocumentoOperador' if numero_lic else ('legacy' if legacy_num else ''),
     }
 
 
@@ -151,6 +185,7 @@ def _viaje_dict(v, full=False):
         'id': v.id,
         'numero_viaje': v.numero_viaje or v.id,
         'id_viaje': v.id_viaje,
+        'folio_carta': f"CT-{v.numero_viaje:06d}" if v.numero_viaje else (v.id_viaje or ''),
         'folio_carga': v.folio_carga or '',
         'fecha_viaje': str(v.fecha_viaje) if v.fecha_viaje else '',
         'operador_id': str(v.operador_id),
@@ -219,6 +254,60 @@ def api_operadores(request):
     return JsonResponse({'results': [_empleado_lite(e) for e in qs]})
 
 
+@csrf_exempt
+@require_http_methods(["PUT", "PATCH", "POST"])
+def api_operador_licencia(request, pk):
+    """
+    PUT /ternium/api/operadores/<empleado_uuid>/licencia/
+    Body JSON: { "numero": "...", "fecha_vencimiento": "YYYY-MM-DD" (opcional), "fecha_expedicion": "YYYY-MM-DD" (opcional) }
+    Upserta un DocumentoOperador del empleado con tipo 'LICENCIA FEDERAL'.
+    """
+    err = _require_auth(request)
+    if err:
+        return err
+    from RH.models import Empleado, TipoDocumentoOperador, DocumentoOperador
+    emp = get_object_or_404(Empleado, pk=pk)
+    try:
+        body = json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    numero = (body.get('numero') or '').strip() or None
+    fexp   = body.get('fecha_expedicion') or None
+    fvenc  = body.get('fecha_vencimiento') or None
+
+    tipo = TipoDocumentoOperador.objects.filter(nombre__iexact='LICENCIA FEDERAL').first()
+    if not tipo:
+        # Fallback: tipo 'LICENCIA' (cualquier match LICENCIA, priorizando FEDERAL)
+        tipo = TipoDocumentoOperador.objects.filter(nombre__icontains='LICENCIA').order_by('nombre').first()
+    if not tipo:
+        tipo = TipoDocumentoOperador.objects.create(nombre='LICENCIA FEDERAL')
+
+    doc = (
+        emp.documentos_operador
+           .filter(tipo_documento__nombre__icontains='LICENCIA')
+           .order_by('-id')
+           .first()
+    )
+    if doc is None:
+        doc = DocumentoOperador(empleado=emp, tipo_documento=tipo)
+    else:
+        doc.tipo_documento = tipo
+
+    doc.numero_documento = numero
+    doc.fecha_expedicion = fexp or None
+    doc.fecha_vencimiento = fvenc or None
+    doc.save()
+
+    numero_lic, venc_iso = _licencia_federal_de_empleado(emp)
+    return JsonResponse({
+        'id': doc.id,
+        'empleado_id': str(emp.id),
+        'numero_licencia': numero_lic,
+        'licencia_vencimiento': venc_iso,
+    })
+
+
 # ─── Viajes ───────────────────────────────────────────────────────────────────
 
 @require_GET
@@ -240,6 +329,24 @@ def api_viajes_list(request):
             Q(operador__apellido__icontains=search) |
             Q(unidad__internal_id__icontains=search)
         )
+
+    origen_id = (request.GET.get('origen_id') or '').strip()
+    if origen_id:
+        try: qs = qs.filter(origen_id=int(origen_id))
+        except (TypeError, ValueError): pass
+
+    destino_id = (request.GET.get('destino_id') or '').strip()
+    if destino_id:
+        try: qs = qs.filter(destino_id=int(destino_id))
+        except (TypeError, ValueError): pass
+
+    fecha_desde = (request.GET.get('fecha_desde') or '').strip()
+    if fecha_desde:
+        qs = qs.filter(fecha_viaje__gte=fecha_desde)
+
+    fecha_hasta = (request.GET.get('fecha_hasta') or '').strip()
+    if fecha_hasta:
+        qs = qs.filter(fecha_viaje__lte=fecha_hasta)
     try:
         page_size = min(int(request.GET.get('page_size', 20)), 100)
         page = max(int(request.GET.get('page', 1)), 1)
@@ -638,7 +745,9 @@ def api_viaje_pdf(request, pk):
     )
 
     # Bloque derecho: 4 grupos etiqueta-valor con tipografía mejorada
-    folio_display = f"{v.folio_carga}" if v.folio_carga else (v.id_viaje or '')
+    # Folio de Carta de Traslado: consecutivo iniciando en CT-000001 (basado en numero_viaje)
+    folio_ct = f"CT-{v.numero_viaje:06d}" if v.numero_viaje else (v.id_viaje or '—')
+    folio_display = folio_ct
     fmt_fecha = ''
     if v.fecha_viaje:
         try:
@@ -773,12 +882,15 @@ def api_viaje_pdf(request, pk):
     # ─── Figura de Transporte ─────────────────────────────────────────────
     story.append(section_title('Figura de Transporte'))
     op = v.operador
+    numero_lic, _ = _licencia_federal_de_empleado(op)
+    if not numero_lic:
+        numero_lic = getattr(op, 'numero_licencia', '') or getattr(op, 'licencia', '') or ''
     fig = Table([
         [Paragraph('RFC', s_cellh), Paragraph('Nombre del Operador', s_cellh), Paragraph('No. Licencia', s_cellh)],
         [
             Paragraph(getattr(op, 'rfc', '') or '—', s_cellc),
             Paragraph(op.nombre_completo, s_cell),
-            Paragraph(getattr(op, 'numero_licencia', '') or getattr(op, 'licencia', '') or '—', s_cellc),
+            Paragraph(numero_lic or '—', s_cellc),
         ],
     ], colWidths=[40*mm, 110*mm, 36*mm])
     fig.setStyle(table_style_v2(3))
@@ -920,5 +1032,5 @@ def api_viaje_pdf(request, pk):
     doc.build(story)
     buffer.seek(0)
     resp = HttpResponse(buffer.read(), content_type='application/pdf')
-    resp['Content-Disposition'] = f'inline; filename="carta-traslado-{v.folio_carga or v.id_viaje}.pdf"'
+    resp['Content-Disposition'] = f'inline; filename="carta-traslado-{folio_ct}.pdf"'
     return resp

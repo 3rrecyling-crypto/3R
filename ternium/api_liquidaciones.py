@@ -369,14 +369,22 @@ def api_viajes_exportar_excel(request):
             Q(operador__nombre__icontains=search) | Q(operador__apellido__icontains=search) |
             Q(unidad__internal_id__icontains=search)
         )
-    fi = request.GET.get('fecha_inicio', '')
-    ff = request.GET.get('fecha_fin', '')
+    fi = request.GET.get('fecha_inicio', '') or request.GET.get('fecha_desde', '')
+    ff = request.GET.get('fecha_fin', '')    or request.GET.get('fecha_hasta', '')
     if fi:
         try: qs = qs.filter(fecha_viaje__gte=datetime.strptime(fi, '%Y-%m-%d').date())
         except ValueError: pass
     if ff:
         try: qs = qs.filter(fecha_viaje__lte=datetime.strptime(ff, '%Y-%m-%d').date())
         except ValueError: pass
+    origen_id = (request.GET.get('origen_id') or '').strip()
+    if origen_id:
+        try: qs = qs.filter(origen_id=int(origen_id))
+        except (TypeError, ValueError): pass
+    destino_id = (request.GET.get('destino_id') or '').strip()
+    if destino_id:
+        try: qs = qs.filter(destino_id=int(destino_id))
+        except (TypeError, ValueError): pass
 
     wb = Workbook()
     ws = wb.active

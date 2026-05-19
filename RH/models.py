@@ -590,7 +590,7 @@ class TipoDocumentoOperador(models.Model):
 class DocumentoOperador(models.Model):
     empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, related_name='documentos_operador')
     tipo_documento = models.ForeignKey(TipoDocumentoOperador, on_delete=models.PROTECT)
-    archivo = models.FileField(upload_to=operador_documento_path)
+    archivo = models.FileField(upload_to=operador_documento_path, blank=True, null=True)
     numero_documento = models.CharField(max_length=100, blank=True, null=True, help_text="Número de licencia, folio, etc.")
     fecha_expedicion = models.DateField(null=True, blank=True)
     fecha_vencimiento = models.DateField(null=True, blank=True)

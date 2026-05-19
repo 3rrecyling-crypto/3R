@@ -223,6 +223,7 @@ urlpatterns = [
 
     # ── Módulo de Viajes / Carta de Traslado ─────────────────────────
     path('api/operadores/', api_viajes.api_operadores, name='api_operadores'),
+    path('api/operadores/<uuid:pk>/licencia/', api_viajes.api_operador_licencia, name='api_operador_licencia'),
     path('api/viajes/', api_viajes.api_viajes_list, name='api_viajes_list'),
     path('api/viajes/crear/', api_viajes.api_viaje_crear, name='api_viaje_crear'),
     path('api/viajes/<int:pk>/', api_viajes.api_viaje_detail, name='api_viaje_detail'),
