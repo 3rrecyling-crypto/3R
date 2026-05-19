@@ -4,7 +4,7 @@ from django.urls import path
 from . import views
 from django.urls import path, include
 from .forms import CustomLoginForm  # <--- Nombre correcto
-from . import api_views
+from . import api_views, api_viajes, api_liquidaciones
 from .views import (
     UnidadDetailView, UnidadUpdateView, LugarDetailView, LugarUpdateView, 
     EmpresaDetailView, EmpresaUpdateView, ContenedorDetailView, ContenedorUpdateView,
@@ -220,6 +220,28 @@ urlpatterns = [
     path('api/cat/unidades/<int:pk>/', api_views.api_cat_unidad_detail, name='api_cat_unidad_detail'),
     path('api/cat/contenedores/', api_views.api_cat_contenedores, name='api_cat_contenedores'),
     path('api/cat/contenedores/<int:pk>/', api_views.api_cat_contenedor_detail, name='api_cat_contenedor_detail'),
+
+    # ── Módulo de Viajes / Carta de Traslado ─────────────────────────
+    path('api/operadores/', api_viajes.api_operadores, name='api_operadores'),
+    path('api/viajes/', api_viajes.api_viajes_list, name='api_viajes_list'),
+    path('api/viajes/crear/', api_viajes.api_viaje_crear, name='api_viaje_crear'),
+    path('api/viajes/<int:pk>/', api_viajes.api_viaje_detail, name='api_viaje_detail'),
+    path('api/viajes/<int:pk>/pdf/', api_viajes.api_viaje_pdf, name='api_viaje_pdf'),
+    path('api/viajes/<int:viaje_id>/paradas/', api_viajes.api_parada_crear, name='api_parada_crear'),
+    path('api/viajes/paradas/<int:pk>/', api_viajes.api_parada_detail, name='api_parada_detail'),
+    path('api/viajes/<int:viaje_id>/mercancias/', api_viajes.api_mercancia_crear, name='api_mercancia_crear'),
+    path('api/viajes/mercancias/<int:pk>/', api_viajes.api_mercancia_detail, name='api_mercancia_detail'),
+    path('api/viajes/exportar-excel/', api_liquidaciones.api_viajes_exportar_excel, name='api_viajes_exportar_excel'),
+
+    # ── Liquidaciones de operador ────────────────────────────────────
+    path('api/liquidaciones/', api_liquidaciones.api_liquidaciones_list, name='api_liquidaciones_list'),
+    path('api/liquidaciones/exportar-excel/', api_liquidaciones.api_liquidaciones_exportar_excel, name='api_liquidaciones_exportar_excel'),
+    path('api/liquidaciones/crear/', api_liquidaciones.api_liquidacion_crear, name='api_liquidacion_crear'),
+    path('api/liquidaciones/viajes-pendientes/', api_liquidaciones.api_viajes_pendientes_liquidar, name='api_viajes_pendientes_liquidar'),
+    path('api/liquidaciones/<int:pk>/', api_liquidaciones.api_liquidacion_detail, name='api_liquidacion_detail'),
+    path('api/liquidaciones/<int:pk>/pdf/', api_liquidaciones.api_liquidacion_pdf, name='api_liquidacion_pdf'),
+    path('api/liquidaciones/<int:liquidacion_id>/conceptos/', api_liquidaciones.api_liquidacion_concepto_crear, name='api_liquidacion_concepto_crear'),
+    path('api/liquidaciones/conceptos/<int:pk>/', api_liquidaciones.api_liquidacion_concepto_detail, name='api_liquidacion_concepto_detail'),
 
     # ── Control Trane (Manifiestos) ──────────────────────────────────
     path('api/trane/manifiestos/', api_views.api_trane_manifiestos, name='api_trane_manifiestos'),

@@ -10,6 +10,7 @@ from .api_nextjs import (
     api_puestos_crear, api_puesto_detail,
     api_rh_vacacion_crear, api_rh_vacacion_detail, api_rh_empleado_balance_vacaciones,
     api_rh_prestamo_crear, api_rh_prestamo_detail,
+    api_rh_empleados_importar,
 )
 from django.http import HttpResponse
 
@@ -115,6 +116,7 @@ urlpatterns = [
     # Empleados CRUD
     path('api/empleados/', views.api_rh_empleados, name='api_empleados'),
     path('api/empleados/crear/', api_rh_crear_empleado, name='api_crear_empleado'),
+    path('api/empleados/importar/', api_rh_empleados_importar, name='api_empleados_importar'),
     path('api/empleados/<uuid:pk>/', api_rh_empleado_detail, name='api_empleado_detail'),
     path('api/empleados/<uuid:pk>/eliminar/', views.api_rh_eliminar_empleado, name='api_eliminar_empleado'),
     path('api/empleados/<uuid:pk>/restaurar/', views.api_rh_restaurar_empleado, name='api_restaurar_empleado'),

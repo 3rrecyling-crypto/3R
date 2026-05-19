@@ -659,3 +659,243 @@ def api_rh_prestamo_detail(request, pk):
         'documento_solicitud_url': p.documento_solicitud.url if p.documento_solicitud else None,
         'contrato_url': p.contrato.url if p.contrato else None,
     })
+
+
+# ── Importación masiva de empleados desde Excel/CSV ───────────────────────────
+
+_IMPORT_FIELD_MAP = {
+    'nombre': 'nombre_completo',
+    'nombrecompleto': 'nombre_completo',
+    'licencia': 'licencia',
+    'cp': 'codigo_postal', 'codigopostal': 'codigo_postal',
+    'calle': 'calle',
+    'numeroexterior': 'numero_exterior', 'noext': 'numero_exterior',
+    'colonia': 'colonia',
+    'localidad': 'localidad',
+    'municipio': 'municipio',
+    'estado': 'estado',
+    'pais': 'pais',
+    'fechadenacimiento': 'fecha_nacimiento', 'fechanacimiento': 'fecha_nacimiento',
+    'nacimiento': 'fecha_nacimiento',
+    'nss': 'nss',
+    'rfc': 'rfc',
+    'curp': 'curp',
+    'departamento': 'departamento',
+    'puesto': 'puesto',
+    'email': 'email', 'correo': 'email',
+    'telefono': 'telefono_personal', 'celular': 'telefono_personal',
+}
+
+
+def _norm_header(h):
+    if h is None:
+        return ''
+    import unicodedata
+    s = str(h).strip().lower()
+    s = unicodedata.normalize('NFD', s)
+    s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+    return s.replace(' ', '').replace('-', '').replace('_', '').replace('.', '')
+
+
+def _split_name(full):
+    parts = (full or '').strip().split()
+    if len(parts) >= 4:
+        return ' '.join(parts[:-2]), ' '.join(parts[-2:])
+    if len(parts) == 3:
+        return parts[0], ' '.join(parts[1:])
+    if len(parts) == 2:
+        return parts[0], parts[1]
+    return (parts[0] if parts else ''), ''
+
+
+def _parse_fecha(value):
+    if not value:
+        return None
+    if hasattr(value, 'date') and callable(value.date):
+        try:
+            return value.date()
+        except Exception:
+            pass
+    if hasattr(value, 'strftime'):
+        return value
+    s = str(value).strip().split(' ')[0]
+    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%Y/%m/%d', '%m/%d/%Y'):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _read_table(uploaded_file):
+    name = (uploaded_file.name or '').lower()
+    if name.endswith('.csv'):
+        import csv as _csv
+        import io as _io
+        text = uploaded_file.read().decode('utf-8-sig', errors='ignore')
+        reader = _csv.reader(_io.StringIO(text))
+        all_rows = [r for r in reader if any((c or '').strip() for c in r)]
+        if not all_rows:
+            return [], []
+        return all_rows[0], all_rows[1:]
+    try:
+        from openpyxl import load_workbook
+    except ImportError:
+        raise RuntimeError("openpyxl no esta instalado. pip install openpyxl")
+    wb = load_workbook(filename=uploaded_file, data_only=True, read_only=True)
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        return [], []
+    headers = list(rows[0])
+    data = [list(r) for r in rows[1:] if any(c not in (None, '') for c in r)]
+    return headers, data
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_rh_empleados_importar(request):
+    err = _require_auth(request)
+    if err:
+        return err
+
+    f = request.FILES.get('archivo')
+    if not f:
+        return JsonResponse({'error': "Falta el archivo (campo 'archivo')."}, status=400)
+
+    try:
+        headers, rows = _read_table(f)
+    except Exception as exc:
+        return JsonResponse({'error': 'No se pudo leer el archivo: ' + str(exc)}, status=400)
+
+    if not headers:
+        return JsonResponse({'error': 'El archivo esta vacio.'}, status=400)
+
+    col_to_field = {}
+    for idx, h in enumerate(headers):
+        key = _norm_header(h)
+        if key in _IMPORT_FIELD_MAP:
+            col_to_field[idx] = _IMPORT_FIELD_MAP[key]
+
+    if not col_to_field:
+        return JsonResponse({
+            'error': 'Ninguna columna coincide con campos conocidos. Usa encabezados como Nombre, CURP, RFC, NSS, Departamento, Puesto, etc.',
+            'headers_recibidos': [str(h) for h in headers],
+        }, status=400)
+
+    creados = 0
+    omitidos_dup = 0
+    errores = []
+    detalles_creados = []
+    deptos_cache = {}
+    puestos_cache = {}
+
+    def get_or_create_depto(nombre):
+        nombre = (nombre or '').strip()
+        if not nombre:
+            return None
+        key = nombre.upper()
+        if key in deptos_cache:
+            return deptos_cache[key]
+        obj = Departamento.objects.filter(nombre__iexact=nombre).first()
+        if not obj:
+            obj = Departamento.objects.create(nombre=nombre)
+        deptos_cache[key] = obj
+        return obj
+
+    def get_or_create_puesto(nombre):
+        nombre = (nombre or '').strip()
+        if not nombre:
+            return None
+        key = nombre.upper()
+        if key in puestos_cache:
+            return puestos_cache[key]
+        obj = Puesto.objects.filter(nombre__iexact=nombre).first()
+        if not obj:
+            obj = Puesto.objects.create(nombre=nombre)
+        puestos_cache[key] = obj
+        return obj
+
+    for row_idx, row in enumerate(rows, start=2):
+        data = {}
+        for col_idx, field in col_to_field.items():
+            try:
+                val = row[col_idx]
+            except IndexError:
+                val = None
+            if val is None:
+                continue
+            v = str(val).strip()
+            if v:
+                data[field] = v
+
+        curp = (data.get('curp') or '').upper().strip()
+        rfc = (data.get('rfc') or '').upper().strip()
+        if curp and Empleado.objects.filter(curp__iexact=curp).exists():
+            omitidos_dup += 1
+            continue
+        if rfc and Empleado.objects.filter(rfc__iexact=rfc).exists():
+            omitidos_dup += 1
+            continue
+
+        try:
+            with transaction.atomic():
+                nombre_full = data.get('nombre_completo', '')
+                nombre, apellido = _split_name(nombre_full)
+                if not nombre:
+                    errores.append({'fila': row_idx, 'error': 'Falta nombre'})
+                    continue
+
+                emp = Empleado(
+                    nombre=nombre.upper(),
+                    apellido=apellido.upper(),
+                    curp=curp or None,
+                    rfc=rfc or None,
+                    nss=(data.get('nss') or '').strip() or None,
+                    fecha_nacimiento=_parse_fecha(data.get('fecha_nacimiento')),
+                    codigo_postal=(data.get('codigo_postal') or '').strip() or None,
+                    colonia=(data.get('colonia') or '').strip() or None,
+                    ciudad=(data.get('localidad') or '').strip() or None,
+                    estado=(data.get('estado') or '').strip() or None,
+                    pais=(data.get('pais') or 'Mexico').strip() or 'Mexico',
+                    email=(data.get('email') or '').strip() or None,
+                    telefono_personal=(data.get('telefono_personal') or '').strip() or None,
+                )
+                partes_dir = []
+                if data.get('calle'):
+                    partes_dir.append(data['calle'].strip())
+                if data.get('numero_exterior'):
+                    partes_dir.append('#' + data['numero_exterior'].strip())
+                if data.get('municipio'):
+                    partes_dir.append(data['municipio'].strip())
+                if partes_dir:
+                    emp.direccion = ', '.join(partes_dir)
+
+                depto = get_or_create_depto(data.get('departamento'))
+                puesto = get_or_create_puesto(data.get('puesto'))
+                if depto:
+                    emp.departamento = depto
+                if puesto:
+                    emp.puesto = puesto
+
+                emp.save()
+                creados += 1
+                detalles_creados.append({
+                    'fila': row_idx,
+                    'id': str(emp.id),
+                    'nombre': (emp.nombre + ' ' + (emp.apellido or '')).strip(),
+                    'curp': emp.curp or '',
+                    'rfc': emp.rfc or '',
+                })
+        except Exception as exc:
+            errores.append({'fila': row_idx, 'error': str(exc)})
+
+    return JsonResponse({
+        'creados': creados,
+        'omitidos_duplicados': omitidos_dup,
+        'errores_count': len(errores),
+        'errores': errores[:50],
+        'detalles_creados': detalles_creados[:20],
+        'total_filas': len(rows),
+        'columnas_detectadas': {str(headers[i]): f for i, f in col_to_field.items()},
+    })

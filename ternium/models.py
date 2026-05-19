@@ -253,6 +253,16 @@ class Unidad(models.Model):
     insurance_due_date = models.DateField("Vencimiento de Póliza", blank=True, null=True)
     circulation_license = models.CharField("Tarjeta de Circulación", max_length=255, blank=True, null=True)
     license_due_date = models.DateField("Vencimiento de Tarjeta", blank=True, null=True)
+
+    # --- 3.b Datos SCT / Carta Porte (sin timbrar) ---
+    permiso_sct = models.CharField("Permiso SCT (Tipo)", max_length=50, blank=True, null=True, help_text="Ej: TPAF01")
+    no_permiso_sct = models.CharField("No. Permiso SCT", max_length=100, blank=True, null=True)
+    nombre_aseguradora = models.CharField("Nombre Aseguradora", max_length=200, blank=True, null=True)
+    no_poliza_seguro = models.CharField("No. Póliza Seguro", max_length=100, blank=True, null=True)
+    eco_remolque_1 = models.CharField("Eco. Remolque 1", max_length=50, blank=True, null=True)
+    placa_remolque_1 = models.CharField("Placa Remolque 1", max_length=50, blank=True, null=True)
+    eco_remolque_2 = models.CharField("Eco. Remolque 2", max_length=50, blank=True, null=True)
+    placa_remolque_2 = models.CharField("Placa Remolque 2", max_length=50, blank=True, null=True)
     
     # --- 4. Archivos y Evidencias ---
     display_photo = models.ImageField(
@@ -427,11 +437,29 @@ class Lugar(models.Model):
     estado = models.CharField("Estado", max_length=50, blank=True, null=True)
     pais = models.CharField("País", max_length=50, default="México", blank=True, null=True)
     
+    # Código de ubicación tipo OR000001 / DE000001 (auto-generado en save)
+    id_ubicacion = models.CharField("ID Ubicación", max_length=15, unique=True, blank=True, null=True,
+                                    help_text="Generado automáticamente: ORnnnnnn para Origen, DEnnnnnn para Destino")
+
     # Campo de búsqueda para el admin
-    search_fields = ['nombre', 'rfc', 'razon_social']
+    search_fields = ['nombre', 'rfc', 'razon_social', 'id_ubicacion']
 
     def __str__(self):
-        return self.nombre
+        return f"{self.id_ubicacion} - {self.nombre}" if self.id_ubicacion else self.nombre
+
+    def save(self, *args, **kwargs):
+        if not self.id_ubicacion:
+            prefix = 'OR' if self.tipo == 'ORIGEN' else ('DE' if self.tipo == 'DESTINO' else 'AM')
+            # Encontrar el siguiente número secuencial con ese prefijo
+            from django.db.models import Max
+            last = Lugar.objects.filter(id_ubicacion__startswith=prefix).aggregate(
+                m=Max('id_ubicacion'))['m']
+            try:
+                last_num = int(last[2:]) if last else 0
+            except (TypeError, ValueError):
+                last_num = 0
+            self.id_ubicacion = f"{prefix}{last_num + 1:06d}"
+        super().save(*args, **kwargs)
 
     def direccion_completa(self):
         """Retorna la dirección formateada en una sola línea."""
@@ -1635,3 +1663,209 @@ class DestinatarioAlertaMerma(models.Model):
 
     def __str__(self):
         return self.email
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MÓDULO DE VIAJES — Carta de Traslado (sin timbrar)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class Viaje(models.Model):
+    """
+    Bitácora de viajes para generar Cartas de Traslado (sin timbrar).
+    El operador se vincula a un Empleado de RH con puesto que contenga "OPERADOR".
+    """
+    ESTADO_CHOICES = [
+        ('PLANIFICADO', 'Planificado'),
+        ('EN_RUTA',     'En Ruta'),
+        ('ENTREGADO',   'Entregado'),
+        ('CANCELADO',   'Cancelado'),
+    ]
+
+    numero_viaje = models.PositiveIntegerField("Número de viaje", unique=True, blank=True, null=True,
+                                                db_index=True, help_text="ID interno secuencial autoincremental")
+    id_viaje = models.CharField("ID Viaje", max_length=20, unique=True, blank=True,
+                                help_text="Auto-generado tipo V-000001")
+    folio_carga = models.CharField("Folio de Carga", max_length=50, blank=True, null=True)
+    fecha_viaje = models.DateField("Fecha del Viaje")
+    operador = models.ForeignKey('RH.Empleado', on_delete=models.PROTECT,
+                                  related_name='viajes', verbose_name="Operador")
+    unidad = models.ForeignKey(Unidad, on_delete=models.PROTECT,
+                                related_name='viajes', verbose_name="Unidad")
+    origen = models.ForeignKey(Lugar, on_delete=models.PROTECT,
+                                related_name='viajes_origen', verbose_name="Lugar de Origen")
+    destino = models.ForeignKey(Lugar, on_delete=models.PROTECT,
+                                 related_name='viajes_destino', verbose_name="Lugar de Destino")
+    empresa = models.ForeignKey(Empresa, on_delete=models.SET_NULL, null=True, blank=True,
+                                related_name='viajes', verbose_name="Empresa")
+    sueldo_operador = models.DecimalField("Sueldo del operador", max_digits=12, decimal_places=2,
+                                           default=0, help_text="Pago al operador por este viaje")
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='PLANIFICADO')
+    observaciones = models.TextField(blank=True, null=True)
+    creado_por = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name='viajes_creados')
+    creado_en = models.DateTimeField(auto_now_add=True)
+    modificado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Viaje"
+        verbose_name_plural = "Viajes"
+        ordering = ['-numero_viaje']
+        permissions = [
+            ('acceso_viajes', 'Acceso al módulo de Viajes / Cartas de Traslado'),
+            ('exportar_viajes_pdf', 'Puede exportar Cartas de Traslado a PDF'),
+        ]
+
+    def save(self, *args, **kwargs):
+        from django.db.models import Max
+        if not self.numero_viaje:
+            last = Viaje.objects.aggregate(m=Max('numero_viaje'))['m']
+            self.numero_viaje = (last or 0) + 1
+        if not self.id_viaje:
+            self.id_viaje = f"V-{self.numero_viaje:06d}"
+        super().save(*args, **kwargs)
+
+    @property
+    def kms_totales(self):
+        return sum((p.kms or 0) for p in self.paradas.all())
+
+    @property
+    def mismo_origen_destino(self):
+        return self.origen_id is not None and self.origen_id == self.destino_id
+
+    def __str__(self):
+        return f"{self.id_viaje} — {self.origen} → {self.destino}"
+
+
+class ItinerarioParada(models.Model):
+    """Cada parada del itinerario del viaje (orden y kilómetros)."""
+    viaje = models.ForeignKey(Viaje, on_delete=models.CASCADE, related_name='paradas')
+    lugar = models.ForeignKey(Lugar, on_delete=models.PROTECT, related_name='paradas')
+    orden = models.PositiveSmallIntegerField(default=1)
+    fecha_hora = models.DateTimeField("Fecha y hora", blank=True, null=True)
+    kms = models.DecimalField("Kilómetros", max_digits=10, decimal_places=3, default=0)
+    observaciones = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Parada del Itinerario"
+        verbose_name_plural = "Paradas del Itinerario"
+        ordering = ['viaje', 'orden']
+
+    def __str__(self):
+        return f"{self.viaje.id_viaje} — #{self.orden} {self.lugar}"
+
+
+class ViajeMercancia(models.Model):
+    """Mercancía transportada en un tramo (origen→destino) del viaje."""
+    viaje = models.ForeignKey(Viaje, on_delete=models.CASCADE, related_name='mercancias')
+    parada_origen = models.ForeignKey(ItinerarioParada, on_delete=models.SET_NULL, null=True, blank=True,
+                                       related_name='mercancias_origen')
+    parada_destino = models.ForeignKey(ItinerarioParada, on_delete=models.SET_NULL, null=True, blank=True,
+                                        related_name='mercancias_destino')
+    clave_producto = models.CharField("Clave SAT del Producto", max_length=20, blank=True, null=True,
+                                       help_text="Ej: 14121503")
+    descripcion = models.CharField("Descripción", max_length=255)
+    cantidad = models.DecimalField("Cantidad", max_digits=12, decimal_places=2, default=1)
+    peso_kg = models.DecimalField("Peso (kg)", max_digits=12, decimal_places=3, default=0)
+    unidad_medida = models.CharField("Unidad de medida", max_length=10, default='H87',
+                                      help_text="Código SAT: H87=Pieza, KGM=Kilogramo, TNE=Tonelada métrica")
+    material_peligroso = models.BooleanField("¿Material peligroso?", default=False)
+    notas = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Mercancía del Viaje"
+        verbose_name_plural = "Mercancías del Viaje"
+        ordering = ['viaje', 'id']
+
+    def __str__(self):
+        return f"{self.descripcion} ({self.cantidad} × {self.peso_kg} kg)"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LIQUIDACIONES DE OPERADOR
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class LiquidacionOperador(models.Model):
+    """
+    Liquidación de pago a un operador por un periodo (semana / quincena / mes).
+    Suma los sueldos de los viajes en el rango + extras manuales - descuentos.
+    """
+    ESTADO_CHOICES = [
+        ('BORRADOR', 'Borrador'),
+        ('APROBADA', 'Aprobada'),
+        ('PAGADA',   'Pagada'),
+        ('CANCELADA', 'Cancelada'),
+    ]
+
+    folio = models.CharField("Folio", max_length=20, unique=True, blank=True,
+                              help_text="Auto-generado tipo L-000001")
+    operador = models.ForeignKey('RH.Empleado', on_delete=models.PROTECT,
+                                  related_name='liquidaciones', verbose_name="Operador")
+    fecha_inicio = models.DateField("Periodo desde")
+    fecha_fin = models.DateField("Periodo hasta")
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='BORRADOR')
+    fecha_pago = models.DateField(null=True, blank=True)
+    observaciones = models.TextField(blank=True, null=True)
+    creado_por = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name='liquidaciones_creadas')
+    creado_en = models.DateTimeField(auto_now_add=True)
+    modificado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Liquidación de Operador"
+        verbose_name_plural = "Liquidaciones de Operador"
+        ordering = ['-creado_en']
+        permissions = [
+            ('acceso_liquidaciones', 'Acceso al módulo de Liquidaciones de Operador'),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.folio:
+            from django.db.models import Max
+            last = LiquidacionOperador.objects.aggregate(m=Max('folio'))['m']
+            try:
+                last_num = int(last.split('-')[1]) if last else 0
+            except (AttributeError, IndexError, ValueError):
+                last_num = 0
+            self.folio = f"L-{last_num + 1:06d}"
+        super().save(*args, **kwargs)
+
+    @property
+    def total_viajes(self):
+        return sum((c.monto or 0) for c in self.conceptos.filter(tipo='VIAJE'))
+
+    @property
+    def total_extras(self):
+        return sum((c.monto or 0) for c in self.conceptos.filter(tipo='EXTRA'))
+
+    @property
+    def total_descuentos(self):
+        return sum((c.monto or 0) for c in self.conceptos.filter(tipo='DESCUENTO'))
+
+    @property
+    def total_pagar(self):
+        return self.total_viajes + self.total_extras - self.total_descuentos
+
+    def __str__(self):
+        return f"{self.folio} — {self.operador} ({self.fecha_inicio} a {self.fecha_fin})"
+
+
+class LiquidacionConcepto(models.Model):
+    """Cada renglón de la liquidación: viaje, extra (bono, peaje) o descuento."""
+    TIPO_CHOICES = [
+        ('VIAJE',     'Viaje'),
+        ('EXTRA',     'Extra / Bono'),
+        ('DESCUENTO', 'Descuento'),
+    ]
+    liquidacion = models.ForeignKey(LiquidacionOperador, on_delete=models.CASCADE, related_name='conceptos')
+    tipo = models.CharField(max_length=15, choices=TIPO_CHOICES, default='VIAJE')
+    descripcion = models.CharField(max_length=255)
+    monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    viaje = models.ForeignKey(Viaje, on_delete=models.SET_NULL, null=True, blank=True,
+                               related_name='conceptos_liquidacion')
+
+    class Meta:
+        verbose_name = "Concepto de Liquidación"
+        verbose_name_plural = "Conceptos de Liquidación"
+        ordering = ['liquidacion', 'id']
+
+    def __str__(self):
+        return f"{self.tipo}: {self.descripcion} (${self.monto})"
