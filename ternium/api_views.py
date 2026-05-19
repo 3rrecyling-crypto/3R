@@ -2656,6 +2656,8 @@ def api_admin_usuarios(request):
             'empresa': (profile.empresa or '') if profile else '',
             'grupos': [g.name for g in u.groups.all()],
             'empresas_autorizadas': [{'id': e.id, 'nombre': e.nombre} for e in profile.empresas_autorizadas.all()] if profile else [],
+            'last_login': u.last_login.isoformat() if u.last_login else None,
+            'date_joined': u.date_joined.isoformat() if u.date_joined else None,
         })
     return JsonResponse({'users': data})
 
@@ -2684,6 +2686,8 @@ def api_admin_usuario_permisos(request, pk):
             'empresas_autorizadas': [e.id for e in profile.empresas_autorizadas.all()],
             'all_empresas': all_empresas,
             'available_perms': [{'codename': p[0], 'label': p[1]} for p in _MODULE_PERMS],
+            'last_login': usuario.last_login.isoformat() if usuario.last_login else None,
+            'date_joined': usuario.date_joined.isoformat() if usuario.date_joined else None,
         })
     if request.method in ('PUT', 'PATCH', 'POST'):
         body, err = _json_body(request)
