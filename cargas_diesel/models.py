@@ -278,8 +278,27 @@ class CargaDiesel(models.Model):
     costo_total = models.DecimalField(max_digits=12, decimal_places=2, default=0, editable=False)
     precio_litro = models.DecimalField(max_digits=10, decimal_places=4, default=0, editable=False)
 
-    foto_bomba = models.ImageField(upload_to='diesel/bombas/%Y/%m/', verbose_name="Foto Bomba")
-    foto_odometro = models.ImageField(upload_to='diesel/odometros/%Y/%m/', verbose_name="Foto Odómetro")
+    # Fotos clásicas (mantienen compatibilidad). Ahora son opcionales para
+    # facilitar el registro en campo cuando el usuario no alcanza a tomar todas.
+    foto_bomba    = models.ImageField(upload_to='diesel/bombas/%Y/%m/',    verbose_name="Foto Bomba",    blank=True, null=True)
+    foto_odometro = models.ImageField(upload_to='diesel/odometros/%Y/%m/', verbose_name="Foto Odómetro", blank=True, null=True)
+
+    # ── NUEVO: trazabilidad operativa por carga ──────────────────────────
+    cinchos_anteriores = models.CharField("Cinchos anteriores", max_length=120, blank=True, default='')
+    cinchos_actuales   = models.CharField("Cinchos actuales",   max_length=120, blank=True, default='')
+    # Persona que estuvo presente / llenó el equipo. Si no se especifica,
+    # la view lo llena con el usuario logueado.
+    persona_relleno = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='diesel_cargas_realizadas',
+        verbose_name="Persona que realizó el llenado",
+    )
+
+    # Fotos opcionales adicionales (igual que el formulario operativo en campo).
+    foto_sticker      = models.ImageField(upload_to='diesel/stickers/%Y/%m/',      verbose_name="Foto Sticker",       blank=True, null=True)
+    foto_motor        = models.ImageField(upload_to='diesel/motor/%Y/%m/',         verbose_name="Foto Motor",         blank=True, null=True)
+    foto_thermo       = models.ImageField(upload_to='diesel/thermo/%Y/%m/',        verbose_name="Foto Thermo",        blank=True, null=True)
+    foto_horas_thermo = models.ImageField(upload_to='diesel/horas_thermo/%Y/%m/',  verbose_name="Foto Horas Thermo",  blank=True, null=True)
 
     rendimiento = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, verbose_name="Rendimiento Km/L")
 

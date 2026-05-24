@@ -486,6 +486,19 @@ def api_remisiones_lista(request):
         diff = total_dlv - total_ld
         porcentaje_merma = float(rem.porcentaje_merma) if rem.porcentaje_merma else 0
 
+        # Banderas para mostrar (o no) el botón de Reporte Destrucción (Word).
+        # Reflejan exactamente las mismas condicionales que el template Django:
+        #   {% if remision.permite_manifiesto_destruccion and
+        #         remision.destruccion_fiscal_completa %}
+        try:
+            permite_word = bool(rem.permite_manifiesto_destruccion)
+        except Exception:
+            permite_word = False
+        try:
+            destruccion_completa = bool(rem.destruccion_fiscal_completa)
+        except Exception:
+            destruccion_completa = False
+
         remisiones_data.append({
             'id': rem.pk,
             'remision': rem.remision,
@@ -504,6 +517,11 @@ def api_remisiones_lista(request):
             'detalles': detalles,
             'evidencias_urls': evidencias_urls,
             'facturas': facturas_data,
+            'permite_manifiesto_destruccion': permite_word,
+            'destruccion_fiscal_completa': destruccion_completa,
+            # Alias cortos (lo que ya consume el front Next.js).
+            'permite_manifiesto': permite_word,
+            'destruccion_completa': destruccion_completa,
         })
 
     # 8. CATÁLOGOS PARA LLENAR LOS SELECTS DEL FRONTEND

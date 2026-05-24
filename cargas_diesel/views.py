@@ -204,7 +204,14 @@ class CargaDieselCreateAPIView(APIView):
     def post(self, request):
         serializer = CargaDieselSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(usuario=request.user)
+            # `usuario` = el despachador (quien registra desde el sistema).
+            # `persona_relleno` = quien físicamente realizó el llenado en campo.
+            # Por defecto coinciden: si no viene `persona_relleno` en el
+            # request, se toma el usuario logueado.
+            extra = {'usuario': request.user}
+            if not serializer.validated_data.get('persona_relleno'):
+                extra['persona_relleno'] = request.user
+            serializer.save(**extra)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
