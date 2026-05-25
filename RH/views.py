@@ -6041,7 +6041,7 @@ def api_rh_empleados(request):
     if err:
         return err
 
-    qs = Empleado.objects.no_eliminados().select_related('departamento', 'puesto')
+    qs = Empleado.objects.no_eliminados().select_related('departamento', 'puesto').prefetch_related('empresas', 'division_operativa')
 
     search = request.GET.get('search', '').strip()
     if search:
@@ -6064,6 +6064,11 @@ def api_rh_empleados(request):
     empresa = request.GET.get('empresa', '')
     if empresa:
         qs = qs.filter(empresa=empresa)
+
+    # Filtro por División Operativa (M2M). Acepta ID numérico.
+    division = request.GET.get('division_operativa', '') or request.GET.get('division', '')
+    if division:
+        qs = qs.filter(division_operativa__id=division).distinct()
 
     ordering = request.GET.get('ordering', 'apellido')
     field_map = {
@@ -6089,6 +6094,10 @@ def api_rh_empleados(request):
 
     results = []
     for e in empleados:
+        # "División Operativa" en la UI = empresas asignadas (M2M nuevo a
+        # ternium.Empresa). Devolvemos los nombres como ya los maneja el
+        # catálogo, sin filtros adicionales.
+        divisiones_list = [emp.nombre for emp in e.empresas.all()]
         results.append({
             'id': str(e.id),
             'numero_empleado': e.numero_empleado or '',
@@ -6098,6 +6107,8 @@ def api_rh_empleados(request):
             'departamento': e.departamento.nombre if e.departamento else '',
             'puesto': e.puesto.nombre if e.puesto else '',
             'empresa': e.get_empresa_display() if e.empresa else '',
+            'divisiones': divisiones_list,
+            'divisiones_display': ', '.join(divisiones_list),
             'email': e.email or '',
             'telefono_personal': e.telefono_personal or '',
             'curp': e.curp or '',

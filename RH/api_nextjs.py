@@ -80,8 +80,15 @@ def _empleado_to_dict(e):
         'telefono_referencia_2': e.telefono_referencia_2 or '',
         'relacion_referencia_2': e.relacion_referencia_2 or '',
         'empresa': e.empresa or '',
+        # Lugar de operación (FK a ternium.Lugar). Devolvemos id + nombre.
+        'lugar_id': str(e.lugar_id) if getattr(e, 'lugar_id', None) else '',
+        'lugar_nombre': e.lugar.nombre if getattr(e, 'lugar_id', None) and e.lugar else '',
         'tipo_viaje': list(e.tipo_viaje.values_list('id', flat=True)),
         'tipo_carga': list(e.tipo_carga.values_list('id', flat=True)),
+        # `empresas_ids` = M2M nuevo a `ternium.Empresa`. Es la "División
+        # Operativa" que muestra la UI actual. El frontend lo lee en este
+        # nombre. Mantenemos `division_operativa` (legacy) por compatibilidad.
+        'empresas_ids': list(e.empresas.values_list('id', flat=True)),
         'division_operativa': list(e.division_operativa.values_list('id', flat=True)),
         'banco': e.banco or '',
         'numero_cuenta': e.numero_cuenta or '',
@@ -262,6 +269,17 @@ def _apply_empleado_fields(empleado, data):
         val = str(data['activo']).strip().lower()
         empleado.activo = val in ('true', '1', 'yes', 'si', 'sí', 'on')
 
+    # Lugar de operación actual (FK a ternium.Lugar). El form envía `lugar_id`.
+    if 'lugar_id' in data:
+        lid = data['lugar_id']
+        if lid:
+            try:
+                empleado.lugar_id = int(lid)
+            except (ValueError, TypeError):
+                empleado.lugar = None
+        else:
+            empleado.lugar = None
+
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -287,6 +305,13 @@ def api_rh_crear_empleado(request):
             divs = request.POST.getlist('division_operativa')
             if divs:
                 empleado.division_operativa.set(DivisionOperativa.objects.filter(id__in=divs))
+
+            # Empresas asignadas (M2M nuevo). El front envía `empresas_ids`.
+            # Si viene la clave, sobrescribimos completo (incluso si está vacío).
+            if 'empresas_ids' in request.POST or len(request.POST.getlist('empresas_ids')) > 0:
+                from ternium.models import Empresa as TerniumEmpresa
+                ids = [v for v in request.POST.getlist('empresas_ids') if v]
+                empleado.empresas.set(TerniumEmpresa.objects.filter(id__in=ids))
 
             _save_documentos_operador(empleado, request.POST, request.FILES)
 
@@ -315,6 +340,11 @@ def api_rh_empleado_detail(request, pk):
             empleado.tipo_viaje.set(TipoViaje.objects.filter(id__in=post_data.getlist('tipo_viaje')))
             empleado.tipo_carga.set(TipoCarga.objects.filter(id__in=post_data.getlist('tipo_carga')))
             empleado.division_operativa.set(DivisionOperativa.objects.filter(id__in=post_data.getlist('division_operativa')))
+            # Empresas asignadas (M2M nuevo a ternium.Empresa). El front envía
+            # `empresas_ids`. Sobrescribimos siempre (incluso vacío = limpiar).
+            from ternium.models import Empresa as TerniumEmpresa
+            empresa_ids = [v for v in post_data.getlist('empresas_ids') if v]
+            empleado.empresas.set(TerniumEmpresa.objects.filter(id__in=empresa_ids))
             _save_documentos_operador(empleado, post_data, files_data)
         return JsonResponse(_empleado_to_dict(empleado))
     except Exception as exc:
@@ -352,11 +382,19 @@ def api_rh_tipos_carga(request):
 
 
 def api_rh_divisiones(request):
-    """GET /rh/api/divisiones/"""
+    """GET /rh/api/divisiones/ — todas las divisiones operativas.
+
+    Kept for backward-compat; el formulario actual de empleados ya usa
+    `api.getCatEmpresas()` (catálogo Ternium) para los chips de "División
+    Operativa". Este endpoint sigue disponible por si algún otro consumidor
+    legacy depende de él.
+    """
     err = _require_auth(request)
     if err:
         return err
-    return JsonResponse({'results': list(DivisionOperativa.objects.values('id', 'nombre').order_by('nombre'))})
+    return JsonResponse({
+        'results': list(DivisionOperativa.objects.values('id', 'nombre').order_by('nombre')),
+    })
 
 
 # ── Departamentos CRUD ──────────────────────────────────────────────────────────

@@ -1664,6 +1664,101 @@ class DestinatarioAlertaMerma(models.Model):
     def __str__(self):
         return self.email
 
+
+class RemisionAlertaMermaLog(models.Model):
+    """
+    Bitácora de alertas de merma enviadas por remisión. Sirve únicamente
+    como bandera anti-duplicado: si una remisión ya tiene un registro aquí,
+    no se vuelve a enviar el correo (aunque la remisión se edite).
+    OneToOne para garantizar a nivel de BD que solo hay un registro por
+    remisión.
+    """
+    remision = models.OneToOneField(
+        'Remision', on_delete=models.CASCADE,
+        related_name='alerta_merma_log',
+        verbose_name="Remisión",
+    )
+    enviada_en = models.DateTimeField(auto_now_add=True, verbose_name="Enviada en")
+    materiales_alertados = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name="Cantidad de materiales que superaron el umbral",
+    )
+    detalle = models.TextField(
+        blank=True, default='',
+        verbose_name="Resumen de la alerta enviada",
+    )
+
+    class Meta:
+        verbose_name = 'Log de Alerta Merma'
+        verbose_name_plural = 'Logs de Alertas Merma'
+        ordering = ['-enviada_en']
+
+    def __str__(self):
+        return f"Alerta merma · remisión {self.remision_id} · {self.enviada_en:%Y-%m-%d %H:%M}"
+
+
+class Alerta(models.Model):
+    """
+    Alertas/mensajes que aparecen en el Centro de Alertas (campana del header
+    y módulo de administración). Las crean usuarios STAFF desde el panel
+    `/admin/centro-alertas`. Los usuarios marcan como leídas mediante el M2M
+    `leida_por` (cada usuario tiene su propio "leído").
+    """
+    TIPO_CHOICES = [
+        ('alert',   'Crítica'),
+        ('warning', 'Advertencia'),
+        ('info',    'Informativa'),
+        ('success', 'Éxito'),
+        ('neural',  'Neural'),
+    ]
+    tipo  = models.CharField(max_length=10, choices=TIPO_CHOICES, default='info')
+    title = models.CharField("Título", max_length=200)
+    desc  = models.TextField("Mensaje")
+    creada_por = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='alertas_creadas', verbose_name='Creada por',
+    )
+    creada_en = models.DateTimeField(auto_now_add=True)
+    # Cada usuario que abra esta alerta marca leído para él mismo. Así no
+    # interferimos entre staff distinto (cada uno tiene su badge "no leído").
+    leida_por = models.ManyToManyField(
+        User, blank=True, related_name='alertas_leidas',
+        verbose_name='Leída por',
+    )
+
+    class Meta:
+        verbose_name = 'Alerta'
+        verbose_name_plural = 'Alertas'
+        ordering = ['-creada_en']
+
+    def __str__(self):
+        return f"[{self.tipo}] {self.title} ({self.creada_en:%Y-%m-%d %H:%M})"
+
+
+class ChatMensaje(models.Model):
+    """
+    Mensaje del chat IA del asistente del sistema. Cada usuario tiene su
+    propio hilo de conversación (no se comparte entre usuarios).
+    """
+    ROL_CHOICES = [
+        ('user', 'Usuario'),
+        ('bot',  'Asistente'),
+    ]
+    user      = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_mensajes')
+    rol       = models.CharField(max_length=10, choices=ROL_CHOICES)
+    contenido = models.TextField()
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Mensaje del Chat IA'
+        verbose_name_plural = 'Mensajes del Chat IA'
+        ordering = ['creado_en']
+        indexes = [models.Index(fields=['user', 'creado_en'])]
+
+    def __str__(self):
+        return f"{self.user.username} [{self.rol}] {self.contenido[:50]}"
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # MÓDULO DE VIAJES — Carta de Traslado (sin timbrar)
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -13,7 +13,8 @@ from django.shortcuts import get_object_or_404
 from .models import (
     Remision, Empresa, Material, Lugar, ConfiguracionManifiesto,
     HistorialRemision, EvidenciaRemision, DetalleRemision,
-    ConfiguracionAlertaMerma, DestinatarioAlertaMerma,
+    ConfiguracionAlertaMerma, DestinatarioAlertaMerma, RemisionAlertaMermaLog,
+    Alerta, ChatMensaje,
 )
 
 import datetime
@@ -47,7 +48,7 @@ from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from django.conf import settings
 from .models import PrecioMedline
 
@@ -101,12 +102,21 @@ from django.conf import settings
 
 def enviar_alerta_merma(remision):
     """
-    Evalúa la merma por cada material del detalle.
+    Evalúa la merma por cada material del detalle de la remisión.
     El umbral se lee de ConfiguracionAlertaMerma (default 1 % si no existe
     configuración para ese material). Si algún material supera su umbral,
-    se envía un correo de alerta agrupando todos los materiales afectados.
+    se envía UN correo de alerta agrupando todos los materiales afectados.
+
+    Anti-duplicado: si ya existe `RemisionAlertaMermaLog` para esta remisión,
+    no se vuelve a mandar. Esto garantiza que el correo se envía SOLO UNA
+    VEZ por remisión, aunque la remisión se edite múltiples veces.
     """
     UMBRAL_DEFAULT = 1.0
+
+    # ── Anti-duplicado ──────────────────────────────────────────────────
+    # Si ya se mandó la alerta para esta remisión, no hacemos nada.
+    if RemisionAlertaMermaLog.objects.filter(remision=remision).exists():
+        return
 
     alertas = []
 
@@ -152,15 +162,160 @@ def enviar_alerta_merma(remision):
         for a in alertas
     )
 
+    # ── Helpers para formatear seguros ─────────────────────────────────
+    def _txt(v, fallback='—'):
+        if v is None: return fallback
+        s = str(v).strip()
+        return s if s else fallback
+
+    def _fmt_fecha(d):
+        try:
+            return d.strftime('%d/%m/%Y') if d else '—'
+        except Exception:
+            return str(d) if d else '—'
+
+    def _fmt_dt(d):
+        try:
+            return d.strftime('%d/%m/%Y %H:%M') if d else '—'
+        except Exception:
+            return str(d) if d else '—'
+
+    def _fmt_hora(h):
+        try:
+            return h.strftime('%H:%M') if h else '—'
+        except Exception:
+            return str(h) if h else '—'
+
+    def _fmt_num(n, dec=3):
+        try:
+            return f"{float(n):,.{dec}f}" if n is not None else '—'
+        except Exception:
+            return '—'
+
+    # ── Datos ya resueltos para el correo ──────────────────────────────
+    empresa_nombre   = _txt(remision.empresa.nombre if remision.empresa_id else None)
+    cliente_nombre   = _txt(remision.cliente.nombre if remision.cliente_id else None)
+    origen_nombre    = _txt(remision.origen.nombre if remision.origen_id else None)
+    destino_nombre   = _txt(remision.destino.nombre if remision.destino_id else None)
+    operador_nombre  = _txt(
+        remision.operador.nombre if remision.operador_id else (remision.operador_manual or None)
+    )
+    linea_nombre     = _txt(remision.linea_transporte.nombre if remision.linea_transporte_id else None)
+    unidad_nombre    = _txt(
+        f"{remision.unidad.numero_economico or remision.unidad.id}"
+        if remision.unidad_id else (remision.unidad_manual or None)
+    )
+    placas_unidad    = _txt(
+        getattr(remision.unidad, 'placas', None) if remision.unidad_id else remision.placas_unidad_manual
+    )
+    contenedor_nom   = _txt(
+        f"{remision.contenedor.numero or remision.contenedor.id}"
+        if remision.contenedor_id else (remision.contenedor_manual or None)
+    )
+    placas_contened  = _txt(
+        getattr(remision.contenedor, 'placas', None) if remision.contenedor_id else remision.placas_contenedor_manual
+    )
+
+    # Totales calculados
+    total_ld   = remision.total_peso_ld
+    total_dlv  = remision.total_peso_dlv
+    total_rech = remision.total_peso_rechazado
+    pct_global = remision.porcentaje_merma
+
+    # Status display amigable
+    status_display = dict(Remision.STATUS_CHOICES).get(remision.status, remision.status)
+
+    # Línea con todos los detalles de cada material (no solo los que superaron)
+    detalle_total_lineas = []
+    for det in remision.detalles.all():
+        mat = det.material.nombre if det.material else '—'
+        pld  = float(det.peso_ld or 0)
+        pdlv = float(det.peso_dlv or 0)
+        prec = float(det.peso_rechazado or 0)
+        mkg  = pld - (pdlv + prec)
+        mpct = (mkg / pld * 100) if pld > 0 else 0
+        detalle_total_lineas.append(
+            f"  • {mat:25} Carga: {pld:>10,.2f} Kg | Descarga: {pdlv:>10,.2f} Kg | "
+            f"Rechazo: {prec:>10,.2f} Kg | Merma: {mkg:>+10,.2f} Kg ({mpct:>+6.2f}%)"
+        )
+    detalle_total = "\n".join(detalle_total_lineas) if detalle_total_lineas else "  (sin detalles capturados)"
+
     asunto = f"⚠️ ALERTA DE MERMA: Remisión {remision.remision} ({len(alertas)} material(es))"
     mensaje = (
-        f"Se detectó merma inusual en la remisión {remision.remision}.\n\n"
-        f"DETALLES OPERATIVOS:\n"
-        f"  Origen:   {remision.origen.nombre if remision.origen else 'N/A'}\n"
-        f"  Destino:  {remision.destino.nombre if remision.destino else 'N/A'}\n"
-        f"  Operador: {remision.operador.nombre if remision.operador else remision.operador_manual or 'N/A'}\n\n"
-        f"MATERIALES CON MERMA SUPERIOR AL UMBRAL:\n{lineas}\n\n"
-        f"Por favor revise esta remisión en el sistema."
+        f"════════════════════════════════════════════════════════════════\n"
+        f"  ALERTA DE MERMA — REMISIÓN {remision.remision}\n"
+        f"════════════════════════════════════════════════════════════════\n\n"
+        f"Se detectó merma superior al umbral configurado en la siguiente\n"
+        f"remisión. Estos son TODOS los datos del registro:\n\n"
+
+        f"─── IDENTIFICACIÓN ──────────────────────────────────────────────\n"
+        f"  Folio Remisión:    {_txt(remision.remision)}\n"
+        f"  Folio Medline:     {_txt(remision.folio_medline)}\n"
+        f"  Fecha:             {_fmt_fecha(remision.fecha)}\n"
+        f"  Estatus:           {_txt(status_display)}\n"
+        f"  Empresa:           {empresa_nombre}\n"
+        f"  Cliente:           {cliente_nombre}\n\n"
+
+        f"─── TRANSPORTE ──────────────────────────────────────────────────\n"
+        f"  Operador:          {operador_nombre}\n"
+        f"  Línea Transporte:  {linea_nombre}\n"
+        f"  Unidad:            {unidad_nombre}\n"
+        f"  Placas Unidad:     {placas_unidad}\n"
+        f"  Contenedor:        {contenedor_nom}\n"
+        f"  Placas Contenedor: {placas_contened}\n\n"
+
+        f"─── RUTA Y TIEMPOS ──────────────────────────────────────────────\n"
+        f"  Origen:            {origen_nombre}\n"
+        f"  Destino:           {destino_nombre}\n"
+        f"  Inicia Carga:      {_fmt_dt(remision.inicia_ld)}\n"
+        f"  Termina Carga:     {_fmt_dt(remision.termina_ld)}\n"
+        f"  Folio Carga:       {_txt(remision.folio_ld)}\n"
+        f"  Inicia Descarga:   {_fmt_dt(remision.inicia_dlv)}\n"
+        f"  Termina Descarga:  {_fmt_dt(remision.termina_dlv)}\n"
+        f"  Folio Descarga:    {_txt(remision.folio_dlv)}\n"
+        f"  Hora Entrada:      {_fmt_hora(remision.hora_entrada)}\n"
+        f"  Hora Salida:       {_fmt_hora(remision.hora_salida)}\n\n"
+
+        f"─── BÁSCULA Y FACTURACIÓN ───────────────────────────────────────\n"
+        f"  Peso Báscula:      {_fmt_num(remision.peso_bascula)} Kg\n"
+        f"  Folio Factura:     {_txt(remision.factura_nombre)}\n\n"
+
+        f"─── TOTALES DE PESO ─────────────────────────────────────────────\n"
+        f"  Total Carga (LD):     {_fmt_num(total_ld)} Kg\n"
+        f"  Total Descarga (DLV): {_fmt_num(total_dlv)} Kg\n"
+        f"  Total Rechazo:        {_fmt_num(total_rech)} Kg\n"
+        f"  Merma Global:         {pct_global:+.2f}%\n\n"
+
+        f"─── DETALLE POR MATERIAL ────────────────────────────────────────\n"
+        f"{detalle_total}\n\n"
+
+        f"⚠️ MATERIALES QUE SUPERAN EL UMBRAL CONFIGURADO ⚠️\n"
+        f"{lineas}\n\n"
+
+        f"─── DESTRUCCIÓN FISCAL ──────────────────────────────────────────\n"
+        f"  Fecha Destrucción: {_fmt_fecha(remision.fecha_destruccion)}\n"
+        f"  Material 1:        {_txt(remision.destruccion_material_1)}"
+        f" ({_fmt_num(remision.destruccion_peso_1)} Kg)\n"
+        f"  Material 2:        {_txt(remision.destruccion_material_2)}"
+        f" ({_fmt_num(remision.destruccion_peso_2)} Kg)\n"
+        f"  Comentarios:       {_txt(remision.comentarios_destruccion)}\n\n"
+
+        f"─── OBSERVACIONES ───────────────────────────────────────────────\n"
+        f"  Descripción:       {_txt(remision.descripcion)}\n"
+        f"  Comentario:        {_txt(remision.comentario)}\n"
+        f"  Notas TRANE:       {_txt(remision.trazabilidad_notas)}\n\n"
+
+        f"─── AUDITORÍA ───────────────────────────────────────────────────\n"
+        f"  Auditado por:      "
+        f"{_txt(remision.auditado_por.get_full_name() or remision.auditado_por.username if remision.auditado_por_id else None)}\n"
+        f"  Auditado en:       {_fmt_dt(remision.auditado_en)}\n"
+        f"  Creado en:         {_fmt_dt(remision.creado_en)}\n"
+        f"  Última actualiz.:  {_fmt_dt(remision.actualizado_en)}\n\n"
+
+        f"────────────────────────────────────────────────────────────────\n"
+        f"Por favor revisa esta remisión en el sistema:\n"
+        f"https://app.3recycling.com.mx/detalle-remision/{remision.id}\n"
+        f"────────────────────────────────────────────────────────────────\n"
     )
 
     destinatarios = list(DestinatarioAlertaMerma.objects.values_list('email', flat=True))
@@ -174,8 +329,21 @@ def enviar_alerta_merma(remision):
             message=mensaje,
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=destinatarios,
-            fail_silently=True,
+            fail_silently=False,  # queremos saber si falla para NO registrar
         )
+        # Registramos el envío para que no se vuelva a mandar otro correo
+        # por la misma remisión (aunque luego se edite).
+        try:
+            RemisionAlertaMermaLog.objects.create(
+                remision=remision,
+                materiales_alertados=len(alertas),
+                detalle=lineas,
+            )
+        except Exception as log_err:
+            # Si falla el log por una race condition (otro proceso ya lo
+            # creó), no pasa nada — el correo ya se envió y la presencia
+            # del log evitará duplicados.
+            print(f"⚠️ Alerta enviada pero no se pudo registrar el log: {log_err}")
         print(f"✅ Alerta de merma enviada para la remisión {remision.remision}")
     except Exception as e:
         print(f"❌ Error al enviar alerta de merma: {e}")
@@ -215,23 +383,31 @@ def asignar_folio_medline(remision):
     month = f"{fecha_base.month:02d}"
     prefix = f"3R-{year}-{month}-"
 
+    # Contador GLOBAL (no por mes/año):
+    # · Encontramos el número más alto que se haya asignado en CUALQUIER
+    #   folio Medline previo, sin importar año o mes.
+    # · Asignamos el siguiente número entero al actual.
+    # · El prefijo siempre usa el año y mes de la remisión (fecha_base),
+    #   pero el número consecutivo crece monotónicamente.
     with transaction.atomic():
-        last_rem = (
+        existentes = (
             Remision.objects
             .select_for_update()
-            .filter(folio_medline__startswith=prefix)
-            .order_by('folio_medline')
-            .last()
+            .filter(folio_medline__startswith='3R-')
+            .values_list('folio_medline', flat=True)
         )
-        if last_rem and last_rem.folio_medline:
+        max_num = 0
+        for f in existentes:
+            if not f:
+                continue
             try:
-                last_num = int(last_rem.folio_medline.split('-')[-1])
-                next_num = last_num + 1
-            except ValueError:
-                next_num = 1
-        else:
-            next_num = 1
+                n = int(str(f).split('-')[-1])
+                if n > max_num:
+                    max_num = n
+            except (ValueError, TypeError):
+                continue
 
+        next_num = max_num + 1
         remision.folio_medline = f"{prefix}{next_num:03d}"
         remision.save(update_fields=['folio_medline'])
 
@@ -2044,8 +2220,12 @@ def cancelar_remision(request, pk):
 
             remision.save()
 
-            # 4. Renumerar folios Medline posteriores para cerrar el hueco
-            _renumerar_folios_medline(folio_liberado)
+            # 4. (Deshabilitado) Renumerar folios Medline posteriores.
+            # Con el contador GLOBAL monotónico, los huecos NO se rellenan:
+            # cada nuevo folio toma el max(existentes)+1 sin importar
+            # cancelaciones. Esto evita reorganizar registros históricos.
+            # _renumerar_folios_medline(folio_liberado)
+            _ = folio_liberado  # silencio el linter para variable usada antes
 
             # --- HISTORIAL: REGISTRAR CANCELACIÓN ---
             HistorialRemision.objects.create(
@@ -3028,4 +3208,170 @@ def api_destruccion_fiscal_catalogos(request):
     return JsonResponse({
         'origenes': list(origenes),
         'materiales': list(materiales),
+    })
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CENTRO DE ALERTAS (Bell icon + módulo de administración)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _alerta_to_dict(a, user=None):
+    """Serializa una Alerta. `unread` es relativo al usuario que consulta."""
+    unread = True
+    if user and user.is_authenticated:
+        unread = not a.leida_por.filter(pk=user.pk).exists()
+    # Tiempo relativo amigable ("hace 5 min", "ayer", etc.)
+    from django.utils.timesince import timesince
+    try:
+        relative = timesince(a.creada_en, timezone.now())
+        relative = f"hace {relative.split(',')[0]}"
+    except Exception:
+        relative = a.creada_en.strftime('%d/%m/%Y %H:%M')
+    return {
+        'id':     a.id,
+        'tipo':   a.tipo,
+        'type':   a.tipo,  # alias para compat con front
+        'title':  a.title,
+        'desc':   a.desc,
+        'message': a.desc,  # alias
+        'creada_en': a.creada_en.isoformat() if a.creada_en else None,
+        'time': relative,
+        'creada_por': (a.creada_por.get_full_name() or a.creada_por.username) if a.creada_por_id else None,
+        'unread': unread,
+    }
+
+
+@csrf_exempt
+@require_http_methods(['GET', 'POST'])
+def api_alertas_list(request):
+    """
+    GET  /api/alertas/  → lista todas las alertas (cualquier autenticado puede VER).
+    POST /api/alertas/  → crea una alerta (solo Staff).
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'No autenticado'}, status=401)
+
+    if request.method == 'GET':
+        qs = Alerta.objects.all().select_related('creada_por').prefetch_related('leida_por')
+        only_unread = request.GET.get('unread', '').lower() in ('1', 'true', 'yes')
+        if only_unread:
+            qs = qs.exclude(leida_por=request.user)
+        return JsonResponse({
+            'results': [_alerta_to_dict(a, request.user) for a in qs],
+            'total':   qs.count(),
+        })
+
+    # POST — crear alerta: SOLO staff/superuser
+    if not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({'error': 'Permiso denegado. Solo Staff puede crear alertas.'}, status=403)
+
+    try:
+        body = json.loads(request.body or '{}')
+    except Exception:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    tipo  = (body.get('tipo') or 'info').strip()
+    title = (body.get('title') or '').strip()
+    desc  = (body.get('desc') or body.get('message') or '').strip()
+
+    if tipo not in dict(Alerta.TIPO_CHOICES):
+        return JsonResponse({'error': f'Tipo inválido. Debe ser uno de: {list(dict(Alerta.TIPO_CHOICES).keys())}'}, status=400)
+    if not title:
+        return JsonResponse({'error': 'El título es obligatorio.'}, status=400)
+    if not desc:
+        return JsonResponse({'error': 'El mensaje es obligatorio.'}, status=400)
+
+    a = Alerta.objects.create(tipo=tipo, title=title, desc=desc, creada_por=request.user)
+    # El creador la marca automáticamente como leída para sí mismo.
+    a.leida_por.add(request.user)
+    return JsonResponse(_alerta_to_dict(a, request.user), status=201)
+
+
+@csrf_exempt
+@require_http_methods(['PATCH', 'POST', 'DELETE'])
+def api_alerta_detail(request, pk):
+    """
+    PATCH/POST /api/alertas/<pk>/leida/  → marca como leída por el usuario actual.
+    DELETE     /api/alertas/<pk>/        → borra la alerta (solo Staff).
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'No autenticado'}, status=401)
+
+    a = get_object_or_404(Alerta, pk=pk)
+
+    if request.method in ('PATCH', 'POST'):
+        a.leida_por.add(request.user)
+        return JsonResponse(_alerta_to_dict(a, request.user))
+
+    # DELETE
+    if not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({'error': 'Permiso denegado. Solo Staff puede borrar alertas.'}, status=403)
+    a.delete()
+    return JsonResponse({'ok': True})
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CHAT IA — Asistente del sistema (por usuario)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _chat_msg_to_dict(m):
+    return {
+        'id':       m.id,
+        'rol':      m.rol,
+        'role':     m.rol,  # alias para front
+        'contenido': m.contenido,
+        'content':  m.contenido,  # alias
+        'creado_en': m.creado_en.isoformat() if m.creado_en else None,
+    }
+
+
+@csrf_exempt
+@require_http_methods(['GET', 'POST', 'DELETE'])
+def api_chat_ia(request):
+    """
+    GET    /api/chat/   → devuelve el historial del usuario actual (ordenado asc).
+    POST   /api/chat/   → recibe {mensaje}, guarda + responde + guarda respuesta.
+    DELETE /api/chat/   → borra todo el historial del usuario actual.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'No autenticado'}, status=401)
+
+    if request.method == 'GET':
+        msgs = ChatMensaje.objects.filter(user=request.user).order_by('creado_en')
+        return JsonResponse({'results': [_chat_msg_to_dict(m) for m in msgs]})
+
+    if request.method == 'DELETE':
+        ChatMensaje.objects.filter(user=request.user).delete()
+        return JsonResponse({'ok': True})
+
+    # POST — preguntar
+    try:
+        body = json.loads(request.body or '{}')
+    except Exception:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    mensaje_usuario = (body.get('mensaje') or body.get('message') or '').strip()
+    if not mensaje_usuario:
+        return JsonResponse({'error': 'El mensaje es obligatorio'}, status=400)
+
+    # Guarda mensaje del usuario
+    msg_user = ChatMensaje.objects.create(
+        user=request.user, rol='user', contenido=mensaje_usuario,
+    )
+
+    # Genera la respuesta del asistente (rule-based; ver chat_ia.py para
+    # upgrade a IA real con un cambio de una sola función).
+    try:
+        from .chat_ia import responder
+        respuesta_texto = responder(mensaje_usuario, request.user)
+    except Exception as exc:
+        respuesta_texto = f"⚠️ Tuve un problema generando la respuesta: {exc}"
+
+    msg_bot = ChatMensaje.objects.create(
+        user=request.user, rol='bot', contenido=respuesta_texto,
+    )
+
+    return JsonResponse({
+        'pregunta':  _chat_msg_to_dict(msg_user),
+        'respuesta': _chat_msg_to_dict(msg_bot),
     })

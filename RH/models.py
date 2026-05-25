@@ -378,6 +378,25 @@ class Empleado(models.Model):
 
     empresa = models.CharField(max_length=20, choices=EMPRESA_CHOICES, blank=True, null=True)
 
+    # Lugar de operación actual (patio/sucursal donde está asignado el empleado).
+    # FK al catálogo de Lugares de Ternium. Opcional porque no aplica a todos
+    # los empleados (administrativos, por ejemplo).
+    lugar = models.ForeignKey(
+        'ternium.Lugar', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='empleados_asignados',
+        verbose_name='Lugar de operación',
+    )
+
+    # Empresas a las que pertenece el empleado (M2M al catálogo de Empresas).
+    # Esta es la "División Operativa" que se muestra en el sistema actual.
+    # NOTA: `division_operativa` (M2M a RH.DivisionOperativa, abajo) se conserva
+    # para no perder asignaciones históricas; ya no se usa desde la UI.
+    empresas = models.ManyToManyField(
+        'ternium.Empresa', blank=True,
+        related_name='empleados',
+        verbose_name='Empresas asignadas',
+    )
+
     division_operativa = models.ManyToManyField(DivisionOperativa, blank=True)
     tipo_carga = models.ManyToManyField(TipoCarga, blank=True)
     tipo_viaje = models.ManyToManyField(TipoViaje, blank=True)

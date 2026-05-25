@@ -259,6 +259,13 @@ urlpatterns = [
     path('api/admin/alertas-merma/', api_views.api_alertas_merma, name='api_alertas_merma'),
     path('api/admin/alertas-merma/<int:pk>/', api_views.api_alerta_merma_detail, name='api_alerta_merma_detail'),
 
+    # ── Centro de Alertas (mensajes/notificaciones del header + admin) ───
+    path('api/alertas/',            api_views.api_alertas_list,   name='api_alertas_list'),
+    path('api/alertas/<int:pk>/',   api_views.api_alerta_detail,  name='api_alerta_detail'),
+
+    # ── Chat IA (asistente del sistema por usuario) ─────────────────────
+    path('api/chat/',               api_views.api_chat_ia,        name='api_chat_ia'),
+
     # ── Destrucción Fiscal (ConfiguracionManifiesto) ─────────────────────
     path('api/admin/destruccion-fiscal/catalogos/', api_views.api_destruccion_fiscal_catalogos, name='api_destruccion_fiscal_catalogos'),
     path('api/admin/destruccion-fiscal/', api_views.api_destruccion_fiscal, name='api_destruccion_fiscal'),
