@@ -215,8 +215,10 @@ def asignar_folio_medline(remision):
     """
     Evalúa si la remisión es de MEDLINE y contiene Cartón o Archivo.
     SOLO aplica para remisiones con fecha del 1 de Abril de 2026 en adelante.
+    Calcula el folio automáticamente restando 465 al número NLD.
     """
     import datetime
+    from django.utils import timezone
 
     # 1. Obtener la fecha base (si es datetime, la convertimos a date)
     fecha_base = remision.fecha or timezone.now().date()
@@ -227,16 +229,11 @@ def asignar_folio_medline(remision):
     if fecha_base < datetime.date(2026, 4, 1):
         return
 
-    # 3. Si ya tiene folio, no lo reasignamos para no alterar históricos ya generados
-    # (Si quieres forzar a que se sobreescriban, puedes quitar estas dos líneas)
-    if remision.folio_medline:
-        return
-
-    # 4. Validar que el origen sea MEDLINE
+    # 3. Validar que el origen sea MEDLINE
     if not remision.origen or 'MEDLINE' not in remision.origen.nombre.upper():
         return
 
-    # 5. Validar que al menos un material sea Cartón o Archivo Muerto
+    # 4. Validar que al menos un material sea Cartón o Archivo Muerto
     aplica_material = False
     for detalle in remision.detalles.all():
         if detalle.material:
@@ -248,29 +245,33 @@ def asignar_folio_medline(remision):
     if not aplica_material:
         return
 
+    # 5. Validar que exista el formato NLD-XXX en la remisión para poder calcular
+    if not remision.remision:
+        return
+        
+    rem_str = remision.remision.upper().strip()
+    if not rem_str.startswith("NLD-"):
+        return
+
+    try:
+        # Extraer el número consecutivo de la remisión (ej. de NLD-611 extrae 611)
+        numero_nld = int(rem_str.split("-")[1])
+        # Aplicar la regla matemática acordada (611 - 465 = 146)
+        consecutivo = numero_nld - 465
+        if consecutivo <= 0:
+            return
+    except (ValueError, IndexError):
+        return
+
     # 6. Generar prefijo 3R-AÑO-MES-
     year = fecha_base.year
     month = f"{fecha_base.month:02d}"
     prefix = f"3R-{year}-{month}-"
+    nuevo_folio = f"{prefix}{consecutivo:03d}"
 
-    # 7. Buscar el último consecutivo de este mes con bloqueo para evitar race conditions
-    with transaction.atomic():
-        todos_mes = list(
-            Remision.objects
-            .select_for_update()
-            .filter(folio_medline__startswith=prefix)
-        )
-        # Ordenar numéricamente para evitar error con strings ≥ 1000
-        nums = []
-        for r in todos_mes:
-            try:
-                nums.append(int(r.folio_medline.split('-')[-1]))
-            except (ValueError, IndexError, AttributeError):
-                pass
-        next_num = (max(nums) + 1) if nums else 1
-
-        # 8. Asignar y guardar permanentemente dentro de la misma transacción
-        remision.folio_medline = f"{prefix}{next_num:03d}"
+    # 7. Asignar y guardar permanentemente si el folio es distinto al actual
+    if remision.folio_medline != nuevo_folio:
+        remision.folio_medline = nuevo_folio
         remision.save(update_fields=['folio_medline'])
 
 

@@ -686,6 +686,9 @@ def api_remisiones_lista(request):
             'destino': rem.destino.nombre if rem.destino else '-',
             'folio_ld': rem.folio_ld or '-',
             'folio_dlv': rem.folio_dlv or '-',
+            # Folio Medline (3R-YYYY-MM-NNN) — solo lo tienen las remisiones
+            # MEDLINE con cartón/archivo. Vacío "" para las demás.
+            'folio_medline': rem.folio_medline or '',
             'total_peso_ld': total_ld,
             'total_peso_dlv': total_dlv,
             'diff': round(diff, 2),
