@@ -765,6 +765,7 @@ class Remision(models.Model):
             ("acceso_dashboard_remisiones", "Acceso al Dashboard de Remisiones"),
             ("ver_kpis_remisiones", "Puede ver KPIs y métricas de remisiones"),
             ("exportar_remisiones", "Puede exportar reportes de remisiones a Excel"),
+            ("acceso_utilidades", "Acceso al módulo de Utilidades / Herramientas"),
         ]
 
 class Cliente(models.Model):
