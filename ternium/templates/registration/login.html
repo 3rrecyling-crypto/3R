@@ -327,7 +327,9 @@
         justify-content: center;
         background: #020b18;
         transition: opacity 0.6s ease, transform 0.6s ease;
-        overflow: hidden;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
     }
     .vs-overlay.slide-out {
         opacity: 0;
@@ -425,7 +427,8 @@
     }
     .vs-card {
         position: relative;
-        width: 340px;
+        width: 100%;
+        max-width: 340px;
         background: rgba(255,255,255,0.04);
         border: 1px solid rgba(255,255,255,0.08);
         border-radius: 24px;
@@ -1120,10 +1123,36 @@
         .input-group-lg {
             height: 55px;
         }
-        
+
         .login-btn {
             height: 55px;
         }
+    }
+
+    /* ── CELULAR: selector de versión + formulario clásico ───────────── */
+    @media (max-width: 640px) {
+        /* Alinear arriba y permitir scroll para que las 2 tarjetas apiladas
+           no se corten en pantallas chicas. */
+        .vs-overlay { align-items: flex-start; }
+        .vs-content { padding: 1.5rem 1rem 2.5rem; gap: 1.5rem; }
+        .vs-logo-wrap { width: 64px; height: 64px; }
+        .vs-logo { height: 40px; }
+        .vs-title { font-size: 1.5rem; letter-spacing: 2px; }
+        .vs-sub { font-size: 0.8rem; }
+        .vs-cards { flex-direction: column; align-items: center; gap: 1rem; }
+        .vs-card { max-width: 100%; }
+        .vs-card-inner { padding: 1.3rem; }
+        .vs-card-title { font-size: 1.2rem; }
+
+        /* Formulario clásico compacto en celular */
+        .login-form-section { padding: 1rem !important; }
+        .card-body { padding: 1.5rem !important; }
+        .logo-container { padding: 0.7rem; }
+        .logo-animated { height: 56px; }
+        .text-center.mb-5 { margin-bottom: 1.5rem !important; }
+        .card-title { font-size: 1.25rem; }
+        .divider { margin: 1.25rem 0; }
+        .alternative-login .btn { display: block; width: 100%; margin: 0 0 0.5rem 0 !important; }
     }
 </style>
 
