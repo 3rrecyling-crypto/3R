@@ -491,6 +491,13 @@ class Empleado(models.Model):
         verbose_name = "Empleado"
         verbose_name_plural = "Empleados"
         ordering = ['apellido', 'nombre']
+        # Permisos de MÓDULO de RH (los espera el admin de permisos del front:
+        # RH.acceso_rh / RH.exportar_rh). Sin esto, "acceso_rh" no existía en la
+        # BD y /rh quedaba abierto para todos.
+        permissions = [
+            ('acceso_rh', 'Acceso al módulo de Recursos Humanos'),
+            ('exportar_rh', 'Exportar nómina / reportes de RH'),
+        ]
 
     def __str__(self):
         return f"{self.nombre} {self.apellido}"
