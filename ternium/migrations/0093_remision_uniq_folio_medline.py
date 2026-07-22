@@ -11,9 +11,9 @@ class Migration(migrations.Migration):
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
-    operations = [
-        migrations.AddConstraint(
-            model_name='remision',
-            constraint=models.UniqueConstraint(condition=models.Q(('folio_medline__isnull', False), models.Q(('folio_medline', ''), _negated=True)), fields=('folio_medline',), name='uniq_folio_medline'),
-        ),
-    ]
+    # NEUTRALIZADA: la base de producción (Render) ya tenía folios_medline duplicados,
+    # así que crear el índice único fallaba (IntegrityError: duplicate key). La unicidad
+    # del folio Medline se valida a nivel de APLICACIÓN (RemisionForm.clean_folio_medline,
+    # la API api_crear/editar_remision y el serializer DRF), no en la base de datos.
+    # Se deja el archivo (sin operaciones) para no romper la dependencia de la 0094.
+    operations = []

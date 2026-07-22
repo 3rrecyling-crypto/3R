@@ -768,16 +768,11 @@ class Remision(models.Model):
             ("acceso_utilidades", "Acceso al módulo de Utilidades / Herramientas"),
         ]
 
-        # Folio Medline ahora es MANUAL: no puede repetirse. Constraint PARCIAL
-        # (excluye NULL y '') → muchas remisiones "pendientes" (sin folio) conviven,
-        # y solo se exige unicidad sobre folios reales ya capturados.
-        constraints = [
-            models.UniqueConstraint(
-                fields=['folio_medline'],
-                name='uniq_folio_medline',
-                condition=models.Q(folio_medline__isnull=False) & ~models.Q(folio_medline=''),
-            ),
-        ]
+        # Folio Medline MANUAL y único: la unicidad se valida a NIVEL APLICACIÓN
+        # (RemisionForm.clean_folio_medline + api_crear/editar_remision + serializer DRF).
+        # NO se usa un UniqueConstraint de BD porque la base de producción (Render) ya
+        # tenía folios_medline duplicados y el índice único no podía crearse sin modificar
+        # esos datos. Ver migración 0093 (neutralizada).
 
 class Cliente(models.Model):
     """
