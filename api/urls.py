@@ -23,13 +23,13 @@ from api.views.config import (
 from api.views.ternium import (
     OrigenViewSet, EmpresaViewSet, LineaTransporteViewSet,
     OperadorViewSet, MaterialViewSet, UnidadViewSet,
-    ContenedorViewSet, LugarViewSet, ClienteViewSet,
+    ContenedorViewSet, LugarViewSet, ClienteViewSet, ManifiestoClienteViewSet,
     RemisionViewSet, RegistroLogisticoViewSet, EntradaMaquilaViewSet,
     InventarioPatioViewSet, DescargaViewSet, PlasticoViewSet,
     ControlTarimaViewSet, ConfiguracionManifiestoViewSet,
-    ControlManifiestoTraneViewSet, PrecioMedlineViewSet,
+    ControlManifiestoTraneViewSet, ManifiestoResiduosViewSet, PrecioMedlineViewSet,
     ConfiguracionAlertaMermaViewSet, DestinatarioAlertaMermaViewSet,
-    ReporteKPIView, CatalogosEmpresaView,
+    ReporteKPIView, CatalogosEmpresaView, CodigoPostalView,
 )
 
 # ── RH ────────────────────────────────────────────────
@@ -40,6 +40,7 @@ from api.views.rh import (
     MotivoBajaViewSet, BajaEmpleadoViewSet,
     VacacionViewSet, HistoricoVacacionesViewSet,
     PrestamoViewSet, ControlVacanteViewSet, DashboardRHView,
+    PlantillaContratoViewSet, ContratoGeneradoViewSet,
 )
 
 # ── Bancos ────────────────────────────────────────────
@@ -78,6 +79,7 @@ router.register(r'unidades',        UnidadViewSet,          basename='unidad')
 router.register(r'contenedores',    ContenedorViewSet,      basename='contenedor')
 router.register(r'lugares',         LugarViewSet,           basename='lugar')
 router.register(r'clientes',        ClienteViewSet,         basename='cliente')
+router.register(r'manifiesto-clientes', ManifiestoClienteViewSet, basename='manifiesto-cliente')
 
 # ── Operaciones ──────────────────────────────────────
 router.register(r'remisiones',          RemisionViewSet,            basename='remision')
@@ -91,6 +93,7 @@ router.register(r'control-tarimas',     ControlTarimaViewSet,       basename='co
 # ── Manifiestos / TRANE ──────────────────────────────
 router.register(r'configuracion-manifiesto',  ConfiguracionManifiestoViewSet,  basename='config-manifiesto')
 router.register(r'manifiestos-trane',         ControlManifiestoTraneViewSet,   basename='manifiesto-trane')
+router.register(r'manifiestos-residuos',      ManifiestoResiduosViewSet,       basename='manifiesto-residuos')
 
 # ── Medline ──────────────────────────────────────────
 router.register(r'precios-medline',           PrecioMedlineViewSet,            basename='precio-medline')
@@ -114,6 +117,8 @@ router.register(r'rh/vacaciones',             VacacionViewSet,                 b
 router.register(r'rh/historico-vacaciones',   HistoricoVacacionesViewSet,      basename='rh-historico-vac')
 router.register(r'rh/prestamos',              PrestamoViewSet,                 basename='rh-prestamo')
 router.register(r'rh/control-vacantes',       ControlVacanteViewSet,           basename='rh-vacante')
+router.register(r'rh/plantillas-contrato',    PlantillaContratoViewSet,        basename='rh-plantilla-contrato')
+router.register(r'rh/contratos-generados',    ContratoGeneradoViewSet,         basename='rh-contrato-generado')
 
 # ── Bancos ───────────────────────────────────────────
 router.register(r'bancos/cuentas',            CuentaViewSet,                   basename='banco-cuenta')
@@ -159,6 +164,7 @@ urlpatterns = [
     path('auth/usuarios/<int:pk>/permisos/', UsuarioPermisosView.as_view(), name='api-usuario-permisos'),
 
     # ── Configuración del sistema ─────────────────────
+    path('codigo-postal/',  CodigoPostalView.as_view(),        name='api-codigo-postal'),
     path('config/',         ConfiguracionView.as_view(),       name='api-config'),
     path('config/modulos/', ConfiguracionModulosView.as_view(), name='api-config-modulos'),
     path('config/ui/',      ConfiguracionUIView.as_view(),     name='api-config-ui'),

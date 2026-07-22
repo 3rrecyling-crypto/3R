@@ -6,7 +6,7 @@ from django.db.models import Q
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from .models import Empresa, Material, Lugar, LineaTransporte, Operador, Unidad, Contenedor
 import json
 from django.shortcuts import get_object_or_404
@@ -14,8 +14,9 @@ from .models import (
     Remision, Empresa, Material, Lugar, ConfiguracionManifiesto,
     HistorialRemision, EvidenciaRemision, DetalleRemision,
     ConfiguracionAlertaMerma, DestinatarioAlertaMerma, RemisionAlertaMermaLog,
-    Alerta, ChatMensaje,
+    Alerta, ChatMensaje, InventarioPatio,
 )
+import decimal
 
 import datetime
 from django.utils import timezone
@@ -70,31 +71,27 @@ def _update_inventory_from_remision(remision, revert=False):
         # 1. DESCONTAR DEL ORIGEN (Carga)
         # Solo descontamos si el origen es un patio propio (donde llevamos inventario)
         if remision.origen and getattr(remision.origen, 'es_patio', False) and peso_carga > 0:
-            # Lógica genérica, adapta "Inventario" a tu modelo real
-            # inventario_origen, _ = Inventario.objects.get_or_create(
-            #     lugar=remision.origen, material=detalle.material, defaults={'cantidad': 0}
-            # )
-            # inventario_origen.cantidad = F('cantidad') - (peso_carga * factor)
-            # inventario_origen.save()
-            pass # Reemplaza el pass con la lógica comentada arriba
+            inv, _ = InventarioPatio.objects.get_or_create(patio=remision.origen, material=detalle.material)
+            cant = decimal.Decimal(str(peso_carga))
+            actual = decimal.Decimal(inv.cantidad)
+            inv.cantidad = actual + cant if revert else actual - cant  # revert devuelve al patio
+            inv.save()
 
         # 2. SUMAR AL DESTINO (Descarga)
         if remision.destino and getattr(remision.destino, 'es_patio', False) and peso_descarga > 0:
-            # inventario_destino, _ = Inventario.objects.get_or_create(
-            #     lugar=remision.destino, material=detalle.material, defaults={'cantidad': 0}
-            # )
-            # inventario_destino.cantidad = F('cantidad') + (peso_descarga * factor)
-            # inventario_destino.save()
-            pass
+            inv, _ = InventarioPatio.objects.get_or_create(patio=remision.destino, material=detalle.material)
+            cant = decimal.Decimal(str(peso_descarga))
+            actual = decimal.Decimal(inv.cantidad)
+            inv.cantidad = actual - cant if revert else actual + cant  # revert quita lo sumado
+            inv.save()
 
         # 3. SUMAR RECHAZOS (Regresos a Patio)
-        if detalle.patio_rechazo and peso_rechazado > 0:
-            # inventario_rechazo, _ = Inventario.objects.get_or_create(
-            #     lugar=detalle.patio_rechazo, material=detalle.material, defaults={'cantidad': 0}
-            # )
-            # inventario_rechazo.cantidad = F('cantidad') + (peso_rechazado * factor)
-            # inventario_rechazo.save()
-            pass
+        if detalle.patio_rechazo and getattr(detalle.patio_rechazo, 'es_patio', False) and peso_rechazado > 0:
+            inv, _ = InventarioPatio.objects.get_or_create(patio=detalle.patio_rechazo, material=detalle.material)
+            cant = decimal.Decimal(str(peso_rechazado))
+            actual = decimal.Decimal(inv.cantidad)
+            inv.cantidad = actual - cant if revert else actual + cant  # revert quita el rechazo sumado
+            inv.save()
 
 
 from django.core.mail import send_mail
@@ -548,10 +545,13 @@ def api_remisiones_lista(request):
             q_fecha_desde = month_ago.strftime('%Y-%m-%d')
             q_fecha_hasta = today.strftime('%Y-%m-%d')
             
-        if q_fecha_desde:
-            queryset = queryset.filter(fecha__gte=q_fecha_desde)
-        if q_fecha_hasta:
-            queryset = queryset.filter(fecha__lte=q_fecha_hasta)
+        from django.utils.dateparse import parse_date
+        _fd = parse_date(q_fecha_desde) if q_fecha_desde else None
+        _fh = parse_date(q_fecha_hasta) if q_fecha_hasta else None
+        if _fd:
+            queryset = queryset.filter(fecha__gte=_fd)
+        if _fh:
+            queryset = queryset.filter(fecha__lte=_fh)
 
     # 4. APLICAR RESTO DE FILTROS EXACTOS
     q_prefijo = params.get('q_prefijo', '').strip()
@@ -562,14 +562,15 @@ def api_remisiones_lista(request):
 
     if q_prefijo:
         queryset = queryset.filter(empresa__prefijo__icontains=q_prefijo)
-    if q_material:
+    if q_material.isdigit():
         queryset = queryset.filter(detalles__material_id=q_material)
-    if q_origen:
+    if q_origen.isdigit():
         queryset = queryset.filter(origen_id=q_origen)
-    if q_destino:
+    if q_destino.isdigit():
         queryset = queryset.filter(destino_id=q_destino)
-    if q_status:
-        queryset = queryset.filter(status=q_status)
+    # NOTA: el filtro por status se aplica más abajo (tras calcular los contadores),
+    # para que los badges PENDIENTES/CANCELADOS muestren los totales reales aunque
+    # haya un quick-filter de status activo.
 
     # --- NUEVO FILTRO DE OPERADOR LIBRE ---
     q_operador = params.get('q_operador', '').strip()
@@ -616,25 +617,44 @@ def api_remisiones_lista(request):
     if q_material or q_destruccion:
         queryset = queryset.distinct()
 
-    # 5. PAGINACIÓN
-    page_number = int(params.get('page', 1))
-    page_size = int(params.get('page_size', 15))
-    paginator = Paginator(queryset, page_size)
-    page_obj = paginator.get_page(page_number)
-
-    # 6. CONTADORES
+    # 6. CONTADORES (sobre la base SIN el filtro de status → badges con totales reales)
     total_pendientes = queryset.filter(status='PENDIENTE').count()
     total_cancelados = queryset.filter(status='CANCELADO').count()
+
+    # Se aplica AQUÍ el filtro de status (tras los contadores) antes de paginar.
+    if q_status:
+        queryset = queryset.filter(status=q_status)
+
+    # 5. PAGINACIÓN (saneada: nunca revienta con valor no numérico/vacío/0/negativo)
+    try:
+        page_number = int(params.get('page', 1))
+    except (TypeError, ValueError):
+        page_number = 1
+    if page_number < 1:
+        page_number = 1
+    try:
+        page_size = int(params.get('page_size', 15))
+    except (TypeError, ValueError):
+        page_size = 15
+    page_size = max(1, min(page_size, 200))  # mínimo 1, tope 200 (evita ZeroDivisionError y abusos)
+    paginator = Paginator(queryset, page_size)
+    page_obj = paginator.get_page(page_number)
 
     # 7. SERIALIZACIÓN DE LA RESPUESTA
     remisiones_data = []
     for rem in page_obj.object_list:
         detalles = []
-        for det in rem.detalles.all():
+        sum_ld = sum_dlv = sum_rech = 0.0
+        for det in rem.detalles.all():  # prefetched → sin query extra
+            pld = float(det.peso_ld or 0)
+            pdlv = float(det.peso_dlv or 0)
+            sum_ld += pld
+            sum_dlv += pdlv
+            sum_rech += float(det.peso_rechazado or 0)
             detalles.append({
                 'material': det.material.nombre if det.material else '-',
-                'peso_ld': float(det.peso_ld or 0),
-                'peso_dlv': float(det.peso_dlv or 0),
+                'peso_ld': pld,
+                'peso_dlv': pdlv,
                 'bultos': det.bultos if hasattr(det, 'bultos') and det.bultos else None,
             })
 
@@ -657,10 +677,14 @@ def api_remisiones_lista(request):
 
         facturas_data = [{'id': fac.id} for fac in rem.facturas.all()]
 
-        total_ld = float(rem.total_peso_ld or 0)
-        total_dlv = float(rem.total_peso_dlv or 0)
-        diff = total_dlv - total_ld
-        porcentaje_merma = float(rem.porcentaje_merma) if rem.porcentaje_merma else 0
+        # Totales desde los detalles YA prefetcheados (evita ~6 queries aggregate por
+        # fila que hacían las @property del modelo, que ignoran el prefetch → N+1).
+        # Fórmulas idénticas al modelo: Dif = (descarga + rechazado) − carga;
+        # % merma = ((carga − (descarga + rechazado)) / carga) × 100.
+        total_ld = sum_ld
+        total_dlv = sum_dlv
+        diff = (total_dlv + sum_rech) - total_ld
+        porcentaje_merma = ((total_ld - (total_dlv + sum_rech)) / total_ld * 100) if total_ld > 0 else 0.0
 
         # Banderas para mostrar (o no) el botón de Reporte Destrucción (Word).
         # Reflejan exactamente las mismas condicionales que el template Django:
@@ -691,7 +715,7 @@ def api_remisiones_lista(request):
             'folio_medline': rem.folio_medline or '',
             'total_peso_ld': total_ld,
             'total_peso_dlv': total_dlv,
-            'diff': round(diff, 2),
+            'diff': round(diff, 3),
             'porcentaje_merma': round(porcentaje_merma, 1),
             'detalles': detalles,
             'evidencias_urls': evidencias_urls,
@@ -704,10 +728,21 @@ def api_remisiones_lista(request):
         })
 
     # 8. CATÁLOGOS PARA LLENAR LOS SELECTS DEL FRONTEND
-    prefijos = list(Empresa.objects.values_list('prefijo', flat=True).distinct().order_by('prefijo'))
-    materiales_list = list(Material.objects.values('id', 'nombre').order_by('nombre'))
-    origenes_list = list(Lugar.objects.filter(tipo__in=['ORIGEN', 'AMBOS']).values('id', 'nombre').order_by('nombre'))
-    destinos_list = list(Lugar.objects.filter(tipo__in=['DESTINO', 'AMBOS']).values('id', 'nombre').order_by('nombre'))
+    #    Para un no-superusuario se limitan a sus empresas autorizadas (misma
+    #    lógica de permisos que el filtrado de remisiones, arriba).
+    _emp_qs = Empresa.objects.all()
+    _mat_qs = Material.objects.all()
+    _lug_qs = Lugar.objects.all()
+    if not request.user.is_superuser:
+        _perfil = getattr(request.user, 'ternium_profile', None)
+        _mis = _perfil.empresas_autorizadas.all() if _perfil else Empresa.objects.none()
+        _emp_qs = _emp_qs.filter(pk__in=_mis)
+        _mat_qs = _mat_qs.filter(empresas__in=_mis).distinct()
+        _lug_qs = _lug_qs.filter(empresas__in=_mis).distinct()
+    prefijos = list(_emp_qs.values_list('prefijo', flat=True).distinct().order_by('prefijo'))
+    materiales_list = list(_mat_qs.values('id', 'nombre').order_by('nombre'))
+    origenes_list = list(_lug_qs.filter(tipo__in=['ORIGEN', 'AMBOS']).values('id', 'nombre').order_by('nombre'))
+    destinos_list = list(_lug_qs.filter(tipo__in=['DESTINO', 'AMBOS']).values('id', 'nombre').order_by('nombre'))
     estatus_choices = [{'value': v, 'display': d} for v, d in Remision.STATUS_CHOICES]
 
     # 9. RETORNO JSON FINAL
@@ -809,11 +844,15 @@ def api_crear_remision(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Método no permitido'}, status=405)
 
+    archivos_s3_subidos = []  # rutas subidas a S3 para limpiarlas si hay rollback
     try:
         data = request.POST
         empresa_id = data.get('empresa')
         empresa_seleccionada = None
-        
+
+        if not empresa_id:
+            return JsonResponse({'error': 'BAD_REQUEST', 'detail': 'La empresa es requerida.'}, status=400)
+
         if empresa_id:
             empresa_seleccionada = get_object_or_404(Empresa, pk=empresa_id)
 
@@ -828,11 +867,24 @@ def api_crear_remision(request):
             remision.empresa = empresa_seleccionada
             
             # --- DATOS GENERALES ---
-            remision.fecha = data.get('fecha')
+            from django.utils.dateparse import parse_date
+            _fecha_str = (data.get('fecha') or '').strip()
+            try:
+                _fecha_val = parse_date(_fecha_str) if _fecha_str else None
+            except ValueError:
+                _fecha_val = None
+            if _fecha_val is None:
+                return JsonResponse({'error': 'VALIDACION', 'detail': 'La fecha es obligatoria y debe tener formato YYYY-MM-DD.'}, status=400)
+            remision.fecha = _fecha_val
             if data.get('origen'): remision.origen_id = data.get('origen')
             if data.get('destino'): remision.destino_id = data.get('destino')
             if data.get('linea_transporte'): remision.linea_transporte_id = data.get('linea_transporte')
-            
+            # Paridad con RemisionForm de Django: origen y destino son obligatorios en el servidor.
+            if not remision.origen_id:
+                return JsonResponse({'error': 'VALIDACION', 'detail': 'El origen es obligatorio.'}, status=400)
+            if not remision.destino_id:
+                return JsonResponse({'error': 'VALIDACION', 'detail': 'El destino es obligatorio.'}, status=400)
+
             remision.inicia_ld = data.get('inicia_ld') or None
             remision.termina_ld = data.get('termina_ld') or None
             remision.inicia_dlv = data.get('inicia_dlv') or None
@@ -840,6 +892,11 @@ def api_crear_remision(request):
             
             remision.folio_ld = data.get('folio_ld', '').upper()
             remision.folio_dlv = data.get('folio_dlv', '').upper()
+            # Paridad Django (RemisionForm.clean): folio de carga/descarga únicos por empresa.
+            if remision.folio_ld and Remision.objects.filter(folio_ld__iexact=remision.folio_ld, empresa=empresa_seleccionada).exists():
+                return JsonResponse({'error': 'VALIDACION', 'detail': f"El Folio de Carga «{remision.folio_ld}» ya existe en otra remisión de {empresa_seleccionada.nombre}."}, status=400)
+            if remision.folio_dlv and Remision.objects.filter(folio_dlv__iexact=remision.folio_dlv, empresa=empresa_seleccionada).exists():
+                return JsonResponse({'error': 'VALIDACION', 'detail': f"El Folio de Descarga «{remision.folio_dlv}» ya existe en otra remisión de {empresa_seleccionada.nombre}."}, status=400)
             remision.comentario = data.get('comentario', '')
             remision.trazabilidad_notas = data.get('trazabilidad_notas', '')
 
@@ -850,10 +907,19 @@ def api_crear_remision(request):
             remision.fecha_destruccion = data.get('fecha_destruccion') or None
             remision.comentarios_destruccion = data.get('comentarios_destruccion', '')
 
+            def _peso_seguro(valor):
+                if valor is None or str(valor).strip() == '':
+                    return None
+                try:
+                    return float(str(valor).replace(',', '.').strip())
+                except (TypeError, ValueError):
+                    return None
             remision.destruccion_material_1 = data.get('destruccion_material_1')
-            remision.destruccion_peso_1 = float(data.get('destruccion_peso_1')) if data.get('destruccion_peso_1') else None
+            remision.destruccion_peso_1 = _peso_seguro(data.get('destruccion_peso_1'))
             remision.destruccion_material_2 = data.get('destruccion_material_2')
-            remision.destruccion_peso_2 = float(data.get('destruccion_peso_2')) if data.get('destruccion_peso_2') else None
+            remision.destruccion_peso_2 = _peso_seguro(data.get('destruccion_peso_2'))
+            if 'peso_bascula' in data:
+                remision.peso_bascula = _peso_seguro(data.get('peso_bascula'))
 
             # --- LÓGICA MANUAL (OPERADOR, UNIDAD, CONTENEDOR) ---
             op_manual = data.get('operador_texto', '').strip().upper()
@@ -881,9 +947,21 @@ def api_crear_remision(request):
 
             # --- GENERACIÓN DE FOLIO ---
             if empresa_seleccionada and empresa_seleccionada.prefijo:
-                remision.remision = calcular_siguiente_folio(empresa_seleccionada.prefijo)
-
-            remision.save()
+                # read-max-then-increment sin bloqueo → carrera con unique_together.
+                # Reintentar recalculando el folio ante IntegrityError, con savepoint
+                # anidado para no romper la transacción exterior.
+                for _intento in range(6):
+                    remision.remision = calcular_siguiente_folio(empresa_seleccionada.prefijo)
+                    try:
+                        with transaction.atomic():
+                            remision.save()
+                        break
+                    except IntegrityError:
+                        remision.pk = None  # fuerza un INSERT nuevo en el siguiente intento
+                else:
+                    raise IntegrityError("No se pudo asignar un folio único tras varios reintentos.")
+            else:
+                remision.save()
 
             # --- SUBIDA DE ARCHIVOS (S3) ---
             # 1. Fotos Destrucción
@@ -894,14 +972,18 @@ def api_crear_remision(request):
                     nombre_limpio = archivo.name.replace(" ", "_")
                     s3_path = f"remisiones/{remision.remision}/{campo_foto}_{nombre_limpio}"
                     ruta_s3 = _subir_archivo_a_s3(archivo, s3_path)
-                    if ruta_s3: setattr(remision, campo_foto, ruta_s3)
+                    if ruta_s3:
+                        setattr(remision, campo_foto, ruta_s3)
+                        archivos_s3_subidos.append(ruta_s3)
 
             # 2. Manifiesto
             if 'manifiesto' in request.FILES:
                 archivo = request.FILES['manifiesto']
                 nombre_limpio = archivo.name.replace(" ", "_")
                 ruta_s3 = _subir_archivo_a_s3(archivo, f"remisiones/{remision.remision}/manifiesto_{nombre_limpio}")
-                if ruta_s3: remision.manifiesto = ruta_s3
+                if ruta_s3:
+                    remision.manifiesto = ruta_s3
+                    archivos_s3_subidos.append(ruta_s3)
 
             # 3. Boleta Medline
             if 'boleta_salida_medline' in request.FILES:
@@ -909,7 +991,9 @@ def api_crear_remision(request):
                 archivo = request.FILES['boleta_salida_medline']
                 nombre_limpio = re.sub(r'[^a-zA-Z0-9_\-\.]', '', archivo.name.replace(" ", "_"))
                 ruta_s3 = _subir_archivo_a_s3(archivo, f"remisiones/{remision.remision}/medline_{nombre_limpio}")
-                if ruta_s3: remision.boleta_salida_medline = ruta_s3
+                if ruta_s3:
+                    remision.boleta_salida_medline = ruta_s3
+                    archivos_s3_subidos.append(ruta_s3)
 
             remision.save() # Guardar rutas de archivos
 
@@ -920,6 +1004,7 @@ def api_crear_remision(request):
                 ruta_s3 = _subir_archivo_a_s3(archivo, f"remisiones/{remision.remision}/evidencia_{i}_{nombre_limpio}")
                 if ruta_s3:
                     EvidenciaRemision.objects.create(remision=remision, archivo=ruta_s3)
+                    archivos_s3_subidos.append(ruta_s3)
 
             # --- PROCESAR DETALLES (MATERIALES) ---
             # Se espera que el frontend envíe un JSON stringificado en un campo 'detalles'
@@ -931,6 +1016,7 @@ def api_crear_remision(request):
                         DetalleRemision.objects.create(
                             remision=remision,
                             material_id=det.get('material'),
+                            unidad_medida=(det.get('unidad') or 'KG'),  # paridad con /remisiones/crear/ (evita default 'TON' → peso ×1000)
                             bultos=det.get('bultos') or None,
                             peso_ld=det.get('peso_ld') or 0,
                             peso_dlv=det.get('peso_dlv') or 0,
@@ -946,13 +1032,26 @@ def api_crear_remision(request):
                 remision=remision, usuario=request.user, cambio="Creación de la remisión vía API"
             )
             
-            asignar_folio_medline(remision)
+            # Folio Medline MANUAL (lo captura el usuario si aplica). Vacío = pendiente. Debe ser único.
+            if 'folio_medline' in request.POST:
+                _folio_med = (request.POST.get('folio_medline') or '').strip() or None
+                if _folio_med and Remision.objects.filter(folio_medline=_folio_med).exclude(pk=remision.pk).exists():
+                    raise ValueError(f"El folio Medline «{_folio_med}» ya existe en otra remisión. Debe ser único.")
+                if _folio_med != remision.folio_medline:
+                    remision.folio_medline = _folio_med
+                    remision.save(update_fields=['folio_medline'])
             _update_inventory_from_remision(remision, revert=False)
             enviar_alerta_merma(remision)
 
             return JsonResponse({'success': True, 'remision_id': remision.pk, 'folio': remision.remision}, status=201)
 
     except Exception as e:
+        # Si la transacción hizo rollback, los archivos ya subidos a S3 quedan huérfanos: los borramos.
+        for _ruta_huerfana in archivos_s3_subidos:
+            try:
+                _eliminar_archivo_de_s3(_ruta_huerfana)
+            except Exception:
+                pass
         return JsonResponse({'error': 'Error en servidor', 'detail': str(e)}, status=500)
 
 
@@ -1020,42 +1119,96 @@ def api_editar_remision(request, pk):
             if data.get('origen'): remision.origen_id = data.get('origen')
             if data.get('destino'): remision.destino_id = data.get('destino')
             if data.get('linea_transporte'): remision.linea_transporte_id = data.get('linea_transporte')
+            # Paridad Django: origen y destino obligatorios.
+            if not remision.origen_id:
+                return JsonResponse({'error': 'VALIDACION', 'detail': 'El origen es obligatorio.'}, status=400)
+            if not remision.destino_id:
+                return JsonResponse({'error': 'VALIDACION', 'detail': 'El destino es obligatorio.'}, status=400)
 
-            remision.inicia_ld = data.get('inicia_ld') or remision.inicia_ld
-            remision.termina_ld = data.get('termina_ld') or remision.termina_ld
-            remision.inicia_dlv = data.get('inicia_dlv') or remision.inicia_dlv
-            remision.termina_dlv = data.get('termina_dlv') or remision.termina_dlv
+            # Presente-en-POST = actualizar (vacío → NULL, permite BORRAR el tiempo al
+            # editar). Ausente = conservar el valor actual (un submit parcial no lo pisa).
+            if 'inicia_ld' in data: remision.inicia_ld = data.get('inicia_ld') or None
+            if 'termina_ld' in data: remision.termina_ld = data.get('termina_ld') or None
+            if 'inicia_dlv' in data: remision.inicia_dlv = data.get('inicia_dlv') or None
+            if 'termina_dlv' in data: remision.termina_dlv = data.get('termina_dlv') or None
 
             remision.folio_ld = data.get('folio_ld', remision.folio_ld).upper()
             remision.folio_dlv = data.get('folio_dlv', remision.folio_dlv).upper()
+            # Paridad Django: folio de carga/descarga únicos por empresa (excluyendo esta remisión).
+            if remision.folio_ld and Remision.objects.filter(folio_ld__iexact=remision.folio_ld, empresa=remision.empresa).exclude(pk=remision.pk).exists():
+                return JsonResponse({'error': 'VALIDACION', 'detail': f"El Folio de Carga «{remision.folio_ld}» ya existe en otra remisión de {remision.empresa.nombre}."}, status=400)
+            if remision.folio_dlv and Remision.objects.filter(folio_dlv__iexact=remision.folio_dlv, empresa=remision.empresa).exclude(pk=remision.pk).exists():
+                return JsonResponse({'error': 'VALIDACION', 'detail': f"El Folio de Descarga «{remision.folio_dlv}» ya existe en otra remisión de {remision.empresa.nombre}."}, status=400)
             remision.comentario = data.get('comentario', remision.comentario)
             remision.trazabilidad_notas = data.get('trazabilidad_notas', remision.trazabilidad_notas)
 
+            # --- DESTRUCCIÓN FISCAL Y BÁSCULA (faltaban en edición: se perdían al guardar) ---
+            if 'hora_entrada' in data: remision.hora_entrada = data.get('hora_entrada') or None
+            if 'hora_salida' in data: remision.hora_salida = data.get('hora_salida') or None
+            if 'factura_nombre' in data: remision.factura_nombre = (data.get('factura_nombre') or '').upper()
+            if 'fecha_destruccion' in data: remision.fecha_destruccion = data.get('fecha_destruccion') or None
+            if 'comentarios_destruccion' in data: remision.comentarios_destruccion = data.get('comentarios_destruccion', '')
+
+            def _peso_seguro_edit(valor):
+                if valor is None or str(valor).strip() == '':
+                    return None
+                try:
+                    return float(str(valor).replace(',', '.').strip())
+                except (TypeError, ValueError):
+                    return None
+            if 'destruccion_material_1' in data: remision.destruccion_material_1 = data.get('destruccion_material_1') or None
+            if 'destruccion_peso_1' in data: remision.destruccion_peso_1 = _peso_seguro_edit(data.get('destruccion_peso_1'))
+            if 'destruccion_material_2' in data: remision.destruccion_material_2 = data.get('destruccion_material_2') or None
+            if 'destruccion_peso_2' in data: remision.destruccion_peso_2 = _peso_seguro_edit(data.get('destruccion_peso_2'))
+            if 'peso_bascula' in data: remision.peso_bascula = _peso_seguro_edit(data.get('peso_bascula'))
+
             # --- ACTUALIZAR ARCHIVOS ---
+            # Recolectamos las rutas VIEJAS y las borramos de S3 SOLO tras confirmar
+            # la transacción (on_commit): así un rollback posterior (p.ej. al recrear
+            # los detalles) no destruye evidencia que en la BD seguiría existiendo.
+            # IMPORTANTE: solo se encola la ruta vieja si (a) la subida del nuevo
+            # archivo tuvo éxito y (b) la key nueva es DISTINTA de la vieja. Con
+            # AWS_S3_FILE_OVERWRITE=True (default), subir un archivo del mismo nombre
+            # sobrescribe la misma key; borrar "la vieja" borraría el archivo recién
+            # subido y se perdería el adjunto. Comparar las rutas evita esa pérdida.
+            rutas_s3_a_borrar = []
             fotos_destruccion = ['foto_ingreso', 'foto_ingreso_2', 'foto_vertido', 'foto_vertido_2', 'foto_destruccion', 'foto_destruccion_2']
             for campo_foto in fotos_destruccion:
                 if campo_foto in request.FILES:
                     foto_actual = getattr(remision, campo_foto)
-                    if foto_actual and hasattr(foto_actual, 'name') and foto_actual.name:
-                        _eliminar_archivo_de_s3(foto_actual.name)
+                    ruta_vieja = foto_actual.name if (foto_actual and hasattr(foto_actual, 'name') and foto_actual.name) else None
 
                     archivo = request.FILES[campo_foto]
                     ruta_s3 = _subir_archivo_a_s3(archivo, f"remisiones/{remision.remision}/{campo_foto}_{archivo.name.replace(' ', '_')}")
-                    if ruta_s3: 
+                    if ruta_s3:
                         setattr(remision, campo_foto, ruta_s3)
                         cambios_log.append(f"Se actualizó {campo_foto}")
+                        if ruta_vieja and ruta_vieja != ruta_s3:
+                            rutas_s3_a_borrar.append(ruta_vieja)
 
             if 'manifiesto' in request.FILES:
-                if remision.manifiesto and remision.manifiesto.name: _eliminar_archivo_de_s3(remision.manifiesto.name)
+                ruta_vieja = remision.manifiesto.name if (remision.manifiesto and remision.manifiesto.name) else None
                 archivo = request.FILES['manifiesto']
                 ruta_s3 = _subir_archivo_a_s3(archivo, f"remisiones/{remision.remision}/manifiesto_{archivo.name.replace(' ', '_')}")
-                if ruta_s3: remision.manifiesto = ruta_s3; cambios_log.append("Manifiesto actualizado")
+                if ruta_s3:
+                    remision.manifiesto = ruta_s3
+                    cambios_log.append("Manifiesto actualizado")
+                    if ruta_vieja and ruta_vieja != ruta_s3:
+                        rutas_s3_a_borrar.append(ruta_vieja)
 
             if 'boleta_salida_medline' in request.FILES:
-                if remision.boleta_salida_medline and remision.boleta_salida_medline.name: _eliminar_archivo_de_s3(remision.boleta_salida_medline.name)
+                ruta_vieja = remision.boleta_salida_medline.name if (remision.boleta_salida_medline and remision.boleta_salida_medline.name) else None
                 archivo = request.FILES['boleta_salida_medline']
                 ruta_s3 = _subir_archivo_a_s3(archivo, f"remisiones/{remision.remision}/medline_{archivo.name.replace(' ', '_')}")
-                if ruta_s3: remision.boleta_salida_medline = ruta_s3; cambios_log.append("Boleta Medline actualizada")
+                if ruta_s3:
+                    remision.boleta_salida_medline = ruta_s3
+                    cambios_log.append("Boleta Medline actualizada")
+                    if ruta_vieja and ruta_vieja != ruta_s3:
+                        rutas_s3_a_borrar.append(ruta_vieja)
+
+            # Borra los archivos viejos de S3 solo si la transacción confirma.
+            if rutas_s3_a_borrar:
+                transaction.on_commit(lambda rutas=list(rutas_s3_a_borrar): [_eliminar_archivo_de_s3(p) for p in rutas])
 
             remision.save()
 
@@ -1083,6 +1236,7 @@ def api_editar_remision(request, pk):
                             DetalleRemision.objects.create(
                                 remision=remision,
                                 material_id=det.get('material'),
+                                unidad_medida=(det.get('unidad') or 'KG'),  # paridad con /remisiones/crear/ (evita default 'TON' → peso ×1000)
                                 bultos=det.get('bultos') or None,
                                 peso_ld=det.get('peso_ld') or 0,
                                 peso_dlv=det.get('peso_dlv') or 0,
@@ -1098,7 +1252,14 @@ def api_editar_remision(request, pk):
                 cambios_unicos = list(dict.fromkeys(cambios_log))
                 HistorialRemision.objects.create(remision=remision, usuario=request.user, cambio=" | ".join(cambios_unicos))
 
-            asignar_folio_medline(remision)
+            # Folio Medline MANUAL (lo captura el usuario si aplica). Vacío = pendiente. Debe ser único.
+            if 'folio_medline' in request.POST:
+                _folio_med = (request.POST.get('folio_medline') or '').strip() or None
+                if _folio_med and Remision.objects.filter(folio_medline=_folio_med).exclude(pk=remision.pk).exists():
+                    raise ValueError(f"El folio Medline «{_folio_med}» ya existe en otra remisión. Debe ser único.")
+                if _folio_med != remision.folio_medline:
+                    remision.folio_medline = _folio_med
+                    remision.save(update_fields=['folio_medline'])
             _update_inventory_from_remision(remision, revert=False) # Re-aplicamos inventario
             enviar_alerta_merma(remision)
 
@@ -1111,6 +1272,13 @@ def api_editar_remision(request, pk):
 @csrf_exempt
 def api_obtener_catalogos(request, empresa_id):
     """ Retorna los catálogos estructurados {id, text} para los comboboxes de React """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'NO_AUTORIZADO', 'detail': 'Sesión no válida.'}, status=401)
+    # Un no-superusuario solo ve catálogos de las empresas que tiene autorizadas.
+    if not request.user.is_superuser:
+        perfil = getattr(request.user, 'ternium_profile', None)
+        if not perfil or not perfil.empresas_autorizadas.filter(pk=empresa_id).exists():
+            return JsonResponse({'error': 'FORBIDDEN', 'detail': 'Sin acceso a esta empresa.'}, status=403)
     if request.method == 'GET':
         try:
             materiales = list(Material.objects.filter(empresas__id=empresa_id).annotate(text=F('nombre')).values('id', 'text'))
@@ -1122,11 +1290,14 @@ def api_obtener_catalogos(request, empresa_id):
             unidades = list(Unidad.objects.all().annotate(text=F('numero_economico')).values('id', 'text'))
             contenedores = list(Contenedor.objects.all().annotate(text=F('numero')).values('id', 'text'))
             patios = list(Lugar.objects.filter(es_patio=True).annotate(text=F('nombre')).values('id', 'text'))
+            # Mapeos (origen, material) que disparan Destrucción/Báscula — paridad con verificarDestruccion de Django.
+            configs_destruccion = list(ConfiguracionManifiesto.objects.values('origen_id', 'material_id'))
 
             return JsonResponse({
                 'materiales': materiales, 'lugares_origen': origenes, 'lugares_destino': destinos,
                 'lineas_transporte': lineas, 'operadores': operadores, 'unidades': unidades,
                 'contenedores': contenedores, 'patios': patios,
+                'configs_destruccion': configs_destruccion,
             }, status=200)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
@@ -1135,12 +1306,15 @@ def api_obtener_catalogos(request, empresa_id):
 @csrf_exempt
 def api_obtener_empresas(request):
     """ Retorna la lista de todas las empresas para el frontend """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'NO_AUTORIZADO', 'detail': 'Sesión no válida.'}, status=401)
     if request.method == 'GET':
         try:
             empresas = list(Empresa.objects.annotate(text=F('nombre')).values('id', 'text'))
             return JsonResponse({'empresas': empresas}, status=200)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
 
 
 # =========================================================================
@@ -1150,12 +1324,14 @@ def api_obtener_empresas(request):
 #   path('api/remisiones/<int:pk>/detalle/', api_views.api_remision_detalle, name='api_remision_detalle'),
 # =========================================================================
 
-@login_required
 def api_remision_detalle(request, pk):
     """
     Retorna TODOS los datos de una remisión para la vista de detalle
     y para pre-cargar el formulario de edición.
     """
+    # JSON 401 en vez de @login_required (que redirige a HTML y rompe el fetch).
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'NO_AUTORIZADO', 'detail': 'Sesión no válida.'}, status=401)
     remision = get_object_or_404(
         Remision.objects.select_related(
             'empresa', 'origen', 'destino', 'operador', 'linea_transporte',
@@ -1199,7 +1375,7 @@ def api_remision_detalle(request, pk):
 
     # Historial
     historial = []
-    for h in remision.historial.all().order_by('-fecha'):
+    for h in sorted(remision.historial.all(), key=lambda x: x.fecha, reverse=True):
         historial.append({
             'fecha': h.fecha.strftime('%d/%m/%Y %H:%M'),
             'usuario': h.usuario.get_full_name() or h.usuario.username if h.usuario else 'Sistema',
@@ -1309,6 +1485,8 @@ def export_remisiones_to_excel(request):
     precio_carton_req = request.GET.get('precio_carton', '0')
     precio_archivo_req = request.GET.get('precio_archivo', '0')
     mes_medline = request.GET.get('mes', '')
+    # Diálogo de descarga: con_tabla='1' incluye la tabla de remisiones; '0' = solo manifiesto (sin renglones).
+    con_tabla = request.GET.get('con_tabla', '1')
 
     q_remision = request.GET.get('q_remision', '')
     q_prefijo = request.GET.get('q_prefijo', '')
@@ -1410,7 +1588,7 @@ def export_remisiones_to_excel(request):
                 elif col_idx in [7, 8]: cell.fill = yellow_header
                 elif col_idx in [9, 10]: cell.fill = green_header
 
-        def _poblar_hoja_medline(sheet, tipo_mat):
+        def _poblar_hoja_medline(sheet, tipo_mat, solo_totales=False):
             """
             tipo_mat: 'carton' | 'archivo'
             Rellena la hoja con las remisiones que correspondan al material indicado.
@@ -1435,6 +1613,8 @@ def export_remisiones_to_excel(request):
                     venta_calculada = peso_ld * precio_mostrado
                     total_peso += peso_ld
                     total_venta += venta_calculada
+                    if solo_totales:
+                        continue  # "Solo manifiesto": sin renglones, solo la fila de totales.
                     folio_generado = remision.folio_medline or "N/A"
                     row_data = [
                         remision.remision,
@@ -1466,17 +1646,26 @@ def export_remisiones_to_excel(request):
             sheet.cell(row=last, column=8).number_format = '"$"#,##0.00'
             return total_peso, total_venta
 
+        # Opciones del diálogo de descarga: "solo manifiesto" (sin tabla) vs "con
+        # tabla", y filtro por material (Cartón / Archivo / Ambos).
+        _con_tabla = (con_tabla != '0')
+        _mat = (material_medline or '').strip().lower()
+        _incluir_carton = _mat in ('', 'ambos', 'carton', 'cartón')
+        _incluir_archivo = _mat in ('', 'ambos', 'archivo')
+
         # --- Pestaña 1: Cartón ---
         ws.title = "Cartón"
         ws.append(medline_headers)
         _estilo_encabezados_medline(ws)
-        _poblar_hoja_medline(ws, 'carton')
+        if _incluir_carton:
+            _poblar_hoja_medline(ws, 'carton', solo_totales=not _con_tabla)
 
         # --- Pestaña 2: Archivo Muerto ---
         ws_archivo = wb.create_sheet(title="Archivo Muerto")
         ws_archivo.append(medline_headers)
         _estilo_encabezados_medline(ws_archivo)
-        _poblar_hoja_medline(ws_archivo, 'archivo')
+        if _incluir_archivo:
+            _poblar_hoja_medline(ws_archivo, 'archivo', solo_totales=not _con_tabla)
 
     # =========================================================================
     # LÓGICA REPORTE CONCENTRADO
@@ -3357,16 +3546,23 @@ def api_chat_ia(request):
     if not mensaje_usuario:
         return JsonResponse({'error': 'El mensaje es obligatorio'}, status=400)
 
+    # Historial PREVIO (sin el mensaje actual) para dar memoria conversacional.
+    historial = list(
+        ChatMensaje.objects.filter(user=request.user).order_by('creado_en')
+        .values('rol', 'contenido')
+    )
+
     # Guarda mensaje del usuario
     msg_user = ChatMensaje.objects.create(
         user=request.user, rol='user', contenido=mensaje_usuario,
     )
 
-    # Genera la respuesta del asistente (rule-based; ver chat_ia.py para
-    # upgrade a IA real con un cambio de una sola función).
+    # Genera la respuesta del asistente: IA real (Gemini gratis) con contexto del
+    # sistema + memoria, filtrada por los PERMISOS del usuario. Si no hay
+    # GEMINI_API_KEY o Gemini falla, cae automáticamente al motor por reglas.
     try:
-        from .chat_ia import responder
-        respuesta_texto = responder(mensaje_usuario, request.user)
+        from .chat_ia import responder_ia
+        respuesta_texto = responder_ia(mensaje_usuario, request.user, historial=historial)
     except Exception as exc:
         respuesta_texto = f"⚠️ Tuve un problema generando la respuesta: {exc}"
 

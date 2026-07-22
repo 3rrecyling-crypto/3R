@@ -768,12 +768,32 @@ class Remision(models.Model):
             ("acceso_utilidades", "Acceso al módulo de Utilidades / Herramientas"),
         ]
 
+        # Folio Medline ahora es MANUAL: no puede repetirse. Constraint PARCIAL
+        # (excluye NULL y '') → muchas remisiones "pendientes" (sin folio) conviven,
+        # y solo se exige unicidad sobre folios reales ya capturados.
+        constraints = [
+            models.UniqueConstraint(
+                fields=['folio_medline'],
+                name='uniq_folio_medline',
+                condition=models.Q(folio_medline__isnull=False) & ~models.Q(folio_medline=''),
+            ),
+        ]
+
 class Cliente(models.Model):
     """
     Catálogo de Clientes comerciales para asignar en las remisiones.
     """
     search_fields = ['nombre']
     nombre = models.CharField(max_length=200, unique=True, verbose_name="Nombre del Cliente")
+    # Domicilio del cliente (para autocompletar el manifiesto al elegirlo). Todo opcional.
+    codigo_postal = models.CharField(max_length=10, blank=True, null=True, verbose_name="Código Postal")
+    calle = models.CharField(max_length=200, blank=True, null=True)
+    no_exterior = models.CharField(max_length=30, blank=True, null=True, verbose_name="No. Exterior")
+    no_interior = models.CharField(max_length=30, blank=True, null=True, verbose_name="No. Interior")
+    colonia = models.CharField(max_length=150, blank=True, null=True)
+    municipio = models.CharField(max_length=150, blank=True, null=True)
+    telefono = models.CharField(max_length=50, blank=True, null=True, verbose_name="Teléfono")
+    correo = models.CharField(max_length=200, blank=True, null=True, verbose_name="Correo electrónico")
     empresas = models.ManyToManyField(
         'Empresa',  # Usamos comillas por si acaso
         blank=True,
@@ -1967,3 +1987,24 @@ class LiquidacionConcepto(models.Model):
 
     def __str__(self):
         return f"{self.tipo}: {self.descripcion} (${self.monto})"
+
+
+class ManifiestoResiduos(models.Model):
+    """Manifiesto oficial de Entrega, Transporte y Destino de Residuos de Manejo
+    Especial (formato SMA Nuevo Leon). Los campos de los 4 apartados (Generador,
+    Carga de residuos, Transporte, Destinatario) y la tabla de residuos se
+    guardan en un JSONField `datos` para flexibilidad; con ellos se llena el
+    formulario en la app y se genera el PDF con ese mismo formato oficial."""
+    no_manifiesto = models.CharField(max_length=100, blank=True, default="", verbose_name="No. de manifiesto")
+    datos = models.JSONField(default=dict, blank=True)
+    creado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="manifiestos_residuos")
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-creado_en", "-id"]
+        verbose_name = "Manifiesto de Residuos"
+        verbose_name_plural = "Manifiestos de Residuos"
+
+    def __str__(self):
+        return self.no_manifiesto or f"Manifiesto {self.id}"

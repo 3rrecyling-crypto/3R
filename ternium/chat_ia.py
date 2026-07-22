@@ -8,12 +8,17 @@ Diseño:
   - `responder(mensaje, user)` es el ENTRY POINT. Hace match contra los
     intents y compone una respuesta personalizada con el conocimiento.
 
-Para upgradear a IA real (OpenAI, Claude, Gemini, etc.) en el futuro:
-  Reemplaza `responder()` por una función que llame a la API externa y
-  pase `KNOWLEDGE_BASE` como contexto en el system prompt. Toda la
-  infraestructura (modelo, endpoints, UI) ya está en su lugar.
+Motor de IA:
+  - `responder_ia(mensaje, user, historial)` es el ENTRY POINT nuevo: usa
+    Gemini (tier GRATIS de Google) pasando `KNOWLEDGE_BASE` como contexto, con
+    memoria de conversación y filtrado por PERMISOS (solo módulos que el usuario
+    puede abrir). Si no hay GEMINI_API_KEY o Gemini falla, cae automáticamente a
+    `responder()` (motor por reglas), que TAMBIÉN respeta los permisos.
+  - La key sale de la variable de entorno GEMINI_API_KEY (misma que usa el
+    resto de la IA de 3r en `ia_studio`).
 """
 from __future__ import annotations
+import os
 import re
 import unicodedata
 
@@ -212,6 +217,59 @@ KNOWLEDGE_BASE = {
 
 
 # ════════════════════════════════════════════════════════════════════════════
+# PERMISOS — qué módulos puede CONOCER cada usuario
+# ════════════════════════════════════════════════════════════════════════════
+# Nombre visible de cada módulo gateado (para el resumen "¿qué módulos hay?").
+MODULO_TITULO = {
+    "remisiones": "Remisiones (logística de materiales)",
+    "viajes": "Bitácora de Viajes / Cartas de Traslado",
+    "diesel": "Control Diésel (combustible)",
+    "liquidaciones": "Liquidaciones de Operador",
+    "rh": "Recursos Humanos (Empleados, Vacaciones, Préstamos)",
+    "centro_alertas": "Centro de Alertas",
+    "alertas_merma": "Alertas de Merma",
+    "permisos": "Permisos de Usuario",
+    "perfil": "Mi Perfil (preferencias visuales)",
+}
+
+# Orden de presentación de los módulos.
+_ORDEN_MODULOS = ["remisiones", "viajes", "diesel", "liquidaciones", "rh",
+                  "centro_alertas", "permisos", "alertas_merma", "perfil", "atajos"]
+
+
+def _modulos_permitidos(user) -> set:
+    """Claves de KNOWLEDGE_BASE que ESTE usuario puede conocer, con el MISMO
+    criterio que `useAllowedMenuIds`/`canAccessPath` del frontend
+    (lib/UserContext.tsx). El asistente NO debe explicar ni guiar a un módulo
+    fuera de este conjunto.
+
+    - Superuser: todo.
+    - Universales (siempre): overview del sistema, perfil y atajos.
+    - El resto se abre por el permiso `acceso_*` correspondiente.
+    """
+    if getattr(user, "is_superuser", False):
+        return set(KNOWLEDGE_BASE.keys())
+
+    permitidos = {"sistema", "perfil", "atajos"}
+
+    def _perm(*perms):
+        return any(user.has_perm(p) for p in perms)
+
+    if _perm("ternium.acceso_remisiones", "ternium.view_remision"):
+        permitidos.add("remisiones")
+    if _perm("ternium.acceso_viajes"):
+        permitidos.add("viajes")
+    if _perm("ternium.acceso_diesel"):
+        permitidos.add("diesel")
+    if _perm("ternium.acceso_viajes", "ternium.acceso_liquidaciones"):
+        permitidos.add("liquidaciones")
+    if getattr(user, "is_staff", False):
+        permitidos.add("centro_alertas")
+    # rh, permisos y alertas_merma quedan solo para superuser (retornado arriba).
+    return permitidos
+
+
+# ════════════════════════════════════════════════════════════════════════════
 # UTILIDADES DE NORMALIZACIÓN
 # ════════════════════════════════════════════════════════════════════════════
 
@@ -240,24 +298,36 @@ def _bullets(items: list[str]) -> str:
 
 def _saludo(_msg: str, user) -> str:
     nombre = (user.get_full_name() or user.username or "").split()[0] or "amigo"
+    permitidos = _modulos_permitidos(user)
+    ejemplos = ["¿Qué módulos tengo disponibles?"]
+    if "remisiones" in permitidos:
+        ejemplos.append("¿Cómo creo una remisión?")
+    if "diesel" in permitidos:
+        ejemplos.append("¿Cómo registro una carga de diésel?")
+    if "viajes" in permitidos:
+        ejemplos.append("¿Cómo genero una carta de traslado?")
+    if "liquidaciones" in permitidos:
+        ejemplos.append("¿Cómo hago una liquidación?")
+    ejemplos.append("¿Cómo cambio el color del sistema?")
     return (
-        f"¡Hola, {nombre}! 👋 Soy el asistente IA de **3R Recycling**.\n\n"
-        f"Puedo explicarte cualquier módulo del sistema, cómo usarlo y para qué sirve.\n\n"
+        f"¡Hola, {nombre}! 👋 Soy el **Asistente 3R**, la inteligencia del sistema.\n\n"
+        f"Puedo explicarte los módulos a los que tienes acceso y cómo usarlos.\n\n"
         f"💡 Algunas cosas que puedes preguntarme:\n"
-        f"  • ¿Qué módulos tiene el sistema?\n"
-        f"  • ¿Cómo creo una remisión?\n"
-        f"  • ¿Cómo registro una carga de diésel?\n"
-        f"  • ¿Cómo cambio el color del sistema?\n"
-        f"  • ¿Para qué sirve el Centro de Alertas?"
+        f"{_bullets(ejemplos[:6])}"
     )
 
 
-def _modulos(_msg: str, _user) -> str:
+def _modulos(_msg: str, user) -> str:
     sis = KNOWLEDGE_BASE["sistema"]
+    permitidos = _modulos_permitidos(user)
+    nombres = [MODULO_TITULO[k] for k in _ORDEN_MODULOS
+               if k in permitidos and k in MODULO_TITULO]
+    if not nombres:
+        nombres = [MODULO_TITULO["perfil"]]
     return (
-        f"**{sis['nombre']}** tiene los siguientes módulos:\n\n"
-        f"{_bullets(sis['modulos'])}\n\n"
-        f"Pregúntame por cualquiera de ellos para más detalle."
+        f"**{sis['nombre']}** — estos son los módulos a los que **tú** tienes acceso:\n\n"
+        f"{_bullets(nombres)}\n\n"
+        f"Pregúntame por cualquiera de ellos para ver el detalle y cómo usarlo."
     )
 
 
@@ -324,31 +394,37 @@ INTENTS = [
     },
     # Remisiones
     {
+        "modulo": "remisiones",
         "palabras": ["remision", "remisiones", "carga descarga", "logistica de material"],
         "handler": _hacer_modulo("remisiones"),
     },
     # Viajes / Carta de traslado
     {
+        "modulo": "viajes",
         "palabras": ["viaje", "viajes", "carta de traslado", "carta traslado", "ct-"],
         "handler": _hacer_modulo("viajes"),
     },
     # Diesel
     {
+        "modulo": "diesel",
         "palabras": ["diesel", "diésel", "combustible", "totem", "tótem", "urea"],
         "handler": _hacer_modulo("diesel"),
     },
     # Liquidaciones
     {
+        "modulo": "liquidaciones",
         "palabras": ["liquidacion", "liquidaciones", "pago operador", "sueldo del operador"],
         "handler": _hacer_modulo("liquidaciones"),
     },
     # RH / Empleados
     {
+        "modulo": "rh",
         "palabras": ["empleado", "empleados", "rh ", "recursos humanos", "vacaciones", "prestamos"],
         "handler": _hacer_modulo("rh"),
     },
     # Perfil / Preferencias visuales
     {
+        "modulo": "perfil",
         "palabras": [
             "perfil", "preferencias", "color del sistema", "color de acento",
             "tipografia", "tipo de letra", "fuente", "modo oscuro", "modo claro", "tema",
@@ -357,16 +433,19 @@ INTENTS = [
     },
     # Centro de alertas
     {
+        "modulo": "centro_alertas",
         "palabras": ["alertas", "notificaciones", "centro de alertas", "campana"],
         "handler": _hacer_modulo("centro_alertas"),
     },
     # Permisos
     {
+        "modulo": "permisos",
         "palabras": ["permisos", "permiso de usuario", "acceso", "que puede ver"],
         "handler": _hacer_modulo("permisos"),
     },
     # Alertas de merma
     {
+        "modulo": "alertas_merma",
         "palabras": ["merma", "alerta merma", "alertas merma", "umbral", "correo merma"],
         "handler": _hacer_modulo("alertas_merma"),
     },
@@ -383,16 +462,18 @@ INTENTS = [
 ]
 
 
-def _fallback(mensaje: str, _user) -> str:
-    """Cuando no matcheamos ningún intent, sugerimos posibles temas."""
+def _fallback(mensaje: str, user) -> str:
+    """Cuando no matcheamos ningún intent, sugerimos SOLO módulos permitidos."""
+    permitidos = _modulos_permitidos(user)
+    mods = [MODULO_TITULO[k] for k in ("remisiones", "viajes", "diesel", "liquidaciones")
+            if k in permitidos]
+    sugerencia = ", ".join(mods) if mods else "tu perfil y preferencias visuales"
     return (
         f"No estoy seguro de qué necesitas con: *\"{mensaje[:80]}\"*. 🤔\n\n"
-        f"**Prueba reformular o pregúntame por:**\n"
-        f"  • Un módulo específico (remisiones, viajes, diésel, liquidaciones, RH…)\n"
-        f"  • Una tarea (\"¿cómo creo X?\", \"¿cómo cambio Y?\")\n"
-        f"  • Atajos de teclado\n"
-        f"  • \"¿Qué módulos hay?\" para ver el panorama\n\n"
-        f"O escribe **\"ayuda\"** para ver lo que puedo hacer."
+        f"**Puedo ayudarte con los módulos a los que tienes acceso**, por ejemplo:\n"
+        f"  • {sugerencia}\n"
+        f"  • Atajos de teclado y tus preferencias visuales\n\n"
+        f"Escribe **\"¿qué módulos tengo?\"** para ver tu lista, o **\"ayuda\"**."
     )
 
 
@@ -402,18 +483,174 @@ def _fallback(mensaje: str, _user) -> str:
 
 def responder(mensaje: str, user) -> str:
     """
-    Recibe un mensaje del usuario y devuelve una respuesta.
+    Motor por REGLAS (fallback). Matchea el mensaje contra los intents y
+    devuelve una respuesta con el conocimiento del sistema. Respeta permisos:
+    NUNCA reconoce un intent de un módulo al que el usuario no tiene acceso.
 
-    Para upgradear a IA real más adelante: reemplaza el cuerpo de esta función
-    por una llamada a OpenAI / Anthropic / Gemini, pasando KNOWLEDGE_BASE como
-    contexto (system prompt). La infraestructura (modelo ChatMensaje, endpoints,
-    UI) ya está preparada y no necesita cambios.
+    Es el respaldo de `responder_ia()` cuando no hay GEMINI_API_KEY o Gemini
+    falla, así el asistente jamás se queda sin responder.
     """
     if not mensaje or not mensaje.strip():
         return "Te escucho. ¿En qué te ayudo?"
 
+    permitidos = _modulos_permitidos(user)
     for intent in INTENTS:
+        mod = intent.get("modulo")
+        if mod and mod not in permitidos:
+            continue  # módulo sin acceso: se ignora (no se revela)
         if _contiene_alguna(mensaje, intent["palabras"]):
             return intent["handler"](mensaje, user)
 
     return _fallback(mensaje, user)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# MOTOR GEMINI (gratis) — IA conversacional real
+# ════════════════════════════════════════════════════════════════════════════
+# Mismos modelos flash del tier GRATIS que usa el resto de la IA de 3r
+# (ia_studio). El texto de Gemini sí tiene capa gratuita.
+GEMINI_CHAT_MODELS = ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.0-flash-001"]
+
+
+def _gemini_api_key() -> str:
+    """Key de Gemini: primero el panel Configuración IA (donde el admin la pega),
+    luego variables de entorno del backend (GEMINI_API_KEY / IMAGEN_API_KEY)."""
+    try:
+        from api.models import ConfiguracionSistema
+        k = (ConfiguracionSistema.get_config().imagen_api_key or "").strip()
+        if k:
+            return k
+    except Exception:
+        pass
+    return (os.environ.get("GEMINI_API_KEY") or os.environ.get("IMAGEN_API_KEY") or "").strip()
+
+
+def _kb_contexto_texto(permitidos: set) -> str:
+    """Aplana el KNOWLEDGE_BASE a texto para el system prompt, incluyendo SOLO
+    los módulos permitidos para este usuario."""
+    bloques = []
+    for clave in _ORDEN_MODULOS:
+        if clave not in permitidos or clave not in KNOWLEDGE_BASE:
+            continue
+        m = KNOWLEDGE_BASE[clave]
+        titulo = MODULO_TITULO.get(clave, clave.replace("_", " ").title())
+        lineas = [f"### {titulo}"]
+        if m.get("que_es"):
+            lineas.append(m["que_es"])
+        if m.get("descripcion"):
+            lineas.append(m["descripcion"])
+        for campo, etq in (("como_crear", "Cómo hacerlo"),
+                           ("como_usar", "Cómo usarlo"),
+                           ("tips", "Tips")):
+            if m.get(campo):
+                lineas.append(f"{etq}:")
+                lineas += [f"- {x}" for x in m[campo]]
+        if m.get("ruta"):
+            lineas.append(f"Ruta en el sistema: {m['ruta']}")
+        bloques.append("\n".join(lineas))
+    return "\n\n".join(bloques)
+
+
+def _system_prompt(user, permitidos: set) -> str:
+    try:
+        nombre = (user.get_full_name() or user.username or "").strip()
+    except Exception:
+        nombre = ""
+    lista = ", ".join(MODULO_TITULO[k] for k in _ORDEN_MODULOS
+                      if k in permitidos and k in MODULO_TITULO) or "solo tu perfil"
+    kb = _kb_contexto_texto(permitidos)
+    return (
+        f"Eres el \"Asistente 3R\", la inteligencia integrada del ERP 3R Recycling. "
+        f"Ayudas a {nombre or 'el usuario'} a entender y usar el sistema.\n\n"
+        "REGLAS ESTRICTAS:\n"
+        "- Responde SIEMPRE en español de México, con tono cordial, claro y profesional. Sé conciso.\n"
+        "- SOLO puedes hablar de los módulos a los que ESTE usuario tiene acceso (los de abajo). "
+        "Si preguntan por un módulo que NO está en tu conocimiento, responde con amabilidad que no "
+        "tienen acceso a ese módulo y que lo soliciten a un administrador (Permisos de Usuario); "
+        "NO expliques cómo usarlo ni reveles sus detalles.\n"
+        "- No inventes módulos, rutas, botones ni funciones que no aparezcan en el conocimiento. "
+        "Si no lo sabes, dilo y sugiere a quién preguntar.\n"
+        "- Al indicar cómo llegar a un módulo, menciona su ruta (p. ej. /remisiones).\n"
+        "- Formato: usa **negritas** para resaltar y viñetas con \"• \" (una por línea). "
+        "No uses tablas ni encabezados markdown (#). Respuestas breves salvo que pidan el paso a paso.\n\n"
+        f"Módulos a los que ESTE usuario tiene acceso: {lista}.\n\n"
+        "=== CONOCIMIENTO DEL SISTEMA (solo lo permitido para este usuario) ===\n"
+        f"{kb}"
+    )
+
+
+def _gemini_chat(api_key: str, system: str, historial, mensaje: str) -> str:
+    """Llama a Gemini (texto, tier gratis) con memoria de conversación.
+    Devuelve el texto de la respuesta o lanza excepción si no hay disponibilidad."""
+    from google import genai
+    from google.genai import types
+
+    # Timeout duro: evita que una llamada colgada bloquee el worker.
+    client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=40000))
+
+    contents = []
+    for h in list(historial or [])[-12:]:  # últimos ~12 turnos: acota tokens/latencia
+        if isinstance(h, dict):
+            rol = h.get("rol") or h.get("role") or ""
+            texto = h.get("contenido") or h.get("content") or ""
+        else:
+            rol = getattr(h, "rol", "")
+            texto = getattr(h, "contenido", "")
+        texto = str(texto).strip()
+        if not texto:
+            continue
+        role = "user" if rol == "user" else "model"
+        contents.append(types.Content(role=role, parts=[types.Part.from_text(text=texto)]))
+    contents.append(types.Content(role="user", parts=[types.Part.from_text(text=str(mensaje))]))
+
+    # Desactivar "thinking" acelera mucho (los flash razonan por defecto). Si el
+    # modelo no lo soporta, se reintenta sin ese campo (cfg_simple).
+    common = dict(system_instruction=system, temperature=0.4, max_output_tokens=1200)
+    try:
+        cfg_fast = types.GenerateContentConfig(
+            **common, thinking_config=types.ThinkingConfig(thinking_budget=0))
+    except Exception:
+        cfg_fast = None
+    cfg_simple = types.GenerateContentConfig(**common)
+
+    ultimo = None
+    for modelo in GEMINI_CHAT_MODELS:
+        for cfg in ([cfg_fast, cfg_simple] if cfg_fast else [cfg_simple]):
+            try:
+                r = client.models.generate_content(model=modelo, contents=contents, config=cfg)
+                if r and r.text:
+                    return r.text.strip()
+                ultimo = ValueError(f"respuesta vacía de {modelo}")
+                break
+            except Exception as e:
+                ultimo = e
+                msg = str(e)
+                # Sin cuota / modelo inexistente: saltar YA al siguiente modelo.
+                if "RESOURCE_EXHAUSTED" in msg or "429" in msg or "NOT_FOUND" in msg or "404" in msg:
+                    break
+                continue
+    raise RuntimeError(f"Gemini no disponible: {ultimo}")
+
+
+def responder_ia(mensaje: str, user, historial=None) -> str:
+    """
+    ENTRY POINT del asistente. Usa Gemini (gratis) con el KNOWLEDGE_BASE como
+    contexto, memoria de conversación e informado por los PERMISOS del usuario.
+    Si no hay GEMINI_API_KEY o Gemini falla por cualquier motivo, cae al motor
+    por reglas `responder()` (que también respeta permisos). Nunca lanza.
+    """
+    if not mensaje or not mensaje.strip():
+        return "Te escucho. ¿En qué te ayudo?"
+
+    api_key = _gemini_api_key()
+    if not api_key:
+        return responder(mensaje, user)  # sin key → motor por reglas
+
+    try:
+        permitidos = _modulos_permitidos(user)
+        system = _system_prompt(user, permitidos)
+        texto = _gemini_chat(api_key, system, historial, mensaje)
+        return texto.strip() or responder(mensaje, user)
+    except Exception:
+        # Cualquier fallo (sin cuota, red, SDK) → motor por reglas.
+        return responder(mensaje, user)

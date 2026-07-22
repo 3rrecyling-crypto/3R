@@ -259,6 +259,40 @@ class ConfiguracionSistema(SingletonModel):
         verbose_name='Número WhatsApp emisor Twilio'
     )
 
+    # ── IA (Canvas / Diagramas / Modelador 3D · informes con Claude/DeepSeek) ──
+    ia_proveedor = models.CharField(
+        max_length=20,
+        choices=[('anthropic', 'Anthropic (Claude)'), ('deepseek', 'DeepSeek')],
+        default='anthropic',
+        verbose_name='Proveedor de IA',
+        help_text='Proveedor de IA para asistentes e informes'
+    )
+    ia_base_url = models.URLField(
+        blank=True, default='',
+        verbose_name='URL base del proveedor de IA',
+        help_text='Vacío = default. DeepSeek: https://api.deepseek.com'
+    )
+    ia_api_key = models.CharField(
+        max_length=255, blank=True, default='',
+        verbose_name='API Key de IA (texto)',
+        help_text='API key del proveedor (Anthropic o DeepSeek)'
+    )
+    ia_modelo = models.CharField(
+        max_length=60, blank=True, default='',
+        verbose_name='Modelo de IA',
+        help_text='Vacío = el por defecto del proveedor'
+    )
+    imagen_api_key = models.CharField(
+        max_length=255, blank=True, default='',
+        verbose_name='API Key de Google Gemini (imágenes)',
+        help_text='Para generar imágenes en Canvas (aistudio.google.com/apikey)'
+    )
+    imagen_modelo = models.CharField(
+        max_length=80, blank=True, default='',
+        verbose_name='Modelo de imagen de Gemini',
+        help_text='Vacío = el por defecto'
+    )
+
     # ── Paginación / Listas ───────────────────────────────────────────────────
     items_por_pagina = models.PositiveIntegerField(
         default=25,

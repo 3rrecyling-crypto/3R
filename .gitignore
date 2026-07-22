@@ -25,6 +25,10 @@ venv/
 *.env
 .env.*
 
+# ── Certificados CA locales (Avast intercepta TLS; CA única por equipo) ──
+avast-root.pem
+ia-ca-bundle.pem
+
 # ── Base de datos local ──────────────────────────────────────
 db.sqlite3
 *.sqlite3

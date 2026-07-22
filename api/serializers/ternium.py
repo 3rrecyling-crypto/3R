@@ -10,7 +10,7 @@ from ternium.models import (
     RegistroLogistico, EntradaMaquila, EvidenciaRemision,
     HistorialRemision, InventarioPatio, Descarga, Plastico,
     EvidenciaPlastico, HistorialPlastico, ControlTarima,
-    ConfiguracionManifiesto, ControlManifiestoTrane,
+    ConfiguracionManifiesto, ControlManifiestoTrane, ManifiestoResiduos,
     PrecioMedline, ConfiguracionAlertaMerma, DestinatarioAlertaMerma,
     Profile,
 )
@@ -156,7 +156,7 @@ class LugarMiniSerializer(serializers.ModelSerializer):
 class ClienteSerializer(serializers.ModelSerializer):
     empresas = EmpresaMiniSerializer(many=True, read_only=True)
     empresas_ids = serializers.PrimaryKeyRelatedField(
-        many=True, queryset=Empresa.objects.all(), source='empresas', write_only=True
+        many=True, queryset=Empresa.objects.all(), source='empresas', write_only=True, required=False
     )
 
     class Meta:
@@ -236,6 +236,18 @@ class RemisionDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Remision
         fields = '__all__'
+
+    def validate_folio_medline(self, value):
+        # Folio Medline manual: debe ser único. Vacío = pendiente (permitido).
+        v = (value or '').strip() or None
+        if v is None:
+            return None
+        qs = Remision.objects.filter(folio_medline=v)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(f"El folio Medline «{v}» ya existe. Debe ser único.")
+        return v
 
     def get_porcentaje_merma(self, obj):
         try:
@@ -372,6 +384,21 @@ class ControlManifiestoTraneSerializer(serializers.ModelSerializer):
     class Meta:
         model = ControlManifiestoTrane
         fields = '__all__'
+
+
+class ManifiestoResiduosSerializer(serializers.ModelSerializer):
+    """Manifiesto oficial de residuos de manejo especial (formato SMA)."""
+    creado_por_nombre = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ManifiestoResiduos
+        fields = ['id', 'no_manifiesto', 'datos', 'creado_por', 'creado_por_nombre',
+                  'creado_en', 'actualizado_en']
+        read_only_fields = ['creado_por', 'creado_en', 'actualizado_en']
+
+    def get_creado_por_nombre(self, obj) -> str:
+        u = obj.creado_por
+        return (u.get_full_name() or u.username) if u else ""
 
 
 # ─── MEDLINE ─────────────────────────────────────────────────────────────────

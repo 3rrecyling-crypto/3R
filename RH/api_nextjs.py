@@ -111,7 +111,7 @@ def _empleado_to_dict(e):
                 'fecha_inicio': str(c.fecha_inicio) if c.fecha_inicio else '',
                 'fecha_fin': str(c.fecha_fin) if c.fecha_fin else '',
                 'comentarios': c.comentarios or '',
-                'archivo_url': c.archivo.url if c.archivo else None,
+                'archivo_url': c.archivo_contrato.url if c.archivo_contrato else None,
             }
             for c in e.contratos.order_by('-fecha_inicio')
         ] if hasattr(e, 'contratos') else [],

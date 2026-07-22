@@ -12,4 +12,5 @@ urlpatterns = [
     path('fotos-pdf/', views.fotos_a_pdf, name='fotos_pdf'),
     path('quitar-fondo/', views.quitar_fondo, name='quitar_fondo'),
     path('unir-pdf/', views.unir_pdf_pro, name='unir_pdf'), # <-- ESTA ES LA QUE VALE
+    path('licencia-premium/', views.LicenciaPremiumView.as_view(), name='licencia_premium'),
 ]

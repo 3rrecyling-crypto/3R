@@ -7,6 +7,61 @@ import dj_database_url
 # Base
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# --- Carga de variables de entorno desde un archivo .env (sin dependencias) ---
+# Permite poner llaves (GEMINI_API_KEY, ANTHROPIC_API_KEY, etc.) en un archivo
+# .env junto a manage.py sin exportarlas a mano. NO sobreescribe variables que
+# ya existan en el entorno del sistema (esas tienen prioridad). Si no hay .env,
+# es un no-op silencioso.
+def _cargar_env(_ruta):
+    try:
+        with open(_ruta, 'r', encoding='utf-8') as _fh:
+            for _linea in _fh:
+                _linea = _linea.strip()
+                if not _linea or _linea.startswith('#') or '=' not in _linea:
+                    continue
+                _clave, _, _valor = _linea.partition('=')
+                _clave = _clave.strip()
+                _valor = _valor.strip().strip('"').strip("'")
+                if _clave and _clave not in os.environ:
+                    os.environ[_clave] = _valor
+    except FileNotFoundError:
+        pass
+
+_cargar_env(BASE_DIR / '.env')
+
+
+# --- TLS con Avast (u otro antivirus/proxy que intercepta HTTPS) ---
+# Avast reemplaza el certificado de los sitios HTTPS por uno firmado con su
+# propia CA (ÚNICA por equipo). Python (google-genai/httpx, requests, grpc) no
+# confía en ella y las llamadas a Gemini/Pollinations fallan con
+# CERTIFICATE_VERIFY_FAILED. Aquí construimos un bundle = certifi (CAs públicas)
+# + la CA extra local y lo publicamos por SSL_CERT_FILE / REQUESTS_CA_BUNDLE para
+# que TODO el stack confíe en ella. Si no hay CA extra (p. ej. el servidor de
+# producción sin Avast), es un no-op silencioso.
+def _configurar_ca_extra():
+    import os
+    candidatos = [
+        (os.environ.get("IA_EXTRA_CA") or "").strip(),
+        os.path.join(str(BASE_DIR), "avast-root.pem"),
+        os.path.expanduser(os.path.join("~", ".node-certs", "avast-root.pem")),
+    ]
+    ca_extra = next((c for c in candidatos if c and os.path.exists(c)), "")
+    if not ca_extra:
+        return
+    try:
+        import certifi
+        bundle = os.path.join(str(BASE_DIR), "ia-ca-bundle.pem")
+        base = open(certifi.where(), "r", encoding="utf-8").read().rstrip()
+        extra = open(ca_extra, "r", encoding="utf-8").read().strip()
+        with open(bundle, "w", encoding="utf-8") as _fh:
+            _fh.write(base + "\n" + extra + "\n")
+        for _var in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "GRPC_DEFAULT_SSL_ROOTS_FILE_PATH"):
+            os.environ[_var] = bundle
+    except Exception:
+        pass
+
+_configurar_ca_extra()
+
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 # Seguridad
@@ -53,6 +108,13 @@ INSTALLED_APPS = [
     'corsheaders',
     'RH',
     'api',
+    # Módulos portados desde SANBENITO (Diagramas, Canva Pro, Modelador 3D):
+    'diagramas',
+    'ia_studio',
+    'yard_sketch',
+    'transferencias',
+    'simulador',
+    'mensajeria',  # Chat interno + videollamadas (LiveKit), portado de SANBENITO
 ]
 
 MIDDLEWARE = [

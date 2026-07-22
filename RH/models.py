@@ -1542,3 +1542,52 @@ class ControlVacante(models.Model):
     def __str__(self):
         div = f" - {self.division}" if self.division else ""
         return f"{self.empresa} - {self.puesto}{div} ({self.cantidad_presupuestada})"
+
+
+class PlantillaContrato(models.Model):
+    """Plantilla de contrato con marcadores {{variable}} reutilizable. El
+    contenido es HTML; al generar el contrato de un empleado, las variables se
+    rellenan con sus datos reales (ver RH/contratos.py). Portado de SANBENITO."""
+    nombre = models.CharField(max_length=160)
+    contenido = models.TextField(blank=True, help_text="HTML con marcadores {{variable}}")
+    creado_por = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="plantillas_contrato_creadas",
+    )
+    creado = models.DateTimeField(auto_now_add=True)
+    actualizado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nombre"]
+        verbose_name = "Plantilla de contrato"
+        verbose_name_plural = "Plantillas de contrato"
+
+    def __str__(self):
+        return self.nombre
+
+
+class ContratoGenerado(models.Model):
+    """Contrato ya rellenado y vinculado a un empleado (snapshot del HTML final)."""
+    empleado = models.ForeignKey(
+        Empleado, on_delete=models.CASCADE, related_name="contratos_generados",
+    )
+    plantilla = models.ForeignKey(
+        PlantillaContrato, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="contratos_generados",
+    )
+    titulo = models.CharField(max_length=200)
+    contenido_html = models.TextField(blank=True)
+    creado_por = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="contratos_generados",
+    )
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-creado"]
+        verbose_name = "Contrato generado"
+        verbose_name_plural = "Contratos generados"
+        indexes = [models.Index(fields=["empleado", "-creado"])]
+
+    def __str__(self):
+        return self.titulo

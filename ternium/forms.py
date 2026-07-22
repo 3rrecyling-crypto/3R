@@ -372,6 +372,22 @@ class RemisionForm(forms.ModelForm):
 
         return cleaned_data
 
+    def clean_folio_medline(self):
+        """
+        Folio Medline MANUAL y ÚNICO (paridad con el formulario Next).
+        Lo captura el usuario; vacío = PENDIENTE (se guarda NULL). No se puede
+        repetir: unicidad global excluyendo la propia remisión al editar.
+        """
+        valor = (self.cleaned_data.get('folio_medline') or '').strip()
+        if not valor:
+            return None  # vacío = PENDIENTE
+        qs = Remision.objects.filter(folio_medline=valor)
+        if self.instance and self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError(f"El folio Medline «{valor}» ya existe en otra remisión. Debe ser único.")
+        return valor
+
 class DetalleRemisionForm(forms.ModelForm):
     class Meta:
         model = DetalleRemision

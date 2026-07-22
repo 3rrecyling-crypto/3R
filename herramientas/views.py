@@ -177,3 +177,40 @@ def unir_pdf_pro(request):
         'title': 'Organizador Avanzado de PDFs',
         'btn_text': 'Fusionar PDFs'
     })
+
+# ── API JSON: licencia PREMIUM de herramientas (PDF Studio, etc.) ──────────────
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_protect
+from django.utils.decorators import method_decorator
+from django.views import View
+from .licencias import clave_valida, normalizar
+from .models import LicenciaPremium
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class LicenciaPremiumView(View):
+    """GET  -> {premium, clave (enmascarada), activada_en}
+       POST -> {clave} valida offline y activa para TODOS."""
+
+    def get(self, request):
+        lic = LicenciaPremium.objects.filter(activa=True).first()
+        if not lic:
+            return JsonResponse({"premium": False, "clave": "", "activada_en": None})
+        c = lic.clave
+        return JsonResponse({
+            "premium": True,
+            "clave": f"{c[:9]}…{c[-4:]}" if len(c) > 13 else c,
+            "activada_en": lic.activada_en.isoformat(),
+        })
+
+    def post(self, request):
+        try:
+            data = json.loads(request.body or "{}")
+        except Exception:
+            data = {}
+        clave = normalizar(str(data.get("clave") or ""))
+        if not clave_valida(clave):
+            return JsonResponse({"detail": "La clave no es válida. Revisa que esté completa (SANB-XXXXX-XXXXX-XXXXX)."}, status=400)
+        LicenciaPremium.objects.filter(activa=True).update(activa=False)
+        LicenciaPremium.objects.update_or_create(clave=clave, defaults={"activa": True})
+        return JsonResponse({"premium": True, "detail": "Licencia PREMIUM activada."})

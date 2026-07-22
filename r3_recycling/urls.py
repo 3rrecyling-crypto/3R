@@ -50,6 +50,14 @@ urlpatterns = [
     # 6. API REST v1 (Next.js / React)
     path('api/v1/', include('api.urls')),
 
+    # Módulos portados desde SANBENITO (mismos prefijos que consume el frontend)
+    path('api/diagramas/', include('diagramas.urls')),
+    path('api/ia-studio/', include('ia_studio.urls')),
+    path('api/yard-sketch/', include('yard_sketch.urls')),
+    path('api/transferencias/', include('transferencias.urls')),
+    path('api/simulador/', include('simulador.urls')),
+    path('api/mensajeria/', include('mensajeria.urls')),  # Chat interno + videollamadas
+
     # 6. Ruta General / Bienvenida (IMPORTANTE: Esta va al FINAL)
     # Al entrar a "midominio.com/", Django probará todas las de arriba.
     # Como ninguna coincidirá con la cadena vacía (porque facturacion ahora tiene prefijo),

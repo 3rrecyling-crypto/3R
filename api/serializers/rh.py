@@ -10,6 +10,7 @@ from RH.models import (
     DocumentoOperador, HistorialLaboral, Contrato,
     MotivoBaja, BajaEmpleado, Vacacion, HistoricoVacaciones,
     Prestamo, PagoPrestamo, ControlVacante,
+    PlantillaContrato, ContratoGenerado,
 )
 
 
@@ -286,3 +287,23 @@ class ControlVacanteSerializer(serializers.ModelSerializer):
     class Meta:
         model = ControlVacante
         fields = '__all__'
+
+
+class PlantillaContratoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlantillaContrato
+        fields = '__all__'
+        read_only_fields = ['creado_por', 'creado', 'actualizado']
+
+
+class ContratoGeneradoSerializer(serializers.ModelSerializer):
+    empleado_nombre = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ContratoGenerado
+        fields = '__all__'
+        read_only_fields = ['creado_por', 'creado']
+
+    def get_empleado_nombre(self, obj):
+        e = obj.empleado
+        return f"{e.nombre} {getattr(e, 'apellido', '') or ''}".strip()

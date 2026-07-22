@@ -206,8 +206,9 @@
                 
                 <div class="col-md" id="contenedor_folio_medline" style="display: none;">
                     <label class="form-label fw-bold" style="color: #6f42c1;"><i class="fas fa-hashtag me-1"></i>Folio Medline</label>
-                    <input type="text" class="form-control fw-bold text-center" style="background-color: #f3e8ff; color: #6f42c1; border-color: #d8b4fe;" readonly value="{{ remision.folio_medline|default:'SE GENERARÁ AL GUARDAR' }}">
-                    <div class="form-text" style="color: #6f42c1;"><i class="fas fa-info-circle me-1"></i>Consecutivo automático</div>
+                    <input type="text" name="folio_medline" class="form-control fw-bold text-center" style="background-color: #f3e8ff; color: #6f42c1; border-color: #d8b4fe;" value="{{ form.folio_medline.value|default:'' }}" placeholder="Escribe el folio (ej. 3R-2026-0181)" autocomplete="off">
+                    <div class="form-error">{{ form.folio_medline.errors }}</div>
+                    <div class="form-text" style="color: #6f42c1;"><i class="fas fa-info-circle me-1"></i>Manual — no se puede repetir. Vacío = PENDIENTE.</div>
                 </div>
                 
             </div></div>

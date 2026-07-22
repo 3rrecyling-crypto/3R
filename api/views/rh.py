@@ -21,6 +21,7 @@ from api.serializers.rh import (
     VacacionSerializer, HistoricoVacacionesSerializer,
     PrestamoSerializer, PagoPrestamoSerializer,
     ControlVacanteSerializer,
+    PlantillaContratoSerializer, ContratoGeneradoSerializer,
 )
 from RH.models import (
     Departamento, Puesto, MotivoInactivacion,
@@ -29,6 +30,7 @@ from RH.models import (
     DocumentoOperador, HistorialLaboral, Contrato,
     MotivoBaja, BajaEmpleado, Vacacion, HistoricoVacaciones,
     Prestamo, PagoPrestamo, ControlVacante,
+    PlantillaContrato, ContratoGenerado,
 )
 
 
@@ -350,3 +352,89 @@ class DashboardRHView(APIView):
             'prestamos_activos': prestamos_activos,
             'cumpleanos_del_mes': list(cumples),
         })
+
+
+# ─── CONTRATOS (plantillas con {{variables}} + generación) ───────────────────
+class PlantillaContratoViewSet(viewsets.ModelViewSet):
+    """Plantillas de contrato reutilizables (editor de HTML con variables)."""
+    queryset = PlantillaContrato.objects.all().order_by('nombre')
+    serializer_class = PlantillaContratoSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['nombre']
+
+    def perform_create(self, serializer):
+        serializer.save(creado_por=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def variables(self, request):
+        """Catálogo de variables {{...}} disponibles, para el editor."""
+        from RH.contratos import VARIABLES_INFO
+        return Response({'grupos': VARIABLES_INFO})
+
+    @action(detail=True, methods=['post'])
+    def generar(self, request, pk=None):
+        """Body: {empleado_id, guardar?}. Devuelve el HTML final; si `guardar`,
+        además crea un ContratoGenerado vinculado al empleado."""
+        from RH.contratos import render_contrato, variables_de_empleado
+        plantilla = self.get_object()
+        emp = Empleado.objects.filter(pk=request.data.get('empleado_id')).first()
+        if not emp:
+            return Response({'detail': 'Empleado no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        variables = variables_de_empleado(emp)
+        html = render_contrato(plantilla.contenido, variables)
+        if request.data.get('con_anexo'):
+            from RH.contratos import anexo_datos_empleado
+            html += anexo_datos_empleado(emp)
+        guardado_id = None
+        if request.data.get('guardar'):
+            cg = ContratoGenerado.objects.create(
+                empleado=emp, plantilla=plantilla,
+                titulo=f"{plantilla.nombre} — {emp.nombre} {getattr(emp, 'apellido', '') or ''}".strip(),
+                contenido_html=html, creado_por=request.user,
+            )
+            guardado_id = cg.id
+        return Response({'html': html, 'variables': variables, 'guardado_id': guardado_id})
+
+    @action(detail=True, methods=['post'], url_path='generar-departamento')
+    def generar_departamento(self, request, pk=None):
+        """Genera el contrato para TODOS los empleados activos de un departamento y
+        devuelve el HTML combinado (uno por página). Body: {departamento_id, con_anexo?, guardar?}."""
+        from RH.contratos import render_contrato, variables_de_empleado, anexo_datos_empleado
+        plantilla = self.get_object()
+        depto_id = request.data.get('departamento_id')
+        if not depto_id:
+            return Response({'detail': 'Falta el departamento.'}, status=status.HTTP_400_BAD_REQUEST)
+        con_anexo = bool(request.data.get('con_anexo'))
+        guardar = bool(request.data.get('guardar'))
+        emps = (Empleado.objects
+                .filter(departamento_id=depto_id, activo=True, eliminado=False)
+                .order_by('apellido', 'nombre'))
+        partes = []
+        for emp in emps:
+            h = render_contrato(plantilla.contenido, variables_de_empleado(emp))
+            if con_anexo:
+                h += anexo_datos_empleado(emp)
+            partes.append(h)
+            if guardar:
+                ContratoGenerado.objects.create(
+                    empleado=emp, plantilla=plantilla,
+                    titulo=f"{plantilla.nombre} — {emp.nombre} {getattr(emp, 'apellido', '') or ''}".strip(),
+                    contenido_html=h, creado_por=request.user,
+                )
+        combinado = '<div style="page-break-after:always"></div>'.join(partes)
+        return Response({'html': combinado, 'total': len(partes)})
+
+
+class ContratoGeneradoViewSet(viewsets.ModelViewSet):
+    """Contratos ya generados y vinculados a un empleado (leer + borrar)."""
+    serializer_class = ContratoGeneradoSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'delete', 'head', 'options']
+
+    def get_queryset(self):
+        qs = ContratoGenerado.objects.select_related('empleado', 'plantilla').all()
+        emp = self.request.query_params.get('empleado')
+        if emp:
+            qs = qs.filter(empleado_id=emp)
+        return qs.order_by('-creado')

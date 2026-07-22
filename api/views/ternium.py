@@ -8,6 +8,7 @@ from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from api.pagination import DynamicPagePagination
 from api.permissions import AccesoRemisiones, AccesoCatalogos, AccesoReportes
@@ -21,6 +22,7 @@ from api.serializers.ternium import (
     EntradaMaquilaSerializer, InventarioPatiSerializer,
     DescargaSerializer, PlasticoSerializer, ControlTarimaSerializer,
     ConfiguracionManifiestoSerializer, ControlManifiestoTraneSerializer,
+    ManifiestoResiduosSerializer,
     PrecioMedlineSerializer, ConfiguracionAlertaMermaSerializer,
     DestinatarioAlertaMermaSerializer,
 )
@@ -30,6 +32,7 @@ from ternium.models import (
     EvidenciaRemision, HistorialRemision, RegistroLogistico,
     EntradaMaquila, InventarioPatio, Descarga, Plastico,
     ControlTarima, ConfiguracionManifiesto, ControlManifiestoTrane,
+    ManifiestoResiduos,
     PrecioMedline, ConfiguracionAlertaMerma, DestinatarioAlertaMerma,
 )
 
@@ -165,6 +168,38 @@ class ClienteViewSet(viewsets.ModelViewSet):
         empresas = _empresas_autorizadas(self.request.user)
         return Cliente.objects.filter(empresas__in=empresas).distinct().order_by('nombre')
 
+    def perform_create(self, serializer):
+        cliente = serializer.save()
+        # Si se dio de alta sin especificar empresas, asociarlo a las autorizadas del
+        # usuario para que sea visible (get_queryset filtra por empresas). Evita crear
+        # "clientes fantasma" que no aparecerían en el catálogo tras guardarse.
+        if not cliente.empresas.exists():
+            cliente.empresas.set(_empresas_autorizadas(self.request.user))
+
+
+class ManifiestoClienteViewSet(viewsets.ModelViewSet):
+    """Catálogo de clientes para el COMBOBOX del manifiesto oficial (campo generador).
+
+    A diferencia de ClienteViewSet (gestión de catálogos: exige `acceso_catalogos` y
+    filtra por empresa), aquí basta con estar AUTENTICADO y se muestra el catálogo
+    completo. Así los usuarios del portal de manifiestos pueden listar / dar de alta /
+    editar clientes aunque NO tengan permiso de entrar a la sección de catálogos.
+    Eliminar sí queda restringido a administradores de catálogos.
+    """
+    serializer_class = ClienteSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['nombre']
+    pagination_class = DynamicPagePagination
+    queryset = Cliente.objects.all().order_by('nombre')
+
+    def perform_destroy(self, instance):
+        user = self.request.user
+        if not (user.is_superuser or user.has_perm('ternium.acceso_catalogos')):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Solo administradores de catálogos pueden eliminar clientes.")
+        instance.delete()
+
 
 # ─── REMISIONES ──────────────────────────────────────────────────────────────
 class RemisionViewSet(viewsets.ModelViewSet):
@@ -242,8 +277,10 @@ class RemisionViewSet(viewsets.ModelViewSet):
             remision.status = 'CANCELADO'
             remision.folio_medline = None
             remision.save()
-            if folio_liberado:
-                av._renumerar_folios_medline(folio_liberado)
+            # Folio Medline manual: al cancelar se LIBERA (queda pendiente), pero NO
+            # se renumera — renumerar reescribiría folios que el usuario tecleó a mano.
+            # if folio_liberado:
+            #     av._renumerar_folios_medline(folio_liberado)
             return Response({'detail': 'Remisión cancelada.', 'id': remision.pk})
         except Exception as e:
             return Response({'detail': str(e)}, status=500)
@@ -449,6 +486,49 @@ class ControlManifiestoTraneViewSet(viewsets.ModelViewSet):
         if fecha_hasta:
             qs = qs.filter(fecha_captura__lte=fecha_hasta)
         return qs
+
+
+class ManifiestoResiduosViewSet(viewsets.ModelViewSet):
+    """CRUD del manifiesto oficial de residuos de manejo especial (formato SMA)."""
+    serializer_class = ManifiestoResiduosSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = DynamicPagePagination
+
+    def get_queryset(self):
+        qs = ManifiestoResiduos.objects.all().order_by('-creado_en', '-id')
+        buscar = self.request.query_params.get('buscar')
+        if buscar:
+            qs = qs.filter(no_manifiesto__icontains=buscar)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(creado_por=self.request.user)
+
+
+class CodigoPostalView(APIView):
+    """Búsqueda por código postal usando el catálogo SEPOMEX/SAT ya cargado en la
+    app facturacion. GET ?cp=64000 → { cp, estado, municipio, colonias: [...] }.
+    Autocompleta el domicilio en el manifiesto (municipio) y sugiere colonias."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from facturacion.models import Colonia, CodigoPostalFiscal
+        cp = "".join(ch for ch in (request.query_params.get("cp") or "") if ch.isdigit())[:5]
+        if len(cp) < 5:
+            return Response({"cp": cp, "estado": "", "municipio": "", "colonias": []})
+        cpf = (CodigoPostalFiscal.objects
+               .select_related("estado", "municipio")
+               .filter(codigo=cp).first())
+        colonias = list(
+            Colonia.objects.filter(codigo_postal=cp)
+            .values_list("nombre", flat=True).distinct().order_by("nombre")
+        )
+        return Response({
+            "cp": cp,
+            "estado": cpf.estado.nombre if cpf else "",
+            "municipio": cpf.municipio.nombre if cpf else "",
+            "colonias": colonias,
+        })
 
 
 # ─── MEDLINE ─────────────────────────────────────────────────────────────────

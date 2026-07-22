@@ -1172,9 +1172,9 @@ def crear_remision(request):
                     for obj in formset.deleted_objects: obj.delete()
 
                     # ==========================================================
-                    # NUEVO: ASIGNAR FOLIO MEDLINE YA QUE SE GUARDÓ EL MATERIAL
-                    # ==========================================================
-                    asignar_folio_medline(remision)
+                    # Folio Medline ahora es MANUAL (lo captura el usuario en el
+                    # formulario). Ya no se autogenera aquí.
+                    # asignar_folio_medline(remision)
 
                     # --- Inventarios ---
                     _update_inventory_from_remision(remision, revert=False)
@@ -1460,9 +1460,9 @@ def editar_remision(request, pk):
                         obj.delete()
 
                     # ==========================================================
-                    # NUEVO: ASIGNAR FOLIO MEDLINE YA QUE SE GUARDÓ EL MATERIAL
-                    # ==========================================================
-                    asignar_folio_medline(remision)
+                    # Folio Medline ahora es MANUAL (lo captura el usuario en el
+                    # formulario). Ya no se autogenera aquí.
+                    # asignar_folio_medline(remision)
                     
                     _update_inventory_from_remision(remision, revert=False)
                     enviar_alerta_merma(remision) 
@@ -2332,6 +2332,13 @@ def get_catalogos_por_empresa(request, empresa_id):
     Devuelve los catálogos filtrados por una empresa específica.
     ESTA ES LA VERSIÓN CORREGIDA.
     """
+    from django.http import JsonResponse
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'NO_AUTORIZADO', 'detail': 'Sesión no válida.'}, status=401)
+    if not request.user.is_superuser:
+        perfil = getattr(request.user, 'ternium_profile', None)
+        if not perfil or not perfil.empresas_autorizadas.filter(pk=empresa_id).exists():
+            return JsonResponse({'error': 'FORBIDDEN', 'detail': 'Sin acceso a esta empresa.'}, status=403)
     try:
         # La línea 'unidades' fallaba porque 'models.F' no estaba definido.
         # Al importar 'F' directamente, ahora funciona correctamente.
@@ -4400,8 +4407,9 @@ def cancelar_remision(request, pk):
 
             remision.save()
 
-            # 4. Renumerar folios Medline posteriores para cerrar el hueco
-            api_views._renumerar_folios_medline(folio_liberado)
+            # Folio Medline manual: NO renumerar al cancelar (reescribiría folios
+            # capturados a mano en otras remisiones).
+            # api_views._renumerar_folios_medline(folio_liberado)
 
             # --- HISTORIAL: REGISTRAR CANCELACIÓN ---
             HistorialRemision.objects.create(
@@ -8003,10 +8011,39 @@ def api_dashboard_trane(request):
     Devuelve KPIs, gráficas, tablas (fase1, fase2, bitácora) y filtros.
     """
 
-    # --- 0. FILTROS ---
-    filtro_material_id = request.GET.get('material')
-    fecha_inicio = request.GET.get('fecha_inicio')
-    fecha_fin = request.GET.get('fecha_fin')
+    # --- AUTH CHECK (devuelve JSON 401, NO redirige a login HTML) ---
+    if not request.user.is_authenticated:
+        return JsonResponse(
+            {'error': 'NO_AUTORIZADO', 'detail': 'Sesión no válida.'},
+            status=401
+        )
+
+    # --- 0. FILTROS (validados: parámetros inválidos → 400 JSON, no 500) ---
+    try:
+        filtro_material_id = int(request.GET.get('material')) if request.GET.get('material') else None
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'material inválido'}, status=400)
+
+    from django.utils.dateparse import parse_date
+
+    def _fecha_param(nombre):
+        crudo = (request.GET.get(nombre) or '').strip()
+        if not crudo:
+            return None, None
+        try:
+            valor = parse_date(crudo)
+        except ValueError:
+            valor = None
+        if valor is None:
+            return None, JsonResponse({'error': f'{nombre} inválida (usa YYYY-MM-DD)'}, status=400)
+        return valor.isoformat(), None
+
+    fecha_inicio, err = _fecha_param('fecha_inicio')
+    if err:
+        return err
+    fecha_fin, err = _fecha_param('fecha_fin')
+    if err:
+        return err
 
     # MODIFICACIÓN: Filtro automático para "lo que va de este año"
     if not fecha_inicio and not fecha_fin and not filtro_material_id:
@@ -8044,16 +8081,17 @@ def api_dashboard_trane(request):
     # --- 3. GRÁFICAS ---
     # Mensual
     mensual_qs = queryset.annotate(mes=TruncMonth('fecha')).values('mes').annotate(
-        total_kg=Sum('detalles__peso_ld')
+        total_kg=Coalesce(Sum('detalles__peso_ld'), 0.0, output_field=FloatField())
     ).order_by('mes')
     chart_mensual = {
-        'labels': [m['mes'].strftime("%b %Y") for m in mensual_qs if m['mes']],
+        # Meses en español (strftime %b depende del locale del SO y salía en inglés)
+        'labels': [f"{['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][m['mes'].month - 1]} {m['mes'].year}" for m in mensual_qs if m['mes']],
         'data': [round((m['total_kg'] or 0) / 1000, 2) for m in mensual_qs if m['mes']],
     }
 
     # Destinos
     destinos_qs = queryset.values('destino__nombre').annotate(
-        total_kg=Sum('detalles__peso_ld')
+        total_kg=Coalesce(Sum('detalles__peso_ld'), 0.0, output_field=FloatField())
     ).order_by('-total_kg')
     chart_destinos = {
         'labels': [d['destino__nombre'] or 'N/A' for d in destinos_qs],
@@ -8062,7 +8100,7 @@ def api_dashboard_trane(request):
 
     # Materiales
     materiales_qs = queryset.values('detalles__material__nombre').annotate(
-        total_kg=Sum('detalles__peso_ld')
+        total_kg=Coalesce(Sum('detalles__peso_ld'), 0.0, output_field=FloatField())
     ).order_by('-total_kg')
     chart_materiales = {
         'labels': [m['detalles__material__nombre'] or 'N/A' for m in materiales_qs],
@@ -8084,7 +8122,7 @@ def api_dashboard_trane(request):
         dest_nom = mov.destino.nombre if mov.destino else "Sin Destino"
         key = f"{mat_nom}_{dest_nom}"
 
-        peso_ton = round((mov.total_peso_ld or 0) / 1000, 3)
+        peso_ton = round(float(mov.total_peso_ld or 0) / 1000, 3)
         transporte = mov.linea_transporte.nombre if mov.linea_transporte else 'S/T'
         operador = mov.operador.nombre if mov.operador else (mov.operador_manual or 'S/O')
         folio = mov.folio_ld.strip() if mov.folio_ld and mov.folio_ld.strip() else mov.remision
@@ -8124,7 +8162,7 @@ def api_dashboard_trane(request):
     trazabilidad_qs = queryset.values(
         'detalles__material__nombre', 'destino__nombre', 'destino__es_patio'
     ).annotate(
-        kilos=Sum('detalles__peso_ld'), viajes=Count('id')
+        kilos=Coalesce(Sum('detalles__peso_ld'), 0.0, output_field=FloatField()), viajes=Count('id')
     ).order_by('detalles__material__nombre')
 
     fase1 = []
@@ -8182,7 +8220,7 @@ def api_dashboard_trane(request):
                     arch2.append({'url': ex.archivo.url, 'type': 'extra'})
             bd_f2[k2].append({
                 'remision': f2_folio, 'fecha': mov.fecha.strftime("%d/%m/%Y"),
-                'peso': round((mov.total_peso_ld or 0) / 1000, 3), 'archivos': arch2,
+                'peso': round(float(mov.total_peso_ld or 0) / 1000, 3), 'archivos': arch2,
                 'origen': on, 'destino': dn,
                 'operador': mov.operador.nombre if mov.operador else 'S/O',
                 'trazabilidad': mov.trazabilidad_notas or "",
@@ -8190,7 +8228,7 @@ def api_dashboard_trane(request):
 
         agrupado = salidas_patio.values(
             'origen__nombre', 'detalles__material__nombre', 'destino__nombre'
-        ).annotate(kilos=Sum('detalles__peso_ld'), viajes=Count('id')).order_by('detalles__material__nombre')
+        ).annotate(kilos=Coalesce(Sum('detalles__peso_ld'), 0.0, output_field=FloatField()), viajes=Count('id')).order_by('detalles__material__nombre')
 
         for s in agrupado:
             k2 = f"{s['origen__nombre']}_{s['detalles__material__nombre']}_{s['destino__nombre']}"
@@ -8202,33 +8240,56 @@ def api_dashboard_trane(request):
                 'breakdown': bd_f2.get(k2, []),
             })
 
-    # --- 7. SALIDAS (ControlManifiestoTrane) ---
-    salidas_qs = ControlManifiestoTrane.objects.select_related(
-        'linea_transporte', 'operador', 'destino', 'material', 'remision_vinculada'
-    )
+    # --- 7. SALIDAS = MANIFIESTOS OFICIALES (ManifiestoResiduos de /trane/manifiestos) ---
+    # Cada manifiesto ES el documento (PDF); el frontend enlaza al manifiesto por id.
+    from .models import ManifiestoResiduos
+    import re as _re
+
+    def _num(v):
+        """Primer número dentro de un texto libre de cantidad (best-effort)."""
+        try:
+            mm = _re.search(r'[-+]?\d*[.,]?\d+', str(v or '').replace(',', '.'))
+            return float(mm.group(0)) if mm else 0.0
+        except Exception:
+            return 0.0
+
+    def _peso_kg_residuo(res):
+        res = res or {}
+        n = _num(res.get('cant'))
+        uni = str(res.get('uni') or '').strip().lower()
+        if 'ton' in uni or uni in ('t', 'tn'):
+            n *= 1000
+        return n
+
+    ofi_qs = ManifiestoResiduos.objects.all()
     if fecha_inicio:
-        salidas_qs = salidas_qs.filter(fecha_captura__gte=fecha_inicio)
+        ofi_qs = ofi_qs.filter(creado_en__date__gte=fecha_inicio)
     if fecha_fin:
-        salidas_qs = salidas_qs.filter(fecha_captura__lte=fecha_fin)
-    salidas_qs = salidas_qs.order_by('-fecha_captura', '-id')[:100]
+        ofi_qs = ofi_qs.filter(creado_en__date__lte=fecha_fin)
+    ofi_qs = ofi_qs.order_by('-creado_en', '-id')[:100]
 
     salidas_list = []
-    for r in salidas_qs:
-        docs = []
-        if r.manifiesto:
-            docs.append({'url': r.manifiesto.url, 'type': 'manifiesto'})
-        if r.documento_trane:
-            docs.append({'url': r.documento_trane.url, 'type': 'doc_trane'})
+    for m in ofi_qs:
+        d = m.datos or {}
+        residuos = d.get('residuos') or []
+        descs = [str((res or {}).get('desc') or '').strip() for res in residuos if (res or {}).get('desc')]
+        if descs:
+            material = descs[0] + (f' (+{len(descs) - 1})' if len(descs) > 1 else '')
+        else:
+            material = 'Residuos de manejo especial'
+        peso = round(sum(_peso_kg_residuo(res) for res in residuos), 4)
         salidas_list.append({
-            'folio': r.folio or '-',
-            'remision_vinculada': r.remision_vinculada.remision if r.remision_vinculada else None,
-            'fecha': r.fecha_captura.strftime("%Y-%m-%d") if r.fecha_captura else '-',
-            'transporte': r.linea_transporte.nombre if r.linea_transporte else '-',
-            'operador': r.operador.nombre if r.operador else (r.operador_manual or '-'),
-            'destino': r.destino.nombre if r.destino else '-',
-            'material': r.material.nombre if r.material else '-',
-            'peso_kg': round(float(r.cantidad_kg or 0), 4),
-            'documentos': docs,
+            'id': m.id,
+            'folio': (m.no_manifiesto or d.get('no_manifiesto') or f'MAN-{m.id}'),
+            'remision_vinculada': None,
+            'fecha': m.creado_en.strftime("%Y-%m-%d") if m.creado_en else '-',
+            'transporte': (d.get('trans_razon') or '-'),
+            'operador': (d.get('trans_firma') or d.get('gen_firma') or '-'),
+            'destino': (d.get('dest_razon') or '-'),
+            'material': material,
+            'peso_kg': peso,
+            'documentos': [],
+            'es_oficial': True,
         })
 
     # --- RESPONSE ---
@@ -8245,7 +8306,7 @@ def api_dashboard_trane(request):
         'salidas': salidas_list,
         'filtros': {
             'materiales': [{'id': m['id'], 'nombre': m['nombre']} for m in materiales_disponibles],
-            'materialActual': int(filtro_material_id) if filtro_material_id else None,
+            'materialActual': filtro_material_id,
             'fechaInicio': fecha_inicio,
             'fechaFin': fecha_fin,
         },
