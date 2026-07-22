@@ -34,4 +34,5 @@ urlpatterns = [
     path('carga/formulario/', views.formulario_carga_view, name='formulario_carga'),
     path('dashboard/', views.dashboard_view, name='dashboard_diesel'),
     path('api/login/', views.LoginAPIView.as_view(), name='api-login'),
+    path('api/csrf/', views.CsrfView.as_view(), name='api-csrf'),
 ]

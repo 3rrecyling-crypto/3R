@@ -365,3 +365,16 @@ class LoginAPIView(APIView):
                 {"detail": "Credenciales inválidas"},
                 status=status.HTTP_401_UNAUTHORIZED
             )
+
+
+# Planta la cookie `csrftoken` (dominio .3recycling.com.mx) SIN necesidad de re-loguear.
+# El frontend la llama al cargar la app / antes de cualquier mutación, así siempre puede
+# leer el token y mandarlo en X-CSRFToken. Antes, la cookie SOLO se plantaba en el login,
+# por lo que una sesión válida sin cookie csrftoken rompía todos los POST/PUT/PATCH/DELETE.
+@method_decorator(ensure_csrf_cookie, name='dispatch')
+class CsrfView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({"detail": "csrf ok"})
