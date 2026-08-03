@@ -474,32 +474,26 @@
                     <a onclick="filtrarPorEstatus('CANCELADO')" title="Ver solo Cancelados" class="badge rounded-pill py-2 px-3 shadow-sm ms-2 text-decoration-none badge-filter" style="background-color: var(--primary-color); color: white; border: 1px solid rgba(255,255,255,0.2);">
                         <i class="fas fa-ban me-1"></i> {{ total_cancelados|default:"0" }} cancelados
                     </a>
+                    <button type="button" class="btn btn-sm btn-light rounded-pill py-2 px-3 shadow-sm ms-2 fw-bold" data-bs-toggle="modal" data-bs-target="#modalPersonalizarTabla" title="Elegir las columnas de la tabla">
+                        <i class="fas fa-table-columns me-1"></i> Personalizar tabla
+                        {% if usa_tabla_personalizada %}<span class="badge bg-success ms-1">Mi vista</span>{% endif %}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light rounded-pill py-2 px-3 shadow-sm ms-2 fw-bold text-success" data-bs-toggle="modal" data-bs-target="#modalExcelVista" title="Excel con estas columnas y los filtros aplicados">
+                        <i class="fas fa-file-excel me-1"></i> Excel de esta vista
+                    </button>
                 </div>
             </div>
         </div>
         
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover table-sm mb-0">
+                <table class="table table-hover table-sm mb-0" id="tablaRemisiones">
                     <thead style="background-color: #f0f7fc;">
                         <tr>
-                            <th class="py-3 px-2 col-corta">Remisión</th>
-                            <th class="py-3 px-2 col-corta">Fecha</th>
-                            <th class="py-3 px-2 col-corta">Estatus</th>
-                            <th class="py-3 px-2 col-corta text-center">Factura</th>
-                            
-                            <th class="py-3 px-3 col-texto">Origen</th>
-                            <th class="py-3 px-3 col-texto">Destino</th>
-                            <th class="py-3 px-3 col-texto">Material</th> 
-
-                            <th class="py-3 px-2 col-corta text-center">Bultos</th>
-                            
-                            <th class="text-end py-3 px-2 col-equitativa" style="border-left: 2px solid #dee2e6;">Peso Carga (Kg)</th>
-                            <th class="py-3 px-2 text-primary col-equitativa text-center">Folio Carga</th> 
-                            <th class="text-end py-3 px-2 col-equitativa" style="border-left: 1px solid #dee2e6;">Peso Descarga (Kg)</th>
-                            <th class="py-3 px-2 text-primary col-equitativa text-center">Folio Descarga</th> 
-                            <th class="text-end py-3 px-2 col-corta">Dif. (Kg)</th>
-                            <th class="text-end py-3 px-2 col-corta text-center">MERMA/A FAVOR</th>
+                            {% for col in columnas_visibles %}
+                            <th class="{{ col.th }}"{% if col.style %} style="{{ col.style }}"{% endif %}>{{ col.etiqueta }}</th>
+                            {% endfor %}
+                            {# Acciones va siempre al final y no se puede ocultar #}
                             <th class="text-center py-3 px-2 col-corta">Acciones</th>
                         </tr>
                     </thead>
@@ -512,101 +506,7 @@
                                 table-pending
                             {% endif %}">
                             
-                            <td class="fw-bold py-3 px-2">{{ remision.remision }}</td>
-                            <td class="text-nowrap py-3 px-2 small">{{ remision.fecha|date:"d/m/Y" }}</td>
-                            <td class="text-nowrap py-3 px-2"><span class="status-badge status-{{ remision.status }}" style="transform: scale(0.9);">{{ remision.get_status_display }}</span></td>
-                            
-                            <td class="py-3 px-2 text-center">
-                                {% if remision.facturas.exists %}
-                                    {% for factura in remision.facturas.all %}
-                                        <a href="{% url 'detalle_factura_cliente' factura.id %}" class="badge bg-success text-decoration-none border border-light shadow-sm" data-bs-toggle="tooltip" title="Ver Factura">
-                                            <i class="fas fa-file-invoice"></i>
-                                        </a>
-                                    {% endfor %}
-                                {% else %}
-                                    <span class="text-muted small">-</span>
-                                {% endif %}
-                            </td>
-
-                            <td class="py-3 px-3 small">{{ remision.origen.nombre|default:"-"|truncatechars:20 }}</td>
-                            <td class="py-3 px-3 small">{{ remision.destino.nombre|default:"-"|truncatechars:20 }}</td>
-                            
-                            <td class="py-3 px-3 small">
-                                {% for detalle in remision.detalles.all %}
-                                    {{ detalle.material.nombre|truncatechars:25 }}{% if not forloop.last %}<br>{% endif %}
-                                {% empty %}
-                                    <span class="text-muted small">-</span>
-                                {% endfor %}
-                            </td>
-                            
-                            <td class="py-3 px-2 text-center font-mono">
-                                {% for detalle in remision.detalles.all %}
-                                    {% if detalle.bultos %}
-                                        <span class="badge bg-secondary">{{ detalle.bultos }}</span>
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                    {% if not forloop.last %}<br>{% endif %}
-                                {% empty %}
-                                    <span class="text-muted">-</span>
-                                {% endfor %}
-                            </td>
-
-                            <td class="text-end py-3 px-2" style="border-left: 2px solid #dee2e6;">
-                                {% for detalle in remision.detalles.all %}
-                                    {{ detalle.peso_ld|floatformat:2|intcomma }}{% if not forloop.last %}<br>{% endif %}
-                                {% empty %}
-                                    0.00
-                                {% endfor %}
-                            </td>
-                            
-                            <td class="py-3 px-2 fw-bold text-secondary text-center align-middle">
-                                {{ remision.folio_ld|default:"-" }}
-                            </td>
-
-                            <td class="text-end py-3 px-2" style="border-left: 1px solid #dee2e6;">
-                                {% for detalle in remision.detalles.all %}
-                                    {{ detalle.peso_dlv|floatformat:2|intcomma }}{% if not forloop.last %}<br>{% endif %}
-                                {% empty %}
-                                    0.00
-                                {% endfor %}
-                            </td>
-                            
-                            <td class="py-3 px-2 fw-bold text-secondary text-center align-middle">
-                                {{ remision.folio_dlv|default:"-" }}
-                            </td>
-
-                            <td class="text-end py-3 px-2">
-                                {% if remision.status == 'PENDIENTE' %}
-                                    <span class="text-muted small">-</span>
-                                {% else %}
-                                    {% with diff=remision.total_peso_dlv|sub:remision.total_peso_ld %}
-                                        <span class="{% if diff < 0 %}text-loss{% elif diff > 0 %}text-gain{% endif %}">
-                                            {{ diff|floatformat:2|intcomma }}
-                                        </span>
-                                    {% endwith %}
-                                {% endif %}
-                            </td>
-                            
-                            <td class="text-end py-3 px-2 text-center fw-bold">
-                                {% if remision.status == 'PENDIENTE' %}
-                                    <span class="text-na small">N/A</span>
-                                {% else %}
-                                    {% with pct=remision.porcentaje_merma %}
-                                        {% if pct > 1.0 %}
-                                            <span class="badge bg-danger text-white shadow-sm" style="font-size: 0.7rem;" data-bs-toggle="tooltip" title="Merma Alta">
-                                                {{ pct|floatformat:1 }}%
-                                            </span>
-                                        {% elif pct > 0 %}
-                                            <span class="text-warning small">{{ pct|floatformat:1 }}%</span>
-                                        {% elif pct < 0 %}
-                                            <span class="text-success small">{{ pct|floatformat:1 }}%</span>
-                                        {% else %}
-                                            <span class="text-muted small">0%</span>
-                                        {% endif %}
-                                    {% endwith %}
-                                {% endif %}
-                            </td>
+                            {% for col in columnas_visibles %}{% include "ternium/_celda_remision.html" %}{% endfor %}
 
                             <td class="text-center py-3 px-2">
                                 <div class="btn-group btn-group-sm" role="group">
@@ -667,7 +567,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="15" class="text-center py-5"> <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <td colspan="{{ total_columnas }}" class="text-center py-5"> <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
                                 <h5 class="text-muted">No se encontraron remisiones</h5>
                             </td>
                         </tr>
@@ -952,6 +852,146 @@
   </div>
 </div>
 
+{# ===== RANGO DE FECHAS PARA EL EXCEL DE LA VISTA ACTUAL ===== #}
+<div class="modal fade" id="modalExcelVista" tabindex="-1" aria-labelledby="modalExcelVistaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title fw-bold" id="modalExcelVistaLabel"><i class="fas fa-file-excel me-2"></i>Excel de esta vista</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <p class="small text-muted">
+          Se descargará con <strong>tus columnas</strong>
+          {% if usa_tabla_personalizada %}(estás usando tu tabla){% else %}(estás usando la vista por defecto){% endif %}
+          y los filtros que tengas aplicados. Elige el periodo:
+        </p>
+
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <button type="button" class="btn btn-sm btn-outline-success rounded-pill" onclick="rangoRapido('mes')">Este mes</button>
+          <button type="button" class="btn btn-sm btn-outline-success rounded-pill" onclick="rangoRapido('mes_pasado')">Mes pasado</button>
+          <button type="button" class="btn btn-sm btn-outline-success rounded-pill" onclick="rangoRapido('anio')">Este año</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" onclick="rangoRapido('todo')">Todas las fechas</button>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-6">
+            <label for="excelFechaDesde" class="form-label small fw-bold">Fecha desde</label>
+            <input type="date" id="excelFechaDesde" class="form-control form-control-sm" value="{{ search_params.q_fecha_desde|default:'' }}">
+          </div>
+          <div class="col-6">
+            <label for="excelFechaHasta" class="form-label small fw-bold">Fecha hasta</label>
+            <input type="date" id="excelFechaHasta" class="form-control form-control-sm" value="{{ search_params.q_fecha_hasta|default:'' }}">
+          </div>
+        </div>
+
+        <div class="alert alert-light border small mt-3 mb-0" id="avisoRangoExcel">
+          <i class="fas fa-circle-info me-1 text-secondary"></i>
+          <span id="textoAvisoRango">Si dejas las dos fechas vacías se exportarán todas las remisiones.</span>
+        </div>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary rounded-pill fw-bold" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-success rounded-pill fw-bold shadow-sm" onclick="descargarVistaActual()">
+          <i class="fas fa-download me-2"></i>Descargar Excel
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ===== PERSONALIZAR TABLA: elegir columnas y su orden, por usuario ===== #}
+<div class="modal fade" id="modalPersonalizarTabla" tabindex="-1" aria-labelledby="modalPersonalizarLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-primary-gradient text-white">
+        <h5 class="modal-title fw-bold" id="modalPersonalizarLabel"><i class="fas fa-table-columns me-2"></i>Personalizar tabla</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4 bg-light">
+
+        {# Selector de vista: la de siempre o la que armó el usuario #}
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
+            <div class="card h-100 vista-opcion" id="tarjetaVistaDefault" onclick="seleccionarVista(false)" style="cursor:pointer;">
+              <div class="card-body d-flex align-items-center">
+                <i class="fas fa-table fa-2x text-secondary me-3"></i>
+                <div>
+                  <div class="fw-bold">Vista por defecto</div>
+                  <small class="text-muted">Las 14 columnas de siempre, en su orden original.</small>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card h-100 vista-opcion" id="tarjetaVistaPersonal" onclick="seleccionarVista(true)" style="cursor:pointer;">
+              <div class="card-body d-flex align-items-center">
+                <i class="fas fa-sliders fa-2x text-primary me-3"></i>
+                <div>
+                  <div class="fw-bold">Mi tabla</div>
+                  <small class="text-muted">La que armas abajo. Se guarda aunque uses la vista por defecto.</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {# Con la vista por defecto activa, el editor de abajo se bloquea #}
+        <div id="avisoVistaDefault" class="alert alert-secondary d-flex align-items-start gap-2 small d-none">
+          <i class="fas fa-ban mt-1"></i>
+          <div>Estás usando la <strong>vista por defecto</strong>, que no se modifica. El editor de abajo está
+          bloqueado; elige <strong>Mi tabla</strong> para armar la tuya.</div>
+        </div>
+
+        <div id="zonaEditorColumnas">
+          <div class="row g-3">
+
+            {# Columnas activas, arrastrables #}
+            <div class="col-lg-5">
+              <div class="card h-100">
+                <div class="card-header bg-white fw-bold py-2 d-flex justify-content-between align-items-center">
+                  <span><i class="fas fa-list-check me-2 text-primary"></i>Mi tabla</span>
+                  <span class="badge bg-primary" id="contadorColumnas">0</span>
+                </div>
+                <div class="card-body p-2" style="max-height: 45vh; overflow-y: auto;">
+                  <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                    <p class="text-muted small mb-0"><i class="fas fa-up-down-left-right me-1"></i>Arrastra para cambiar el orden.</p>
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill py-0 px-2" style="font-size: .7rem;" onclick="partirDeLaOriginal()">Partir de la original</button>
+                  </div>
+                  {# La lista la pinta el JS según la vista elegida #}
+                  <ul class="list-group list-group-flush" id="listaColumnasActivas"></ul>
+                </div>
+              </div>
+            </div>
+
+            {# Catálogo de columnas disponibles #}
+            <div class="col-lg-7">
+              <div class="card h-100">
+                <div class="card-header bg-white fw-bold py-2">
+                  <i class="fas fa-plus me-2 text-success"></i>Datos disponibles
+                </div>
+                <div class="card-body p-3" style="max-height: 45vh; overflow-y: auto;" id="catalogoColumnas">
+                  {# Lo pinta el JS: depende de qué columnas estén en uso #}
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-outline-secondary rounded-pill fw-bold me-auto" onclick="restablecerColumnas()">
+          <i class="fas fa-rotate-left me-2"></i>Volver al orden original
+        </button>
+        <button type="button" class="btn btn-secondary rounded-pill fw-bold" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary rounded-pill fw-bold shadow-sm" id="btnGuardarColumnas" onclick="guardarColumnas()">
+          <i class="fas fa-check me-2"></i>Guardar y aplicar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="modalExportarMedline" tabindex="-1" aria-labelledby="modalMedlineLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content border-0 shadow">
@@ -1004,7 +1044,305 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 <script>
+// ============================================================
+// PERSONALIZAR TABLA
+// Se guardan dos vistas: la de siempre y la que arma el usuario.
+// Apagar la personalizada NO borra las columnas elegidas.
+// ============================================================
+let usarTablaPersonalizada = {{ usa_tabla_personalizada|yesno:"true,false" }};
+const CATALOGO_COLUMNAS = {{ catalogo_json|safe }};
+const CLAVES_POR_DEFECTO = {{ columnas_por_defecto_json|safe }};
+// La tabla que armó el usuario. Se conserva aunque esté viendo la de por
+// defecto, para que pueda ir y volver sin rehacerla.
+let miTabla = {{ mi_tabla_json|safe }};
+
+const COL_POR_CLAVE = Object.fromEntries(CATALOGO_COLUMNAS.map(c => [c.clave, c]));
+
+function inicializarPersonalizarTabla() {
+    const lista = document.getElementById('listaColumnasActivas');
+    if (!lista) return;
+
+    // Reordenar arrastrando. Sortable ya se usa en el módulo de herramientas.
+    if (window.Sortable) {
+        Sortable.create(lista, {
+            animation: 150,
+            handle: '.fa-grip-vertical',
+            ghostClass: 'bg-light',
+            onEnd: function () {
+                if (usarTablaPersonalizada) miTabla = clavesEnLaLista();
+            }
+        });
+    }
+    pintarPanel();
+}
+
+// Claves que se están mostrando ahora mismo en el panel.
+function clavesEnLaLista() {
+    const lista = document.getElementById('listaColumnasActivas');
+    return Array.from(lista.children).map(li => li.dataset.clave);
+}
+
+// La vista por defecto SIEMPRE enseña sus columnas; la propia, las del usuario.
+function clavesDeLaVistaActual() {
+    return usarTablaPersonalizada ? miTabla.slice() : CLAVES_POR_DEFECTO.slice();
+}
+
+function seleccionarVista(personalizada) {
+    // Antes de cambiar, conserva lo que el usuario llevaba armado.
+    if (usarTablaPersonalizada) miTabla = clavesEnLaLista();
+    usarTablaPersonalizada = personalizada;
+    pintarPanel();
+}
+
+function pintarPanel() {
+    pintarListaColumnas(clavesDeLaVistaActual());
+    pintarCatalogo();
+    pintarVistaSeleccionada();
+    actualizarContadorColumnas();
+}
+
+function pintarListaColumnas(claves) {
+    const lista = document.getElementById('listaColumnasActivas');
+    if (!lista) return;
+    lista.innerHTML = '';
+
+    claves.forEach(clave => {
+        const col = COL_POR_CLAVE[clave];
+        if (!col) return;
+        const item = document.createElement('li');
+        item.className = 'list-group-item d-flex justify-content-between align-items-center px-2 py-2';
+        item.dataset.clave = clave;
+        item.innerHTML =
+            '<span class="text-truncate"><i class="fas fa-grip-vertical text-muted me-2"></i>' + col.etiqueta +
+            (col.fija ? '<span class="badge bg-secondary ms-1" title="No se puede quitar">fija</span>' : '') +
+            '</span>' +
+            (col.fija ? '' :
+             '<button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="quitarColumna(this)" title="Quitar"><i class="fas fa-times"></i></button>');
+        lista.appendChild(item);
+    });
+}
+
+function pintarCatalogo() {
+    const contenedor = document.getElementById('catalogoColumnas');
+    if (!contenedor) return;
+
+    const enUso = new Set(clavesDeLaVistaActual());
+    const grupos = {};
+    CATALOGO_COLUMNAS.forEach(col => {
+        if (enUso.has(col.clave)) return;
+        (grupos[col.grupo] = grupos[col.grupo] || []).push(col);
+    });
+
+    const nombres = Object.keys(grupos);
+    if (nombres.length === 0) {
+        contenedor.innerHTML = '<p class="text-muted small mb-0">Ya estás usando todas las columnas disponibles.</p>';
+        return;
+    }
+
+    contenedor.innerHTML = nombres.map(nombre =>
+        '<div class="mb-3" data-grupo="' + nombre + '">' +
+        '<div class="text-uppercase text-muted fw-bold mb-2" style="font-size: 0.7rem; letter-spacing: 1px;">' + nombre + '</div>' +
+        '<div class="d-flex flex-wrap gap-2">' +
+        grupos[nombre].map(col =>
+            '<button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" data-clave="' + col.clave +
+            '" onclick="agregarColumna(this)"><i class="fas fa-plus me-1"></i>' + col.etiqueta + '</button>'
+        ).join('') +
+        '</div></div>'
+    ).join('');
+}
+
+function pintarVistaSeleccionada() {
+    const porDefecto = document.getElementById('tarjetaVistaDefault');
+    const personal = document.getElementById('tarjetaVistaPersonal');
+    const editor = document.getElementById('zonaEditorColumnas');
+    const aviso = document.getElementById('avisoVistaDefault');
+    if (!porDefecto || !personal) return;
+
+    porDefecto.classList.toggle('border-primary', !usarTablaPersonalizada);
+    porDefecto.classList.toggle('border-2', !usarTablaPersonalizada);
+    personal.classList.toggle('border-primary', usarTablaPersonalizada);
+    personal.classList.toggle('border-2', usarTablaPersonalizada);
+
+    // La vista por defecto no se edita: se bloquea el editor para no dar a
+    // entender que esos cambios se están aplicando.
+    if (aviso) aviso.classList.toggle('d-none', usarTablaPersonalizada);
+    if (editor) {
+        editor.style.opacity = usarTablaPersonalizada ? '1' : '0.4';
+        editor.style.pointerEvents = usarTablaPersonalizada ? '' : 'none';
+        editor.style.userSelect = usarTablaPersonalizada ? '' : 'none';
+    }
+}
+
+// Punto de partida cómodo: copia la tabla de siempre para editarla desde ahí,
+// en vez de agregar 14 columnas a mano.
+function partirDeLaOriginal() {
+    miTabla = CLAVES_POR_DEFECTO.slice();
+    usarTablaPersonalizada = true;
+    pintarPanel();
+}
+
+function actualizarContadorColumnas() {
+    const contador = document.getElementById('contadorColumnas');
+    const lista = document.getElementById('listaColumnasActivas');
+    if (contador && lista) contador.textContent = lista.children.length;
+}
+
+function agregarColumna(boton) {
+    miTabla = clavesEnLaLista();
+    miTabla.push(boton.dataset.clave);
+    usarTablaPersonalizada = true;
+    pintarPanel();
+}
+
+function quitarColumna(boton) {
+    const clave = boton.closest('li').dataset.clave;
+    miTabla = clavesEnLaLista().filter(c => c !== clave);
+    usarTablaPersonalizada = true;
+    pintarPanel();
+}
+
+function restablecerColumnas() {
+    // Vuelve a la vista de siempre sin tocar la tabla armada.
+    if (usarTablaPersonalizada) miTabla = clavesEnLaLista();
+    usarTablaPersonalizada = false;
+    pintarPanel();
+    guardarColumnas();
+}
+
+function rangoRapido(cual) {
+    const hoy = new Date();
+    const iso = d => d.toISOString().slice(0, 10);
+    let desde = '', hasta = '';
+
+    if (cual === 'mes') {
+        desde = iso(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+        hasta = iso(hoy);
+    } else if (cual === 'mes_pasado') {
+        desde = iso(new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1));
+        hasta = iso(new Date(hoy.getFullYear(), hoy.getMonth(), 0));
+    } else if (cual === 'anio') {
+        desde = iso(new Date(hoy.getFullYear(), 0, 1));
+        hasta = iso(hoy);
+    }
+    // 'todo' deja ambas vacías: sin filtro de fechas.
+
+    document.getElementById('excelFechaDesde').value = desde;
+    document.getElementById('excelFechaHasta').value = hasta;
+    revisarRangoExcel();
+}
+
+function revisarRangoExcel() {
+    const desde = document.getElementById('excelFechaDesde').value;
+    const hasta = document.getElementById('excelFechaHasta').value;
+    const aviso = document.getElementById('textoAvisoRango');
+    const caja = document.getElementById('avisoRangoExcel');
+    if (!aviso) return true;
+
+    caja.className = 'alert alert-light border small mt-3 mb-0';
+
+    if (desde && hasta && desde > hasta) {
+        caja.className = 'alert alert-danger small mt-3 mb-0';
+        aviso.textContent = 'La fecha inicial es posterior a la final.';
+        return false;
+    }
+    if (!desde && !hasta) {
+        aviso.textContent = 'Sin fechas: se exportarán todas las remisiones.';
+    } else if (desde && hasta) {
+        aviso.textContent = `Se exportará del ${desde} al ${hasta}.`;
+    } else {
+        aviso.textContent = desde ? `Desde el ${desde} en adelante.` : `Hasta el ${hasta}.`;
+    }
+    return true;
+}
+
+function descargarVistaActual() {
+    if (!revisarRangoExcel()) return;
+
+    // Se arrastran los filtros de la pantalla (empresa, material, estatus...)
+    // y encima se pone el rango elegido aquí, para que el archivo traiga lo
+    // mismo que se está viendo pero en el periodo que pidió el usuario.
+    const params = new URLSearchParams($('#filterForm').serialize());
+    params.delete('q_fecha_desde');
+    params.delete('q_fecha_hasta');
+    params.delete('page');
+
+    const desde = document.getElementById('excelFechaDesde').value;
+    const hasta = document.getElementById('excelFechaHasta').value;
+    if (desde) params.set('q_fecha_desde', desde);
+    if (hasta) params.set('q_fecha_hasta', hasta);
+    // Sin fechas la vista aplicaría su default de 30 días; esta marca le dice
+    // que el usuario pidió el histórico completo a propósito.
+    if (!desde && !hasta) params.set('q_sin_rango', '1');
+
+    const baseUrl = "{% url 'exportar_vista_remisiones' %}";
+    const query = params.toString();
+
+    // Se descarga con fetch y no navegando: así la capa de carga se quita
+    // cuando el archivo está listo de verdad, y no a los 4 segundos a ciegas.
+    $('#modalExcelVista').modal('hide');
+    $('#loadingOverlay').removeClass('d-none');
+
+    fetch(query ? `${baseUrl}?${query}` : baseUrl, { credentials: 'same-origin' })
+        .then(res => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const tipo = res.headers.get('Content-Type') || '';
+            if (!tipo.includes('spreadsheet')) throw new Error('La sesión expiró; vuelve a iniciarla.');
+            return res.blob();
+        })
+        .then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Remisiones_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        })
+        .catch(err => alert('No se pudo descargar el Excel: ' + err.message))
+        .finally(() => $('#loadingOverlay').addClass('d-none'));
+}
+
+function guardarColumnas() {
+    const lista = document.getElementById('listaColumnasActivas');
+    const columnas = Array.from(lista.children).map(li => li.dataset.clave);
+
+    if (usarTablaPersonalizada && columnas.length === 0) {
+        alert('Elige al menos una columna para tu tabla.');
+        return;
+    }
+
+    const boton = document.getElementById('btnGuardarColumnas');
+    boton.disabled = true;
+    boton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Guardando...';
+
+    const csrfToken = document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] || '';
+
+    fetch("{% url 'guardar_columnas_remisiones' %}", {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ columnas: columnas, personalizada: usarTablaPersonalizada })
+    })
+    .then(res => {
+        // El middleware de perfil incompleto responde con un 302 a HTML;
+        // sin esto el .json() reventaría con un error críptico.
+        if (res.redirected || !res.ok) throw new Error('No se pudo guardar (HTTP ' + res.status + ')');
+        return res.json();
+    })
+    .then(data => {
+        if (!data.success) throw new Error(data.error || 'No se pudo guardar');
+        window.location.reload();
+    })
+    .catch(err => {
+        alert('No se pudo guardar la configuración: ' + err.message);
+        boton.disabled = false;
+        boton.innerHTML = '<i class="fas fa-check me-2"></i>Guardar y aplicar';
+    });
+}
+
 // --- VARIABLES GLOBALES PARA ZOOM, ROTACIÓN Y DRAG ---
 let currentScale = 1;
 let currentRotation = 0;
@@ -1019,6 +1357,11 @@ $(document).ready(function() {
     $('#exportExcelModal').appendTo("body");
     $('#modalImportarTrane').appendTo("body"); 
     $('#modalExportarMedline').appendTo("body"); // Añadido modal medline zip
+    $('#modalPersonalizarTabla').appendTo("body");
+    // Sin esta línea el modal queda anidado en el contenido y el backdrop
+    // oscuro (z-index 1050) se le pone encima: se veía "bloqueado".
+    $('#modalExcelVista').appendTo("body");
+    inicializarPersonalizarTabla();
 
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {

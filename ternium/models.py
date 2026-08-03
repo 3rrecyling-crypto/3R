@@ -1300,6 +1300,16 @@ class Profile(models.Model):
     rol = models.CharField(max_length=30, blank=True, default='', choices=ROL_CHOICES,
                            verbose_name="Rol de acceso")
 
+    # Configuración de la tabla de /remisiones/ para este usuario:
+    #   {"columnas": ["remision", "fecha", ...], "personalizada": true}
+    # Se guardan las dos vistas: 'columnas' conserva la tabla que armó el
+    # usuario aunque tenga desactivada la personalización, así puede volver a
+    # la vista por defecto y regresar a la suya sin rehacerla.
+    columnas_remisiones = models.JSONField(
+        default=dict, blank=True,
+        verbose_name="Configuración de la tabla de remisiones"
+    )
+
     def __str__(self):
         return f'Perfil de {self.user.username}'
 

@@ -51,6 +51,11 @@ urlpatterns = [
     path('remision/<int:pk>/auditar/', api_views.auditar_remision, name='auditar_remision'),
     path('remisiones/exportar-excel/', api_views.export_remisiones_to_excel, name='export_remisiones_to_excel'),
     
+    # Columnas que cada usuario elige para la tabla de remisiones
+    path('remisiones/columnas/', views.guardar_columnas_remisiones, name='guardar_columnas_remisiones'),
+    path('remisiones/exportar-vista/', views.exportar_vista_remisiones, name='exportar_vista_remisiones'),
+    path('api/remisiones/columnas/', api_views.api_columnas_remisiones, name='api_columnas_remisiones'),
+
     # API interna para obtener folio
     path('api/get-next-remision/<int:empresa_id>/', views.get_next_remision_number, name='get_next_remision_number'),
     path('api/dashboard-operacion/', views.api_dashboard_operacion, name='api_dashboard_operacion'),

@@ -505,8 +505,24 @@ def api_remisiones_lista(request):
         return JsonResponse({'error': 'Método no permitido'}, status=405)
 
     # 1. QUERYSET BASE OPTIMIZADO
+    # Las relaciones dependen de las columnas activas del usuario: sin esto,
+    # una columna como Operador o Línea de transporte costaría una consulta
+    # por fila.
+    from .columnas_remisiones import (
+        SELECT_RELATED_POR_CLAVE,
+        columnas_de as _columnas_de,
+        valor_texto as _valor_texto_col,
+    )
+
+    _columnas_usuario = _columnas_de(request.user)
+    _relaciones = {'empresa', 'origen', 'destino', 'operador'}
+    for _c in _columnas_usuario:
+        _rel = SELECT_RELATED_POR_CLAVE.get(_c['clave'])
+        if _rel:
+            _relaciones.add(_rel)
+
     queryset = Remision.objects.select_related(
-        'empresa', 'origen', 'destino', 'operador'
+        *sorted(_relaciones)
     ).prefetch_related(
         'detalles__material',
         'evidencias',
@@ -699,7 +715,13 @@ def api_remisiones_lista(request):
         except Exception:
             destruccion_completa = False
 
+        # Valores de las columnas que el usuario tenga activas. El frontend
+        # pinta con su propio marcado las columnas de siempre (badges, enlaces)
+        # y usa estos textos para las que se agregaron desde el panel.
+        celdas = {c['clave']: _valor_texto_col(rem, c) for c in _columnas_usuario}
+
         remisiones_data.append({
+            'celdas': celdas,
             'id': rem.pk,
             'remision': rem.remision,
             'fecha': rem.fecha.strftime('%d/%m/%Y') if rem.fecha else '',
@@ -746,7 +768,48 @@ def api_remisiones_lista(request):
     estatus_choices = [{'value': v, 'display': d} for v, d in Remision.STATUS_CHOICES]
 
     # 9. RETORNO JSON FINAL
+    from .columnas_remisiones import (
+        COLUMNAS as _CATALOGO_COLUMNAS,
+        catalogo_agrupado as _catalogo_agrupado,
+        columnas_por_defecto as _columnas_por_defecto,
+        config_de as _config_de,
+    )
+    _claves_guardadas, _usa_personalizada = _config_de(request.user)
+    _activas, _disponibles = _catalogo_agrupado(_claves_guardadas)
+
     return JsonResponse({
+        'columnas': [
+            {'clave': c['clave'], 'etiqueta': c['etiqueta'], 'fija': bool(c.get('fija'))}
+            for c in _columnas_usuario
+        ],
+        'columnas_config': {
+            # 'activas' es lo que el panel debe mostrar AHORA: con la vista por
+            # defecto seleccionada, siempre las columnas de siempre.
+            'activas': [
+                {'clave': c['clave'], 'etiqueta': c['etiqueta'], 'fija': bool(c.get('fija'))}
+                for c in (_activas if _usa_personalizada else _columnas_por_defecto())
+            ],
+            # La tabla que armó el usuario, para restaurarla al cambiar de vista.
+            'mi_tabla': [
+                {'clave': c['clave'], 'etiqueta': c['etiqueta'], 'fija': bool(c.get('fija'))}
+                for c in _activas
+            ],
+            'por_defecto': [
+                {'clave': c['clave'], 'etiqueta': c['etiqueta'], 'fija': bool(c.get('fija'))}
+                for c in _columnas_por_defecto()
+            ],
+            'catalogo': [
+                {'clave': c['clave'], 'etiqueta': c['etiqueta'], 'grupo': c['grupo'],
+                 'fija': bool(c.get('fija'))}
+                for c in _CATALOGO_COLUMNAS
+            ],
+            'disponibles': [
+                {'nombre': g['nombre'],
+                 'columnas': [{'clave': c['clave'], 'etiqueta': c['etiqueta']} for c in g['columnas']]}
+                for g in _disponibles
+            ],
+            'personalizada': _usa_personalizada,
+        },
         'remisiones': remisiones_data,
         'pagination': {
             'current_page': page_obj.number,
@@ -2992,6 +3055,71 @@ def api_trane_manifiesto_detail(request, pk):
         r.delete()
         return JsonResponse({'ok': True})
     return JsonResponse({'error': 'Metodo no permitido'}, status=405)
+
+# ── COLUMNAS DE LA TABLA DE REMISIONES ───────────────────────────────────
+@csrf_exempt
+def api_columnas_remisiones(request):
+    """Lee y guarda la configuración de columnas del usuario para el SPA.
+
+    Comparte catálogo y reglas con la pantalla Django (columnas_remisiones.py),
+    así que las dos versiones muestran siempre lo mismo. Devuelve 401 en JSON
+    en vez de redirigir a HTML, que rompería el fetch del frontend.
+    """
+    from .columnas_remisiones import (
+        catalogo_agrupado, columnas_por_defecto, config_de, sanear,
+    )
+    from .models import Profile
+
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'NO_AUTORIZADO', 'detail': 'Sesión no válida.'}, status=401)
+
+    def _payload(claves=None, personalizada=None):
+        # Tras guardar hay que pasar los valores nuevos: request.user trae el
+        # Profile cacheado y config_de devolvería la configuración anterior.
+        if claves is None:
+            claves, personalizada = config_de(request.user)
+        activas, disponibles = catalogo_agrupado(claves)
+        return {
+            'activas': [{'clave': c['clave'], 'etiqueta': c['etiqueta'], 'fija': bool(c.get('fija'))}
+                        for c in activas],
+            'disponibles': [
+                {'nombre': g['nombre'],
+                 'columnas': [{'clave': c['clave'], 'etiqueta': c['etiqueta']} for c in g['columnas']]}
+                for g in disponibles
+            ],
+            'personalizada': personalizada,
+            'por_defecto': [{'clave': c['clave'], 'etiqueta': c['etiqueta'], 'fija': bool(c.get('fija'))}
+                            for c in columnas_por_defecto()],
+        }
+
+    if request.method == 'GET':
+        return JsonResponse(_payload())
+
+    if request.method == 'POST':
+        try:
+            datos = json.loads(request.body or '{}')
+        except (ValueError, TypeError):
+            return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+        recibidas = datos.get('columnas')
+        if recibidas is not None and not isinstance(recibidas, list):
+            return JsonResponse({'error': 'Se esperaba una lista de columnas'}, status=400)
+
+        perfil, _ = Profile.objects.get_or_create(user=request.user)
+        previas, _ = config_de(request.user)
+
+        claves = sanear(recibidas) if recibidas else previas
+        personalizada = bool(datos.get('personalizada', True))
+
+        perfil.columnas_remisiones = {'columnas': claves, 'personalizada': personalizada}
+        perfil.save(update_fields=['columnas_remisiones'])
+
+        respuesta = _payload(claves, personalizada)
+        respuesta['ok'] = True
+        return JsonResponse(respuesta)
+
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
+
 
 # ── PERFIL DE USUARIO ────────────────────────────────────────────────────
 @csrf_exempt

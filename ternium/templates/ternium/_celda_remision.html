@@ -1,0 +1,96 @@
+{% load humanize math_filters columnas_extras %}{% comment %}
+Pinta una celda de la tabla de remisiones.
+
+Recibe del contexto:
+    col       la columna del catálogo (ternium/columnas_remisiones.py)
+    remision  la fila
+
+Las columnas que ya existían conservan su marcado tal cual estaba en la tabla
+fija: badges, tooltips, enlaces y el alineado línea a línea de los detalles.
+Las columnas nuevas son de valor simple y se resuelven con el filtro valor_col.
+{% endcomment %}<td class="{{ col.td }}"{% if col.td_style %} style="{{ col.td_style }}"{% endif %}>
+{% if col.clave == 'remision' %}{{ remision.remision }}
+
+{% elif col.clave == 'fecha' %}{{ remision.fecha|date:"d/m/Y" }}
+
+{% elif col.clave == 'status' %}<span class="status-badge status-{{ remision.status }}" style="transform: scale(0.9);">{{ remision.get_status_display }}</span>
+
+{% elif col.clave == 'factura' %}
+    {% if remision.facturas.exists %}
+        {% for factura in remision.facturas.all %}
+            <a href="{% url 'detalle_factura_cliente' factura.id %}" class="badge bg-success text-decoration-none border border-light shadow-sm" data-bs-toggle="tooltip" title="Ver Factura">
+                <i class="fas fa-file-invoice"></i>
+            </a>
+        {% endfor %}
+    {% else %}
+        <span class="text-muted small">-</span>
+    {% endif %}
+
+{% elif col.clave == 'material' %}
+    {% for detalle in remision.detalles.all %}
+        {{ detalle.material.nombre|truncatechars:25 }}{% if not forloop.last %}<br>{% endif %}
+    {% empty %}
+        <span class="text-muted small">-</span>
+    {% endfor %}
+
+{% elif col.clave == 'bultos' %}
+    {% for detalle in remision.detalles.all %}
+        {% if detalle.bultos %}
+            <span class="badge bg-secondary">{{ detalle.bultos }}</span>
+        {% else %}
+            <span class="text-muted">-</span>
+        {% endif %}
+        {% if not forloop.last %}<br>{% endif %}
+    {% empty %}
+        <span class="text-muted">-</span>
+    {% endfor %}
+
+{% elif col.clave == 'peso_ld' %}
+    {% for detalle in remision.detalles.all %}
+        {{ detalle.peso_ld|floatformat:2|intcomma }}{% if not forloop.last %}<br>{% endif %}
+    {% empty %}
+        0.00
+    {% endfor %}
+
+{% elif col.clave == 'peso_dlv' %}
+    {% for detalle in remision.detalles.all %}
+        {{ detalle.peso_dlv|floatformat:2|intcomma }}{% if not forloop.last %}<br>{% endif %}
+    {% empty %}
+        0.00
+    {% endfor %}
+
+{% elif col.clave == 'diff' %}
+    {% if remision.status == 'PENDIENTE' %}
+        <span class="text-muted small">-</span>
+    {% else %}
+        {% with diff=remision.total_peso_dlv|sub:remision.total_peso_ld %}
+            <span class="{% if diff < 0 %}text-loss{% elif diff > 0 %}text-gain{% endif %}">
+                {{ diff|floatformat:2|intcomma }}
+            </span>
+        {% endwith %}
+    {% endif %}
+
+{% elif col.clave == 'merma' %}
+    {% if remision.status == 'PENDIENTE' %}
+        <span class="text-na small">N/A</span>
+    {% else %}
+        {% with pct=remision.porcentaje_merma %}
+            {% if pct > 1.0 %}
+                <span class="badge bg-danger text-white shadow-sm" style="font-size: 0.7rem;" data-bs-toggle="tooltip" title="Merma Alta">
+                    {{ pct|floatformat:1 }}%
+                </span>
+            {% elif pct > 0 %}
+                <span class="text-warning small">{{ pct|floatformat:1 }}%</span>
+            {% elif pct < 0 %}
+                <span class="text-success small">{{ pct|floatformat:1 }}%</span>
+            {% else %}
+                <span class="text-muted small">0%</span>
+            {% endif %}
+        {% endwith %}
+    {% endif %}
+
+{% elif col.clave == 'origen' or col.clave == 'destino' %}{{ remision|valor_col:col.accessor|truncatechars:20 }}
+
+{% else %}{{ remision|valor_col:col.accessor }}
+{% endif %}
+</td>

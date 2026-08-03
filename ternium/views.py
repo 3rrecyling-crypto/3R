@@ -779,12 +779,23 @@ class RemisionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     
     def get_queryset(self):
         # 1. Queryset base optimizado
+        # Las relaciones a precargar dependen de las columnas que el usuario
+        # tenga activas: si pide Operador o Línea de transporte y no se
+        # precargan aquí, se dispara una consulta por fila.
+        from .columnas_remisiones import SELECT_RELATED_POR_CLAVE, columnas_de
+
+        relaciones = {'empresa', 'origen', 'destino'}
+        for col in columnas_de(self.request.user):
+            rel = SELECT_RELATED_POR_CLAVE.get(col['clave'])
+            if rel:
+                relaciones.add(rel)
+
         queryset = Remision.objects.select_related(
-            'empresa', 'origen', 'destino'
+            *sorted(relaciones)
         ).prefetch_related(
             'detalles__material',
             'facturas' # Agregado por si usas facturas en la tabla
-        ).order_by('-pk') 
+        ).order_by('-pk')
         
         # 2. FILTRADO POR PERMISOS DE EMPRESA
         if not self.request.user.is_superuser:
@@ -930,7 +941,34 @@ class RemisionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         from .models import ControlManifiestoTrane
         context['trane_pendientes'] = ControlManifiestoTrane.objects.filter(remision_vinculada__isnull=True).order_by('-id')
         context['empresas_disponibles'] = Empresa.objects.all().order_by('nombre')
-        
+
+        # Columnas de la tabla. Se pinta la vista activa (por defecto o
+        # personalizada) pero el panel siempre recibe la tabla que el usuario
+        # armó, para que pueda alternar entre las dos sin rehacerla.
+        from .columnas_remisiones import (
+            COLUMNAS, columnas_de, columnas_por_defecto, config_de,
+        )
+        claves_guardadas, usa_personalizada = config_de(self.request.user)
+        columnas = columnas_de(self.request.user)
+
+        context['columnas_visibles'] = columnas
+        context['usa_tabla_personalizada'] = usa_personalizada
+
+        # El panel se pinta con JavaScript a partir de estas tres listas: así
+        # al alternar entre la vista por defecto y la propia se muestra
+        # siempre la que corresponde, sin recargar la página.
+        def _defs(cols):
+            return [{'clave': c['clave'], 'etiqueta': c['etiqueta'],
+                     'grupo': c['grupo'], 'fija': bool(c.get('fija'))} for c in cols]
+
+        context['catalogo_json'] = json.dumps(_defs(COLUMNAS), ensure_ascii=False)
+        context['columnas_por_defecto_json'] = json.dumps(
+            [c['clave'] for c in columnas_por_defecto()], ensure_ascii=False)
+        context['mi_tabla_json'] = json.dumps(claves_guardadas, ensure_ascii=False)
+        context['usa_tabla_personalizada'] = usa_personalizada
+        # +1 por la columna fija de Acciones, que no entra al catálogo.
+        context['total_columnas'] = len(columnas) + 1
+
         return context
     
 def calcular_siguiente_folio(prefijo):
@@ -5004,6 +5042,106 @@ def export_remision_pdf(request, pk):
     remision = get_object_or_404(Remision, pk=pk)
     # Renderizamos una plantilla especial limpia para imprimir
     return render(request, 'ternium/remision_print.html', {'remision': remision})
+
+
+@login_required
+@require_POST
+def guardar_columnas_remisiones(request):
+    """Guarda la configuración de la tabla de remisiones de este usuario.
+
+    Recibe {"columnas": [...], "personalizada": bool}. La lista de columnas se
+    conserva aunque 'personalizada' venga en false: así el usuario alterna
+    entre la vista por defecto y la suya sin tener que rearmarla.
+    Siempre escribe sobre request.user; el cliente no dice a quién afectar.
+    """
+    from .columnas_remisiones import CLAVES_POR_DEFECTO, config_de, sanear
+    from .models import Profile
+
+    try:
+        datos = json.loads(request.body or '{}')
+    except (ValueError, TypeError):
+        return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
+
+    recibidas = datos.get('columnas')
+    if recibidas is not None and not isinstance(recibidas, list):
+        return JsonResponse({'success': False, 'error': 'Se esperaba una lista de columnas'}, status=400)
+
+    perfil, _ = Profile.objects.get_or_create(user=request.user)
+    guardadas_previas, _ = config_de(request.user)
+
+    # Sin lista nueva se conserva la que ya tenía armada.
+    claves = sanear(recibidas) if recibidas else guardadas_previas
+    personalizada = bool(datos.get('personalizada', True))
+
+    perfil.columnas_remisiones = {'columnas': claves, 'personalizada': personalizada}
+    perfil.save(update_fields=['columnas_remisiones'])
+
+    return JsonResponse({
+        'success': True,
+        'columnas': claves,
+        'personalizada': personalizada,
+        'columnas_en_uso': claves if personalizada else list(CLAVES_POR_DEFECTO),
+    })
+
+
+@login_required
+def exportar_vista_remisiones(request):
+    """Descarga en Excel exactamente lo que el usuario está viendo: sus
+    columnas, en su orden, con los filtros que tenga aplicados.
+
+    Reutiliza el get_queryset de RemisionListView para no duplicar la lógica
+    de filtros ni la restricción por empresa: si la pantalla y el archivo se
+    calcularan por separado, tarde o temprano dejarían de coincidir.
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    from .columnas_remisiones import columnas_de, valor_plano
+
+    if not (request.user.has_perm('ternium.acceso_remisiones')
+            or request.user.has_perm('ternium.view_remision')):
+        raise PermissionDenied("No tienes permiso para exportar remisiones.")
+
+    vista = RemisionListView()
+    vista.request = request
+    vista.kwargs = {}
+    queryset = vista.get_queryset()
+
+    columnas = columnas_de(request.user)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Remisiones"
+
+    ws.append([c['etiqueta'] for c in columnas])
+    for celda in ws[1]:
+        celda.font = Font(bold=True, color="FFFFFF")
+        celda.fill = PatternFill("solid", fgColor="2C3E50")
+        celda.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    for remision in queryset:
+        ws.append([valor_plano(remision, col) for col in columnas])
+
+    # Las columnas multilínea (material, bultos, pesos) necesitan ajuste de
+    # texto o se ven como un solo renglón apelmazado.
+    for indice, col in enumerate(columnas, start=1):
+        letra = get_column_letter(indice)
+        ancho = max(len(col['etiqueta']) + 4, 14)
+        ws.column_dimensions[letra].width = min(ancho, 40)
+        if col.get('detalle'):
+            for celda in ws[letra][1:]:
+                celda.alignment = Alignment(wrap_text=True, vertical="top")
+
+    ws.freeze_panes = "A2"
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    nombre = f"Remisiones_{timezone.localdate().strftime('%Y-%m-%d')}.xlsx"
+    response['Content-Disposition'] = f'attachment; filename="{nombre}"'
+    wb.save(response)
+    return response
 
 
 @login_required
