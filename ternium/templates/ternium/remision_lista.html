@@ -822,17 +822,21 @@
                           <h6 class="fw-bold mb-0"><i class="fas fa-cog me-2"></i>Reporte Medline (Cartón + Archivo Muerto)</h6>
                       </div>
                       <div class="card-body">
-                          <p class="small text-muted mb-3">Se genera un Excel con dos pestañas: <strong>Cartón</strong> y <strong>Archivo Muerto</strong>, ambas con el mismo precio.</p>
+                          <p class="small text-muted mb-3">Se genera un Excel con dos pestañas: <strong>Cartón</strong> y <strong>Archivo Muerto</strong>, cada una con su propio precio por kilo.</p>
                           <div class="row g-2 align-items-end">
-                              <div class="col-md-4">
+                              <div class="col-md-3">
                                   <label class="small fw-bold text-muted">Mes a Reportar</label>
                                   <input type="month" id="mesMedline" class="form-control form-control-sm">
                               </div>
-                              <div class="col-md-4">
-                                  <label class="small fw-bold text-muted">Precio ($)</label>
-                                  <input type="number" step="0.001" id="precioMedline" class="form-control form-control-sm" placeholder="Ej. 0.45">
+                              <div class="col-md-3">
+                                  <label class="small fw-bold text-muted">Precio Cartón ($/kg)</label>
+                                  <input type="number" step="0.001" id="precioMedlineCarton" class="form-control form-control-sm" placeholder="Ej. 0.45">
                               </div>
-                              <div class="col-md-4">
+                              <div class="col-md-3">
+                                  <label class="small fw-bold text-muted">Precio Archivo Muerto ($/kg)</label>
+                                  <input type="number" step="0.001" id="precioMedlineArchivo" class="form-control form-control-sm" placeholder="Ej. 0.45">
+                              </div>
+                              <div class="col-md-3">
                                   <button type="button" class="btn btn-danger btn-sm w-100 fw-bold mb-1" onclick="descargarMedlineCompleto()">
                                       <i class="fas fa-download me-2"></i>Descargar Excel
                                   </button>
@@ -1061,20 +1065,24 @@ $(document).ready(function() {
     $('#mesMedline').on('change', function() {
         const mesSeleccionado = $(this).val();
         if (mesSeleccionado) {
-            $('#precioMedline').attr('placeholder', 'Buscando...');
+            $('#precioMedlineCarton, #precioMedlineArchivo').attr('placeholder', 'Buscando...');
             $.ajax({
                 url: "{% url 'obtener_precio_medline' %}",
                 data: { 'mes': mesSeleccionado },
                 success: function(response) {
-                    const precio = response.precio_carton || response.precio_archivo || 0;
-                    if (response.success && precio > 0) {
-                        $('#precioMedline').val(precio);
-                    } else {
-                        $('#precioMedline').val('');
-                        $('#precioMedline').attr('placeholder', 'Ej. 0.45');
+                    // El endpoint devuelve un precio por material; cada uno va a su campo.
+                    // Un 0 guardado es un dato válido y se prellena tal cual: antes el
+                    // `||` lo enmascaraba con el precio del otro material y al descargar
+                    // se sobrescribía el valor bueno.
+                    function llenarPrecio(selector, valor) {
+                        const num = parseFloat(valor);
+                        $(selector).val(response.success && isFinite(num) ? num : '');
+                        $(selector).attr('placeholder', 'Ej. 0.45');
                     }
+                    llenarPrecio('#precioMedlineCarton', response.precio_carton);
+                    llenarPrecio('#precioMedlineArchivo', response.precio_archivo);
                 },
-                error: function() { $('#precioMedline').attr('placeholder', 'Ej. 0.45'); }
+                error: function() { $('#precioMedlineCarton, #precioMedlineArchivo').attr('placeholder', 'Ej. 0.45'); }
             });
         }
     });
@@ -1101,9 +1109,12 @@ function mostrarOpcionesMedline() {
 // --- DESCARGA DE REPORTE MEDLINE (CARTÓN + ARCHIVO MUERTO EN UN EXCEL) ---
 function descargarMedlineCompleto() {
     const mes = $('#mesMedline').val();
-    const precio = $('#precioMedline').val();
-    if (!precio) {
-        alert("Por favor, ingresa el precio para generar el reporte.");
+    const precioCarton = $('#precioMedlineCarton').val();
+    const precioArchivo = $('#precioMedlineArchivo').val();
+    // Se piden los dos: si uno viaja vacío, el backend deja AMBOS en 0.00 (el
+    // float() de los dos precios comparte un mismo try/except).
+    if (!precioCarton || !precioArchivo) {
+        alert("Ingresa los dos precios (Cartón y Archivo Muerto) para generar el reporte.");
         return;
     }
 
@@ -1111,7 +1122,11 @@ function descargarMedlineCompleto() {
     $('#loadingOverlay').removeClass('d-none');
 
     const baseUrl = "{% url 'export_remisiones_to_excel' %}";
-    const finalUrl = `${baseUrl}?tipo_reporte=medline&precio_carton=${precio}&precio_archivo=${precio}&mes=${mes}`;
+    // Cada pestaña del Excel se calcula con el precio de su material.
+    const finalUrl = `${baseUrl}?tipo_reporte=medline`
+        + `&precio_carton=${encodeURIComponent(precioCarton)}`
+        + `&precio_archivo=${encodeURIComponent(precioArchivo)}`
+        + `&mes=${encodeURIComponent(mes)}`;
 
     window.location.href = finalUrl;
     setTimeout(function(){ $('#loadingOverlay').addClass('d-none'); }, 4000);
