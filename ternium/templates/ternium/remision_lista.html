@@ -910,6 +910,11 @@
       </div>
       <div class="modal-body p-4 bg-light">
 
+        {# Token propio: el form de filtros es GET y los demás {% csrf_token %}
+           de la página son condicionales, así que la cookie csrftoken puede no
+           existir y el guardado se caía con 403. #}
+        {% csrf_token %}
+
         {# Selector de vista: la de siempre o la que armó el usuario #}
         <div class="row g-3 mb-4">
           <div class="col-md-6">
@@ -1318,7 +1323,12 @@ function guardarColumnas() {
     boton.disabled = true;
     boton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Guardando...';
 
-    const csrfToken = document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] || '';
+    // Se prefiere el token del propio panel: la cookie csrftoken no siempre
+    // está presente en esta página (el form de filtros es GET) y sin él el
+    // servidor responde 403.
+    const campoToken = document.querySelector('#modalPersonalizarTabla [name=csrfmiddlewaretoken]');
+    const csrfToken = (campoToken && campoToken.value) ||
+        document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] || '';
 
     fetch("{% url 'guardar_columnas_remisiones' %}", {
         method: 'POST',
