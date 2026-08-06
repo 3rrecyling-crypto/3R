@@ -2381,7 +2381,7 @@ def get_catalogos_por_empresa(request, empresa_id):
         # La línea 'unidades' fallaba porque 'models.F' no estaba definido.
         # Al importar 'F' directamente, ahora funciona correctamente.
         data = {
-            'operadores': list(Operador.objects.filter(empresas__id=empresa_id).distinct().values('id', 'nombre')),
+            'operadores': list(Operador.objects.filter(empresas__id=empresa_id, activo=True).distinct().values('id', 'nombre')),
             'lineas_transporte': list(LineaTransporte.objects.filter(empresas__id=empresa_id).values('id', 'nombre')),
             'materiales': list(Material.objects.filter(empresas__id=empresa_id).values('id', 'nombre')),
             'unidades': list(Unidad.objects.filter(empresas__id=empresa_id).values('id', nombre=F('internal_id'), placas=F('license_plate'))),

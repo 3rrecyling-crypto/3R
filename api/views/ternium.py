@@ -93,6 +93,15 @@ class OperadorViewSet(viewsets.ModelViewSet):
         empresas = _empresas_autorizadas(self.request.user)
         return Operador.objects.filter(empresas__in=empresas).distinct().order_by('nombre')
 
+    def perform_destroy(self, instance):
+        """Da de baja en vez de borrar.
+
+        La FK de Remision es SET_NULL: borrar el operador dejaría sin nombre a
+        todas sus remisiones y ese dato no se puede recuperar.
+        """
+        instance.activo = False
+        instance.save(update_fields=['activo'])
+
 
 class MaterialViewSet(viewsets.ModelViewSet):
     serializer_class = MaterialSerializer
@@ -307,7 +316,7 @@ class RemisionViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'Empresa no encontrada.'}, status=404)
         return Response({
             'operadores': OperadorSerializer(
-                Operador.objects.filter(empresas=empresa), many=True
+                Operador.objects.filter(empresas=empresa, activo=True), many=True
             ).data,
             'lineas': LineaTransporteSerializer(
                 LineaTransporte.objects.filter(empresas=empresa), many=True
@@ -616,7 +625,7 @@ class CatalogosEmpresaView(APIView):
 
         return Response({
             'operadores': OperadorSerializer(
-                Operador.objects.filter(empresas=empresa).order_by('nombre'), many=True
+                Operador.objects.filter(empresas=empresa, activo=True).order_by('nombre'), many=True
             ).data,
             'lineas_transporte': LineaTransporteSerializer(
                 LineaTransporte.objects.filter(empresas=empresa).order_by('nombre'), many=True

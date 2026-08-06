@@ -48,16 +48,22 @@ class MultipleFileInput(forms.ClearableFileInput):
 class OperadorForm(forms.ModelForm):
     class Meta:
         model = Operador
-        fields = ['nombre', 'folio', 'empresas'] # <--- Agregamos los campos
+        fields = ['nombre', 'folio', 'empresas', 'activo'] # <--- Agregamos los campos
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej. Juan Pérez'}),
             'folio': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej. LIC-123456'}),
             'empresas': forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+            'activo': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
         labels = {
             'nombre': 'Nombre Completo',
             'folio': 'Folio o Licencia',
-            'empresas': 'Unidades de Negocio (Empresas)'
+            'empresas': 'Unidades de Negocio (Empresas)',
+            'activo': 'Operador activo',
+        }
+        help_texts = {
+            'activo': 'Al desactivarlo deja de aparecer al capturar remisiones, '
+                      'pero se conserva en las que ya lo tenían asignado.',
         }
 
 
@@ -299,7 +305,14 @@ class RemisionForm(forms.ModelForm):
             self.fields['origen'].queryset = Lugar.objects.none()
             self.fields['destino'].queryset = Lugar.objects.none()
 
-        self.fields['operador'].queryset = Operador.objects.all()
+        # Solo se ofrecen operadores activos, pero si esta remisión ya tenía
+        # asignado uno que se dio de baja, se incluye: si no, al editarla el
+        # campo saldría vacío y el guardado borraría el dato.
+        operadores = Operador.objects.filter(activo=True)
+        asignado = getattr(self.instance, 'operador_id', None)
+        if asignado:
+            operadores = Operador.objects.filter(Q(activo=True) | Q(pk=asignado))
+        self.fields['operador'].queryset = operadores.distinct()
 
         if self.instance and self.instance.pk and self.instance.status == 'AUDITADO':
             for field in self.fields:

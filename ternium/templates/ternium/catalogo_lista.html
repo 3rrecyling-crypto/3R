@@ -397,8 +397,8 @@
                             <th scope="col">Contacto</th>
                             {% endif %}
                             {% if model_name == "operador" %}
-                            <th scope="col">Licencia</th>
-                            <th scope="col">Teléfono</th>
+                            <th scope="col">Folio / Licencia</th>
+                            <th scope="col">Estado</th>
                             {% endif %}
                             {% if model_name == "unidad" or model_name == "contenedor" %}
                             <th scope="col">Placas</th>
@@ -444,13 +444,14 @@
                             {% endif %}
                             
                             {% if model_name == "operador" %}
-                            <td><code>{{ object.licencia|default:"N/A" }}</code></td>
+                            {# 'licencia' y 'telefono' no existen en el modelo: siempre salía N/A #}
+                            <td><code>{{ object.folio|default:"N/A" }}</code></td>
                             <td>
-                                {% if object.telefono %}
-                                <a href="tel:{{ object.telefono }}" class="text-decoration-none">
-                                    <i class="fas fa-phone me-1 text-success"></i>{{ object.telefono }}
-                                </a>
-                                {% else %}N/A{% endif %}
+                                {% if object.activo %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">Activo</span>
+                                {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle" title="No aparece al capturar remisiones, pero se conserva en el historial">Inactivo</span>
+                                {% endif %}
                             </td>
                             {% endif %}
                             

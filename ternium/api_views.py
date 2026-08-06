@@ -1349,7 +1349,7 @@ def api_obtener_catalogos(request, empresa_id):
             destinos = list(Lugar.objects.filter(empresas__id=empresa_id, tipo__in=['DESTINO', 'AMBOS']).annotate(text=F('nombre')).values('id', 'text'))
             
             lineas = list(LineaTransporte.objects.all().annotate(text=F('nombre')).values('id', 'text'))
-            operadores = list(Operador.objects.all().annotate(text=F('nombre')).values('id', 'text'))
+            operadores = list(Operador.objects.filter(activo=True).annotate(text=F('nombre')).values('id', 'text'))
             unidades = list(Unidad.objects.all().annotate(text=F('numero_economico')).values('id', 'text'))
             contenedores = list(Contenedor.objects.all().annotate(text=F('numero')).values('id', 'text'))
             patios = list(Lugar.objects.filter(es_patio=True).annotate(text=F('nombre')).values('id', 'text'))
@@ -2724,14 +2724,29 @@ def api_cat_linea_detail(request, pk):
     return JsonResponse({'error': 'Metodo no permitido'}, status=405)
 
 # ── OPERADORES ───────────────────────────────────────────────────────────
+def _operador_dict(o):
+    return {
+        'id': o.id,
+        'nombre': o.nombre,
+        'folio': o.folio or '',
+        'empresas': _empresas_ids(o),
+        'activo': o.activo,
+        'tiene_historial': o.tiene_historial,
+    }
+
+
 @csrf_exempt
 @login_required
 def api_cat_operadores(request):
     if request.method == 'GET':
+        # La pantalla de catálogos muestra activos e inactivos (hay que poder
+        # reactivarlos); los desplegables de captura sí filtran por activo.
         qs = Operador.objects.prefetch_related('empresas').all().order_by('nombre')
         q = request.GET.get('q', '')
         if q: qs = qs.filter(nombre__icontains=q)
-        return JsonResponse({'results': [{'id': o.id, 'nombre': o.nombre, 'folio': o.folio or '', 'empresas': _empresas_ids(o)} for o in qs]})
+        if request.GET.get('solo_activos') == '1':
+            qs = qs.filter(activo=True)
+        return JsonResponse({'results': [_operador_dict(o) for o in qs]})
     if request.method == 'POST':
         err = _perm_check(request, 'ternium.add_operador')
         if err: return err
@@ -2740,11 +2755,22 @@ def api_cat_operadores(request):
         nombre = body.get('nombre', '').strip()
         if not nombre:
             return JsonResponse({'error': 'El nombre es requerido'}, status=400)
-        if Operador.objects.filter(nombre__iexact=nombre).exists():
-            return JsonResponse({'error': 'Ya existe un operador con ese nombre'}, status=400)
+        # El nombre es unique, así que un operador dado de baja lo mantiene
+        # ocupado. Si alguien vuelve a darlo de alta, se reactiva el existente
+        # en vez de rechazar el alta.
+        existente = Operador.objects.filter(nombre__iexact=nombre).first()
+        if existente:
+            if existente.activo:
+                return JsonResponse({'error': 'Ya existe un operador con ese nombre'}, status=400)
+            existente.activo = True
+            if body.get('folio'):
+                existente.folio = body['folio'].strip() or None
+            existente.save()
+            _set_empresas(existente, body)
+            return JsonResponse({**_operador_dict(existente), 'reactivado': True}, status=200)
         o = Operador.objects.create(nombre=nombre, folio=body.get('folio', '') or None)
         _set_empresas(o, body)
-        return JsonResponse({'id': o.id, 'nombre': o.nombre, 'folio': o.folio or '', 'empresas': _empresas_ids(o)}, status=201)
+        return JsonResponse(_operador_dict(o), status=201)
     return JsonResponse({'error': 'Metodo no permitido'}, status=405)
 
 @csrf_exempt
@@ -2752,7 +2778,7 @@ def api_cat_operadores(request):
 def api_cat_operador_detail(request, pk):
     o = get_object_or_404(Operador, pk=pk)
     if request.method == 'GET':
-        return JsonResponse({'id': o.id, 'nombre': o.nombre, 'folio': o.folio or '', 'empresas': _empresas_ids(o)})
+        return JsonResponse(_operador_dict(o))
     if request.method in ('PUT', 'PATCH'):
         err = _perm_check(request, 'ternium.change_operador')
         if err: return err
@@ -2760,14 +2786,19 @@ def api_cat_operador_detail(request, pk):
         if err: return err
         if 'nombre' in body: o.nombre = body['nombre'].strip()
         if 'folio' in body: o.folio = body['folio'].strip() or None
+        if 'activo' in body: o.activo = bool(body['activo'])
         o.save()
         _set_empresas(o, body)
-        return JsonResponse({'id': o.id, 'nombre': o.nombre, 'folio': o.folio or '', 'empresas': _empresas_ids(o)})
+        return JsonResponse(_operador_dict(o))
     if request.method == 'DELETE':
-        err = _perm_check(request, 'ternium.delete_operador')
+        # No se borra: se da de baja. Borrarlo dejaría sin operador a las
+        # remisiones que ya lo tenían (la FK es SET_NULL) y ese dato no se
+        # puede recuperar.
+        err = _perm_check(request, 'ternium.change_operador')
         if err: return err
-        o.delete()
-        return JsonResponse({'ok': True})
+        o.activo = False
+        o.save(update_fields=['activo'])
+        return JsonResponse({'ok': True, 'desactivado': True, **_operador_dict(o)})
     return JsonResponse({'error': 'Metodo no permitido'}, status=405)
 
 # ── MATERIALES ───────────────────────────────────────────────────────────

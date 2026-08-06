@@ -76,8 +76,25 @@ class LineaTransporteAdmin(admin.ModelAdmin):
 
 @admin.register(Operador)
 class OperadorAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'folio', 'creado_en')
+    list_display = ('nombre', 'folio', 'activo', 'creado_en')
+    list_filter = ('activo',)
     search_fields = ('nombre', 'folio')
+    actions = ['desactivar_operadores', 'activar_operadores']
+
+    def has_delete_permission(self, request, obj=None):
+        """Borrar aquí dejaría sin operador a sus remisiones (FK SET_NULL) y el
+        dato no se recupera. Se da de baja con la acción 'Desactivar'."""
+        return False
+
+    @admin.action(description="Desactivar (dejan de aparecer al capturar)")
+    def desactivar_operadores(self, request, queryset):
+        n = queryset.update(activo=False)
+        self.message_user(request, f"{n} operador(es) desactivado(s).")
+
+    @admin.action(description="Activar")
+    def activar_operadores(self, request, queryset):
+        n = queryset.update(activo=True)
+        self.message_user(request, f"{n} operador(es) activado(s).")
 
 @admin.register(Material)
 class MaterialAdmin(admin.ModelAdmin):

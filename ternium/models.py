@@ -155,7 +155,17 @@ class Operador(models.Model):
         blank=True
     )
     # ---------------------
-    
+
+    # Baja lógica: un operador que deja de trabajar se marca como inactivo en
+    # vez de borrarlo. Así desaparece de los desplegables al capturar, pero las
+    # remisiones que ya lo tenían asignado conservan su nombre. Es reversible.
+    activo = models.BooleanField(
+        default=True,
+        verbose_name="Activo",
+        help_text="Los inactivos no aparecen al capturar remisiones, "
+                  "pero se conservan en el historial."
+    )
+
     creado_en = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -168,6 +178,11 @@ class Operador(models.Model):
         verbose_name = "Operador"
         verbose_name_plural = "Operadores"
         ordering = ['nombre']
+
+    @property
+    def tiene_historial(self):
+        """Si ya se usó en alguna remisión, borrarlo perdería ese dato."""
+        return self.remision_set.exists()
 
 
 class Material(models.Model):
