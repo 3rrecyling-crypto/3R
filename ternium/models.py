@@ -1,6 +1,7 @@
 # ternium/models.py
 
 import os
+import re
 from django.db import models, transaction
 from django.db.models import Sum
 from django.core.validators import FileExtensionValidator, MinValueValidator
@@ -493,6 +494,11 @@ class Lugar(models.Model):
         ordering = ['nombre']
 
 
+def es_sealed_air(nombre):
+    """Reconoce la empresa SEALED AIR aunque cambie el formato ("Sealed Air", "SEALED-AIR")."""
+    return 'SEALEDAIR' in re.sub(r'[^A-Z]', '', (nombre or '').upper())
+
+
 class Remision(models.Model):
     STATUS_CHOICES = [
         ('PENDIENTE', 'Pendiente'),
@@ -641,6 +647,11 @@ class Remision(models.Model):
                 return peso * 1000
 
         return peso
+
+    @property
+    def aplica_precio(self):
+        """El precio por Kg de los detalles solo aplica a SEALED AIR con origen patio."""
+        return bool(self.empresa and es_sealed_air(self.empresa.nombre) and self.origen and self.origen.es_patio)
 
     @property
     def diff(self):
@@ -881,9 +892,16 @@ class DetalleRemision(models.Model):
         default=0
     )
     bultos = models.PositiveIntegerField(
-        verbose_name="Bultos", 
-        blank=True, 
+        verbose_name="Bultos",
+        blank=True,
         null=True
+    )
+    # Solo aplica a SEALED AIR con origen patio (ver Remision.aplica_precio).
+    precio = models.DecimalField(
+        verbose_name="Precio por Kg",
+        max_digits=12,
+        decimal_places=4,
+        null=True, blank=True
     )
 
     def __str__(self):
@@ -901,6 +919,13 @@ class DetalleRemision(models.Model):
     @property
     def diferencia_abs(self):
         return abs(self.diferencia)
+
+    @property
+    def importe(self):
+        """Kg de descarga × precio por Kg."""
+        if self.precio is None:
+            return None
+        return (self.peso_dlv or 0) * self.precio
 
 class InventarioPatio(models.Model):
     patio = models.ForeignKey(Lugar, on_delete=models.CASCADE, limit_choices_to={'es_patio': True}, related_name='inventario')

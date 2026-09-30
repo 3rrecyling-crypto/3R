@@ -51,7 +51,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.views.decorators.http import require_POST, require_http_methods
 from django.conf import settings
-from .models import PrecioMedline
+from .models import PrecioMedline, es_sealed_air
 
 def _update_inventory_from_remision(remision, revert=False):
     """
@@ -1085,10 +1085,15 @@ def api_crear_remision(request):
                             peso_dlv=det.get('peso_dlv') or 0,
                             peso_rechazado=det.get('peso_rechazado') or 0,
                             patio_rechazo_id=det.get('patio_rechazo') or None,
+                            precio=det.get('precio') or None,
                             cliente=remision.destino # Forzar cliente = destino
                         )
             except json.JSONDecodeError:
                 pass # Manejar error si es necesario
+
+            # El precio por Kg solo aplica a SEALED AIR con origen patio.
+            if not remision.aplica_precio:
+                remision.detalles.exclude(precio=None).update(precio=None)
 
             # --- HISTORIAL, INVENTARIO Y ALERTAS ---
             HistorialRemision.objects.create(
@@ -1305,10 +1310,15 @@ def api_editar_remision(request, pk):
                                 peso_dlv=det.get('peso_dlv') or 0,
                                 peso_rechazado=det.get('peso_rechazado') or 0,
                                 patio_rechazo_id=det.get('patio_rechazo') or None,
+                                precio=det.get('precio') or None,
                                 cliente=remision.destino
                             )
                 except json.JSONDecodeError:
                     pass
+
+            # El precio por Kg solo aplica a SEALED AIR con origen patio.
+            if not remision.aplica_precio:
+                remision.detalles.exclude(precio=None).update(precio=None)
 
             # --- HISTORIAL, INVENTARIO Y ALERTAS ---
             if cambios_log:
@@ -1345,7 +1355,7 @@ def api_obtener_catalogos(request, empresa_id):
     if request.method == 'GET':
         try:
             materiales = list(Material.objects.filter(empresas__id=empresa_id).annotate(text=F('nombre')).values('id', 'text'))
-            origenes = list(Lugar.objects.filter(empresas__id=empresa_id).annotate(text=F('nombre')).values('id', 'text'))
+            origenes = list(Lugar.objects.filter(empresas__id=empresa_id).annotate(text=F('nombre')).values('id', 'text', 'es_patio'))
             destinos = list(Lugar.objects.filter(empresas__id=empresa_id, tipo__in=['DESTINO', 'AMBOS']).annotate(text=F('nombre')).values('id', 'text'))
             
             lineas = list(LineaTransporte.objects.all().annotate(text=F('nombre')).values('id', 'text'))
@@ -1421,6 +1431,8 @@ def api_remision_detalle(request, pk):
             'peso_dlv': float(det.peso_dlv or 0),
             'peso_rechazado': float(det.peso_rechazado or 0),
             'patio_rechazo': det.patio_rechazo_id,
+            'precio': float(det.precio) if det.precio is not None else None,
+            'importe': float(det.importe) if det.importe is not None else None,
         })
 
     # Evidencias
@@ -2030,6 +2042,14 @@ def export_reportes_especificos(request):
         queryset = queryset.filter(origen__nombre__icontains=tipo_reporte.upper())
     elif tipo_reporte == 'hudson':
         queryset = queryset.filter(origen__nombre__icontains='HUDSON')
+    elif tipo_reporte == 'sealed-air':
+        # Por Unidad de Negocio (Empresa), no por origen.
+        ids_sealed = [e.pk for e in Empresa.objects.all() if es_sealed_air(e.nombre)]
+        queryset = queryset.filter(empresa_id__in=ids_sealed)
+        # Incluye precios: solo empresas autorizadas para el usuario.
+        if not request.user.is_superuser:
+            perfil = getattr(request.user, 'ternium_profile', None)
+            queryset = queryset.filter(empresa__in=perfil.empresas_autorizadas.all()) if perfil else queryset.none()
     else:
         return HttpResponse("Tipo de reporte no válido.", status=400)
 
@@ -2209,11 +2229,81 @@ def export_reportes_especificos(request):
         ws.cell(row=last_row, column=10).font = Font(bold=True)
         ws.cell(row=last_row, column=10).number_format = '"$"#,##0.00'
 
-    # Ajustar ancho de columnas automáticamente
+    # =========================================================================
+    # ESTRUCTURA PARA SEALED AIR (1 fila por material, con el folio de la remisión)
+    # =========================================================================
+    elif tipo_reporte == 'sealed-air':
+        ws.title = "Reporte_Sealed_Air"
+
+        # Sin logo en S3: título y periodo en las filas reservadas para la imagen
+        if tipo_filtro == 'mes' and mes_req:
+            periodo = f"Mes: {mes_req}"
+        elif tipo_filtro == 'rango' and (fecha_inicio or fecha_fin):
+            periodo = f"Del {fecha_inicio or 'inicio'} al {fecha_fin or 'hoy'}"
+        else:
+            periodo = "Todas las fechas"
+        ws['A1'] = "SEALED AIR - Remisiones con precio"
+        ws['A1'].font = Font(bold=True, size=14)
+        ws['A2'] = periodo
+        ws['A3'] = "Total = Kg de descarga × precio por Kg"
+        ws['A3'].font = Font(italic=True, color="666666")
+
+        headers = ["Remisión", "Origen", "Destino", "Material", "Kg", "Precio", "Total"]
+        ws.append(headers)
+        for cell in ws[start_row_table]:
+            cell.alignment = center_style
+
+        total_kg = 0
+        total_importe = 0
+
+        for remision in queryset:
+            for d in remision.detalles.all():
+                kg = float(d.peso_dlv or 0)
+                precio = float(d.precio) if d.precio is not None else None
+                importe = float(d.importe) if d.importe is not None else None
+
+                total_kg += kg
+                total_importe += importe or 0
+
+                ws.append([
+                    remision.remision,
+                    remision.origen.nombre if remision.origen else '',
+                    remision.destino.nombre if remision.destino else '',
+                    d.material.nombre if d.material else "S/M",
+                    kg,
+                    precio if precio is not None else '',
+                    importe if importe is not None else '',
+                ])
+
+                current_row = ws.max_row
+                for col_idx in range(1, 8):
+                    ws.cell(row=current_row, column=col_idx).alignment = center_style
+                ws.cell(row=current_row, column=5).number_format = '#,##0.000'
+                ws.cell(row=current_row, column=6).number_format = '"$"#,##0.00##'
+                ws.cell(row=current_row, column=7).number_format = '"$"#,##0.00'
+
+        # Formato tabla de Excel (filtros y filas alternadas). Una tabla necesita
+        # al menos una fila de datos, aunque el periodo no tenga remisiones.
+        ultima_fila = max(ws.max_row, start_row_table + 1)
+        tabla = Table(displayName="TablaSealedAir", ref=f"A{start_row_table}:G{ultima_fila}")
+        tabla.tableStyleInfo = TableStyleInfo(name="TableStyleMedium9", showFirstColumn=False, showLastColumn=False, showRowStripes=True, showColumnStripes=False)
+        ws.add_table(tabla)
+
+        # Fila de totales, debajo de la tabla
+        fila_totales = ultima_fila + 1
+        for col_idx, valor in ((4, "TOTALES:"), (5, total_kg), (7, total_importe)):
+            cell = ws.cell(row=fila_totales, column=col_idx, value=valor)
+            cell.font = Font(bold=True)
+            cell.alignment = center_style
+        ws.cell(row=fila_totales, column=5).number_format = '#,##0.000'
+        ws.cell(row=fila_totales, column=7).number_format = '"$"#,##0.00'
+
+    # Ajustar ancho de columnas automáticamente (desde la tabla; las filas de
+    # arriba son para logo/título y no deben ensanchar la columna A)
     for col in ws.columns:
         max_length = 0
         col_letter = col[0].column_letter
-        for cell in col:
+        for cell in col[start_row_table - 1:]:
             try:
                 if len(str(cell.value)) > max_length and cell.value:
                     max_length = len(str(cell.value))

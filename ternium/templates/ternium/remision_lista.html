@@ -317,24 +317,6 @@
             </a>
             
             {% if perms.ternium.add_remision %}
-            <button type="button" class="btn btn-solid-primary shadow-sm py-2 px-3 rounded-pill text-white fw-bold" data-bs-toggle="modal" data-bs-target="#modalImportarTrane">
-                <i class="fas fa-file-import me-2"></i>IMPORTAR TRANE
-            </button>
-            {% endif %}
-
-            {% if perms.ternium.view_plastico %}
-            <a href="{% url 'lista_plastico' %}" class="btn btn-solid-secondary shadow-sm py-2 px-3 rounded-pill">
-                <i class="fas fa-recycle me-2"></i>GESTIÓN DE PLÁSTICO
-            </a>
-            {% endif %}
-            
-            {% if perms.ternium.view_controltarima %}
-            <a href="{% url 'lista_tarimas' %}" class="btn btn-solid-primary shadow-sm py-2 px-3 rounded-pill">
-                <i class="fas fa-pallet me-2"></i>GESTIÓN TARIMAS
-            </a>
-            {% endif %}
-            
-            {% if perms.ternium.add_remision %}
             <a href="{% url 'crear_remision' %}" class="btn btn-primary-gradient shadow-sm py-2 px-3 rounded-pill">
                 <i class="fas fa-plus-circle me-2"></i>NUEVA REMISION
             </a>
@@ -787,6 +769,16 @@
                           <img src="https://3rrecycling.s3.amazonaws.com/static/Fotos_Reportes/HUDSON.png" alt="Logo HUDSON" style="height: 60px; width: auto; object-fit: contain;" class="mb-3">
                           <h5 class="fw-bold text-dark">HUDSON</h5>
                           <p class="small text-muted mb-0">Reporte con precios y ventas.</p>
+                      </div>
+                  </div>
+              </div>
+
+              <div class="col-md-3">
+                  <div class="card excel-card-option h-100" onclick="abrirMenuEspecifico('sealed-air', 'SEALED-AIR')">
+                      <div class="card-body text-center">
+                          <i class="fas fa-box-open fa-3x text-info mb-3" style="height: 60px; line-height: 60px;"></i>
+                          <h5 class="fw-bold text-dark">SEALED-AIR</h5>
+                          <p class="small text-muted mb-0">Remisión, origen, destino, material, kg, precio y total. Una fila por material.</p>
                       </div>
                   </div>
               </div>

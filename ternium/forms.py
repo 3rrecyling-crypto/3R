@@ -401,11 +401,23 @@ class RemisionForm(forms.ModelForm):
             raise forms.ValidationError(f"El folio Medline «{valor}» ya existe en otra remisión. Debe ser único.")
         return valor
 
+class DecimalConComas(forms.DecimalField):
+    """Acepta separadores de miles (1,250.5) que el formulario muestra al teclear."""
+    def to_python(self, value):
+        if isinstance(value, str):
+            value = value.replace(',', '')
+        return super().to_python(value)
+
+
 class DetalleRemisionForm(forms.ModelForm):
     class Meta:
         model = DetalleRemision
+        field_classes = {
+            'peso_ld': DecimalConComas, 'peso_dlv': DecimalConComas,
+            'peso_rechazado': DecimalConComas, 'precio': DecimalConComas,
+        }
         # --- SE AÑADIÓ: bultos, peso_rechazado y patio_rechazo ---
-        fields = ['material', 'bultos', 'unidad_medida', 'cliente', 'peso_ld', 'peso_dlv', 'peso_rechazado', 'patio_rechazo']
+        fields = ['material', 'bultos', 'unidad_medida', 'cliente', 'peso_ld', 'peso_dlv', 'peso_rechazado', 'patio_rechazo', 'precio']
         widgets = {
             'material': forms.Select(attrs={'class': 'form-select select2 material-select'}),
             
@@ -426,21 +438,31 @@ class DetalleRemisionForm(forms.ModelForm):
             # -----------------------------------------------------------------------------
 
             'cliente': forms.Select(attrs={'class': 'form-select cliente-select'}),
-            'peso_ld': forms.NumberInput(attrs={'class': 'form-control peso-carga text-end', 'step': '0.001', 'placeholder': '0.000'}),
-            'peso_dlv': forms.NumberInput(attrs={'class': 'form-control peso-descarga text-end', 'step': '0.001', 'placeholder': '0.000'}),
-            
+            # Pesos y precio: texto con teclado decimal para mostrar comas de miles al teclear.
+            'peso_ld': forms.TextInput(attrs={'class': 'form-control peso-carga text-end', 'inputmode': 'decimal', 'autocomplete': 'off', 'placeholder': '0.000'}),
+            'peso_dlv': forms.TextInput(attrs={'class': 'form-control peso-descarga text-end', 'inputmode': 'decimal', 'autocomplete': 'off', 'placeholder': '0.000'}),
+
             # --- WIDGETS DE RECHAZO ---
-            'peso_rechazado': forms.NumberInput(attrs={
-                'class': 'form-control peso-rechazado text-end border-warning', 
-                'step': '0.001', 
+            'peso_rechazado': forms.TextInput(attrs={
+                'class': 'form-control peso-rechazado text-end border-warning',
+                'inputmode': 'decimal',
+                'autocomplete': 'off',
                 'placeholder': '0.000'
             }),
             'patio_rechazo': forms.Select(attrs={
                 'class': 'form-select patio-select border-warning'
             }),
+
+            # --- PRECIO POR KG (solo SEALED AIR con origen patio) ---
+            'precio': forms.TextInput(attrs={
+                'class': 'form-control precio-input text-end border-success',
+                'inputmode': 'decimal',
+                'autocomplete': 'off',
+                'placeholder': '0.00'
+            }),
         }
         labels = {
-            'material': '', 'bultos': '', 'unidad_medida': '', 'cliente': '', 'peso_ld': '', 'peso_dlv': '', 'peso_rechazado': '', 'patio_rechazo': ''
+            'material': '', 'bultos': '', 'unidad_medida': '', 'cliente': '', 'peso_ld': '', 'peso_dlv': '', 'peso_rechazado': '', 'patio_rechazo': '', 'precio': ''
         }
 
     def __init__(self, *args, **kwargs):
@@ -456,7 +478,8 @@ class DetalleRemisionForm(forms.ModelForm):
         self.fields['peso_rechazado'].required = False 
         self.fields['patio_rechazo'].required = False # --- SE AÑADIÓ COMO OPCIONAL ---
         self.fields['bultos'].required = False  # --- BULTOS OPCIONAL ---
-        
+        self.fields['precio'].required = False
+
         # --- CAMBIO AQUÍ: Forzar que el valor sea siempre KG ---
         self.fields['unidad_medida'].initial = 'KG'
         # -----------------------------------------------------

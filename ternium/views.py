@@ -1206,8 +1206,12 @@ def crear_remision(request):
                         
                         # Guardamos directamente en KG
                         detalle.save()
-                    
+
                     for obj in formset.deleted_objects: obj.delete()
+
+                    # El precio por Kg solo aplica a SEALED AIR con origen patio.
+                    if not remision.aplica_precio:
+                        remision.detalles.exclude(precio=None).update(precio=None)
 
                     # ==========================================================
                     # Folio Medline ahora es MANUAL (lo captura el usuario en el
@@ -1373,7 +1377,7 @@ def editar_remision(request, pk):
                             
                             elif f.instance.pk and f.has_changed():
                                 for campo in f.changed_data:
-                                    if campo in ['peso_ld', 'peso_dlv', 'material', 'cliente', 'unidad_medida']:
+                                    if campo in ['peso_ld', 'peso_dlv', 'material', 'cliente', 'unidad_medida', 'precio']:
                                         cambios_log.append(f"Detalle modificado: {campo}")
 
                     # --- Guardado ---
@@ -1496,6 +1500,10 @@ def editar_remision(request, pk):
                     
                     for obj in formset.deleted_objects:
                         obj.delete()
+
+                    # El precio por Kg solo aplica a SEALED AIR con origen patio.
+                    if not remision.aplica_precio:
+                        remision.detalles.exclude(precio=None).update(precio=None)
 
                     # ==========================================================
                     # Folio Medline ahora es MANUAL (lo captura el usuario en el
@@ -2386,7 +2394,7 @@ def get_catalogos_por_empresa(request, empresa_id):
             'materiales': list(Material.objects.filter(empresas__id=empresa_id).values('id', 'nombre')),
             'unidades': list(Unidad.objects.filter(empresas__id=empresa_id).values('id', nombre=F('internal_id'), placas=F('license_plate'))),
             'contenedores': list(Contenedor.objects.filter(empresas__id=empresa_id).values('id', 'nombre', 'placas')),
-            'lugares_origen': list(Lugar.objects.filter(empresas__id=empresa_id, tipo__in=['ORIGEN', 'AMBOS']).values('id', 'nombre')),
+            'lugares_origen': list(Lugar.objects.filter(empresas__id=empresa_id, tipo__in=['ORIGEN', 'AMBOS']).values('id', 'nombre', 'es_patio')),
             'lugares_destino': list(Lugar.objects.filter(empresas__id=empresa_id, tipo__in=['DESTINO', 'AMBOS']).values('id', 'nombre')),
             'patios': list(Lugar.objects.filter(empresas__id=empresa_id, es_patio=True).values('id', 'nombre')),
         }

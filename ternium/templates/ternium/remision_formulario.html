@@ -293,31 +293,31 @@
             <div class="card-body p-0">
                 {{ formset.management_form }}
                 
-                <div class="row g-3 formset-header align-items-center d-none d-md-flex">
-                    <div class="col-md-2">MATERIAL</div>
-                    <div class="col-md-1">UNIDAD</div> 
-                    <div class="col-md-1 text-center">BULTOS</div>
-                    <div class="col-md-2 text-end">CARGA</div>
-                    <div class="col-md-2">CLIENTE (Destino)</div>
-                    <div class="col-md-2 text-end">DESCARGA</div>
-                    <div class="col-md-1 text-center">PÉRDIDA</div>
-                    <div class="col-md-1"></div>
+                <div class="row g-3 formset-header align-items-center d-none d-lg-flex">
+                    <div class="col-lg-2">MATERIAL</div>
+                    <div class="col-lg-1">UNIDAD</div> 
+                    <div class="col-lg-1 text-center">BULTOS</div>
+                    <div class="col-lg-2 text-end">CARGA</div>
+                    <div class="col-lg-2">CLIENTE (Destino)</div>
+                    <div class="col-lg-2 text-end">DESCARGA</div>
+                    <div class="col-lg-1 text-center">PÉRDIDA</div>
+                    <div class="col-lg-1"></div>
                 </div>
                 
                 <div id="form-container">
                     {% for form in formset %}
                     <div class="detalle-form-row">
                         <div class="row g-3 align-items-center">
-                            <div class="col-12 col-md-2">{{ form.material }}<div class="form-error">{{ form.material.errors }}</div></div>
-                            <div class="col-6 col-md-1"><input type="text" name="{{ form.unidad_medida.html_name }}" value="KG" readonly class="form-control unidad-select unidad-fija"></div>
+                            <div class="col-12 col-lg-2">{{ form.material }}<div class="form-error">{{ form.material.errors }}</div></div>
+                            <div class="col-6 col-lg-1"><input type="text" name="{{ form.unidad_medida.html_name }}" value="KG" readonly class="form-control unidad-select unidad-fija"></div>
                             
-                            <div class="col-6 col-md-1">{{ form.bultos }}<div class="form-error">{{ form.bultos.errors }}</div></div>
+                            <div class="col-6 col-lg-1">{{ form.bultos }}<div class="form-error">{{ form.bultos.errors }}</div></div>
                             
-                            <div class="col-6 col-md-2">{{ form.peso_ld }}<div class="form-error">{{ form.peso_ld.errors }}</div></div>
-                            <div class="col-12 col-md-2">{{ form.cliente }}<div class="form-error">{{ form.cliente.errors }}</div></div>
-                            <div class="col-6 col-md-2">{{ form.peso_dlv }}<div class="form-error">{{ form.peso_dlv.errors }}</div></div>
-                            <div class="col-6 col-md-1 text-center"><span class="perdida-calculada-label">PÉRDIDA</span><span class="perdida-calculada-valor text-danger">0.000</span></div>
-                            <div class="col-12 col-md-1 text-center delete-widget-cell">{{ form.DELETE }} <button type="button" class="btn btn-danger btn-sm btn-delete-row w-100"><i class="fas fa-trash"></i></button></div>
+                            <div class="col-6 col-lg-2"><div class="d-lg-none small fw-bold text-muted mb-1">CARGA (Kg)</div>{{ form.peso_ld }}<div class="form-error">{{ form.peso_ld.errors }}</div></div>
+                            <div class="col-12 col-lg-2"><div class="d-lg-none small fw-bold text-muted mb-1">CLIENTE (Destino)</div>{{ form.cliente }}<div class="form-error">{{ form.cliente.errors }}</div></div>
+                            <div class="col-6 col-lg-2"><div class="d-lg-none small fw-bold text-muted mb-1">DESCARGA (Kg)</div>{{ form.peso_dlv }}<div class="form-error">{{ form.peso_dlv.errors }}</div></div>
+                            <div class="col-6 col-lg-1 text-center"><span class="perdida-calculada-label">PÉRDIDA</span><span class="perdida-calculada-valor text-danger">0.000</span></div>
+                            <div class="col-12 col-lg-1 text-center delete-widget-cell">{{ form.DELETE }} <button type="button" class="btn btn-danger btn-sm btn-delete-row w-100"><i class="fas fa-trash"></i></button></div>
                             {{ form.id }}
                         </div>
                         <div class="row g-2 mt-2 align-items-center rechazo-container" style="display: none; background-color: #fff3cd; padding: 8px; border-radius: 6px;">
@@ -326,6 +326,12 @@
                             <div class="col-md-4">{{ form.patio_rechazo }}<div class="form-error">{{ form.patio_rechazo.errors }}</div></div>
                             <div class="col-md-3 small text-muted">Devolución a inventario de patio.</div>
                         </div>
+                        <div class="row g-2 mt-2 align-items-center precio-container" style="display: none; background-color: #d1e7dd; padding: 8px; border-radius: 6px;">
+                            <div class="col-md-3 text-end fw-bold text-success-emphasis"><i class="fas fa-dollar-sign me-1"></i>Precio por Kg:</div>
+                            <div class="col-md-2">{{ form.precio }}<div class="form-error">{{ form.precio.errors }}</div></div>
+                            <div class="col-md-4 fw-bold text-success-emphasis">Importe: <span class="importe-calculado">$0.00</span></div>
+                            <div class="col-md-3 small text-muted">Kg de descarga × precio.</div>
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
@@ -333,22 +339,28 @@
                 <div id="empty-form-template" style="display: none;">
                     <div class="detalle-form-row">
                         <div class="row g-3 align-items-center">
-                            <div class="col-12 col-md-2">{{ formset.empty_form.material }}</div>
-                            <div class="col-6 col-md-1"><input type="text" name="{{ formset.empty_form.unidad_medida.html_name }}" value="KG" readonly class="form-control unidad-select unidad-fija"></div> 
+                            <div class="col-12 col-lg-2">{{ formset.empty_form.material }}</div>
+                            <div class="col-6 col-lg-1"><input type="text" name="{{ formset.empty_form.unidad_medida.html_name }}" value="KG" readonly class="form-control unidad-select unidad-fija"></div> 
                             
-                            <div class="col-6 col-md-1">{{ formset.empty_form.bultos }}</div>
+                            <div class="col-6 col-lg-1">{{ formset.empty_form.bultos }}</div>
                             
-                            <div class="col-6 col-md-2">{{ formset.empty_form.peso_ld }}</div>
-                            <div class="col-12 col-md-2">{{ formset.empty_form.cliente }}</div>
-                            <div class="col-6 col-md-2">{{ formset.empty_form.peso_dlv }}</div>
-                            <div class="col-6 col-md-1 text-center"><span class="perdida-calculada-label">PÉRDIDA</span><span class="perdida-calculada-valor text-danger">0.000</span></div>
-                            <div class="col-12 col-md-1 text-center delete-widget-cell">{{ formset.empty_form.DELETE }}<button type="button" class="btn btn-danger btn-sm btn-delete-row w-100"><i class="fas fa-trash"></i></button></div>
+                            <div class="col-6 col-lg-2"><div class="d-lg-none small fw-bold text-muted mb-1">CARGA (Kg)</div>{{ formset.empty_form.peso_ld }}</div>
+                            <div class="col-12 col-lg-2"><div class="d-lg-none small fw-bold text-muted mb-1">CLIENTE (Destino)</div>{{ formset.empty_form.cliente }}</div>
+                            <div class="col-6 col-lg-2"><div class="d-lg-none small fw-bold text-muted mb-1">DESCARGA (Kg)</div>{{ formset.empty_form.peso_dlv }}</div>
+                            <div class="col-6 col-lg-1 text-center"><span class="perdida-calculada-label">PÉRDIDA</span><span class="perdida-calculada-valor text-danger">0.000</span></div>
+                            <div class="col-12 col-lg-1 text-center delete-widget-cell">{{ formset.empty_form.DELETE }}<button type="button" class="btn btn-danger btn-sm btn-delete-row w-100"><i class="fas fa-trash"></i></button></div>
                         </div>
                         <div class="row g-2 mt-2 align-items-center rechazo-container" style="display: none; background-color: #fff3cd; padding: 8px; border-radius: 6px;">
                             <div class="col-md-3 text-end fw-bold text-warning-emphasis"><i class="fas fa-undo me-1"></i>Material Rechazado:</div>
                             <div class="col-md-2">{{ formset.empty_form.peso_rechazado }}</div>
                             <div class="col-md-4">{{ formset.empty_form.patio_rechazo }}</div>
                             <div class="col-md-3 small text-muted">Devolución a inventario de patio.</div>
+                        </div>
+                        <div class="row g-2 mt-2 align-items-center precio-container" style="display: none; background-color: #d1e7dd; padding: 8px; border-radius: 6px;">
+                            <div class="col-md-3 text-end fw-bold text-success-emphasis"><i class="fas fa-dollar-sign me-1"></i>Precio por Kg:</div>
+                            <div class="col-md-2">{{ formset.empty_form.precio }}</div>
+                            <div class="col-md-4 fw-bold text-success-emphasis">Importe: <span class="importe-calculado">$0.00</span></div>
+                            <div class="col-md-3 small text-muted">Kg de descarga × precio.</div>
                         </div>
                     </div>
                 </div>
@@ -731,7 +743,7 @@ $(document).ready(function() {
     }
     
     const IS_EDITING = {{ is_editing|yesno:"true,false" }}; 
-    let cachedCatalogData = { materiales: [], lugares: [], patios: [] };
+    let cachedCatalogData = { materiales: [], lugares: [], patios: [], origenesPatio: new Set() };
 
     // --- HACER EL PESO BÁSCULA READONLY (Gris claro) ---
     $('#id_peso_bascula').prop('readonly', true).css('background-color', '#e9ecef').attr('placeholder', 'Suma calculada auto.');
@@ -956,14 +968,28 @@ $(document).ready(function() {
         });
     }
 
+    // --- PRECIO POR KG: solo visible para SEALED AIR con origen patio ---
+    // No se limpian los valores al ocultar (al editar, el catálogo llega después
+    // de pintar la página); el servidor descarta el precio si no aplica.
+    function togglePrecio() {
+        const esSealedAir = empresaSelect.find('option:selected').text().toUpperCase().replace(/[^A-Z]/g, '').includes('SEALEDAIR');
+        const esPatio = cachedCatalogData.origenesPatio.has(String(origenSelect.val()));
+        if (esSealedAir && esPatio) {
+            $('.precio-container').slideDown();
+        } else {
+            $('.precio-container').slideUp();
+        }
+    }
+
     initializeSelect2(document);
     lineaTransporteSelect.on('change', function() { toggleTransportFields(); });
-    
-    origenSelect.on('change select2:select', function() { 
-        toggleOrigenDependientes(); 
+
+    origenSelect.on('change select2:select', function() {
+        toggleOrigenDependientes();
         verificarDestruccion();
-        toggleBultos(); 
+        toggleBultos();
         toggleFolioMedline(); // <--- SE DISPARA EL FOLIO
+        togglePrecio();
     });
     toggleOrigenDependientes();
 
@@ -1028,8 +1054,9 @@ $(document).ready(function() {
             .then(data => {
                 cachedCatalogData.materiales = data.materiales || [];
                 cachedCatalogData.lugares = data.lugares_destino || []; 
-                cachedCatalogData.patios = data.patios || []; 
-                
+                cachedCatalogData.patios = data.patios || [];
+                cachedCatalogData.origenesPatio = new Set((data.lugares_origen || []).filter(l => l.es_patio).map(l => String(l.id)));
+
                 populateSelect($('#id_linea_transporte'), data.lineas_transporte);
                 populateSelect($('#id_operador'), data.operadores);
                 populateSelect($('#id_unidad'), data.unidades);
@@ -1047,6 +1074,7 @@ $(document).ready(function() {
                 setTimeout(verificarDestruccion, 200);
                 setTimeout(toggleBultos, 250);
                 setTimeout(toggleFolioMedline, 250); // <--- SE DISPARA EL FOLIO
+                setTimeout(togglePrecio, 250);
             })
             .catch(error => console.error("Error catálogos:", error))
             .finally(() => { addButton.prop('disabled', false); });
@@ -1109,8 +1137,9 @@ $(document).ready(function() {
         totalFormsInput.val(formIndex + 1);
         
         calcularFila(newRow);
-        toggleBultos(); 
+        toggleBultos();
         toggleFolioMedline(); // <--- SE DISPARA EL FOLIO
+        togglePrecio();
     });
     
     formContainer.on('click', '.btn-delete-row', function() { 
@@ -1119,11 +1148,42 @@ $(document).ready(function() {
         setTimeout(toggleFolioMedline, 100); // <--- SE DISPARA EL FOLIO
     });
 
+    // --- SEPARADOR DE MILES AL TECLEAR (pesos y precio) ---
+    const CAMPOS_MILES = '.peso-carga, .peso-descarga, .peso-rechazado, .precio-input';
+
+    function valorNumerico(valor) {
+        return parseFloat(String(valor ?? '').replace(/,/g, '')) || 0;
+    }
+
+    // Deja solo dígitos y un punto decimal, y agrega comas a la parte entera.
+    function formatearMiles(texto) {
+        const partes = String(texto).replace(/[^\d.]/g, '').split('.');
+        const entero = partes.shift().replace(/^0+(?=\d)/, '');
+        const decimales = partes.length ? '.' + partes.join('') : '';
+        return entero.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + decimales;
+    }
+
+    formContainer.on('input', CAMPOS_MILES, function() {
+        // Conserva la posición del cursor contando dígitos, no comas.
+        const digitosAntes = this.value.slice(0, this.selectionStart).replace(/[^\d.]/g, '').length;
+        this.value = formatearMiles(this.value);
+        let pos = 0, contados = 0;
+        while (pos < this.value.length && contados < digitosAntes) {
+            if (/[\d.]/.test(this.value[pos])) contados++;
+            pos++;
+        }
+        this.setSelectionRange(pos, pos);
+    });
+
+    $(CAMPOS_MILES).each(function() {
+        if (this.value) this.value = formatearMiles(this.value);
+    });
+
     function calcularFila(row) {
-        const unidad = row.find('.unidad-select').val(); 
-        const carga = parseFloat(row.find('.peso-carga').val()) || 0;
-        const descarga = parseFloat(row.find('.peso-descarga').val()) || 0;
-        const rechazo = parseFloat(row.find('.peso-rechazado').val()) || 0;
+        const unidad = row.find('.unidad-select').val();
+        const carga = valorNumerico(row.find('.peso-carga').val());
+        const descarga = valorNumerico(row.find('.peso-descarga').val());
+        const rechazo = valorNumerico(row.find('.peso-rechazado').val());
         
         const diferencia = (descarga + rechazo) - carga; 
         
@@ -1140,9 +1200,14 @@ $(document).ready(function() {
             labelSpan.text('PÉRDIDA').removeClass('text-success').addClass('text-danger');
             valorSpan.removeClass('text-success').addClass('text-danger');
         }
+
+        // Importe = Kg de descarga × precio por Kg
+        const precio = valorNumerico(row.find('.precio-input').val());
+        const importe = descarga * precio;
+        row.find('.importe-calculado').text('$' + importe.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
     }
 
-    formContainer.on('input change', '.peso-carga, .peso-descarga, .peso-rechazado, .unidad-select', function() { 
+    formContainer.on('input change', '.peso-carga, .peso-descarga, .peso-rechazado, .unidad-select, .precio-input', function() {
         const row = $(this).closest('.detalle-form-row');
         calcularFila(row);
     });
@@ -1173,7 +1238,7 @@ $(document).ready(function() {
     setTimeout(() => {
         let hayRechazoPrevio = false;
         $('.peso-rechazado').each(function() {
-            if(parseFloat($(this).val()) > 0) hayRechazoPrevio = true;
+            if(valorNumerico($(this).val()) > 0) hayRechazoPrevio = true;
         });
         if(hayRechazoPrevio) toggleRechazoUI(true);
         verificarDestruccion();
@@ -1246,7 +1311,8 @@ $(document).ready(function() {
             const matId = matSelect.val();
             const matText = matSelect.find('option:selected').text();
             
-            let pesoValue = $(this).find('input[name$="-peso_dlv"]').val() || $(this).find('input[name$="-peso_ld"]').val() || 0;
+            // Sin comas de miles: el modal interpreta la coma como punto decimal.
+            let pesoValue = ($(this).find('input[name$="-peso_dlv"]').val() || $(this).find('input[name$="-peso_ld"]').val() || '0').replace(/,/g, '');
 
             if (matId) {
                 count++;

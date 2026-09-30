@@ -653,24 +653,37 @@
             }
 
             // Configuración: cuántos items mostrar a la vez
-            const itemsToShow = 6; 
+            // (máximo 6; se reduce si la barra no cabe en la pantalla)
+            const maxItemsToShow = 6;
+            let itemsToShow = maxItemsToShow;
+            const navContainer = document.querySelector('.navbar > .container-fluid');
+            const navDesborda = () => navContainer && navContainer.scrollWidth > navContainer.clientWidth + 1;
 
             function updateNavbarCarousel() {
                 const screenWidth = window.innerWidth;
-                
+
                 // --- MODO MÓVIL (< 992px) ---
                 if (screenWidth < 992) {
                     btnLeft.style.display = 'none';
                     btnRight.style.display = 'none';
                     dynamicItems.forEach(item => {
-                        item.style.display = ''; 
+                        item.style.display = '';
                         item.classList.remove('animate-enter');
                     });
                     return;
                 }
 
                 // --- MODO ESCRITORIO (>= 992px) ---
-                
+                // Mostrar tantos items como quepan sin desbordar la página horizontalmente
+                itemsToShow = maxItemsToShow;
+                renderCarousel();
+                while (itemsToShow > 1 && navDesborda()) {
+                    itemsToShow--;
+                    renderCarousel();
+                }
+            }
+
+            function renderCarousel() {
                 // Si caben todos, ocultar controles y mostrar todo
                 if (totalItems <= itemsToShow) {
                     btnLeft.style.display = 'none';
