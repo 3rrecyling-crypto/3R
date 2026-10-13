@@ -31,7 +31,7 @@ from django.db.models.functions import TruncMonth, Coalesce, Abs
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponse, JsonResponse
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.contrib import messages
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -2406,23 +2406,78 @@ def get_catalogos_por_empresa(request, empresa_id):
         return JsonResponse({'error': 'Ocurrió un error en el servidor'}, status=500)
 
 
-class CatalogoListView(ListView):
+# Clave SAT genérica ("No existe en el catálogo"); la tienen casi todos los materiales.
+CLAVE_SAT_GENERICA = '01010101'
+
+# Filtro común: si el registro ya se usó en alguna remisión (requiere uso_lookup).
+FILTRO_USO = ('uso', 'Uso en remisiones', [
+    ('con', 'Con remisiones', Q(usos__gt=0)),
+    ('sin', 'Sin uso', Q(usos=0)),
+])
+
+# Órdenes disponibles en los catálogos: clave -> (etiqueta, order_by).
+ORDENES_CATALOGO = {
+    'nombre': ('Nombre (A-Z)', ['nombre']),
+    'usos': ('Más usados', ['-usos', 'nombre']),
+    'recientes': ('Más recientes', ['-creado_en']),
+}
+
+
+class CatalogoListView(LoginRequiredMixin, ListView):
     """
-    Clase base Premium. Incluye búsqueda avanzada, filtro dinámico por 'Empresa'
-    y paginación.
+    Clase base Premium. Incluye búsqueda avanzada, filtro dinámico por 'Empresa',
+    filtros propios de cada catálogo y paginación.
     """
     template_name = 'ternium/catalogo_lista.html'
     paginate_by = 15
+    # Filtros propios de cada catálogo: (parámetro GET, etiqueta, [(valor, etiqueta, Q), ...]).
+    filtros = []
+    # Relación para contar en cuántas remisiones se usó cada registro (None = no se cuenta).
+    uso_lookup = None
+
+    def _condicion(self, param):
+        """Q del filtro `param` según el valor elegido en la URL (None si no aplica)."""
+        for p, _, opciones in self.filtros:
+            if p == param:
+                return {valor: q for valor, _, q in opciones}.get(self.request.GET.get(param))
+        return None
+
+    def _aplicar_filtros(self, queryset, excepto=None):
+        for param, _, _ in self.filtros:
+            condicion = self._condicion(param) if param != excepto else None
+            if condicion is not None:
+                queryset = queryset.filter(condicion)
+        return queryset
+
+    def _ordenes(self):
+        campos = {f.name for f in self.model._meta.get_fields()}
+        requisitos = {'nombre': 'nombre' in campos, 'usos': bool(self.uso_lookup), 'recientes': 'creado_en' in campos}
+        return {clave: valor for clave, valor in ORDENES_CATALOGO.items() if requisitos[clave]}
+
+    def _url_con(self, **cambios):
+        """La URL actual con algunos parámetros cambiados (vacío = quitarlo); vuelve a la página 1."""
+        params = self.request.GET.copy()
+        params.pop('page', None)
+        for clave, valor in cambios.items():
+            if valor:
+                params[clave] = valor
+            else:
+                params.pop(clave, None)
+        return '?' + params.urlencode()
 
     def get_queryset(self):
-        # Esta versión ya está corregida y no debería dar errores.
         queryset = super().get_queryset()
+        if hasattr(self.model, 'empresas'):
+            queryset = queryset.prefetch_related('empresas')
         query = self.request.GET.get('q')
-        
+
         empresa_id = self.request.GET.get('empresa')
 
         if empresa_id and hasattr(self.model, 'empresas'):
-            queryset = queryset.filter(empresas__id=empresa_id)
+            if empresa_id == 'ninguna':
+                queryset = queryset.filter(empresas__isnull=True)
+            elif empresa_id.isdigit():
+                queryset = queryset.filter(empresas__id=empresa_id)
 
         if query:
             if hasattr(self.model, 'search_fields'):
@@ -2436,32 +2491,117 @@ class CatalogoListView(ListView):
             elif hasattr(self.model, 'nombre'):
                  queryset = queryset.filter(nombre__icontains=query)
 
+        if self.uso_lookup:
+            queryset = queryset.annotate(usos=Count(self.uso_lookup, distinct=True))
+
+        # Base (ya con búsqueda y empresa) para los contadores de cada filtro.
+        self.queryset_base = queryset
+        queryset = self._aplicar_filtros(queryset)
+
+        orden = self._ordenes().get(self.request.GET.get('orden'))
+        if orden:
+            queryset = queryset.order_by(*orden[1])
+        elif self.uso_lookup:
+            # Con un Count de por medio Django ignora Meta.ordering: hay que darlo
+            # explícito o la paginación sale en orden indefinido.
+            queryset = queryset.order_by(*self.model._meta.ordering)
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         model_name = self.model._meta.model_name
-        
+
         context['verbose_name_plural'] = self.model._meta.verbose_name_plural
         context['verbose_name'] = self.model._meta.verbose_name
         context['model_name'] = model_name
         context['search_query'] = self.request.GET.get('q', '')
-        
+
         # Check if the model has 'empresas' m2m field
         context['has_empresa_filter'] = hasattr(self.model, 'empresas') and model_name != 'empresa'
         if context['has_empresa_filter']:
             context['empresas'] = Empresa.objects.all().order_by('nombre')
-            try:
-                context['selected_empresa'] = int(self.request.GET.get('empresa', ''))
-            except (ValueError, TypeError):
-                context['selected_empresa'] = ''
+            context['selected_empresa'] = self.request.GET.get('empresa', '')
 
+        # Filtros propios del catálogo, como botones con el total de cada opción.
+        # El total de un grupo respeta los demás filtros activos, no el propio.
+        filtros_ctx = []
+        for param, etiqueta, opciones in self.filtros:
+            base = self._aplicar_filtros(self.queryset_base, excepto=param)
+            actual = self.request.GET.get(param, '')
+            if actual not in {valor for valor, _, _ in opciones}:
+                actual = ''
+            filtros_ctx.append({
+                'param': param,
+                'etiqueta': etiqueta,
+                'valor': actual,
+                'opciones': [{'etiqueta': 'Todos', 'total': base.count(), 'activo': actual == '',
+                              'url': self._url_con(**{param: ''})}] + [
+                    {'etiqueta': et, 'total': base.filter(q).count(), 'activo': actual == valor,
+                     'url': self._url_con(**{param: valor})}
+                    for valor, et, q in opciones
+                ],
+            })
+        context['filtros_catalogo'] = filtros_ctx
+
+        ordenes = self._ordenes()
+        orden_actual = self.request.GET.get('orden', '')
+        context['ordenes'] = [(clave, et) for clave, (et, _) in ordenes.items()]
+        context['orden_actual'] = orden_actual if orden_actual in ordenes else 'nombre'
+        context['tiene_usos'] = bool(self.uso_lookup)
+
+        # Parámetros actuales sin la página: para paginar y exportar sin perder filtros.
+        params = self.request.GET.copy()
+        params.pop('page', None)
+        context['querystring'] = params.urlencode()
+        context['hay_filtros'] = any(
+            self.request.GET.get(p) for p in ['q', 'empresa'] + [f[0] for f in self.filtros]
+        )
         return context
     
 # --- VISTAS DE CATÁLOGOS ---
-class EmpresaListView(CatalogoListView): 
+class EmpresaListView(CatalogoListView):
     model = Empresa
-    template_name = 'ternium/empresa_list.html' # Template nuevo
+    uso_lookup = 'remisiones'
+    filtros = [
+        ('prefijo', 'Prefijo de folio', [
+            ('con', 'Con prefijo', Q(prefijo__gt='')),
+            ('sin', 'Sin prefijo', Q(prefijo__isnull=True) | Q(prefijo='')),
+        ]),
+        FILTRO_USO,
+    ]
+
+    def get_queryset(self):
+        return super().get_queryset().annotate(ultima_remision=Max('remisiones__fecha'))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Cuántos registros de cada catálogo tiene cada empresa, con liga a ese
+        # catálogo ya filtrado por la empresa. Una consulta agrupada por catálogo.
+        empresas = list(context['object_list'])
+        ids = [e.pk for e in empresas]
+        catalogos = [
+            (('operador', 'operadores'), Operador, 'lista_operadores'),
+            (('material', 'materiales'), Material, 'lista_materiales'),
+            (('origen/destino', 'orígenes/destinos'), Lugar, 'lista_lugares'),
+            (('línea', 'líneas'), LineaTransporte, 'lista_lineas_transporte'),
+            (('contenedor', 'contenedores'), Contenedor, 'lista_contenedores'),
+        ]
+        conteos = {}
+        for _, modelo, url_name in catalogos:
+            filas = (modelo.objects.filter(empresas__in=ids)
+                     .values('empresas').annotate(n=Count('id', distinct=True)))
+            for fila in filas:
+                conteos.setdefault(fila['empresas'], {})[url_name] = fila['n']
+        for empresa in empresas:
+            por_catalogo = conteos.get(empresa.pk, {})
+            empresa.catalogo = [
+                {'etiqueta': singular if por_catalogo[url_name] == 1 else plural,
+                 'total': por_catalogo[url_name],
+                 'url': f"{reverse(url_name)}?empresa={empresa.pk}"}
+                for (singular, plural), _, url_name in catalogos if url_name in por_catalogo
+            ]
+        context['object_list'] = empresas
+        return context
 
 class EmpresaCreateView(CreateView): 
     model = Empresa
@@ -2489,17 +2629,43 @@ class EmpresaUpdateView(UpdateView):
         context['titulo'] = f'Editar Empresa: {self.object.nombre}'
         return context
 
-class LineaTransporteListView(CatalogoListView): model = LineaTransporte
+class LineaTransporteListView(CatalogoListView):
+    model = LineaTransporte
+    uso_lookup = 'remision'
+    filtros = [FILTRO_USO]
 class LineaTransporteCreateView(CreateView): model = LineaTransporte; form_class = LineaTransporteForm; success_url = reverse_lazy('lista_lineas_transporte')
 class LineaTransporteDetailView(DetailView): model = LineaTransporte
 class LineaTransporteUpdateView(UpdateView): model = LineaTransporte; form_class = LineaTransporteForm; success_url = reverse_lazy('lista_lineas_transporte')
 
-class OperadorListView(CatalogoListView): model = Operador
+class OperadorListView(CatalogoListView):
+    model = Operador
+    uso_lookup = 'remision'
+    filtros = [
+        ('estado', 'Estado', [
+            ('activos', 'Activos', Q(activo=True)),
+            ('inactivos', 'Inactivos', Q(activo=False)),
+        ]),
+        ('folio', 'Folio / Licencia', [
+            ('con', 'Con folio', Q(folio__gt='')),
+            ('sin', 'Sin folio', Q(folio__isnull=True) | Q(folio='')),
+        ]),
+        FILTRO_USO,
+    ]
 class OperadorCreateView(CreateView): model = Operador; form_class = OperadorForm; success_url = reverse_lazy('lista_operadores')
 class OperadorDetailView(DetailView): model = Operador
 class OperadorUpdateView(UpdateView): model = Operador; form_class = OperadorForm; success_url = reverse_lazy('lista_operadores')
 
-class MaterialListView(CatalogoListView): model = Material
+class MaterialListView(CatalogoListView):
+    model = Material
+    uso_lookup = 'detalleremision__remision'
+    filtros = [
+        ('sat', 'Clave SAT', [
+            ('especifica', 'Clave específica', Q(clave_sat__gt='') & ~Q(clave_sat=CLAVE_SAT_GENERICA)),
+            ('generica', f'Genérica ({CLAVE_SAT_GENERICA})', Q(clave_sat=CLAVE_SAT_GENERICA)),
+            ('sin', 'Sin clave', Q(clave_sat__isnull=True) | Q(clave_sat='')),
+        ]),
+        FILTRO_USO,
+    ]
 class MaterialCreateView(CreateView): model = Material; form_class = MaterialForm; success_url = reverse_lazy('lista_materiales')
 class MaterialDetailView(DetailView): model = Material
 class MaterialUpdateView(UpdateView): model = Material; form_class = MaterialForm; success_url = reverse_lazy('lista_materiales')
@@ -2513,7 +2679,10 @@ class UnidadCreateView(CreateView): model = Unidad; form_class = UnidadForm; suc
 class UnidadDetailView(DetailView): model = Unidad
 class UnidadUpdateView(UpdateView): model = Unidad; form_class = UnidadForm; success_url = reverse_lazy('lista_unidades')
 
-class ContenedorListView(CatalogoListView): model = Contenedor
+class ContenedorListView(CatalogoListView):
+    model = Contenedor
+    uso_lookup = 'remision'
+    filtros = [FILTRO_USO]
 class ContenedorCreateView(CreateView): model = Contenedor; form_class = ContenedorForm; success_url = reverse_lazy('lista_contenedores')
 class ContenedorDetailView(DetailView): model = Contenedor
 class ContenedorUpdateView(UpdateView): model = Contenedor; form_class = ContenedorForm; success_url = reverse_lazy('lista_contenedores')
@@ -4494,8 +4663,9 @@ def export_catalogo_excel(request, model_name):
     config = {
         'empresa': {
             'model': Empresa,
-            'headers': ['ID', 'Nombre', 'Prefijo', 'Contacto', 'Teléfono', 'Email'],
-            'fields': ['id', 'nombre', 'prefijo', 'contacto_principal', 'telefono', 'email']
+            # Contacto, teléfono y email ya no existen en el modelo: salían vacíos.
+            'headers': ['ID', 'Nombre', 'Prefijo', 'Remisiones', 'Última remisión'],
+            'fields': ['id', 'nombre', 'prefijo', 'usos', 'ultima_remision']
         },
         'lugar': {
             'model': Lugar,
@@ -4505,21 +4675,19 @@ def export_catalogo_excel(request, model_name):
         },
         'lineatransporte': {
             'model': LineaTransporte,
-            # Ya incluida, pero aseguramos el orden
-            'headers': ['ID', 'Nombre', 'Empresas Asociadas'],
-            'fields': ['id', 'nombre', 'empresas_str']
+            'headers': ['ID', 'Nombre', 'Remisiones', 'Empresas Asociadas'],
+            'fields': ['id', 'nombre', 'usos', 'empresas_str']
         },
         'operador': {
             'model': Operador,
-            # MODIFICADO para incluir Empresas
-            'headers': ['ID', 'Nombre', 'Licencia', 'Teléfono', 'Empresas Asociadas'],
-            'fields': ['id', 'nombre', 'licencia', 'telefono', 'empresas_str']
+            # 'licencia' y 'telefono' no existen en el modelo: siempre salían vacías.
+            'headers': ['ID', 'Nombre', 'Folio / Licencia', 'Estado', 'Remisiones', 'Empresas Asociadas'],
+            'fields': ['id', 'nombre', 'folio', 'estado_str', 'usos', 'empresas_str']
         },
         'material': {
             'model': Material,
-            # MODIFICADO para incluir Empresas
-            'headers': ['ID', 'Nombre', 'Clave SAT', 'Unidad SAT', 'Empresas Asociadas'],
-            'fields': ['id', 'nombre', 'clave_sat', 'clave_unidad_sat', 'empresas_str']
+            'headers': ['ID', 'Nombre', 'Clave SAT', 'Unidad SAT', 'Remisiones', 'Empresas Asociadas'],
+            'fields': ['id', 'nombre', 'clave_sat', 'clave_unidad_sat', 'usos', 'empresas_str']
         },
         'unidad': {
             'model': Unidad,
@@ -4529,9 +4697,8 @@ def export_catalogo_excel(request, model_name):
         },
         'contenedor': {
             'model': Contenedor,
-            # MODIFICADO para incluir Empresas
-            'headers': ['ID/Nombre', 'Placas', 'Empresas Asociadas'],
-            'fields': ['nombre', 'placas', 'empresas_str']
+            'headers': ['ID/Nombre', 'Placas', 'Remisiones', 'Empresas Asociadas'],
+            'fields': ['nombre', 'placas', 'usos', 'empresas_str']
         }
     }
 
@@ -4542,18 +4709,32 @@ def export_catalogo_excel(request, model_name):
 
     # 2. Obtener Queryset Base
     model = conf['model']
+
+    # Los catálogos con lista genérica exportan exactamente lo que se ve en
+    # pantalla: búsqueda, empresa, filtros propios (estado, uso...) y orden.
+    vista_lista = {
+        'empresa': EmpresaListView,
+        'operador': OperadorListView,
+        'material': MaterialListView,
+        'lineatransporte': LineaTransporteListView,
+        'contenedor': ContenedorListView,
+    }.get(model_name.lower())
+    if vista_lista:
+        vista = vista_lista()
+        vista.setup(request)
+        queryset = vista.get_queryset()
     # Optimizamos la consulta si el modelo tiene la relación 'empresas'
-    if hasattr(model, 'empresas'):
+    elif hasattr(model, 'empresas'):
         queryset = model.objects.all().prefetch_related('empresas')
     else:
         queryset = model.objects.all()
-    
-    # --- FILTROS COMUNES (SIN CAMBIOS) ---
-    empresa_id = request.GET.get('empresa')
+
+    # --- FILTROS COMUNES (los catálogos genéricos ya vienen filtrados) ---
+    empresa_id = None if vista_lista else request.GET.get('empresa')
     if empresa_id and hasattr(model, 'empresas'):
         queryset = queryset.filter(empresas__id=empresa_id)
     
-    query = request.GET.get('q')
+    query = None if vista_lista else request.GET.get('q')
     if query:
         if hasattr(model, 'search_fields'):
             q_objects = Q()
@@ -4594,6 +4775,8 @@ def export_catalogo_excel(request, model_name):
                     val = ""
             elif field == 'direccion_completa' and hasattr(obj, 'direccion_completa'):
                 val = obj.direccion_completa()
+            elif field == 'estado_str':
+                val = 'Activo' if obj.activo else 'Inactivo'
             else:
                 # Obtener valor, manejar campos con choices (get_FOO_display)
                 if hasattr(obj, f'get_{field}_display'):

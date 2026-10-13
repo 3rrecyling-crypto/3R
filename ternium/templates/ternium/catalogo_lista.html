@@ -7,578 +7,386 @@
 
 {% block extra_css %}
 <style>
+    /* Colores sólidos (sin degradados), con el color base del sistema. */
     :root {
-        --primary-gradient: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
-        --secondary-gradient: linear-gradient(135deg, #34a853 0%, #0d8040 100%);
-        --accent-gradient: linear-gradient(135deg, #fbbc05 0%, #f57c00 100%);
-        --dark-gradient: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
-        --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-        --hover-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+        --cat-primary: var(--base-color);
+        --cat-primary-dark: var(--base-color-dark);
+        --cat-accent: #1a73e8;
+        --cat-border: #e3e7ec;
+        --cat-muted: #6c757d;
     }
 
-    .catalog-premium-header {
-        background: var(--primary-gradient) !important;
-        color: white;
-        border-radius: 16px 16px 0 0;
-        box-shadow: 0 8px 25px rgba(26, 115, 232, 0.3);
-        padding: 2rem !important;
-    }
-
-    .premium-search-container {
-        background: var(--dark-gradient);
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-        border-left: 5px solid var(--primary-color);
-        box-shadow: var(--card-shadow);
-    }
-
-    .search-input-premium {
-        background: rgba(255, 255, 255, 0.95);
-        border: 2px solid #e3f2fd;
-        border-radius: 12px;
-        padding: 1rem 1.5rem;
-        font-size: 1.1rem;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    }
-
-    .search-input-premium:focus {
-        background: white;
-        border-color: #1a73e8;
-        box-shadow: 0 6px 20px rgba(26, 115, 232, 0.2);
-        transform: translateY(-2px);
-    }
-
-    .table-premium {
-        border-collapse: separate;
-        border-spacing: 0;
-        background: white;
+    .catalog-card {
+        border: 1px solid var(--cat-border);
         border-radius: 12px;
         overflow: hidden;
-        box-shadow: var(--card-shadow);
+        background: white;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
     }
-
-    .table-premium th {
-        background: var(--dark-gradient);
+    .catalog-header {
+        background: var(--cat-primary);
         color: white;
-        font-weight: 600;
-        padding: 1.2rem;
-        font-size: 0.95rem;
+        padding: 1.25rem 1.5rem;
+    }
+    .catalog-header .subtitle { color: rgba(255, 255, 255, 0.75); }
+
+    .catalog-filters {
+        background: #f8f9fb;
+        border-bottom: 1px solid var(--cat-border);
+        padding: 1.25rem 1.5rem;
+    }
+    .catalog-filters .form-label {
+        font-size: 0.75rem;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        border: none;
+        letter-spacing: 0.4px;
+        color: var(--cat-muted);
+        margin-bottom: 0.35rem;
     }
 
-    .table-premium td {
-        padding: 1.2rem;
-        border-bottom: 1px solid #f0f0f0;
-        vertical-align: middle;
-        font-weight: 500;
-        transition: all 0.3s ease;
+    /* Botones de filtro propios de cada catálogo */
+    .filter-group { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+    .filter-group-label {
+        font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.4px; color: var(--cat-muted); margin-right: 0.25rem; min-width: 120px;
+    }
+    .chip {
+        display: inline-flex; align-items: center; gap: 0.4rem;
+        padding: 0.3rem 0.8rem; border-radius: 50rem;
+        border: 1px solid var(--cat-border); background: white;
+        color: var(--cat-primary); font-size: 0.85rem; font-weight: 600;
+        text-decoration: none; transition: background-color 0.15s, border-color 0.15s;
+    }
+    .chip:hover { border-color: var(--cat-primary); color: var(--cat-primary); }
+    .chip .count {
+        background: #eef1f4; color: var(--cat-primary);
+        border-radius: 50rem; padding: 0 0.45rem; font-size: 0.75rem;
+    }
+    .chip.active { background: var(--cat-primary); border-color: var(--cat-primary); color: white; }
+    .chip.active .count { background: rgba(255, 255, 255, 0.2); color: white; }
+
+    .btn-cat-primary { background: var(--cat-primary); border: none; color: white; font-weight: 600; }
+    .btn-cat-primary:hover { background: var(--cat-primary-dark); color: white; }
+
+    .table-catalog { margin-bottom: 0; }
+    .table-catalog thead th {
+        background: #eef1f4;
+        color: var(--cat-primary);
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        border-bottom: 1px solid var(--cat-border);
+        padding: 0.8rem 0.75rem;
+        white-space: nowrap;
+    }
+    .table-catalog td { padding: 0.75rem; vertical-align: middle; border-color: #f0f2f5; }
+    .table-catalog tbody tr:hover { background: #f7f9fc; }
+    .table-catalog tr.row-inactive td { color: var(--cat-muted); }
+    .table-catalog tr.row-inactive .item-name { text-decoration: line-through; text-decoration-color: #adb5bd; }
+
+    .badge-empresa {
+        background: #e8f0fe; color: var(--cat-accent);
+        font-weight: 600; margin: 0 0.25rem 0.25rem 0;
+    }
+    .uso-badge { font-variant-numeric: tabular-nums; }
+
+    .catalog-footer {
+        display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+        gap: 0.75rem; padding: 0.9rem 1.5rem; background: #f8f9fb; border-top: 1px solid var(--cat-border);
     }
 
-    .table-premium tr {
-        transition: all 0.3s ease;
-    }
+    .empty-state { padding: 3.5rem 1.5rem; text-align: center; color: var(--cat-muted); }
+    .empty-state i { font-size: 3rem; color: #c3cad3; margin-bottom: 1rem; }
 
-    .table-premium tr:hover {
-        background: linear-gradient(90deg, rgba(26, 115, 232, 0.05) 0%, transparent 100%);
-        transform: translateX(4px);
-    }
-
-    .table-premium tr:last-child td {
-        border-bottom: none;
-    }
-
-    .btn-premium {
-        padding: 0.6rem 1.2rem;
-        border-radius: 10px;
-        font-weight: 600;
-        font-size: 0.9rem;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        border: none;
-    }
-
-    .btn-premium-primary {
-        background: var(--primary-gradient);
-        color: white;
-    }
-
-    .btn-premium-primary:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 25px rgba(26, 115, 232, 0.3);
-        color: white;
-    }
-
-    .btn-premium-outline {
-        background: transparent;
-        border: 2px solid #1a73e8;
-        color: #1a73e8;
-    }
-
-    .btn-premium-outline:hover {
-        background: #1a73e8;
-        color: white;
-        transform: translateY(-2px);
-    }
-
-    .premium-card {
-        border: none;
-        border-radius: 20px;
-        box-shadow: var(--card-shadow);
-        overflow: hidden;
-        transition: all 0.4s ease;
-        background: white;
-    }
-
-    .premium-card:hover {
-        transform: translateY(-8px);
-        box-shadow: var(--hover-shadow);
-    }
-
-    .empty-state-premium {
-        padding: 4rem 2rem;
-        text-align: center;
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-        border-radius: 20px;
-        margin: 2rem 0;
-    }
-
-    .empty-state-premium i {
-        font-size: 4rem;
-        background: var(--primary-gradient);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 1.5rem;
-        animation: pulse 2s infinite;
-    }
-
-    .loading-overlay-premium {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(255, 255, 255, 0.95);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-        border-radius: 12px;
-        backdrop-filter: blur(5px);
-    }
-
-    .filter-badge {
-        background: var(--accent-gradient);
-        color: white;
-        padding: 0.4rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        margin-left: 0.5rem;
-    }
-
-    .modal-premium .modal-content {
-        border-radius: 20px;
-        border: none;
-        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
-    }
-
-    .modal-premium .modal-header {
-        background: var(--primary-gradient);
-        color: white;
-        border-radius: 20px 20px 0 0;
-        padding: 1.5rem 2rem;
-        border: none;
-    }
-
-    .modal-premium .modal-body {
-        padding: 2rem;
-        background: #fafafa;
-    }
-
-    .detail-item {
-        display: flex;
-        justify-content: space-between;
-        padding: 1rem 0;
-        border-bottom: 1px solid #eee;
-    }
-
-    .detail-item:last-child {
-        border-bottom: none;
-    }
-
-    .detail-label {
-        font-weight: 600;
-        color: #5f6368;
-    }
-
-    .detail-value {
-        font-weight: 500;
-        color: #202124;
-        text-align: right;
-    }
-
-    @media (max-width: 768px) {
-        .premium-search-container {
-            padding: 1rem;
-        }
-        
-        .search-input-premium {
-            padding: 0.8rem 1rem;
-            font-size: 1rem;
-        }
-        
-        .table-premium th,
-        .table-premium td {
-            padding: 0.8rem;
-            font-size: 0.9rem;
-        }
-        
-        .btn-group-premium {
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-        
-        .btn-premium {
-            width: 100%;
-            margin-bottom: 0.5rem;
-        }
-    }
-
-    /* Animaciones premium */
-    @keyframes fadeInUp {
-        from {
-            opacity: 0;
-            transform: translateY(30px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    @keyframes slideInRight {
-        from {
-            opacity: 0;
-            transform: translateX(30px);
-        }
-        to {
-            opacity: 1;
-            transform: translateX(0);
-        }
-    }
-
-    .animate-fade-in-up {
-        animation: fadeInUp 0.6s ease-out;
-    }
-
-    .animate-slide-in-right {
-        animation: slideInRight 0.6s ease-out;
-    }
-
-    .staggered-animation > * {
-        opacity: 0;
-        animation: fadeInUp 0.6s ease-out forwards;
-    }
-
-    .staggered-animation > *:nth-child(1) { animation-delay: 0.1s; }
-    .staggered-animation > *:nth-child(2) { animation-delay: 0.2s; }
-    .staggered-animation > *:nth-child(3) { animation-delay: 0.3s; }
-    .staggered-animation > *:nth-child(4) { animation-delay: 0.4s; }
-    .staggered-animation > *:nth-child(5) { animation-delay: 0.5s; }
+    .detail-item { display: flex; justify-content: space-between; padding: 1rem 0; border-bottom: 1px solid #eee; }
+    .detail-item:last-child { border-bottom: none; }
+    .detail-label { font-weight: 600; color: #5f6368; }
+    .detail-value { font-weight: 500; color: #202124; text-align: right; }
+    #premiumDetailModal .modal-header { background: var(--cat-primary); color: white; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4 mb-5 animate-fade-in-up">
-    <div class="premium-card">
-        <div class="card-header catalog-premium-header">
-            <div class="d-flex flex-wrap justify-content-between align-items-center">
-                <div class="animate-slide-in-right">
-                    <h4 class="mb-2 text-white">
-                        <i class="fas fa-star me-2"></i>
-                        Multi-Catálogo: {{ verbose_name_plural|capfirst }}
-                    </h4>
-                    <p class="mb-0 text-white-80">Gestión avanzada de {{ verbose_name_plural }} con búsqueda inteligente</p>
-                </div>
-                
-                <div class="d-flex gap-2">
-                    <a href="{% url 'export_catalogo_excel' model_name %}?empresa={{ request.GET.empresa }}&q={{ request.GET.q }}" 
-                       class="btn btn-success btn-lg rounded-pill px-4 animate-slide-in-right shadow-sm">
-                        <i class="fas fa-file-excel me-2"></i>Excel
-                    </a>
+<div class="container mt-4 mb-5">
+    <div class="catalog-card">
 
-                    {% with 'crear_'|add:model_name as create_url_name %}
-                        <a href="{% url create_url_name %}" class="btn btn-light btn-lg rounded-pill px-4 animate-slide-in-right shadow-sm">
-                            <i class="fas fa-plus-circle me-2"></i>Nuevo {{ verbose_name|capfirst }}
-                        </a>
-                    {% endwith %}
-                </div>
+        <div class="catalog-header d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <h4 class="mb-1 text-white">
+                    <i class="fas
+                        {% if model_name == 'empresa' %}fa-building
+                        {% elif model_name == 'material' %}fa-cube
+                        {% elif model_name == 'contenedor' %}fa-box
+                        {% elif model_name == 'operador' %}fa-id-card
+                        {% elif model_name == 'lineatransporte' %}fa-route
+                        {% else %}fa-list{% endif %} me-2"></i>
+                    Catálogo de {{ verbose_name_plural|capfirst }}
+                </h4>
+                <p class="mb-0 subtitle small">{% if model_name == 'empresa' %}Unidades de negocio, su prefijo de folio y sus catálogos.{% else %}Busca, filtra y exporta {{ verbose_name_plural|lower }}.{% endif %}</p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{% url 'export_catalogo_excel' model_name %}{% if querystring %}?{{ querystring }}{% endif %}"
+                   class="btn btn-success rounded-pill px-4" title="Exporta lo que ves con los filtros aplicados">
+                    <i class="fas fa-file-excel me-2"></i>Excel
+                </a>
+                {% with 'crear_'|add:model_name as create_url_name %}
+                    <a href="{% url create_url_name %}" class="btn btn-light rounded-pill px-4 fw-semibold">
+                        <i class="fas fa-plus-circle me-2"></i>Agregar {{ verbose_name|lower }}
+                    </a>
+                {% endwith %}
             </div>
         </div>
-        
-        <div class="card-body premium-search-container position-relative">
-            <form method="get" class="row g-3 align-items-center" id="premiumSearchForm">
-                
-                <div class="col-lg-4 col-md-12 position-relative">
-                    <div class="input-group input-group-lg">
-                        <span class="input-group-text bg-white border-end-0 ps-3">
-                            <i class="fas fa-search text-primary"></i>
-                        </span>
-                        <input type="text" class="form-control search-input-premium border-start-0" 
-                               name="q" value="{{ search_query }}" 
-                               placeholder="Buscar en {{ verbose_name_plural }}..." 
-                               aria-label="Buscar" id="premiumSearchInput">
+
+        <div class="catalog-filters">
+            <form method="get" class="row g-3 align-items-end" id="premiumSearchForm">
+                {# Conserva los filtros propios del catálogo al buscar #}
+                {% for grupo in filtros_catalogo %}{% if grupo.valor %}
+                    <input type="hidden" name="{{ grupo.param }}" value="{{ grupo.valor }}">
+                {% endif %}{% endfor %}
+
+                <div class="col-lg-4 col-md-6">
+                    <label class="form-label" for="premiumSearchInput">Buscar</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" class="form-control" name="q" value="{{ search_query }}"
+                               placeholder="{% if model_name == 'operador' %}Nombre o folio...{% elif model_name == 'contenedor' %}Nombre o placas...{% elif model_name == 'empresa' %}Nombre o prefijo...{% else %}Nombre...{% endif %}"
+                               id="premiumSearchInput" autocomplete="off">
                     </div>
                 </div>
                 {% if has_empresa_filter %}
-                <div class="col-lg-4 col-md-12">
-                    <div class="input-group input-group-lg">
-                        <span class="input-group-text bg-white border-end-0 ps-3">
-                            <i class="fas fa-building text-primary"></i>
-                        </span>
-                        <select name="empresa" class="form-select search-input-premium border-start-0" onchange="this.form.submit()">
-                            <option value="">-- Filtrar por Empresa --</option>
-                            {% for empresa in empresas %}
-                                <option value="{{ empresa.id }}" {% if selected_empresa == empresa.id %}selected{% endif %}>
-                                    {{ empresa.nombre }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </div>
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label" for="filtroEmpresa">Unidad de negocio</label>
+                    <select name="empresa" id="filtroEmpresa" class="form-select" onchange="this.form.submit()">
+                        <option value="">Todas</option>
+                        <option value="ninguna" {% if selected_empresa == 'ninguna' %}selected{% endif %}>— Sin empresa asignada —</option>
+                        {% for empresa in empresas %}
+                            <option value="{{ empresa.id }}" {% if selected_empresa == empresa.id|stringformat:"s" %}selected{% endif %}>{{ empresa.nombre }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 {% endif %}
                 <div class="col-lg-2 col-md-6">
-                    <button type="submit" class="btn btn-premium btn-premium-primary w-100 h-100" id="premiumSearchButton">
+                    <label class="form-label" for="filtroOrden">Ordenar por</label>
+                    <select name="orden" id="filtroOrden" class="form-select" onchange="this.form.submit()">
+                        {% for clave, etiqueta in ordenes %}
+                            <option value="{{ clave }}" {% if orden_actual == clave %}selected{% endif %}>{{ etiqueta }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-3 col-md-6 d-flex gap-2">
+                    <button type="submit" class="btn btn-cat-primary flex-fill">
                         <i class="fas fa-search me-1"></i> Buscar
                     </button>
-                </div>
-                <div class="col-lg-2 col-md-6">
-                    <a href="{% url request.resolver_match.url_name %}" class="btn btn-premium btn-premium-outline w-100 h-100">
-                        <i class="fas fa-sync-alt me-1"></i> Limpiar
+                    <a href="{% url request.resolver_match.url_name %}" class="btn btn-outline-secondary flex-fill {% if not hay_filtros %}disabled{% endif %}">
+                        <i class="fas fa-eraser me-1"></i> Limpiar
                     </a>
                 </div>
             </form>
-            
-            {% if search_query %}
-            <div class="mt-3">
-                <small class="text-white-60">
-                    <i class="fas fa-info-circle me-1"></i>
-                    Buscando: "<strong>{{ search_query }}</strong>" 
-                    <span class="filter-badge">Todos los campos</span>
-                </small>
+
+            {% if filtros_catalogo %}
+            <div class="d-flex flex-column gap-2 mt-3 pt-3 border-top">
+                {% for grupo in filtros_catalogo %}
+                <div class="filter-group">
+                    <span class="filter-group-label">{{ grupo.etiqueta }}</span>
+                    {% for op in grupo.opciones %}
+                    <a href="{{ op.url }}" class="chip {% if op.activo %}active{% endif %}">
+                        {{ op.etiqueta }} <span class="count">{{ op.total }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% endfor %}
             </div>
             {% endif %}
         </div>
 
-        <div class="card-body p-0 position-relative">
-            <div class="loading-overlay-premium" id="premiumLoadingOverlay">
-                <div class="text-center">
-                    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
-                        <span class="visually-hidden">Cargando...</span>
-                    </div>
-                    <p class="mt-3 text-muted">Buscando en todos los campos...</p>
-                </div>
-            </div>
-            
-            {% if object_list %}
-            <div class="table-responsive">
-                <table class="table table-premium mb-0">
-                    <thead>
-                        <tr class="staggered-animation">
-                            <th scope="col" class="ps-4">Nombre</th>
-                            {% if model_name in "lineatransporte,material,unidad,contenedor,lugar" %}
-                            <th scope="col">Empresas</th> {% endif %}
+        {% if object_list %}
+        <div class="table-responsive">
+            <table class="table table-catalog">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Nombre</th>
+                        {% if model_name == "empresa" %}<th>Prefijo</th><th>Catálogos</th>{% endif %}
+                        {% if model_name == "operador" %}<th>Folio / Licencia</th>{% endif %}
+                        {% if model_name == "material" %}<th>Clave SAT</th><th>Unidad SAT</th>{% endif %}
+                        {% if model_name == "contenedor" %}<th>Placas</th>{% endif %}
+                        {% if has_empresa_filter %}<th>Unidades de negocio</th>{% endif %}
+                        {% if model_name == "operador" %}<th>Estado</th>{% endif %}
+                        {% if tiene_usos %}<th class="text-center">Remisiones</th>{% endif %}
+                        {% if model_name == "empresa" %}<th>Última remisión</th>{% endif %}
+                        <th class="text-center pe-4">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for object in object_list %}
+                    <tr class="{% if model_name == 'operador' and not object.activo %}row-inactive{% endif %}">
+                        <td class="ps-4 fw-semibold">
                             {% if model_name == "empresa" %}
-                            <th scope="col">RFC</th>
-                            <th scope="col">Contacto</th>
+                                <a href="{% url 'detalle_empresa' pk=object.pk %}" class="item-name text-decoration-none">{{ object.nombre }}</a>
+                            {% else %}
+                                <span class="item-name">{{ object.nombre }}</span>
                             {% endif %}
-                            {% if model_name == "operador" %}
-                            <th scope="col">Folio / Licencia</th>
-                            <th scope="col">Estado</th>
-                            {% endif %}
-                            {% if model_name == "unidad" or model_name == "contenedor" %}
-                            <th scope="col">Placas</th>
-                            {% endif %}
-                            <th scope="col" class="text-center pe-4">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for object in object_list %}
-                        <tr class="animate-fade-in-up" style="animation-delay: {{ forloop.counter0|add:1|divisibleby:2 }}0ms">
-                            <td class="ps-4 fw-semibold">
-                                <div class="d-flex align-items-center">
-                                    <i class="fas 
-                                        {% if model_name == 'empresa' %}fa-building
-                                        {% elif model_name == 'material' %}fa-cube
-                                        {% elif model_name == 'unidad' %}fa-truck
-                                        {% elif model_name == 'contenedor' %}fa-box
-                                        {% elif model_name == 'operador' %}fa-id-card
-                                        {% elif model_name == 'lugar' %}fa-map-marker-alt
-                                        {% elif model_name == 'lineatransporte' %}fa-route
-                                        {% else %}fa-list{% endif %} 
-                                        text-primary me-2"></i>
-                                    {{ object.nombre }}
-                                </div>
-                            </td>
-                            
-                            {% if model_name in "lineatransporte,material,unidad,contenedor,lugar" %}
-                            <td>
-                                {% if object.empresas.all %}
-                                    {% for empresa in object.empresas.all %}
-                                    <span class="badge bg-primary bg-opacity-10 text-primary me-1">
-                                        {{ empresa.nombre }}
-                                    </span>
-                                    {% endfor %}
-                                {% else %}
-                                <span class="text-muted">N/A</span>
-                                {% endif %}
-                            </td>
-                            {% endif %}
-                            {% if model_name == "empresa" %}
-                            <td><code>{{ object.rfc|default:"N/A" }}</code></td>
-                            <td>{{ object.contacto_principal|default:"N/A" }}</td>
-                            {% endif %}
-                            
-                            {% if model_name == "operador" %}
-                            {# 'licencia' y 'telefono' no existen en el modelo: siempre salía N/A #}
-                            <td><code>{{ object.folio|default:"N/A" }}</code></td>
-                            <td>
-                                {% if object.activo %}
-                                <span class="badge bg-success-subtle text-success border border-success-subtle">Activo</span>
-                                {% else %}
-                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle" title="No aparece al capturar remisiones, pero se conserva en el historial">Inactivo</span>
-                                {% endif %}
-                            </td>
-                            {% endif %}
-                            
-                            {% if model_name == "unidad" or model_name == "contenedor" %}
-                            <td>
-                                {% if object.placas %}
-                                <span class="badge bg-dark">{{ object.placas }}</span>
-                                {% else %}N/A{% endif %}
-                            </td>
-                            {% endif %}
-                            
-                            <td class="text-center pe-4">
-                                <div class="btn-group btn-group-premium" role="group">
-                                    {% with 'editar_'|add:model_name as edit_url_name %}
-                                        <a href="{% url edit_url_name object.pk %}" 
-                                           class="btn btn-premium btn-premium-outline"
-                                           data-bs-toggle="tooltip" title="Editar {{ verbose_name }}">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                    {% endwith %}
-                                    
-                                    <button type="button" 
-                                            class="btn btn-premium btn-premium-outline view-details-btn" 
-                                            data-object-id="{{ object.pk }}"
-                                            data-bs-toggle="tooltip" title="Ver detalles">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            
-            <div class="pagination-container bg-light p-3">
-                <div class="results-count fw-semibold">
-                    <i class="fas fa-chart-bar me-2 text-primary"></i>
-                    Mostrando {{ page_obj.start_index }} - {{ page_obj.end_index }} de {{ page_obj.paginator.count }} resultados
-                </div>
-                
-                {% if is_paginated %}
-                <nav aria-label="Navegación de páginas">
-                    <ul class="pagination justify-content-center mb-0">
-                        {% if page_obj.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">
-                                    <i class="fas fa-chevron-left"></i>
-                                </a>
-                            </li>
-                        {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link"><i class="fas fa-chevron-left"></i></span>
-                            </li>
+                        </td>
+
+                        {% if model_name == "empresa" %}
+                        <td>{% if object.prefijo %}<span class="badge bg-dark fs-6">{{ object.prefijo }}</span>{% else %}<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Sin prefijo</span>{% endif %}</td>
+                        <td>
+                            {% for cat in object.catalogo %}
+                                <a href="{{ cat.url }}" class="badge badge-empresa text-decoration-none" title="Ver {{ cat.etiqueta }} de {{ object.nombre }}">{{ cat.total }} {{ cat.etiqueta }}</a>
+                            {% empty %}
+                                <span class="text-muted small">Sin catálogos asignados</span>
+                            {% endfor %}
+                        </td>
                         {% endif %}
-                        
-                        {% for num in page_obj.paginator.page_range %}
-                            {% if page_obj.number == num %}
-                                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
-                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                                <li class="page-item">
-                                    <a class="page-link" href="?page={{ num }}{% if search_query %}&q={{ search_query }}{% endif %}">{{ num }}</a>
-                                </li>
-                            {% endif %}
-                        {% endfor %}
-                        
-                        {% if page_obj.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">
-                                    <i class="fas fa-chevron-right"></i>
-                                </a>
-                            </li>
-                        {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link"><i class="fas fa-chevron-right"></i></span>
-                            </li>
+
+                        {% if model_name == "operador" %}
+                        <td>{% if object.folio %}<code>{{ object.folio }}</code>{% else %}<span class="text-muted small">Sin folio</span>{% endif %}</td>
                         {% endif %}
-                    </ul>
-                </nav>
-                {% endif %}
+
+                        {% if model_name == "material" %}
+                        <td>
+                            {% if not object.clave_sat %}
+                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Sin clave</span>
+                            {% elif object.clave_sat == '01010101' %}
+                                <code>{{ object.clave_sat }}</code> <span class="text-muted small">genérica</span>
+                            {% else %}
+                                <code>{{ object.clave_sat }}</code>
+                            {% endif %}
+                        </td>
+                        <td><span class="badge bg-light text-dark border">{{ object.clave_unidad_sat|default:"—" }}</span></td>
+                        {% endif %}
+
+                        {% if model_name == "contenedor" %}
+                        <td>{% if object.placas %}<span class="badge bg-dark">{{ object.placas }}</span>{% else %}<span class="text-muted small">Sin placas</span>{% endif %}</td>
+                        {% endif %}
+
+                        {% if has_empresa_filter %}
+                        <td>
+                            {% for empresa in object.empresas.all %}
+                                <span class="badge badge-empresa">{{ empresa.nombre }}</span>
+                            {% empty %}
+                                <span class="text-muted small">Sin empresa</span>
+                            {% endfor %}
+                        </td>
+                        {% endif %}
+
+                        {% if model_name == "operador" %}
+                        <td>
+                            {% if object.activo %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle">Activo</span>
+                            {% else %}
+                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle" title="No aparece al capturar remisiones, pero se conserva en el historial">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+
+                        {% if tiene_usos %}
+                        <td class="text-center">
+                            {% if object.usos %}
+                                <span class="badge bg-primary-subtle text-primary-emphasis uso-badge">{{ object.usos }}</span>
+                            {% else %}
+                                <span class="text-muted small">Sin uso</span>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+
+                        {% if model_name == "empresa" %}
+                        <td class="text-nowrap">{% if object.ultima_remision %}{{ object.ultima_remision|date:"d/m/Y" }}{% else %}<span class="text-muted small">—</span>{% endif %}</td>
+                        {% endif %}
+
+                        <td class="text-center pe-4">
+                            <div class="btn-group btn-group-sm" role="group">
+                                {% with 'editar_'|add:model_name as edit_url_name %}
+                                    <a href="{% url edit_url_name object.pk %}" class="btn btn-outline-primary"
+                                       data-bs-toggle="tooltip" title="Editar {{ verbose_name }}">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                {% endwith %}
+                                {% if model_name == "empresa" %}
+                                {# El modal genérico muestra campos que la empresa ya no tiene: se usa su página de detalle #}
+                                <a href="{% url 'detalle_empresa' pk=object.pk %}" class="btn btn-outline-primary"
+                                   data-bs-toggle="tooltip" title="Ver detalles">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% else %}
+                                <button type="button" class="btn btn-outline-primary view-details-btn"
+                                        data-object-id="{{ object.pk }}" data-bs-toggle="tooltip" title="Ver detalles">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="catalog-footer">
+            <div class="fw-semibold small text-muted">
+                Mostrando {{ page_obj.start_index }}–{{ page_obj.end_index }} de {{ page_obj.paginator.count }} {{ verbose_name_plural|lower }}
             </div>
-            
-            {% else %}
-                <div class="empty-state-premium">
-                    <i class="fas fa-search"></i>
-                    <h4>No se encontraron resultados</h4>
-                    <p class="mb-4">No hay {{ verbose_name_plural }} que coincidan con tu búsqueda o el catálogo está vacío.</p>
-                    <div class="d-flex justify-content-center gap-3 flex-wrap">
-                        {% with 'crear_'|add:model_name as create_url_name %}
-                            <a href="{% url create_url_name %}" class="btn btn-premium btn-premium-primary">
-                                <i class="fas fa-plus me-2"></i> Agregar {{ verbose_name }}
-                            </a>
-                        {% endwith %}
-                        <a href="{% url request.resolver_match.url_name %}" class="btn btn-premium btn-premium-outline">
-                            <i class="fas fa-sync-alt me-2"></i> Limpiar búsqueda
-                        </a>
-                    </div>
-                </div>
+            {% if is_paginated %}
+            <nav aria-label="Navegación de páginas">
+                <ul class="pagination pagination-sm mb-0">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if querystring %}&{{ querystring }}{% endif %}"><i class="fas fa-chevron-left"></i></a></li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-left"></i></span></li>
+                    {% endif %}
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item"><a class="page-link" href="?page={{ num }}{% if querystring %}&{{ querystring }}{% endif %}">{{ num }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if page_obj.has_next %}
+                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if querystring %}&{{ querystring }}{% endif %}"><i class="fas fa-chevron-right"></i></a></li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-right"></i></span></li>
+                    {% endif %}
+                </ul>
+            </nav>
             {% endif %}
         </div>
+
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-search d-block"></i>
+            <h5 class="text-dark">No se encontraron {{ verbose_name_plural|lower }}</h5>
+            <p class="mb-4">{% if hay_filtros %}Ningún registro coincide con los filtros aplicados.{% else %}El catálogo está vacío.{% endif %}</p>
+            <div class="d-flex justify-content-center gap-2 flex-wrap">
+                {% if hay_filtros %}
+                <a href="{% url request.resolver_match.url_name %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-eraser me-2"></i>Limpiar filtros
+                </a>
+                {% endif %}
+                {% with 'crear_'|add:model_name as create_url_name %}
+                    <a href="{% url create_url_name %}" class="btn btn-cat-primary">
+                        <i class="fas fa-plus me-2"></i>Agregar {{ verbose_name }}
+                    </a>
+                {% endwith %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 
-<div class="modal fade modal-premium" id="premiumDetailModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="premiumDetailModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
+        <div class="modal-content border-0">
             <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-info-circle me-2"></i>
-                    Detalles Completos
-                </h5>
+                <h5 class="modal-title"><i class="fas fa-info-circle me-2"></i>Detalles</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body" id="premiumModalBody">
-                <div class="text-center py-5">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Cargando detalles...</span>
-                    </div>
-                    <p class="mt-3 text-muted">Cargando información completa...</p>
-                </div>
-            </div>
+            <div class="modal-body" id="premiumModalBody"></div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
                     <i class="fas fa-times me-2"></i>Cerrar
                 </button>
-                <a href="#" class="btn btn-premium btn-premium-primary" id="premiumModalEditBtn">
-                    <i class="fas fa-edit me-2"></i> Editar
+                <a href="#" class="btn btn-cat-primary" id="premiumModalEditBtn">
+                    <i class="fas fa-edit me-2"></i>Editar
                 </a>
             </div>
         </div>
@@ -589,53 +397,32 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // --- Elementos DOM ---
-    const searchForm = document.getElementById('premiumSearchForm');
-    const loadingOverlay = document.getElementById('premiumLoadingOverlay');
     const detailModal = new bootstrap.Modal(document.getElementById('premiumDetailModal'));
     const modalBody = document.getElementById('premiumModalBody');
     const modalEditBtn = document.getElementById('premiumModalEditBtn');
-    
-    // *** Ocultar el overlay al cargar la página ***
-    loadingOverlay.style.display = 'none';
-    
-    // --- Inicializar tooltips ---
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
+
+    [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]')).forEach(function (el) {
+        new bootstrap.Tooltip(el);
     });
-    
-    // --- Envío del formulario de búsqueda principal ---
-    searchForm.addEventListener('submit', function(e) {
-        // Muestra el overlay solo cuando se envía el formulario
-        loadingOverlay.style.display = 'flex';
-    });
-    
-    // --- Lógica para mostrar detalles en el modal ---
+
     document.querySelectorAll('.view-details-btn').forEach(button => {
         button.addEventListener('click', function() {
-            const objectId = this.getAttribute('data-object-id');
-            loadObjectDetails(objectId);
+            loadObjectDetails(this.getAttribute('data-object-id'));
         });
     });
 
     function loadObjectDetails(objectId) {
         modalBody.innerHTML = `<div class="text-center py-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div><p class="mt-3 text-muted">Cargando detalles...</p></div>`;
         detailModal.show();
-        
-        const detailsUrl = `/catalogo/{{ model_name }}/${objectId}/detalles/`;
-        
-        fetch(detailsUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+
+        fetch(`/catalogo/{{ model_name }}/${objectId}/detalles/`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(response => {
                 if (!response.ok) throw new Error('Error al cargar detalles');
                 return response.text();
             })
             .then(html => {
                 modalBody.innerHTML = html;
-                
-                // --- CORRECCIÓN: Generar la URL de edición de forma robusta ---
-                const editUrl = "{% url 'editar_'|add:model_name 999 %}".replace('999', objectId);
-                modalEditBtn.href = editUrl;
+                modalEditBtn.href = "{% url 'editar_'|add:model_name 999 %}".replace('999', objectId);
             })
             .catch(error => {
                 console.error('Error loading details:', error);
