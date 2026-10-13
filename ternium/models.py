@@ -499,6 +499,11 @@ def es_sealed_air(nombre):
     return 'SEALEDAIR' in re.sub(r'[^A-Z]', '', (nombre or '').upper())
 
 
+def es_proboca(nombre):
+    """Reconoce la empresa PROBOCA aunque cambie el formato ("Proboca", "PROBOCA S.A.")."""
+    return 'PROBOCA' in re.sub(r'[^A-Z]', '', (nombre or '').upper())
+
+
 class Remision(models.Model):
     STATUS_CHOICES = [
         ('PENDIENTE', 'Pendiente'),
@@ -586,7 +591,9 @@ class Remision(models.Model):
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
     folio_medline = models.CharField(max_length=50, blank=True, null=True, verbose_name="Folio Medline")
-    
+    # Solo aplica a la Unidad de Negocio PROBOCA (ver aplica_folio_salida).
+    folio_salida = models.CharField(max_length=50, blank=True, null=True, verbose_name="Folio de Salida")
+
     # --- DATOS SELECCIONADOS DEL MODAL PARA EL REPORTE DE DESTRUCCIÓN ---
     destruccion_material_1 = models.CharField(max_length=150, null=True, blank=True, verbose_name="Material Destrucción 1")
     destruccion_peso_1 = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True, verbose_name="Peso Destrucción 1")
@@ -652,6 +659,11 @@ class Remision(models.Model):
     def aplica_precio(self):
         """El precio por Kg de los detalles solo aplica a SEALED AIR con origen patio."""
         return bool(self.empresa and es_sealed_air(self.empresa.nombre) and self.origen and self.origen.es_patio)
+
+    @property
+    def aplica_folio_salida(self):
+        """El Folio de Salida solo se captura cuando la Unidad de Negocio es PROBOCA."""
+        return bool(self.empresa_id and es_proboca(self.empresa.nombre))
 
     @property
     def diff(self):

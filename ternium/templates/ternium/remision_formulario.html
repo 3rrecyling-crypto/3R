@@ -185,7 +185,7 @@
                 <div class="col-md">
                     <label for="{{ form.empresa.id_for_label }}" class="form-label">{{ form.empresa.label }}</label>
                     {% if is_editing %}
-                        <select class="form-select" disabled><option selected>{{ remision.empresa.nombre }}</option></select>
+                        <select class="form-select" id="id_empresa_display" disabled><option selected>{{ remision.empresa.nombre }}</option></select>
                         <input type="hidden" name="empresa" id="id_empresa" value="{{ form.empresa.value }}">
                     {% else %}
                         {{ form.empresa }}
@@ -210,7 +210,14 @@
                     <div class="form-error">{{ form.folio_medline.errors }}</div>
                     <div class="form-text" style="color: #6f42c1;"><i class="fas fa-info-circle me-1"></i>Manual — no se puede repetir. Vacío = PENDIENTE.</div>
                 </div>
-                
+
+                <div class="col-md" id="contenedor_folio_salida" style="display: none;">
+                    <label for="{{ form.folio_salida.id_for_label }}" class="form-label fw-bold"><i class="fas fa-sign-out-alt me-1"></i>{{ form.folio_salida.label }}</label>
+                    {{ form.folio_salida }}
+                    <div class="form-error">{{ form.folio_salida.errors }}</div>
+                    <div class="form-text"><i class="fas fa-info-circle me-1"></i>Solo para PROBOCA.</div>
+                </div>
+
             </div></div>
         </div>
 
@@ -853,6 +860,20 @@ $(document).ready(function() {
     }
     // -------------------------------------
 
+    // --- FOLIO DE SALIDA: solo visible cuando la Unidad de Negocio es PROBOCA ---
+    // Al editar la empresa no se puede cambiar y #id_empresa es un input oculto,
+    // así que el nombre se lee del select deshabilitado.
+    function toggleFolioSalida() {
+        const empresaTexto = (IS_EDITING ? $('#id_empresa_display') : empresaSelect)
+            .find('option:selected').text().toUpperCase().replace(/[^A-Z]/g, '');
+        if (empresaTexto.includes('PROBOCA')) {
+            $('#contenedor_folio_salida').slideDown();
+        } else {
+            $('#contenedor_folio_salida').slideUp();
+        }
+    }
+    // -------------------------------------
+
     function initializeSelect2(context) {
         $(context).find('select:not([data-select2-id])').select2({
             theme: 'bootstrap-5', width: '100%', placeholder: 'Seleccione una opción', allowClear: true
@@ -1041,7 +1062,8 @@ $(document).ready(function() {
         }
     });
 
-    empresaSelect.on('change', function() { 
+    empresaSelect.on('change', function() {
+        toggleFolioSalida();
         const empresaId = $(this).val();
         if (!empresaId) {
              addButton.prop('disabled', true);
@@ -1397,6 +1419,7 @@ $(document).ready(function() {
     
     // Llamada inicial para mostrar el folio medline si aplica desde que se edita
     toggleFolioMedline();
+    toggleFolioSalida();
 
 });
 </script>

@@ -51,7 +51,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.views.decorators.http import require_POST, require_http_methods
 from django.conf import settings
-from .models import PrecioMedline, es_sealed_air
+from .models import PrecioMedline, es_sealed_air, es_proboca
 
 def _update_inventory_from_remision(remision, revert=False):
     """
@@ -960,6 +960,9 @@ def api_crear_remision(request):
                 return JsonResponse({'error': 'VALIDACION', 'detail': f"El Folio de Carga «{remision.folio_ld}» ya existe en otra remisión de {empresa_seleccionada.nombre}."}, status=400)
             if remision.folio_dlv and Remision.objects.filter(folio_dlv__iexact=remision.folio_dlv, empresa=empresa_seleccionada).exists():
                 return JsonResponse({'error': 'VALIDACION', 'detail': f"El Folio de Descarga «{remision.folio_dlv}» ya existe en otra remisión de {empresa_seleccionada.nombre}."}, status=400)
+            # Folio de Salida: solo aplica a PROBOCA (paridad con RemisionForm.clean).
+            if empresa_seleccionada and es_proboca(empresa_seleccionada.nombre):
+                remision.folio_salida = (data.get('folio_salida') or '').strip().upper() or None
             remision.comentario = data.get('comentario', '')
             remision.trazabilidad_notas = data.get('trazabilidad_notas', '')
 
@@ -1207,6 +1210,9 @@ def api_editar_remision(request, pk):
                 return JsonResponse({'error': 'VALIDACION', 'detail': f"El Folio de Carga «{remision.folio_ld}» ya existe en otra remisión de {remision.empresa.nombre}."}, status=400)
             if remision.folio_dlv and Remision.objects.filter(folio_dlv__iexact=remision.folio_dlv, empresa=remision.empresa).exclude(pk=remision.pk).exists():
                 return JsonResponse({'error': 'VALIDACION', 'detail': f"El Folio de Descarga «{remision.folio_dlv}» ya existe en otra remisión de {remision.empresa.nombre}."}, status=400)
+            # Folio de Salida: solo PROBOCA. Presente-en-POST = actualizar (vacío → NULL).
+            if 'folio_salida' in data and remision.aplica_folio_salida:
+                remision.folio_salida = (data.get('folio_salida') or '').strip().upper() or None
             remision.comentario = data.get('comentario', remision.comentario)
             remision.trazabilidad_notas = data.get('trazabilidad_notas', remision.trazabilidad_notas)
 
@@ -1502,6 +1508,8 @@ def api_remision_detalle(request, pk):
         # Folios operativos
         'folio_ld': remision.folio_ld or '',
         'folio_dlv': remision.folio_dlv or '',
+        'folio_salida': remision.folio_salida or '',
+        'aplica_folio_salida': remision.aplica_folio_salida,
         'inicia_ld': str(remision.inicia_ld) if remision.inicia_ld else '',
         'termina_ld': str(remision.termina_ld) if remision.termina_ld else '',
         'inicia_dlv': str(remision.inicia_dlv) if remision.inicia_dlv else '',

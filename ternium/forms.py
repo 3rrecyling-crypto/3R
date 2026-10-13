@@ -10,7 +10,8 @@ from django.contrib.auth.forms import AuthenticationForm
 from .models import (
     Empresa, Lugar, Remision, EntradaMaquila, LineaTransporte,
     Operador, Material, Unidad, Contenedor, DetalleRemision, Descarga,
-    RegistroLogistico,Plastico, ControlTarima,ConfiguracionManifiesto
+    RegistroLogistico,Plastico, ControlTarima,ConfiguracionManifiesto,
+    es_proboca,
 )
 
 
@@ -227,6 +228,7 @@ class RemisionForm(forms.ModelForm):
             'inicia_dlv': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'termina_dlv': forms.DateTimeInput(format='%Y-%m-%dT%H:%M', attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'folio_dlv': forms.TextInput(attrs={'class': 'form-control'}),
+            'folio_salida': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Escribe el folio de salida', 'autocomplete': 'off'}),
             'comentario': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'trazabilidad_notas': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'manifiesto': forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': 'application/pdf,image/*'}),
@@ -263,7 +265,7 @@ class RemisionForm(forms.ModelForm):
         if 'destino' in self.fields: self.fields['destino'].required = True
 
         campos_opcionales = [
-            'folio_ld', 'folio_dlv', 'linea_transporte', 'operador', 
+            'folio_ld', 'folio_dlv', 'folio_salida', 'linea_transporte', 'operador',
             'unidad', 'contenedor', 'cliente', 'inicia_ld', 'termina_ld', 
             'inicia_dlv', 'termina_dlv', 'comentario', 'descripcion', 
             'evidencia_documento', 'trazabilidad_notas', 'manifiesto',
@@ -344,7 +346,14 @@ class RemisionForm(forms.ModelForm):
                     empresa = Empresa.objects.get(pk=self.data['empresa'])
                 except:
                     pass
-        
+
+        # Folio de Salida: solo aplica a PROBOCA; para cualquier otra empresa no se guarda.
+        folio_salida = (cleaned_data.get('folio_salida') or '').strip().upper()
+        if empresa and es_proboca(empresa.nombre) and folio_salida:
+            cleaned_data['folio_salida'] = folio_salida
+        else:
+            cleaned_data['folio_salida'] = None
+
         # Si no tenemos empresa, no podemos validar duplicados por operación
         if not empresa:
             return cleaned_data
