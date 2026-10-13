@@ -57,6 +57,7 @@ urlpatterns = [
     path('api/transferencias/', include('transferencias.urls')),
     path('api/simulador/', include('simulador.urls')),
     path('api/mensajeria/', include('mensajeria.urls')),  # Chat interno + videollamadas
+    path('api/tickets/', include('tickets.urls')),  # Mesa de ayuda (pantallas en Next.js)
 
     # 6. Ruta General / Bienvenida (IMPORTANTE: Esta va al FINAL)
     # Al entrar a "midominio.com/", Django probará todas las de arriba.

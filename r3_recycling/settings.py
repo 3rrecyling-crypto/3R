@@ -115,7 +115,11 @@ INSTALLED_APPS = [
     'transferencias',
     'simulador',
     'mensajeria',  # Chat interno + videollamadas (LiveKit), portado de SANBENITO
+    'tickets',  # Mesa de ayuda: mejoras, fallas y peticiones (pantallas en Next.js)
 ]
+
+# Dirección de la versión nueva (Next.js) para el botón "Ir a versión nueva".
+NEXT_APP_URL = os.environ.get('NEXT_APP_URL', 'https://app.3recycling.com.mx')
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -143,6 +147,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "ternium.context_processors.version_nueva",
             ],
         },
     },
