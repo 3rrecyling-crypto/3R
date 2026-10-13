@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from django.db.models import Q
+from django.db.models.functions import Coalesce, TruncDate
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -1555,6 +1556,15 @@ def api_remision_detalle(request, pk):
 # EXPORTS Y ACCIONES DE REMISIONES (MOVIDOS DESDE views.py)
 # =========================================================================
 
+def _con_fecha_reporte(queryset):
+    """
+    Agrega `fecha_reporte`: la fecha con la que se filtran, ordenan y muestran
+    TODOS los reportes de Excel. Es el día de INICIO DE DESCARGA (en hora local),
+    no el de captura; si la remisión no la tiene, se usa la fecha de captura.
+    """
+    return queryset.annotate(fecha_reporte=Coalesce(TruncDate('inicia_dlv'), 'fecha'))
+
+
 @login_required
 def export_remisiones_to_excel(request):
     # 1. Recuperar filtros del GET
@@ -1593,9 +1603,9 @@ def export_remisiones_to_excel(request):
         precio_archivo_val = 0.0
 
     # 2. Construir QuerySet Base
-    queryset = Remision.objects.all().select_related(
+    queryset = _con_fecha_reporte(Remision.objects.all().select_related(
         'empresa', 'origen', 'destino', 'linea_transporte', 'operador', 'unidad', 'contenedor'
-    ).prefetch_related('detalles', 'detalles__material', 'evidencias')
+    ).prefetch_related('detalles', 'detalles__material', 'evidencias'))
 
     # =========================================================================
     # SI ES MEDLINE: solo filtrar por mes y origen Medline, SIN filtros generales
@@ -1606,7 +1616,7 @@ def export_remisiones_to_excel(request):
         if mes_medline:
             try:
                 year, month = mes_medline.split('-')
-                queryset = queryset.filter(fecha__year=year, fecha__month=month)
+                queryset = queryset.filter(fecha_reporte__year=year, fecha_reporte__month=month)
             except ValueError:
                 pass
 
@@ -1630,12 +1640,12 @@ def export_remisiones_to_excel(request):
         if q_origen: queryset = queryset.filter(origen__id=q_origen)
         if q_destino: queryset = queryset.filter(destino__id=q_destino)
         if q_operador: queryset = queryset.filter(operador__id=q_operador)
-        if q_fecha_desde: queryset = queryset.filter(fecha__gte=q_fecha_desde)
-        if q_fecha_hasta: queryset = queryset.filter(fecha__lte=q_fecha_hasta)
+        if q_fecha_desde: queryset = queryset.filter(fecha_reporte__gte=q_fecha_desde)
+        if q_fecha_hasta: queryset = queryset.filter(fecha_reporte__lte=q_fecha_hasta)
         if q_folio_ld: queryset = queryset.filter(folio_ld__icontains=q_folio_ld)
         if q_folio_dlv: queryset = queryset.filter(folio_dlv__icontains=q_folio_dlv)
 
-    queryset = queryset.order_by('fecha', 'pk')
+    queryset = queryset.order_by('fecha_reporte', 'pk')
 
     # 3. Crear Libro y Hoja
     wb = Workbook()
@@ -1797,7 +1807,7 @@ def export_remisiones_to_excel(request):
             rechazo_val = total_rechazo if total_rechazo > 0 else "N/A"
 
             row_data = [
-                remision.remision, remision.fecha, remision.get_status_display(),
+                remision.remision, remision.fecha_reporte, remision.get_status_display(),
                 remision.empresa.nombre if remision.empresa else '',
                 remision.origen.nombre if remision.origen else '',
                 remision.destino.nombre if remision.destino else '',
@@ -1882,7 +1892,7 @@ def export_remisiones_to_excel(request):
                 rechazo_val = peso_rechazado if peso_rechazado > 0 else "N/A"
 
                 row_data = [
-                    remision.remision, remision.fecha, remision.get_status_display(),
+                    remision.remision, remision.fecha_reporte, remision.get_status_display(),
                     remision.empresa.nombre if remision.empresa else '',
                     remision.origen.nombre if remision.origen else '',
                     remision.destino.nombre if remision.destino else '',
@@ -1959,7 +1969,7 @@ def export_remisiones_to_excel(request):
             rechazo_val = peso_rechazado if peso_rechazado > 0 else "N/A"
 
             row_data = [
-                remision.remision, remision.fecha, remision.get_status_display(),
+                remision.remision, remision.fecha_reporte, remision.get_status_display(),
                 remision.empresa.nombre if remision.empresa else '',
                 remision.origen.nombre if remision.origen else '',
                 remision.destino.nombre if remision.destino else '',
@@ -2063,17 +2073,19 @@ def export_reportes_especificos(request):
         return HttpResponse("Tipo de reporte no válido.", status=400)
 
     # 3. Aplicar Filtro Dinámico de Fechas
+    # Por fecha de INICIO DE DESCARGA, igual que todos los reportes (ver _con_fecha_reporte).
+    queryset = _con_fecha_reporte(queryset)
     if tipo_filtro == 'mes' and mes_req:
         try:
             year, month = mes_req.split('-')
-            queryset = queryset.filter(fecha__year=year, fecha__month=month)
+            queryset = queryset.filter(fecha_reporte__year=year, fecha_reporte__month=month)
         except ValueError:
             pass
     elif tipo_filtro == 'rango':
         if fecha_inicio:
-            queryset = queryset.filter(fecha__gte=fecha_inicio)
+            queryset = queryset.filter(fecha_reporte__gte=fecha_inicio)
         if fecha_fin:
-            queryset = queryset.filter(fecha__lte=fecha_fin)
+            queryset = queryset.filter(fecha_reporte__lte=fecha_fin)
 
     # Texto del periodo para los reportes que no llevan logo (título arriba)
     if tipo_filtro == 'mes' and mes_req:
@@ -2165,7 +2177,7 @@ def export_reportes_especificos(request):
                     remision.remision,
                     remision.origen.nombre if remision.origen else '',
                     remision.destino.nombre if remision.destino else '',
-                    remision.fecha.strftime("%d/%m/%Y") if remision.fecha else "",
+                    remision.fecha_reporte.strftime("%d/%m/%Y") if remision.fecha_reporte else "",
                     remision.folio_ld or '',
                     remision.folio_dlv or '',
                 ]
