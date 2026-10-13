@@ -2050,11 +2050,12 @@ def export_reportes_especificos(request):
         queryset = queryset.filter(origen__nombre__icontains=tipo_reporte.upper())
     elif tipo_reporte == 'hudson':
         queryset = queryset.filter(origen__nombre__icontains='HUDSON')
-    elif tipo_reporte == 'sealed-air':
+    elif tipo_reporte in ['sealed-air', 'proboca']:
         # Por Unidad de Negocio (Empresa), no por origen.
-        ids_sealed = [e.pk for e in Empresa.objects.all() if es_sealed_air(e.nombre)]
-        queryset = queryset.filter(empresa_id__in=ids_sealed)
-        # Incluye precios: solo empresas autorizadas para el usuario.
+        es_empresa = es_sealed_air if tipo_reporte == 'sealed-air' else es_proboca
+        ids_empresa = [e.pk for e in Empresa.objects.all() if es_empresa(e.nombre)]
+        queryset = queryset.filter(empresa_id__in=ids_empresa)
+        # Solo empresas autorizadas para el usuario (SEALED AIR incluye precios).
         if not request.user.is_superuser:
             perfil = getattr(request.user, 'ternium_profile', None)
             queryset = queryset.filter(empresa__in=perfil.empresas_autorizadas.all()) if perfil else queryset.none()
@@ -2073,6 +2074,14 @@ def export_reportes_especificos(request):
             queryset = queryset.filter(fecha__gte=fecha_inicio)
         if fecha_fin:
             queryset = queryset.filter(fecha__lte=fecha_fin)
+
+    # Texto del periodo para los reportes que no llevan logo (título arriba)
+    if tipo_filtro == 'mes' and mes_req:
+        periodo = f"Mes: {mes_req}"
+    elif tipo_filtro == 'rango' and (fecha_inicio or fecha_fin):
+        periodo = f"Del {fecha_inicio or 'inicio'} al {fecha_fin or 'hoy'}"
+    else:
+        periodo = "Todas las fechas"
 
     # 4. Preparar el Excel
     wb = Workbook()
@@ -2117,15 +2126,26 @@ def export_reportes_especificos(request):
             print(f"No se pudo cargar la imagen de S3: {e}") # Falla en silencio para que el Excel sí se descargue
 
     # =========================================================================
-    # ESTRUCTURA PARA HUAXING, BACHOCO O TRANE
+    # ESTRUCTURA PARA HUAXING, BACHOCO, TRANE O PROBOCA
+    # (PROBOCA lleva además el Folio de Salida, junto a los otros folios)
     # =========================================================================
-    if tipo_reporte in ['huaxing', 'bachoco', 'trane']:
+    if tipo_reporte in ['huaxing', 'bachoco', 'trane', 'proboca']:
         ws.title = f"Reporte_{tipo_reporte.capitalize()}"
-        headers = [
-            "Remisión", "Origen", "Destino", "Fecha", "Folio Carga",
-            "Folio Descarga", "Operador", "Material", "Peso Carga (Kg)",
-            "Peso Descarga (Kg)", "Links Evidencias"
-        ]
+        con_folio_salida = tipo_reporte == 'proboca'
+
+        if con_folio_salida:
+            # Sin logo en S3: título y periodo en las filas reservadas para la imagen
+            ws['A1'] = "PROBOCA - Remisiones"
+            ws['A1'].font = Font(bold=True, size=14)
+            ws['A2'] = periodo
+
+        headers = ["Remisión", "Origen", "Destino", "Fecha", "Folio Carga", "Folio Descarga"]
+        if con_folio_salida:
+            headers.append("Folio de Salida")
+        headers += ["Operador", "Material", "Peso Carga (Kg)", "Peso Descarga (Kg)", "Links Evidencias"]
+        col_peso_ld = headers.index("Peso Carga (Kg)") + 1
+        col_peso_dlv = headers.index("Peso Descarga (Kg)") + 1
+        col_evidencias = len(headers)
         ws.append(headers)
 
         # Estilo encabezados (que ahora están en ws[start_row_table])
@@ -2148,6 +2168,10 @@ def export_reportes_especificos(request):
                     remision.fecha.strftime("%d/%m/%Y") if remision.fecha else "",
                     remision.folio_ld or '',
                     remision.folio_dlv or '',
+                ]
+                if con_folio_salida:
+                    row_data.append(remision.folio_salida or '')
+                row_data += [
                     remision.operador.nombre if remision.operador else (remision.operador_manual or ''),
                     d.material.nombre if d.material else "S/M",
                     float(d.peso_ld or 0),
@@ -2157,15 +2181,15 @@ def export_reportes_especificos(request):
                 ws.append(row_data)
 
                 current_row = ws.max_row
-                for col_idx in range(1, 12):
+                for col_idx in range(1, len(headers) + 1):
                     ws.cell(row=current_row, column=col_idx).alignment = center_style
 
-                ws.cell(row=current_row, column=9).number_format = '#,##0.000'
-                ws.cell(row=current_row, column=10).number_format = '#,##0.000'
+                ws.cell(row=current_row, column=col_peso_ld).number_format = '#,##0.000'
+                ws.cell(row=current_row, column=col_peso_dlv).number_format = '#,##0.000'
 
                 # Link de evidencia
                 if len(evidencias_urls) == 1:
-                    cell_link = ws.cell(row=current_row, column=11)
+                    cell_link = ws.cell(row=current_row, column=col_evidencias)
                     cell_link.hyperlink = evidencias_urls[0]
                     cell_link.font = Font(color="0000FF", underline="single")
 
@@ -2244,12 +2268,6 @@ def export_reportes_especificos(request):
         ws.title = "Reporte_Sealed_Air"
 
         # Sin logo en S3: título y periodo en las filas reservadas para la imagen
-        if tipo_filtro == 'mes' and mes_req:
-            periodo = f"Mes: {mes_req}"
-        elif tipo_filtro == 'rango' and (fecha_inicio or fecha_fin):
-            periodo = f"Del {fecha_inicio or 'inicio'} al {fecha_fin or 'hoy'}"
-        else:
-            periodo = "Todas las fechas"
         ws['A1'] = "SEALED AIR - Remisiones con precio"
         ws['A1'].font = Font(bold=True, size=14)
         ws['A2'] = periodo
