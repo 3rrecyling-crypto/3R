@@ -26,8 +26,9 @@
         /* ── Top bar ── */
         .topbar {
             height: var(--topbar-height);
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-            box-shadow: 0 2px 12px rgba(79,70,229,.35);
+            /* Mismo color único que ternium/base.html, sin degradado. */
+            background: #2c3e50;
+            box-shadow: 0 2px 12px rgba(0,0,0,.15);
             position: fixed;
             top: 0; left: 0; right: 0;
             z-index: 1030;
@@ -45,7 +46,7 @@
             letter-spacing: .3px;
         }
 
-        .topbar .brand span { color: #c4b5fd; }
+        .topbar .brand span { color: #9fb3c8; }
 
         .topbar-nav { display: flex; align-items: center; gap: .25rem; margin-left: auto; }
         .topbar-nav a {
@@ -104,11 +105,11 @@
 
         /* ── Buttons ── */
         .btn-primary {
-            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            background: #2c3e50;
             border: none;
             font-weight: 600;
         }
-        .btn-primary:hover { background: linear-gradient(135deg, #4338ca, #6d28d9); }
+        .btn-primary:hover { background: #1a252f; }
 
         /* ── Table ── */
         .table thead th {

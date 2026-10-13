@@ -21,21 +21,9 @@
         --border-radius: 10px;
     }
     
-    .bg-primary-gradient {
-        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    }
-    
-    .btn-primary-gradient {
-        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-        border: none;
-        color: white;
-    }
-    
-    .btn-primary-gradient:hover {
-        background: linear-gradient(135deg, var(--primary-color), #2980b9);
-        color: white;
-        box-shadow: var(--hover-shadow);
-        transform: translateY(-1px);
+    /* Sin degradados: encabezados en color sólido (barra y fondo vienen de la base). */
+    .bg-primary-solid {
+        background-color: var(--primary-color);
     }
 
     .btn-solid-primary {
@@ -68,7 +56,7 @@
     
     /* BOTÓN PARA NEXT.JS - NUEVO DISEÑO ELEGANTE Y LLAMATIVO */
     .btn-dashboard-elite {
-        background: linear-gradient(135deg, #1a252f 0%, #2c3e50 100%);
+        background: #1a252f;
         color: #00d2ff; /* Cyan brillante elegante */
         border: 2px solid #00d2ff;
         border-radius: 6px; /* Más cuadrado y corporativo */
@@ -317,7 +305,7 @@
             </a>
             
             {% if perms.ternium.add_remision %}
-            <a href="{% url 'crear_remision' %}" class="btn btn-primary-gradient shadow-sm py-2 px-3 rounded-pill">
+            <a href="{% url 'crear_remision' %}" class="btn btn-solid-primary shadow-sm py-2 px-3 rounded-pill">
                 <i class="fas fa-plus-circle me-2"></i>NUEVA REMISION
             </a>
             {% endif %}
@@ -326,7 +314,7 @@
     </div>
 
     <div class="card shadow mb-4">
-        <div class="card-header py-3 d-flex justify-content-between align-items-center bg-primary-gradient text-white">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center bg-primary-solid text-white">
             <h6 class="m-0 font-weight-bold"><i class="fas fa-filter me-2"></i>Filtros Avanzados</h6>
             <button class="btn btn-link p-0 text-white" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse"><i class="fas fa-chevron-down"></i></button>
         </div>
@@ -433,7 +421,7 @@
                         <a href="{% url 'remision_lista' %}" class="btn btn-outline-secondary btn-sm me-2 rounded-pill py-2 px-3">
                             <i class="fas fa-broom me-2"></i>Limpiar Filtros
                         </a>
-                        <button type="submit" class="btn btn-primary-gradient btn-sm shadow-sm rounded-pill py-2 px-3">
+                        <button type="submit" class="btn btn-solid-primary btn-sm shadow-sm rounded-pill py-2 px-3">
                             <i class="fas fa-search me-2"></i>Aplicar Filtros
                         </button>
                     </div>
@@ -443,7 +431,7 @@
     </div>
 
     <div class="card shadow border-0">
-        <div class="card-header py-3 bg-primary-gradient text-white">
+        <div class="card-header py-3 bg-primary-solid text-white">
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="m-0 font-weight-bold"><i class="fas fa-list-ol me-2"></i>Resultados</h6>
                 <div>
@@ -896,7 +884,7 @@
 <div class="modal fade" id="modalPersonalizarTabla" tabindex="-1" aria-labelledby="modalPersonalizarLabel" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-centered">
     <div class="modal-content border-0 shadow">
-      <div class="modal-header bg-primary-gradient text-white">
+      <div class="modal-header bg-primary-solid text-white">
         <h5 class="modal-title fw-bold" id="modalPersonalizarLabel"><i class="fas fa-table-columns me-2"></i>Personalizar tabla</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>

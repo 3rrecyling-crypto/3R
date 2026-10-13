@@ -24,7 +24,7 @@ Cada columna es un dict con:
 # página se ve idéntica a como estaba antes de existir esta función.
 COLUMNAS = [
     {'clave': 'remision', 'etiqueta': 'Remisión', 'grupo': 'Identificación',
-     'th': 'py-3 px-2 col-corta', 'td': 'fw-bold py-3 px-2', 'fija': True},
+     'th': 'py-3 px-2 col-corta', 'td': 'fw-bold text-nowrap py-3 px-2', 'fija': True},
 
     {'clave': 'fecha', 'etiqueta': 'Fecha', 'grupo': 'Identificación',
      'th': 'py-3 px-2 col-corta', 'td': 'text-nowrap py-3 px-2 small'},
