@@ -255,6 +255,7 @@ urlpatterns = [
 
     # ── Perfil & Admin ───────────────────────────────────────────────
     path('api/perfil/', api_views.api_perfil, name='api_perfil'),
+    path('api/perfil/foto/', api_views.api_perfil_foto, name='api_perfil_foto'),
     path('api/admin/usuarios/', api_views.api_admin_usuarios, name='api_admin_usuarios'),
     path('api/admin/usuarios/<int:pk>/permisos/', api_views.api_admin_usuario_permisos, name='api_admin_usuario_permisos'),
 

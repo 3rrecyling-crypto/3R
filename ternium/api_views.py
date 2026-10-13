@@ -3281,21 +3281,99 @@ def api_columnas_remisiones(request):
 
 
 # ── PERFIL DE USUARIO ────────────────────────────────────────────────────
+AVATAR_DEFAULT = 'avatars/default-avatar.png'  # valor por defecto de Profile.avatar (= sin foto)
+AVATAR_EXTENSIONES = {'.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic'}
+AVATAR_MAX_BYTES = 5 * 1024 * 1024
+AVATAR_LADO = 512
+
+
+def _avatar_url(request, profile):
+    """URL absoluta de la foto, o None si el usuario no ha subido una (o el archivo falta)."""
+    try:
+        if profile.avatar and profile.avatar.name and profile.avatar.name != AVATAR_DEFAULT:
+            url = profile.avatar.url
+            return request.build_absolute_uri(url) if url.startswith('/') else url
+    except Exception:
+        pass
+    return None
+
+
+def _borrar_avatar_anterior(profile):
+    nombre = profile.avatar.name if profile.avatar else ''
+    if nombre and nombre != AVATAR_DEFAULT:
+        try:
+            profile.avatar.storage.delete(nombre)
+        except Exception:
+            pass
+
+
+def api_perfil_foto(request):
+    """
+    POST   /api/perfil/foto/  (multipart, campo «foto»): sube o reemplaza la foto de perfil.
+    DELETE /api/perfil/foto/  quita la foto (vuelve a las iniciales).
+    La foto se endereza (EXIF), se recorta a un cuadrado de 512 px y se guarda en JPEG.
+    """
+    import os
+    import uuid
+    from io import BytesIO
+    from PIL import Image, ImageOps, UnidentifiedImageError
+    from django.core.files.base import ContentFile
+
+    if not request.user.is_authenticated:
+        return JsonResponse({'detail': 'No autenticado.'}, status=401)
+    profile, _ = Profile.objects.get_or_create(user=request.user)
+
+    if request.method == 'DELETE':
+        _borrar_avatar_anterior(profile)
+        profile.avatar = AVATAR_DEFAULT
+        profile.save(update_fields=['avatar'])
+        return JsonResponse({'avatar_url': None})
+
+    if request.method != 'POST':
+        return JsonResponse({'detail': 'Método no permitido.'}, status=405)
+
+    archivo = request.FILES.get('foto')
+    if not archivo:
+        return JsonResponse({'detail': 'Selecciona una imagen.'}, status=400)
+    if os.path.splitext(archivo.name)[1].lower() not in AVATAR_EXTENSIONES:
+        return JsonResponse({'detail': 'Formato no permitido. Usa JPG, PNG, WEBP o GIF.'}, status=400)
+    if archivo.size > AVATAR_MAX_BYTES:
+        return JsonResponse({'detail': 'La imagen pesa más de 5 MB.'}, status=400)
+    try:
+        img = Image.open(archivo)
+        img.load()
+    except (UnidentifiedImageError, OSError, ValueError):
+        return JsonResponse({'detail': 'El archivo no es una imagen válida.'}, status=400)
+
+    img = ImageOps.exif_transpose(img)  # fotos de celular giradas
+    if img.mode in ('RGBA', 'LA', 'P'):
+        fondo = Image.new('RGB', img.size, (255, 255, 255))
+        img_rgba = img.convert('RGBA')
+        fondo.paste(img_rgba, mask=img_rgba.split()[-1])
+        img = fondo
+    else:
+        img = img.convert('RGB')
+    img = ImageOps.fit(img, (AVATAR_LADO, AVATAR_LADO), method=Image.LANCZOS)
+    salida = BytesIO()
+    img.save(salida, format='JPEG', quality=88, optimize=True)
+
+    _borrar_avatar_anterior(profile)
+    profile.avatar.save(f'avatars/{request.user.id}_{uuid.uuid4().hex[:8]}.jpg',
+                        ContentFile(salida.getvalue()), save=False)
+    profile.save(update_fields=['avatar'])
+    return JsonResponse({'avatar_url': _avatar_url(request, profile)})
+
+
 @csrf_exempt
 @login_required
 def api_perfil(request):
     user = request.user
     profile, _ = Profile.objects.get_or_create(user=user)
     if request.method == 'GET':
-        avatar_url = None
-        try:
-            if profile.avatar and profile.avatar.name:
-                avatar_url = profile.avatar.url
-        except Exception:
-            pass
+        avatar_url = _avatar_url(request, profile)
         # Build flat permission codename list (app_label.codename)
         if user.is_superuser:
-            user_perm_codes = [f"ternium.{p[0].split('.')[1]}" for p in _MODULE_PERMS]
+            user_perm_codes = [p[0] for p in _MODULE_PERMS]
         else:
             user_perm_codes = []
             for p in user.user_permissions.select_related('content_type').all():
@@ -3361,6 +3439,8 @@ _MODULE_PERMS = [
     ('ternium.change_unidad',      'Editar Unidades'),
     ('ternium.add_contenedor',     'Agregar Contenedores'),
     ('ternium.change_contenedor',  'Editar Contenedores'),
+    # ── Mesa de Ayuda ────────────────────────────────────────────────────────
+    ('tickets.atender_tickets',    'Atender tickets (Mesa de Ayuda)'),
 ]
 
 @login_required
