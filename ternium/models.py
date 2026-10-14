@@ -1837,6 +1837,43 @@ class ChatMensaje(models.Model):
         return f"{self.user.username} [{self.rol}] {self.contenido[:50]}"
 
 
+class RegistroReporteIA(models.Model):
+    """
+    Bitácora de Reportes con IA: cada pregunta, su respuesta, las consultas que
+    se hicieron y lo que costó. La consulta el panel "Consumo de IA" (solo staff).
+    """
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                related_name='registros_reportes_ia')
+    conversacion = models.CharField(max_length=40, blank=True, default='', db_index=True)
+    pregunta = models.TextField()
+    respuesta = models.TextField(blank=True, default='')
+    motor = models.CharField(max_length=10, default='ia')          # ia | reglas
+    proveedor = models.CharField(max_length=20, blank=True, default='')
+    modelo = models.CharField(max_length=60, blank=True, default='')
+    consultas = models.JSONField(default=list, blank=True)
+    num_consultas = models.PositiveSmallIntegerField(default=0)
+    llamadas_modelo = models.PositiveSmallIntegerField(default=0)
+    tokens_entrada = models.PositiveIntegerField(default=0)
+    tokens_salida = models.PositiveIntegerField(default=0)
+    tokens_cache_lectura = models.PositiveIntegerField(default=0)
+    tokens_cache_escritura = models.PositiveIntegerField(default=0)
+    costo_usd = models.DecimalField(max_digits=12, decimal_places=6, default=0)
+    # True cuando los tokens los reporta la API (Claude); otros proveedores no los informan
+    medido = models.BooleanField(default=False)
+    duracion_ms = models.PositiveIntegerField(default=0)
+    avisos = models.JSONField(default=list, blank=True)
+    creado_en = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'Registro de Reportes con IA'
+        verbose_name_plural = 'Registros de Reportes con IA'
+        ordering = ['-creado_en']
+        indexes = [models.Index(fields=['usuario', 'creado_en'])]
+
+    def __str__(self):
+        return f"{self.usuario} · {self.pregunta[:50]}"
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # MÓDULO DE VIAJES — Carta de Traslado (sin timbrar)
 # ═══════════════════════════════════════════════════════════════════════════════

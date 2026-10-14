@@ -72,6 +72,8 @@ KNOWLEDGE_BASE = {
             "Las remisiones AUDITADO o CANCELADO no se pueden editar",
             "Puedes generar un Reporte Word de destrucción fiscal cuando los datos están completos",
             "Puedes exportar las remisiones MEDLINE a un ZIP con todas las boletas",
+            "Para pedir datos o reportes de remisiones con texto o con el micrófono usa Reportes con IA (/reportes-ia); "
+            "contesta con cifras, tablas y descarga en Excel",
         ],
         "ruta": "/remisiones",
     },

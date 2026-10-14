@@ -4,7 +4,7 @@ from django.urls import path
 from . import views
 from django.urls import path, include
 from .forms import CustomLoginForm  # <--- Nombre correcto
-from . import api_views, api_viajes, api_liquidaciones
+from . import api_views, api_viajes, api_liquidaciones, reportes_ia, reportes_ia_consumo, alertas_merma
 from .views import (
     UnidadDetailView, UnidadUpdateView, LugarDetailView, LugarUpdateView, 
     EmpresaDetailView, EmpresaUpdateView, ContenedorDetailView, ContenedorUpdateView,
@@ -260,6 +260,9 @@ urlpatterns = [
     path('api/admin/usuarios/<int:pk>/permisos/', api_views.api_admin_usuario_permisos, name='api_admin_usuario_permisos'),
 
     # ── Alertas de Merma — correos primero para no colisionar con <int:pk> ──
+    path('api/admin/alertas-merma/historial/', alertas_merma.api_historial, name='api_alertas_merma_historial'),
+    path('api/admin/alertas-merma/prueba/', alertas_merma.api_prueba, name='api_alertas_merma_prueba'),
+    path('api/admin/alertas-merma/enviar/', alertas_merma.api_enviar, name='api_alertas_merma_enviar'),
     path('api/admin/alertas-merma/correos/', api_views.api_correos_alerta_merma, name='api_correos_alerta_merma'),
     path('api/admin/alertas-merma/correos/<int:pk>/', api_views.api_correo_alerta_merma_detail, name='api_correo_alerta_merma_detail'),
     path('api/admin/alertas-merma/', api_views.api_alertas_merma, name='api_alertas_merma'),
@@ -271,6 +274,14 @@ urlpatterns = [
 
     # ── Chat IA (asistente del sistema por usuario) ─────────────────────
     path('api/chat/',               api_views.api_chat_ia,        name='api_chat_ia'),
+
+    # ── Reportes con IA (datos de remisiones por texto o voz; pantalla en Next) ──
+    path('api/reportes-ia/',        reportes_ia.api_reportes_ia,       name='api_reportes_ia'),
+    path('api/reportes-ia/excel/',  reportes_ia.api_reportes_ia_excel, name='api_reportes_ia_excel'),
+    path('api/reportes-ia/presentacion/', reportes_ia.api_reportes_ia_presentacion, name='api_reportes_ia_presentacion'),
+    # Consumo de IA (solo staff): peticiones, conversaciones, tokens y costo por usuario
+    path('api/reportes-ia/consumo/', reportes_ia_consumo.api_consumo_ia, name='api_consumo_ia'),
+    path('api/reportes-ia/consumo/<int:pk>/', reportes_ia_consumo.api_consumo_ia_detalle, name='api_consumo_ia_detalle'),
 
     # ── Destrucción Fiscal (ConfiguracionManifiesto) ─────────────────────
     path('api/admin/destruccion-fiscal/catalogos/', api_views.api_destruccion_fiscal_catalogos, name='api_destruccion_fiscal_catalogos'),
