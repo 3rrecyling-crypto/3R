@@ -24,7 +24,8 @@ TOKENS = ('tokens_entrada', 'tokens_salida', 'tokens_cache_lectura', 'tokens_cac
 
 
 def _es_staff(user):
-    return user.is_authenticated and (user.is_staff or user.is_superuser)
+    """Solo staff (un superusuario sin la marca de staff tampoco lo ve)."""
+    return user.is_authenticated and user.is_staff
 
 
 def _solo_staff(vista):
