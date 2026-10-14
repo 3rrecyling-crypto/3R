@@ -1220,7 +1220,7 @@ def crear_remision(request):
 
                     # --- Inventarios ---
                     _update_inventory_from_remision(remision, revert=False)
-                    enviar_alerta_merma(remision)
+                    programar_alerta_merma(remision)  # se envía al terminar de guardar
                     messages.success(request, f'Remisión {remision.remision} creada exitosamente.')
                     return redirect('remision_lista')
                 
@@ -1511,7 +1511,7 @@ def editar_remision(request, pk):
                     # asignar_folio_medline(remision)
                     
                     _update_inventory_from_remision(remision, revert=False)
-                    enviar_alerta_merma(remision) 
+                    programar_alerta_merma(remision)  # se envía al terminar de guardar
                     messages.success(request, 'Remisión actualizada correctamente.')
                     return redirect('detalle_remision', pk=remision.pk)
             except Exception as e:
@@ -5725,67 +5725,11 @@ def verificar_remito_existente(request):
         
     return JsonResponse({'existe': False})
 
-def enviar_alerta_merma(remision):
-    """
-    Envía un correo solo si la merma es NEGATIVA (Pérdida) y supera el -1%.
-    Fórmula: ((Descarga - Carga) / Carga) * 100
-    """
-    # 1. Validación de Estatus
-    if remision.status != 'TERMINADO':
-        return 
+# Alertas de merma: misma implementación que la API de Next (ver alertas_merma.py):
+# umbral por material, destinatarios de /admin/alertas-merma y una sola alerta por remisión.
+from .alertas_merma import enviar_alerta_merma, programar_alerta_merma  # noqa: E402,F401
 
-    # 2. Obtener pesos (convertir a float para cálculo seguro)
-    carga = float(remision.total_peso_ld)
-    descarga = float(remision.total_peso_dlv)
 
-    # 3. Cálculo de Diferencia Estándar (Destino - Origen)
-    # Si Descarga < Carga, el resultado será NEGATIVO (Pérdida)
-    if carga > 0:
-        porcentaje = ((descarga - carga) / carga) * 100
-    else:
-        porcentaje = 0
-
-    # 4. CONDICIÓN SOLICITADA: Solo si es NEGATIVA (menor a -1.0%)
-    # Ejemplo: Si resultado es -1.5%, se dispara la alerta.
-    if porcentaje < -1.0: 
-        asunto = f"ALERTA DE MERMA NEGATIVA: Remisión {remision.remision}"
-        mensaje = f"""
-        Se ha detectado una diferencia negativa (pérdida) superior al 1% en la remisión {remision.remision}.
-        
-        Detalles del Movimiento:
-        ------------------------------------------------
-        - Remisión:   {remision.remision}
-        - Fecha:      {remision.fecha}
-        - Origen:     {remision.origen}
-        - Destino:    {remision.destino}
-        
-        Transporte:
-        - Línea:      {remision.linea_transporte}
-        - Operador:   {remision.operador}
-        - Unidad:     {remision.unidad}
-        
-        Balance de Pesos:
-        - Peso Carga:    {carga:,.3f} Kg
-        - Peso Descarga: {descarga:,.3f} Kg
-        - Diferencia:    {descarga - carga:,.3f} Kg
-        
-        >>> PORCENTAJE DE MERMA: {porcentaje:.2f}% <<<
-        
-        Por favor revisar en el sistema.
-        """
-        
-        try:
-            send_mail(
-                asunto,
-                mensaje,
-                settings.DEFAULT_FROM_EMAIL,
-                ['3rrecycling@gmail.com', 'aux.contable@3rrecycling.com.mx', 'calidad@3rrecycling.com.mx', 'mmartinez@3rrecycling.com.mx'], 
-                fail_silently=True,
-            )
-            print(f"📧 Correo de alerta enviado para {remision.remision} (Merma: {porcentaje:.2f}%)")
-        except Exception as e:
-            print(f"❌ Error enviando correo: {e}")
-            
 @method_decorator(login_required, name='dispatch')
 class ControlTarimaListView(ListView):
     model = ControlTarima

@@ -98,253 +98,9 @@ def _update_inventory_from_remision(remision, revert=False):
 from django.core.mail import send_mail
 from django.conf import settings
 
-def enviar_alerta_merma(remision):
-    """
-    Evalúa la merma por cada material del detalle de la remisión.
-    El umbral se lee de ConfiguracionAlertaMerma (default 1 % si no existe
-    configuración para ese material). Si algún material supera su umbral,
-    se envía UN correo de alerta agrupando todos los materiales afectados.
+# Alertas de merma: una sola implementación para HTML y Next (ver alertas_merma.py).
+from .alertas_merma import enviar_alerta_merma, programar_alerta_merma  # noqa: E402,F401
 
-    Anti-duplicado: si ya existe `RemisionAlertaMermaLog` para esta remisión,
-    no se vuelve a mandar. Esto garantiza que el correo se envía SOLO UNA
-    VEZ por remisión, aunque la remisión se edite múltiples veces.
-    """
-    UMBRAL_DEFAULT = 1.0
-
-    # ── Anti-duplicado ──────────────────────────────────────────────────
-    # Si ya se mandó la alerta para esta remisión, no hacemos nada.
-    if RemisionAlertaMermaLog.objects.filter(remision=remision).exists():
-        return
-
-    alertas = []
-
-    for det in remision.detalles.all():
-        if not det.material:
-            continue
-
-        peso_ld = float(det.peso_ld or 0)
-        if peso_ld <= 0:
-            continue
-
-        peso_dlv = float(det.peso_dlv or 0)
-        peso_rechazado = float(det.peso_rechazado or 0)
-        merma_kg = peso_ld - (peso_dlv + peso_rechazado)
-
-        if merma_kg <= 0:
-            continue
-
-        pct_merma = (merma_kg / peso_ld) * 100
-
-        try:
-            umbral = float(det.material.config_alerta_merma.porcentaje_umbral)
-        except ConfiguracionAlertaMerma.DoesNotExist:
-            umbral = UMBRAL_DEFAULT
-
-        if pct_merma > umbral:
-            alertas.append({
-                'material': det.material.nombre,
-                'peso_ld': peso_ld,
-                'peso_dlv': peso_dlv,
-                'peso_rechazado': peso_rechazado,
-                'merma_kg': merma_kg,
-                'pct_merma': pct_merma,
-                'umbral': umbral,
-            })
-
-    if not alertas:
-        return
-
-    lineas = "\n".join(
-        f"  • {a['material']}: {a['merma_kg']:.2f} Kg perdidos "
-        f"({a['pct_merma']:.2f}% — umbral: {a['umbral']}%)"
-        for a in alertas
-    )
-
-    # ── Helpers para formatear seguros ─────────────────────────────────
-    def _txt(v, fallback='—'):
-        if v is None: return fallback
-        s = str(v).strip()
-        return s if s else fallback
-
-    def _fmt_fecha(d):
-        try:
-            return d.strftime('%d/%m/%Y') if d else '—'
-        except Exception:
-            return str(d) if d else '—'
-
-    def _fmt_dt(d):
-        try:
-            return d.strftime('%d/%m/%Y %H:%M') if d else '—'
-        except Exception:
-            return str(d) if d else '—'
-
-    def _fmt_hora(h):
-        try:
-            return h.strftime('%H:%M') if h else '—'
-        except Exception:
-            return str(h) if h else '—'
-
-    def _fmt_num(n, dec=3):
-        try:
-            return f"{float(n):,.{dec}f}" if n is not None else '—'
-        except Exception:
-            return '—'
-
-    # ── Datos ya resueltos para el correo ──────────────────────────────
-    empresa_nombre   = _txt(remision.empresa.nombre if remision.empresa_id else None)
-    cliente_nombre   = _txt(remision.cliente.nombre if remision.cliente_id else None)
-    origen_nombre    = _txt(remision.origen.nombre if remision.origen_id else None)
-    destino_nombre   = _txt(remision.destino.nombre if remision.destino_id else None)
-    operador_nombre  = _txt(
-        remision.operador.nombre if remision.operador_id else (remision.operador_manual or None)
-    )
-    linea_nombre     = _txt(remision.linea_transporte.nombre if remision.linea_transporte_id else None)
-    unidad_nombre    = _txt(
-        f"{remision.unidad.numero_economico or remision.unidad.id}"
-        if remision.unidad_id else (remision.unidad_manual or None)
-    )
-    placas_unidad    = _txt(
-        getattr(remision.unidad, 'placas', None) if remision.unidad_id else remision.placas_unidad_manual
-    )
-    contenedor_nom   = _txt(
-        f"{remision.contenedor.numero or remision.contenedor.id}"
-        if remision.contenedor_id else (remision.contenedor_manual or None)
-    )
-    placas_contened  = _txt(
-        getattr(remision.contenedor, 'placas', None) if remision.contenedor_id else remision.placas_contenedor_manual
-    )
-
-    # Totales calculados
-    total_ld   = remision.total_peso_ld
-    total_dlv  = remision.total_peso_dlv
-    total_rech = remision.total_peso_rechazado
-    pct_global = remision.porcentaje_merma
-
-    # Status display amigable
-    status_display = dict(Remision.STATUS_CHOICES).get(remision.status, remision.status)
-
-    # Línea con todos los detalles de cada material (no solo los que superaron)
-    detalle_total_lineas = []
-    for det in remision.detalles.all():
-        mat = det.material.nombre if det.material else '—'
-        pld  = float(det.peso_ld or 0)
-        pdlv = float(det.peso_dlv or 0)
-        prec = float(det.peso_rechazado or 0)
-        mkg  = pld - (pdlv + prec)
-        mpct = (mkg / pld * 100) if pld > 0 else 0
-        detalle_total_lineas.append(
-            f"  • {mat:25} Carga: {pld:>10,.2f} Kg | Descarga: {pdlv:>10,.2f} Kg | "
-            f"Rechazo: {prec:>10,.2f} Kg | Merma: {mkg:>+10,.2f} Kg ({mpct:>+6.2f}%)"
-        )
-    detalle_total = "\n".join(detalle_total_lineas) if detalle_total_lineas else "  (sin detalles capturados)"
-
-    asunto = f"⚠️ ALERTA DE MERMA: Remisión {remision.remision} ({len(alertas)} material(es))"
-    mensaje = (
-        f"════════════════════════════════════════════════════════════════\n"
-        f"  ALERTA DE MERMA — REMISIÓN {remision.remision}\n"
-        f"════════════════════════════════════════════════════════════════\n\n"
-        f"Se detectó merma superior al umbral configurado en la siguiente\n"
-        f"remisión. Estos son TODOS los datos del registro:\n\n"
-
-        f"─── IDENTIFICACIÓN ──────────────────────────────────────────────\n"
-        f"  Folio Remisión:    {_txt(remision.remision)}\n"
-        f"  Folio Medline:     {_txt(remision.folio_medline)}\n"
-        f"  Fecha:             {_fmt_fecha(remision.fecha)}\n"
-        f"  Estatus:           {_txt(status_display)}\n"
-        f"  Empresa:           {empresa_nombre}\n"
-        f"  Cliente:           {cliente_nombre}\n\n"
-
-        f"─── TRANSPORTE ──────────────────────────────────────────────────\n"
-        f"  Operador:          {operador_nombre}\n"
-        f"  Línea Transporte:  {linea_nombre}\n"
-        f"  Unidad:            {unidad_nombre}\n"
-        f"  Placas Unidad:     {placas_unidad}\n"
-        f"  Contenedor:        {contenedor_nom}\n"
-        f"  Placas Contenedor: {placas_contened}\n\n"
-
-        f"─── RUTA Y TIEMPOS ──────────────────────────────────────────────\n"
-        f"  Origen:            {origen_nombre}\n"
-        f"  Destino:           {destino_nombre}\n"
-        f"  Inicia Carga:      {_fmt_dt(remision.inicia_ld)}\n"
-        f"  Termina Carga:     {_fmt_dt(remision.termina_ld)}\n"
-        f"  Folio Carga:       {_txt(remision.folio_ld)}\n"
-        f"  Inicia Descarga:   {_fmt_dt(remision.inicia_dlv)}\n"
-        f"  Termina Descarga:  {_fmt_dt(remision.termina_dlv)}\n"
-        f"  Folio Descarga:    {_txt(remision.folio_dlv)}\n"
-        f"  Hora Entrada:      {_fmt_hora(remision.hora_entrada)}\n"
-        f"  Hora Salida:       {_fmt_hora(remision.hora_salida)}\n\n"
-
-        f"─── BÁSCULA Y FACTURACIÓN ───────────────────────────────────────\n"
-        f"  Peso Báscula:      {_fmt_num(remision.peso_bascula)} Kg\n"
-        f"  Folio Factura:     {_txt(remision.factura_nombre)}\n\n"
-
-        f"─── TOTALES DE PESO ─────────────────────────────────────────────\n"
-        f"  Total Carga (LD):     {_fmt_num(total_ld)} Kg\n"
-        f"  Total Descarga (DLV): {_fmt_num(total_dlv)} Kg\n"
-        f"  Total Rechazo:        {_fmt_num(total_rech)} Kg\n"
-        f"  Merma Global:         {pct_global:+.2f}%\n\n"
-
-        f"─── DETALLE POR MATERIAL ────────────────────────────────────────\n"
-        f"{detalle_total}\n\n"
-
-        f"⚠️ MATERIALES QUE SUPERAN EL UMBRAL CONFIGURADO ⚠️\n"
-        f"{lineas}\n\n"
-
-        f"─── DESTRUCCIÓN FISCAL ──────────────────────────────────────────\n"
-        f"  Fecha Destrucción: {_fmt_fecha(remision.fecha_destruccion)}\n"
-        f"  Material 1:        {_txt(remision.destruccion_material_1)}"
-        f" ({_fmt_num(remision.destruccion_peso_1)} Kg)\n"
-        f"  Material 2:        {_txt(remision.destruccion_material_2)}"
-        f" ({_fmt_num(remision.destruccion_peso_2)} Kg)\n"
-        f"  Comentarios:       {_txt(remision.comentarios_destruccion)}\n\n"
-
-        f"─── OBSERVACIONES ───────────────────────────────────────────────\n"
-        f"  Descripción:       {_txt(remision.descripcion)}\n"
-        f"  Comentario:        {_txt(remision.comentario)}\n"
-        f"  Notas TRANE:       {_txt(remision.trazabilidad_notas)}\n\n"
-
-        f"─── AUDITORÍA ───────────────────────────────────────────────────\n"
-        f"  Auditado por:      "
-        f"{_txt(remision.auditado_por.get_full_name() or remision.auditado_por.username if remision.auditado_por_id else None)}\n"
-        f"  Auditado en:       {_fmt_dt(remision.auditado_en)}\n"
-        f"  Creado en:         {_fmt_dt(remision.creado_en)}\n"
-        f"  Última actualiz.:  {_fmt_dt(remision.actualizado_en)}\n\n"
-
-        f"────────────────────────────────────────────────────────────────\n"
-        f"Por favor revisa esta remisión en el sistema:\n"
-        f"https://app.3recycling.com.mx/detalle-remision/{remision.id}\n"
-        f"────────────────────────────────────────────────────────────────\n"
-    )
-
-    destinatarios = list(DestinatarioAlertaMerma.objects.values_list('email', flat=True))
-    if not destinatarios:
-        print(f"⚠️ Sin destinatarios configurados para alertas de merma — remisión {remision.remision}")
-        return
-
-    try:
-        send_mail(
-            subject=asunto,
-            message=mensaje,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=destinatarios,
-            fail_silently=False,  # queremos saber si falla para NO registrar
-        )
-        # Registramos el envío para que no se vuelva a mandar otro correo
-        # por la misma remisión (aunque luego se edite).
-        try:
-            RemisionAlertaMermaLog.objects.create(
-                remision=remision,
-                materiales_alertados=len(alertas),
-                detalle=lineas,
-            )
-        except Exception as log_err:
-            # Si falla el log por una race condition (otro proceso ya lo
-            # creó), no pasa nada — el correo ya se envió y la presencia
-            # del log evitará duplicados.
-            print(f"⚠️ Alerta enviada pero no se pudo registrar el log: {log_err}")
-        print(f"✅ Alerta de merma enviada para la remisión {remision.remision}")
-    except Exception as e:
-        print(f"❌ Error al enviar alerta de merma: {e}")
 
 def asignar_folio_medline(remision):
     fecha_base = remision.fecha or timezone.now().date()
@@ -1113,7 +869,7 @@ def api_crear_remision(request):
                     remision.folio_medline = _folio_med
                     remision.save(update_fields=['folio_medline'])
             _update_inventory_from_remision(remision, revert=False)
-            enviar_alerta_merma(remision)
+            programar_alerta_merma(remision)  # se envía al terminar de guardar
 
             return JsonResponse({'success': True, 'remision_id': remision.pk, 'folio': remision.remision}, status=201)
 
@@ -1341,7 +1097,7 @@ def api_editar_remision(request, pk):
                     remision.folio_medline = _folio_med
                     remision.save(update_fields=['folio_medline'])
             _update_inventory_from_remision(remision, revert=False) # Re-aplicamos inventario
-            enviar_alerta_merma(remision)
+            programar_alerta_merma(remision)  # se envía al terminar de guardar
 
             return JsonResponse({'success': True, 'remision_id': remision.pk}, status=200)
 
@@ -2050,8 +1806,11 @@ def export_reportes_especificos(request):
     except ValueError:
         precio_hudson_val = 0.0
 
-    # 1. Base Queryset (Solo Terminados y Auditados)
-    queryset = Remision.objects.filter(status__in=['TERMINADO', 'AUDITADO']).select_related(
+    # 1. Base Queryset: Terminados y Auditados. PROBOCA trae todos los estatus
+    # (pendientes y canceladas incluidas) y los muestra en su columna Estatus.
+    estatus_reporte = (['TERMINADO', 'AUDITADO', 'PENDIENTE', 'CANCELADO'] if tipo_reporte == 'proboca'
+                       else ['TERMINADO', 'AUDITADO'])
+    queryset = Remision.objects.filter(status__in=estatus_reporte).select_related(
         'empresa', 'origen', 'destino', 'linea_transporte', 'operador', 'unidad'
     ).prefetch_related('detalles', 'detalles__material', 'evidencias')
 
@@ -2148,10 +1907,15 @@ def export_reportes_especificos(request):
         if con_folio_salida:
             # Sin logo en S3: título y periodo en las filas reservadas para la imagen
             ws['A1'] = "PROBOCA - Remisiones"
-            ws['A1'].font = Font(bold=True, size=14)
+            ws['A1'].font = Font(bold=True, size=14, color="1F4E79")
             ws['A2'] = periodo
+            ws['A3'] = "Incluye todos los estatus: Terminado, Auditado, Pendiente y Cancelado."
+            ws['A3'].font = Font(italic=True, size=9, color="666666")
 
-        headers = ["Remisión", "Origen", "Destino", "Fecha", "Folio Carga", "Folio Descarga"]
+        headers = ["Remisión"]
+        if con_folio_salida:
+            headers.append("Estatus")
+        headers += ["Origen", "Destino", "Fecha", "Folio Carga", "Folio Descarga"]
         if con_folio_salida:
             headers.append("Folio de Salida")
         headers += ["Operador", "Material", "Peso Carga (Kg)", "Peso Descarga (Kg)", "Links Evidencias"]
@@ -2160,21 +1924,30 @@ def export_reportes_especificos(request):
         col_evidencias = len(headers)
         ws.append(headers)
 
-        # Estilo encabezados (que ahora están en ws[start_row_table])
-        header_font = Font(bold=True)
-        yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+        # Estilo encabezados (que ahora están en ws[start_row_table]).
+        # PROBOCA: azul corporativo; los demás conservan el amarillo de siempre.
+        if con_folio_salida:
+            header_font = Font(bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+        else:
+            header_font = Font(bold=True)
+            header_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
         for cell in ws[start_row_table]:
             cell.alignment = center_style
             cell.font = header_font
-            cell.fill = yellow_fill
+            cell.fill = header_fill
+        # Color del texto de cada estatus (columna Estatus de PROBOCA)
+        color_estatus = {'TERMINADO': '2E7D32', 'AUDITADO': '1F4E79', 'PENDIENTE': 'C65911', 'CANCELADO': 'C0392B'}
 
         for remision in queryset:
             evidencias_urls = [request.build_absolute_uri(ev.archivo.url) for ev in remision.evidencias.all() if ev.archivo]
             texto_evidencias = "Descargar Evidencia" if len(evidencias_urls) == 1 else ("Múltiples Archivos" if len(evidencias_urls) > 1 else "Sin adjuntos")
 
             for d in remision.detalles.all():
-                row_data = [
-                    remision.remision,
+                row_data = [remision.remision]
+                if con_folio_salida:
+                    row_data.append(remision.get_status_display())
+                row_data += [
                     remision.origen.nombre if remision.origen else '',
                     remision.destino.nombre if remision.destino else '',
                     remision.fecha_reporte.strftime("%d/%m/%Y") if remision.fecha_reporte else "",
@@ -2198,12 +1971,24 @@ def export_reportes_especificos(request):
 
                 ws.cell(row=current_row, column=col_peso_ld).number_format = '#,##0.000'
                 ws.cell(row=current_row, column=col_peso_dlv).number_format = '#,##0.000'
+                if con_folio_salida:
+                    ws.cell(row=current_row, column=2).font = Font(
+                        bold=True, color=color_estatus.get(remision.status, '000000'))
 
                 # Link de evidencia
                 if len(evidencias_urls) == 1:
                     cell_link = ws.cell(row=current_row, column=col_evidencias)
                     cell_link.hyperlink = evidencias_urls[0]
                     cell_link.font = Font(color="0000FF", underline="single")
+
+        if con_folio_salida:
+            # Filtros en los encabezados y encabezado fijo al desplazarse
+            ultima_col = ws.cell(row=start_row_table, column=len(headers)).column_letter
+            ws.auto_filter.ref = f"A{start_row_table}:{ultima_col}{max(ws.max_row, start_row_table)}"
+            ws.freeze_panes = ws.cell(row=start_row_table + 1, column=1)
+            for col_idx, titulo in enumerate(headers, start=1):
+                ancho = 14 if titulo not in ("Origen", "Destino", "Operador", "Material", "Links Evidencias") else 22
+                ws.column_dimensions[ws.cell(row=start_row_table, column=col_idx).column_letter].width = ancho
 
     # =========================================================================
     # ESTRUCTURA PARA HUDSON
