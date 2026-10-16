@@ -55,6 +55,10 @@ urlpatterns = [
     path('remisiones/columnas/', views.guardar_columnas_remisiones, name='guardar_columnas_remisiones'),
     path('remisiones/exportar-vista/', views.exportar_vista_remisiones, name='exportar_vista_remisiones'),
     path('api/remisiones/columnas/', api_views.api_columnas_remisiones, name='api_columnas_remisiones'),
+    # Empresa y orden de folios que el usuario eligió en el diálogo de descarga (HTML y Next)
+    path('api/remisiones/opciones-descarga/', api_views.api_opciones_descarga, name='api_opciones_descarga'),
+    # Logos de las tarjetas "Reportes Específicos por Origen" (staff los sube; HTML y Next)
+    path('api/remisiones/logos-reportes/', api_views.api_logos_reportes, name='api_logos_reportes'),
 
     # API interna para obtener folio
     path('api/get-next-remision/<int:empresa_id>/', views.get_next_remision_number, name='get_next_remision_number'),

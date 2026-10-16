@@ -10,6 +10,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction, IntegrityError
 from .models import Empresa, Material, Lugar, LineaTransporte, Operador, Unidad, Contenedor
 import json
+import re
 from django.shortcuts import get_object_or_404
 from .models import (
     Remision, Empresa, Material, Lugar, ConfiguracionManifiesto,
@@ -522,6 +523,11 @@ def api_remisiones_lista(request):
     materiales_list = list(_mat_qs.values('id', 'nombre').order_by('nombre'))
     origenes_list = list(_lug_qs.filter(tipo__in=['ORIGEN', 'AMBOS']).values('id', 'nombre').order_by('nombre'))
     destinos_list = list(_lug_qs.filter(tipo__in=['DESTINO', 'AMBOS']).values('id', 'nombre').order_by('nombre'))
+    # Empresas del selector de "Opciones de Descarga" y lo último que eligió el usuario.
+    from .columnas_remisiones import empresas_para_descarga, opciones_descarga_de
+    from .logos_reportes import logos_reportes, puede_editar as puede_editar_logos
+    empresas_list = list(empresas_para_descarga(request.user).values('id', 'nombre'))
+    opciones_descarga = opciones_descarga_de(request.user, {e['id'] for e in empresas_list})
     estatus_choices = [{'value': v, 'display': d} for v, d in Remision.STATUS_CHOICES]
 
     # 9. RETORNO JSON FINAL
@@ -586,13 +592,17 @@ def api_remisiones_lista(request):
             'materiales': materiales_list,
             'origenes': origenes_list,
             'destinos': destinos_list,
+            'empresas': empresas_list,
             'estatus_choices': estatus_choices,
         },
+        'opciones_descarga': opciones_descarga,
+        'logos_reportes': logos_reportes(request),
         'permissions': {
             'can_add': request.user.has_perm('ternium.add_remision'),
             'can_change': request.user.has_perm('ternium.change_remision'),
             'can_view_plastico': request.user.has_perm('ternium.view_plastico'),
             'can_view_tarimas': request.user.has_perm('ternium.view_controltarima'),
+            'can_edit_logos': puede_editar_logos(request.user),
         },
     })
 
@@ -1312,13 +1322,38 @@ def api_remision_detalle(request, pk):
 # EXPORTS Y ACCIONES DE REMISIONES (MOVIDOS DESDE views.py)
 # =========================================================================
 
-def _con_fecha_reporte(queryset):
+def _con_fecha_reporte(queryset, request):
     """
     Agrega `fecha_reporte`: la fecha con la que se filtran, ordenan y muestran
-    TODOS los reportes de Excel. Es el día de INICIO DE DESCARGA (en hora local),
-    no el de captura; si la remisión no la tiene, se usa la fecha de captura.
+    TODOS los reportes de Excel. El usuario la elige en Opciones de Descarga
+    (fecha_base):
+      - 'descarga' (por defecto): día de INICIO DE DESCARGA (en hora local); si
+        la remisión no lo tiene, se usa la fecha de captura.
+      - 'captura': fecha de captura del folio.
     """
+    if request.GET.get('fecha_base') == 'captura':
+        return queryset.annotate(fecha_reporte=F('fecha'))
     return queryset.annotate(fecha_reporte=Coalesce(TruncDate('inicia_dlv'), 'fecha'))
+
+
+def _clave_folio(remision):
+    """Orden natural del folio: MTY-999 va antes que MTY-1000 (como texto quedaría al revés)."""
+    partes = re.split(r'(\d+)', remision.remision or '')
+    return [int(p) if i % 2 else p.upper() for i, p in enumerate(partes)]
+
+
+def _opciones_descarga(queryset, request):
+    """
+    Orden de folios del diálogo "Opciones de Descarga" (HTML y Next), común a
+    todos los reportes de Excel: 'asc' (menor a mayor) o 'desc' (mayor a
+    menor). Sin valor se deja el orden que ya traiga el reporte (por fecha).
+    El reporte por Empresa es aparte y filtra con q_empresa.
+    Con orden por folio regresa una lista, no un queryset: aplicarlo al final.
+    """
+    orden = request.GET.get('orden_folio', '')
+    if orden in ('asc', 'desc'):
+        return sorted(queryset, key=_clave_folio, reverse=(orden == 'desc'))
+    return queryset
 
 
 @login_required
@@ -1349,6 +1384,7 @@ def export_remisiones_to_excel(request):
     q_fecha_hasta = request.GET.get('q_fecha_hasta', '')
     q_folio_ld = request.GET.get('q_folio_ld', '')
     q_folio_dlv = request.GET.get('q_folio_dlv', '')
+    q_folio_salida = request.GET.get('q_folio_salida', '').strip()
 
     # Convertir precios a decimal de forma segura
     try:
@@ -1361,7 +1397,7 @@ def export_remisiones_to_excel(request):
     # 2. Construir QuerySet Base
     queryset = _con_fecha_reporte(Remision.objects.all().select_related(
         'empresa', 'origen', 'destino', 'linea_transporte', 'operador', 'unidad', 'contenedor'
-    ).prefetch_related('detalles', 'detalles__material', 'evidencias'))
+    ).prefetch_related('detalles', 'detalles__material', 'evidencias'), request)
 
     # =========================================================================
     # SI ES MEDLINE: solo filtrar por mes y origen Medline, SIN filtros generales
@@ -1400,8 +1436,9 @@ def export_remisiones_to_excel(request):
         if q_fecha_hasta: queryset = queryset.filter(fecha_reporte__lte=q_fecha_hasta)
         if q_folio_ld: queryset = queryset.filter(folio_ld__icontains=q_folio_ld)
         if q_folio_dlv: queryset = queryset.filter(folio_dlv__icontains=q_folio_dlv)
+        if q_folio_salida: queryset = queryset.filter(folio_salida__icontains=q_folio_salida)
 
-    queryset = queryset.order_by('fecha_reporte', 'pk')
+    queryset = _opciones_descarga(queryset.order_by('fecha_reporte', 'pk'), request)
 
     # 3. Crear Libro y Hoja
     wb = Workbook()
@@ -1526,6 +1563,7 @@ def export_remisiones_to_excel(request):
             "Transporte", "Operador", "Unidad", "Contenedor", "Materiales",
             "Desglose Carga (Kg)", "Total Carga (Kg)", "Folio Carga", "Inicia Carga",
             "Desglose Descarga (Kg)", "Total Descarga (Kg)", "Folio Descarga", "Termina Descarga",
+            "Folio de Salida",
             "Total Rechazo (Kg)", "Dif. Neta (Kg)", "% Merma Global",
             "Comentarios", "Links Evidencias"
         ]
@@ -1574,6 +1612,7 @@ def export_remisiones_to_excel(request):
                 mat_nombres,
                 desglose_ld, total_ld, remision.folio_ld or '', val_inicia,
                 desglose_dlv, total_dlv, remision.folio_dlv or '', val_termina,
+                remision.folio_salida or '',
                 rechazo_val, diff, porcentaje_merma,
                 remision.comentario or '', texto_evidencias
             ]
@@ -1585,18 +1624,18 @@ def export_remisiones_to_excel(request):
                 if is_pendiente: cell.fill = yellow_fill
 
             for col_idx in [2, 15, 19]: ws.cell(row=current_row, column=col_idx).number_format = 'dd/mm/yyyy'
-            for col_idx in [13, 17, 21]: ws.cell(row=current_row, column=col_idx).number_format = '#,##0.000'
-            if rechazo_val != "N/A": ws.cell(row=current_row, column=20).number_format = '#,##0.000'
+            for col_idx in [13, 17, 22]: ws.cell(row=current_row, column=col_idx).number_format = '#,##0.000'
+            if rechazo_val != "N/A": ws.cell(row=current_row, column=21).number_format = '#,##0.000'
 
             if not is_pendiente:
-                cell_diff = ws.cell(row=current_row, column=21)
+                cell_diff = ws.cell(row=current_row, column=22)
                 if diff < 0: cell_diff.font = red_font
                 elif diff > 0: cell_diff.font = green_font
 
-            ws.cell(row=current_row, column=22).number_format = '0.00%'
+            ws.cell(row=current_row, column=23).number_format = '0.00%'
 
             if len(evidencias_urls) == 1:
-                cell_link = ws.cell(row=current_row, column=24)
+                cell_link = ws.cell(row=current_row, column=25)
                 cell_link.hyperlink = evidencias_urls[0]; cell_link.font = link_font
 
     # =========================================================================
@@ -1609,6 +1648,7 @@ def export_remisiones_to_excel(request):
             "Transporte", "Operador", "Unidad", "Contenedor", "Material",
             "Peso Carga (Kg)", "Folio Carga", "Inicia Carga",
             "Peso Descarga (Kg)", "Folio Descarga", "Termina Descarga",
+            "Folio de Salida",
             "Rechazo", "Dif. (Kg)", "% Merma",
             "Comentarios", "Links Evidencias"
         ]
@@ -1659,6 +1699,7 @@ def export_remisiones_to_excel(request):
                     d['material'],
                     peso_ld, remision.folio_ld or '', val_inicia,
                     peso_dlv, remision.folio_dlv or '', val_termina,
+                    remision.folio_salida or '',
                     rechazo_val, diff, porcentaje_merma,
                     remision.comentario or '', texto_evidencias
                 ]
@@ -1671,18 +1712,18 @@ def export_remisiones_to_excel(request):
                     if is_pendiente: cell.fill = yellow_fill
 
                 for col_idx in [2, 14, 17]: ws.cell(row=current_row, column=col_idx).number_format = 'dd/mm/yyyy'
-                for col_idx in [12, 15, 19]: ws.cell(row=current_row, column=col_idx).number_format = '#,##0.000'
-                if rechazo_val != "N/A": ws.cell(row=current_row, column=18).number_format = '#,##0.000'
+                for col_idx in [12, 15, 20]: ws.cell(row=current_row, column=col_idx).number_format = '#,##0.000'
+                if rechazo_val != "N/A": ws.cell(row=current_row, column=19).number_format = '#,##0.000'
 
                 if not is_pendiente:
-                    cell_diff = ws.cell(row=current_row, column=19)
+                    cell_diff = ws.cell(row=current_row, column=20)
                     if diff < 0: cell_diff.font = red_font
                     elif diff > 0: cell_diff.font = green_font
 
-                ws.cell(row=current_row, column=20).number_format = '0.00%'
+                ws.cell(row=current_row, column=21).number_format = '0.00%'
 
                 if len(evidencias_urls) == 1:
-                    cell_link = ws.cell(row=current_row, column=22)
+                    cell_link = ws.cell(row=current_row, column=23)
                     cell_link.hyperlink = evidencias_urls[0]; cell_link.font = link_font
 
     # =========================================================================
@@ -1695,6 +1736,7 @@ def export_remisiones_to_excel(request):
             "Transporte", "Operador", "Unidad", "Contenedor", "Materiales",
             "Peso Carga (Kg)", "Folio Carga", "Inicia Carga",
             "Peso Descarga (Kg)", "Folio Descarga", "Termina Descarga",
+            "Folio de Salida",
             "Rechazo", "Dif. (Kg)", "% Merma",
             "Comentarios", "Links Evidencias"
         ]
@@ -1736,6 +1778,7 @@ def export_remisiones_to_excel(request):
                 materiales,
                 peso_ld, remision.folio_ld or '', val_inicia,
                 peso_dlv, remision.folio_dlv or '', val_termina,
+                remision.folio_salida or '',
                 rechazo_val, diff, porcentaje_merma,
                 remision.comentario or '', texto_evidencias
             ]
@@ -1748,18 +1791,18 @@ def export_remisiones_to_excel(request):
                 if is_pendiente: cell.fill = yellow_fill
 
             for col_idx in [2, 14, 17]: ws.cell(row=current_row, column=col_idx).number_format = 'dd/mm/yyyy'
-            for col_idx in [12, 15, 19]: ws.cell(row=current_row, column=col_idx).number_format = '#,##0.000'
-            if rechazo_val != "N/A": ws.cell(row=current_row, column=18).number_format = '#,##0.000'
+            for col_idx in [12, 15, 20]: ws.cell(row=current_row, column=col_idx).number_format = '#,##0.000'
+            if rechazo_val != "N/A": ws.cell(row=current_row, column=19).number_format = '#,##0.000'
 
             if not is_pendiente:
-                cell_diff = ws.cell(row=current_row, column=19)
+                cell_diff = ws.cell(row=current_row, column=20)
                 if diff < 0: cell_diff.font = red_font
                 elif diff > 0: cell_diff.font = green_font
 
-            ws.cell(row=current_row, column=20).number_format = '0.00%'
+            ws.cell(row=current_row, column=21).number_format = '0.00%'
 
             if len(evidencias_urls) == 1:
-                cell_link = ws.cell(row=current_row, column=22)
+                cell_link = ws.cell(row=current_row, column=23)
                 cell_link.hyperlink = evidencias_urls[0]; cell_link.font = link_font
 
     if ws.max_row > 1 and tipo_reporte != 'medline':
@@ -1832,8 +1875,8 @@ def export_reportes_especificos(request):
         return HttpResponse("Tipo de reporte no válido.", status=400)
 
     # 3. Aplicar Filtro Dinámico de Fechas
-    # Por fecha de INICIO DE DESCARGA, igual que todos los reportes (ver _con_fecha_reporte).
-    queryset = _con_fecha_reporte(queryset)
+    # Por la fecha que eligió el usuario (inicio de descarga o captura), ver _con_fecha_reporte.
+    queryset = _con_fecha_reporte(queryset, request)
     if tipo_filtro == 'mes' and mes_req:
         try:
             year, month = mes_req.split('-')
@@ -1845,6 +1888,7 @@ def export_reportes_especificos(request):
             queryset = queryset.filter(fecha_reporte__gte=fecha_inicio)
         if fecha_fin:
             queryset = queryset.filter(fecha_reporte__lte=fecha_fin)
+    queryset = _opciones_descarga(queryset, request)
 
     # Texto del periodo para los reportes que no llevan logo (título arriba)
     if tipo_filtro == 'mes' and mes_req:
@@ -3010,7 +3054,7 @@ def api_columnas_remisiones(request):
     en vez de redirigir a HTML, que rompería el fetch del frontend.
     """
     from .columnas_remisiones import (
-        catalogo_agrupado, columnas_por_defecto, config_de, sanear,
+        catalogo_agrupado, columnas_por_defecto, config_de, guardado_de, sanear,
     )
     from .models import Profile
 
@@ -3055,7 +3099,8 @@ def api_columnas_remisiones(request):
         claves = sanear(recibidas) if recibidas else previas
         personalizada = bool(datos.get('personalizada', True))
 
-        perfil.columnas_remisiones = {'columnas': claves, 'personalizada': personalizada}
+        # Se parte de lo guardado para no borrar las opciones de descarga.
+        perfil.columnas_remisiones = {**guardado_de(perfil), 'columnas': claves, 'personalizada': personalizada}
         perfil.save(update_fields=['columnas_remisiones'])
 
         respuesta = _payload(claves, personalizada)
@@ -3063,6 +3108,76 @@ def api_columnas_remisiones(request):
         return JsonResponse(respuesta)
 
     return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+
+# ── OPCIONES DE DESCARGA DE EXCEL ────────────────────────────────────────
+@csrf_exempt
+def api_opciones_descarga(request):
+    """Lee (GET) y guarda (POST) lo que el usuario eligió en el diálogo de
+    descarga de Excel: empresa y orden de folios. La usan el HTML y Next, así
+    que la selección se conserva entre las dos versiones."""
+    from .columnas_remisiones import (
+        empresas_para_descarga, guardar_opciones_descarga, opciones_descarga_de,
+    )
+    from .models import Profile
+
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'NO_AUTORIZADO', 'detail': 'Sesión no válida.'}, status=401)
+
+    validas = set(empresas_para_descarga(request.user).values_list('pk', flat=True))
+
+    if request.method == 'GET':
+        return JsonResponse(opciones_descarga_de(request.user, validas))
+
+    if request.method == 'POST':
+        try:
+            datos = json.loads(request.body or '{}')
+        except (ValueError, TypeError):
+            return JsonResponse({'error': 'JSON inválido'}, status=400)
+        if not isinstance(datos, dict):
+            return JsonResponse({'error': 'Se esperaba un objeto'}, status=400)
+
+        perfil, _ = Profile.objects.get_or_create(user=request.user)
+        return JsonResponse({'ok': True, **guardar_opciones_descarga(perfil, datos, validas)})
+
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+
+# ── LOGOS DE "REPORTES ESPECÍFICOS POR ORIGEN" ───────────────────────────
+def api_logos_reportes(request):
+    """
+    GET    /api/remisiones/logos-reportes/  logos vigentes {clave: {url, personalizado}}.
+    POST   (multipart: «clave», «logo») sube o reemplaza el logo de un reporte. Solo staff.
+    DELETE ?clave=…  quita el logo subido (vuelve al de siempre o al ícono). Solo staff.
+    Lo usan el HTML y Next, así que un logo subido se ve en las dos versiones.
+    """
+    from . import logos_reportes as logos
+
+    if not request.user.is_authenticated:
+        return JsonResponse({'detail': 'No autenticado.'}, status=401)
+    if request.method == 'GET':
+        return JsonResponse(logos.logos_reportes(request))
+    if request.method not in ('POST', 'DELETE'):
+        return JsonResponse({'detail': 'Método no permitido.'}, status=405)
+    if not logos.puede_editar(request.user):
+        return JsonResponse({'detail': 'Solo staff puede cambiar los logos.'}, status=403)
+
+    clave = (request.POST if request.method == 'POST' else request.GET).get('clave', '')
+    if clave not in logos.CLAVES:
+        return JsonResponse({'detail': 'Reporte no válido.'}, status=400)
+
+    if request.method == 'DELETE':
+        logos.quitar_logo(clave)
+    else:
+        archivo = request.FILES.get('logo')
+        if not archivo:
+            return JsonResponse({'detail': 'Selecciona una imagen.'}, status=400)
+        contenido, error = logos.preparar_logo(archivo)
+        if error:
+            return JsonResponse({'detail': error}, status=400)
+        logos.guardar_logo(clave, contenido, request.user)
+
+    return JsonResponse({'clave': clave, **logos.logos_reportes(request)[clave]})
 
 
 # ── PERFIL DE USUARIO ────────────────────────────────────────────────────

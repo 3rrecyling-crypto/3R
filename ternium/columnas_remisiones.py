@@ -282,6 +282,71 @@ def columnas_de(usuario):
     return [POR_CLAVE[c] for c in claves]
 
 
+def guardado_de(perfil):
+    """Copia, como dict, de lo que el usuario tiene guardado en su Profile.
+
+    En ese mismo JSON viven la tabla ('columnas', 'personalizada') y las
+    opciones de descarga ('descarga'): quien guarde una parte debe partir de
+    aquí para no borrar la otra.
+    """
+    guardado = getattr(perfil, 'columnas_remisiones', None) if perfil else None
+    if isinstance(guardado, list):
+        # Formato anterior: solo la lista de columnas.
+        return {'columnas': guardado, 'personalizada': bool(guardado)}
+    return dict(guardado) if isinstance(guardado, dict) else {}
+
+
+# ── Opciones de descarga de Excel (HTML "Opciones de Descarga" y Next) ──────
+ORDENES_FOLIO = ('asc', 'desc')
+# Fecha con la que se filtran los reportes: inicio de descarga (por defecto) o captura del folio.
+FECHAS_BASE = ('descarga', 'captura')
+
+
+def empresas_para_descarga(usuario):
+    """Empresas del selector de descarga. Un no-superusuario solo ve sus
+    empresas autorizadas."""
+    from .models import Empresa
+
+    qs = Empresa.objects.order_by('nombre')
+    if not usuario.is_superuser:
+        perfil = getattr(usuario, 'ternium_profile', None)
+        qs = qs.filter(pk__in=perfil.empresas_autorizadas.all()) if perfil else qs.none()
+    return qs
+
+
+def _limpiar_descarga(datos, empresas_validas):
+    orden = datos.get('orden_folio')
+    fecha_base = datos.get('fecha_base')
+    empresa = str(datos.get('unidad_negocio') or '')
+    if not empresa.isdigit() or int(empresa) not in empresas_validas:
+        empresa = ''
+    return {
+        'orden_folio': orden if orden in ORDENES_FOLIO else '',
+        'fecha_base': fecha_base if fecha_base in FECHAS_BASE else FECHAS_BASE[0],
+        'unidad_negocio': empresa,
+    }
+
+
+def opciones_descarga_de(usuario, empresas_validas):
+    """Lo último que el usuario eligió en el diálogo de descarga.
+
+    Devuelve {'orden_folio': 'asc'|'desc'|'', 'fecha_base': 'descarga'|'captura',
+    'unidad_negocio': '<id>'|''}. Una empresa que ya no está en
+    empresas_validas (ids) se descarta.
+    """
+    descarga = guardado_de(getattr(usuario, 'ternium_profile', None)).get('descarga')
+    return _limpiar_descarga(descarga if isinstance(descarga, dict) else {}, empresas_validas)
+
+
+def guardar_opciones_descarga(perfil, datos, empresas_validas):
+    """Guarda las opciones de descarga sin tocar la configuración de la tabla."""
+    guardado = guardado_de(perfil)
+    guardado['descarga'] = _limpiar_descarga(datos, empresas_validas)
+    perfil.columnas_remisiones = guardado
+    perfil.save(update_fields=['columnas_remisiones'])
+    return guardado['descarga']
+
+
 def formatear(valor):
     """Convierte un valor a texto para mostrarlo en una celda."""
     import datetime

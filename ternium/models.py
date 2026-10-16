@@ -1706,6 +1706,25 @@ class PrecioMedline(models.Model):
         return f"{self.mes} - Cartón: ${self.precio_carton} | Archivo: ${self.precio_archivo}"
 
 
+class LogoReporte(models.Model):
+    """
+    Logo que subió staff para una tarjeta de "Reportes Específicos por Origen"
+    (ventana de descarga de Excel, HTML y Next). Sin registro se muestra el logo
+    de siempre o un ícono (ver ternium/logos_reportes.py).
+    """
+    clave = models.CharField(max_length=30, unique=True, verbose_name="Reporte")
+    imagen = models.ImageField(upload_to='logos_reportes/', max_length=255, verbose_name="Logo")
+    actualizado = models.DateTimeField(auto_now=True)
+    actualizado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+
+    class Meta:
+        verbose_name = 'Logo de reporte'
+        verbose_name_plural = 'Logos de reportes'
+
+    def __str__(self):
+        return self.clave
+
+
 class ConfiguracionAlertaMerma(models.Model):
     """
     Umbral de merma (%) por material. Si la merma supera el umbral,

@@ -26,57 +26,35 @@
         background-color: var(--primary-color);
     }
 
-    .btn-solid-primary {
-        background-color: var(--primary-color);
-        color: white;
-        border: none;
-        font-weight: 600;
-        transition: all 0.3s ease;
+    /* BOTONES DE LA PÁGINA: mismo alto, forma y letra. Variantes: primario (acción principal),
+       claro (secundarias) y excel (todo lo que descarga Excel). */
+    .btn-3r {
+        display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
+        height: 36px; padding: 0 1rem; border-radius: 50rem; border: 1px solid transparent;
+        font-family: inherit; font-size: .85rem; font-weight: 600; line-height: 1;
+        white-space: nowrap; text-decoration: none; cursor: pointer;
+        transition: background-color .2s, border-color .2s, color .2s, box-shadow .2s;
     }
-    .btn-solid-primary:hover {
-        background-color: #1a252f; 
-        color: white;
-        box-shadow: var(--hover-shadow);
-        transform: translateY(-1px);
-    }
+    .btn-3r i { font-size: .9em; }
+    .btn-3r:focus-visible { outline: 0; box-shadow: 0 0 0 3px rgba(44, 62, 80, .25); }
+    .btn-3r-primario { background: var(--primary-color); color: #fff; }
+    .btn-3r-primario:hover { background: #1a252f; color: #fff; box-shadow: 0 4px 12px rgba(26, 37, 47, .25); }
+    .btn-3r-claro { background: #fff; color: var(--primary-color); border-color: #d5dbe1; }
+    .btn-3r-claro:hover { background: #f1f4f7; color: var(--primary-color); border-color: var(--primary-color); }
+    .btn-3r-excel { background: #fff; color: #198754; border-color: #b7dfc7; }
+    .btn-3r-excel:hover { background: #198754; color: #fff; border-color: #198754; }
 
-    .btn-solid-secondary {
-        background-color: var(--secondary-color);
-        color: white;
-        border: none;
-        font-weight: 600;
-        transition: all 0.3s ease;
+    /* Contadores del encabezado de Resultados: fichas que filtran por estatus */
+    .chip-3r {
+        display: inline-flex; align-items: center; gap: .45rem;
+        height: 30px; padding: 0 .85rem; border-radius: 50rem;
+        font-size: .8rem; font-weight: 600; color: #fff; text-decoration: none; cursor: pointer; user-select: none;
+        background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .22);
+        transition: background-color .2s;
     }
-    .btn-solid-secondary:hover {
-        background-color: #2980b9; 
-        color: white;
-        box-shadow: var(--hover-shadow);
-        transform: translateY(-1px);
-    }
-    
-    /* BOTÓN PARA NEXT.JS - NUEVO DISEÑO ELEGANTE Y LLAMATIVO */
-    .btn-dashboard-elite {
-        background: #1a252f;
-        color: #00d2ff; /* Cyan brillante elegante */
-        border: 2px solid #00d2ff;
-        border-radius: 6px; /* Más cuadrado y corporativo */
-        font-weight: 800;
-        letter-spacing: 1.5px;
-        padding: 0.6rem 2.5rem;
-        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-        box-shadow: 0 4px 15px rgba(0, 210, 255, 0.15);
-        display: inline-flex;
-        align-items: center;
-        text-decoration: none;
-        text-transform: uppercase;
-    }
-    .btn-dashboard-elite:hover {
-        background: #00d2ff;
-        color: #1a252f;
-        box-shadow: 0 8px 25px rgba(0, 210, 255, 0.4);
-        transform: translateY(-2px);
-    }
-    
+    .chip-3r:hover { background: rgba(255, 255, 255, .2); color: #fff; }
+    .chip-3r .punto { width: 8px; height: 8px; border-radius: 50%; }
+
     .section-title {
         color: var(--primary-color);
         font-size: 1.5rem;
@@ -208,18 +186,6 @@
         cursor: grabbing; 
     }
 
-    /* ESTILOS PARA CONVERTIR BADGES EN BOTONES FILTRABLES */
-    .badge-filter {
-        cursor: pointer;
-        transition: all 0.2s ease-in-out;
-        user-select: none;
-    }
-    .badge-filter:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(0,0,0,0.15) !important;
-        filter: brightness(0.95);
-    }
-
     /* Barra de Herramientas Flotante */
     .viewer-toolbar {
         position: absolute;
@@ -277,6 +243,96 @@
         box-shadow: 0 8px 20px rgba(25, 135, 84, 0.15);
     }
 
+    /* FLECHAS DE LA TABLA: capa sobre la tabla con un botón en cada esquina superior. Son sticky:
+       al bajar se quedan justo debajo de la barra del sitio (66 px). */
+    .tabla-flechas {
+        position: absolute; inset: 0; z-index: 5; pointer-events: none;
+        display: flex; justify-content: space-between; align-items: flex-start; padding: 0 .4rem;
+    }
+    .tabla-flecha {
+        position: sticky; top: 76px; margin-top: .5rem; pointer-events: auto;
+        width: 36px; height: 36px; border-radius: 50%; border: 0;
+        display: flex; align-items: center; justify-content: center;
+        background: #2c3e50; color: #fff; opacity: .85;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, .25);
+        transition: opacity .2s, transform .2s;
+    }
+    .tabla-flecha:hover { opacity: 1; transform: scale(1.08); }
+    .tabla-flecha:disabled { opacity: 0; pointer-events: none; }  /* ya en la orilla */
+
+    /* VENTANA "OPCIONES DE DESCARGA": compacta para que quepa en laptop */
+    /* Encima de la barra superior (sticky, z-index 10000): si no, en laptop tapa el encabezado de la ventana.
+       !important porque arriba .modal fija 1055 !important para todas las ventanas. */
+    #exportExcelModal { z-index: 10010 !important; }
+    #exportExcelModal .modal-body { background: #f4f6f8; }
+    /* Barra de desplazamiento visible (Edge/Chrome la ocultan hasta pasar el mouse): al abrir
+       Medline o un reporte por origen la ventana crece y hay que poder bajar. */
+    #exportExcelModal .modal-body { overflow-y: auto; scrollbar-color: #198754 #e3e8ee; }
+    #exportExcelModal .modal-body::-webkit-scrollbar { width: 12px; }
+    #exportExcelModal .modal-body::-webkit-scrollbar-track { background: #e3e8ee; border-radius: 6px; }
+    #exportExcelModal .modal-body::-webkit-scrollbar-thumb { background: #198754; border-radius: 6px; border: 2px solid #e3e8ee; }
+    #exportExcelModal .modal-body::-webkit-scrollbar-thumb:hover { background: #146c43; }
+    /* Mismos verdes de la ventana (encabezado y chips de sección) para que combine */
+    .descarga-ia {
+        display: flex; align-items: center; gap: .85rem;
+        padding: .85rem 1rem; border-radius: 12px; text-decoration: none; color: #212529;
+        background: #e8f5ee; border: 1px solid #b7dfc7;
+        transition: transform .2s, box-shadow .2s, border-color .2s;
+    }
+    .descarga-ia:hover {
+        color: #212529; border-color: #198754;
+        transform: translateY(-2px); box-shadow: 0 8px 20px rgba(25, 135, 84, .15);
+    }
+    .descarga-ia .icono {
+        width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.25rem; background: #198754; color: #fff;
+    }
+    .descarga-ia strong, .descarga-ia small { display: block; }
+    .descarga-ia strong { color: #146c43; }
+    .descarga-ia small { color: #495057; }
+    .descarga-prefs {
+        background: #fff;
+        border: 1px solid #e3e8ee;
+        border-left: 4px solid #198754;
+        border-radius: 12px;
+        padding: .85rem 1rem;
+    }
+    .descarga-seccion + .descarga-seccion { margin-top: 1.75rem; }
+    .descarga-titulo { display: flex; align-items: center; gap: .65rem; margin-bottom: .75rem; }
+    .descarga-titulo .chip {
+        width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+        display: inline-flex; align-items: center; justify-content: center;
+        background: #e8f5ee; color: #198754;
+    }
+    .descarga-titulo h6 { margin: 0; font-weight: 700; color: #212529; }
+    .descarga-titulo small { display: block; color: #6c757d; font-size: .8rem; }
+    .excel-card-option.compacta .card-body { display: flex; align-items: flex-start; gap: .75rem; padding: .85rem; }
+    .excel-card-option .icono {
+        width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
+    }
+    .excel-card-option h6 { font-weight: 700; color: #212529; margin-bottom: .2rem; }
+    .excel-card-option p { font-size: .78rem; line-height: 1.35; color: #6c757d; margin: 0; }
+    /* Tarjeta cuyo panel de opciones está abierto (Medline o reporte por origen) */
+    .excel-card-option.activa {
+        border-color: #198754;
+        background-color: #f8fff9;
+        box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.15);
+    }
+    .origen-card .card-body { padding: .85rem .5rem; text-align: center; }
+    .origen-card .logo { height: 40px; display: flex; align-items: center; justify-content: center; margin-bottom: .5rem; }
+    .origen-card .logo img { max-height: 40px; max-width: 100%; object-fit: contain; }
+    .origen-card h6 { font-size: .85rem; }
+    /* Botones de staff para el logo: aparecen al pasar el mouse (siempre en pantallas táctiles) */
+    .origen-card .logo-acciones {
+        position: absolute; top: .35rem; right: .35rem; z-index: 2;
+        display: flex; gap: .25rem; opacity: 0; transition: opacity .2s;
+    }
+    .origen-card .logo-acciones .btn { padding: .1rem .35rem; font-size: .75rem; border: 1px solid #dee2e6; }
+    .origen-card:hover .logo-acciones, .origen-card .logo-acciones:focus-within { opacity: 1; }
+    @media (hover: none) { .origen-card .logo-acciones { opacity: 1; } }
+
 </style>
 {% endblock %}
 
@@ -299,17 +355,14 @@
         </div>
         
         <div class="d-flex flex-wrap gap-2">
-            
-            <a href="https://app.3recycling.com.mx/diesel/dashboard_Operacion" target="_blank" class="btn-dashboard-elite shadow-sm py-2 px-3">
-                <i class="fas fa-chart-pie me-2"></i>DASHBOARD OPERACIONES
+            <a href="https://app.3recycling.com.mx/diesel/dashboard_Operacion" target="_blank" class="btn-3r btn-3r-claro">
+                <i class="fas fa-chart-pie"></i>Dashboard Operaciones
             </a>
-            
             {% if perms.ternium.add_remision %}
-            <a href="{% url 'crear_remision' %}" class="btn btn-solid-primary shadow-sm py-2 px-3 rounded-pill">
-                <i class="fas fa-plus-circle me-2"></i>NUEVA REMISION
+            <a href="{% url 'crear_remision' %}" class="btn-3r btn-3r-primario">
+                <i class="fas fa-plus"></i>Nueva Remisión
             </a>
             {% endif %}
-            
         </div>
     </div>
 
@@ -320,8 +373,9 @@
         </div>
         <div class="card-body collapse show" id="filterCollapse" style="background-color: #f8f9fa;">
             <form method="get" action="" class="needs-validation" novalidate id="filterForm">
+                {# Rejilla: 6 campos por fila en laptop (xl), 4 en lg, 3 en tableta, 2 en sm y 1 en celular. #}
                 <div class="row g-3">
-                    <div class="col-md-4">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
                         <label for="q_remision" class="form-label small fw-bold">N° Remisión</label>
                         <input type="text" name="q_remision" id="q_remision" class="form-control form-control-sm" placeholder="Buscar por número exacto..." value="{{ search_params.q_remision|default:'' }}" list="remision-list">
                         <datalist id="remision-list">
@@ -330,7 +384,7 @@
                             {% endfor %}
                         </datalist>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
                         <label for="q_prefijo" class="form-label small fw-bold">Operación</label>
                         <select name="q_prefijo" id="q_prefijo" class="form-select form-select-sm searchable-select">
                             <option value="" {% if not search_params.q_prefijo %}selected{% endif %}>Todas</option>
@@ -339,7 +393,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
                         <label for="q_material" class="form-label small fw-bold">Material</label>
                         <select name="q_material" id="q_material" class="form-select form-select-sm searchable-select">
                             <option value="">Todos</option>
@@ -348,8 +402,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    
-                    <div class="col-md-3">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
                         <label for="q_status" class="form-label small fw-bold">Estatus</label>
                         <select name="q_status" id="q_status" class="form-select form-select-sm searchable-select">
                             <option value="">Todos</option>
@@ -358,7 +411,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
                         <label for="q_origen" class="form-label small fw-bold">Origen</label>
                         <select name="q_origen" id="q_origen" class="form-select form-select-sm searchable-select">
                             <option value="">Todos</option>
@@ -367,7 +420,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
                         <label for="q_destino" class="form-label small fw-bold">Destino</label>
                         <select name="q_destino" id="q_destino" class="form-select form-select-sm searchable-select">
                             <option value="">Todos</option>
@@ -376,53 +429,52 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
                         <label for="q_operador" class="form-label small fw-bold">Operador</label>
                         <input type="text" name="q_operador" id="q_operador" class="form-control form-control-sm" placeholder="Buscar por nombre..." value="{{ search_params.q_operador|default:'' }}">
                     </div>
-
-                    <div class="col-md-3">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
                         <label for="q_fecha_desde" class="form-label small fw-bold">Fecha desde</label>
                         <input type="date" name="q_fecha_desde" id="q_fecha_desde" class="form-control form-control-sm" value="{{ search_params.q_fecha_desde|default:'' }}">
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
                         <label for="q_fecha_hasta" class="form-label small fw-bold">Fecha hasta</label>
                         <input type="date" name="q_fecha_hasta" id="q_fecha_hasta" class="form-control form-control-sm" value="{{ search_params.q_fecha_hasta|default:'' }}">
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
                         <label for="q_folio_ld" class="form-label small fw-bold text-primary">Folio Carga</label>
                         <input type="text" name="q_folio_ld" id="q_folio_ld" class="form-control form-control-sm" placeholder="" value="{{ search_params.q_folio_ld|default:'' }}">
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
                         <label for="q_folio_dlv" class="form-label small fw-bold text-primary">Folio Descarga</label>
                         <input type="text" name="q_folio_dlv" id="q_folio_dlv" class="form-control form-control-sm" placeholder="" value="{{ search_params.q_folio_dlv|default:'' }}">
                     </div>
-                    <div class="col-md-3">
-                        <label for="q_destruccion" class="form-label small fw-bold text-black"></i> Destrucción Fiscal</label>
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
+                        <label for="q_folio_salida" class="form-label small fw-bold text-primary">Folio de Salida</label>
+                        <input type="text" name="q_folio_salida" id="q_folio_salida" class="form-control form-control-sm" placeholder="" value="{{ search_params.q_folio_salida|default:'' }}">
+                    </div>
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
+                        <label for="q_destruccion" class="form-label small fw-bold text-black">Destrucción Fiscal</label>
                         <select name="q_destruccion" id="q_destruccion" class="form-select form-select-sm searchable-select border-danger">
                             <option value="">Todos</option>
                             <option value="COMPLETO" {% if search_params.q_destruccion == 'COMPLETO' %}selected{% endif %}> Formato Completo</option>
                             <option value="PENDIENTE" {% if search_params.q_destruccion == 'PENDIENTE' %}selected{% endif %}> Formato Incompleto</option>
                         </select>
                     </div>
-                </div>
-                
-                <div class="row mt-4">
-                    <div class="col-12 d-flex justify-content-end align-items-center">
-                        
-                        <button type="button" class="btn btn-outline-info btn-sm me-2 rounded-pill py-2 px-3 fw-bold" data-bs-toggle="modal" data-bs-target="#modalExportarMedline">
-                            <i class="fas fa-file-archive me-2"></i>Docs Medline (ZIP)
-                        </button>
 
-                        <button type="button" class="btn btn-outline-success btn-sm me-2 rounded-pill py-2 px-3 fw-bold" data-bs-toggle="modal" data-bs-target="#exportExcelModal">
-                            <i class="fas fa-file-excel me-2"></i>Exportar a Excel
+                    {# Botones: en laptop comparten fila con el último campo; si no caben, bajan de renglón. #}
+                    <div class="col-12 col-lg d-flex flex-wrap justify-content-end align-items-end gap-2">
+                        <button type="button" class="btn-3r btn-3r-claro" data-bs-toggle="modal" data-bs-target="#modalExportarMedline">
+                            <i class="fas fa-file-archive"></i>Docs Medline (ZIP)
                         </button>
-                        
-                        <a href="{% url 'remision_lista' %}" class="btn btn-outline-secondary btn-sm me-2 rounded-pill py-2 px-3">
-                            <i class="fas fa-broom me-2"></i>Limpiar Filtros
+                        <button type="button" class="btn-3r btn-3r-excel" data-bs-toggle="modal" data-bs-target="#exportExcelModal">
+                            <i class="fas fa-file-excel"></i>Exportar a Excel
+                        </button>
+                        <a href="{% url 'remision_lista' %}" class="btn-3r btn-3r-claro">
+                            <i class="fas fa-broom"></i>Limpiar Filtros
                         </a>
-                        <button type="submit" class="btn btn-solid-primary btn-sm shadow-sm rounded-pill py-2 px-3">
-                            <i class="fas fa-search me-2"></i>Aplicar Filtros
+                        <button type="submit" class="btn-3r btn-3r-primario">
+                            <i class="fas fa-search"></i>Aplicar Filtros
                         </button>
                     </div>
                 </div>
@@ -432,31 +484,40 @@
 
     <div class="card shadow border-0">
         <div class="card-header py-3 bg-primary-solid text-white">
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <h6 class="m-0 font-weight-bold"><i class="fas fa-list-ol me-2"></i>Resultados</h6>
-                <div>
-                    <a onclick="filtrarPorEstatus('')" title="Mostrar Todos" class="badge rounded-pill py-2 px-3 shadow-sm text-decoration-none badge-filter" style="background-color: var(--light-color); color: var(--primary-color); border: 1px solid var(--primary-color);">
-                        {{ page_obj.paginator.count|default:"0" }} registros encontrados
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    {# Contadores: fichas iguales que filtran la lista; el punto da el color del estatus #}
+                    <a onclick="filtrarPorEstatus('')" title="Mostrar Todos" class="chip-3r">
+                        <span class="punto" style="background: #fff;"></span>{{ page_obj.paginator.count|default:"0" }} registros
                     </a>
-                    <a onclick="filtrarPorEstatus('PENDIENTE')" title="Ver solo Pendientes" class="badge rounded-pill py-2 px-3 shadow-sm ms-2 text-decoration-none badge-filter" style="background-color: var(--secondary-color); color: white;">
-                        <i class="fas fa-clock me-1"></i> {{ total_pendientes|default:"0" }} pendientes
+                    <a onclick="filtrarPorEstatus('PENDIENTE')" title="Ver solo Pendientes" class="chip-3r">
+                        <span class="punto" style="background: #f1c40f;"></span>{{ total_pendientes|default:"0" }} pendientes
                     </a>
-                    <a onclick="filtrarPorEstatus('CANCELADO')" title="Ver solo Cancelados" class="badge rounded-pill py-2 px-3 shadow-sm ms-2 text-decoration-none badge-filter" style="background-color: var(--primary-color); color: white; border: 1px solid rgba(255,255,255,0.2);">
-                        <i class="fas fa-ban me-1"></i> {{ total_cancelados|default:"0" }} cancelados
+                    <a onclick="filtrarPorEstatus('CANCELADO')" title="Ver solo Cancelados" class="chip-3r">
+                        <span class="punto" style="background: #e74c3c;"></span>{{ total_cancelados|default:"0" }} cancelados
                     </a>
-                    <button type="button" class="btn btn-sm btn-light rounded-pill py-2 px-3 shadow-sm ms-2 fw-bold" data-bs-toggle="modal" data-bs-target="#modalPersonalizarTabla" title="Elegir las columnas de la tabla">
-                        <i class="fas fa-table-columns me-1"></i> Personalizar tabla
-                        {% if usa_tabla_personalizada %}<span class="badge bg-success ms-1">Mi vista</span>{% endif %}
+                    <button type="button" class="btn-3r btn-3r-claro" data-bs-toggle="modal" data-bs-target="#modalPersonalizarTabla" title="Elegir las columnas de la tabla">
+                        <i class="fas fa-table-columns"></i>Personalizar tabla
+                        {% if usa_tabla_personalizada %}<span class="badge bg-success">Mi vista</span>{% endif %}
                     </button>
-                    <button type="button" class="btn btn-sm btn-light rounded-pill py-2 px-3 shadow-sm ms-2 fw-bold text-success" data-bs-toggle="modal" data-bs-target="#modalExcelVista" title="Excel con estas columnas y los filtros aplicados">
-                        <i class="fas fa-file-excel me-1"></i> Excel de esta vista
+                    <button type="button" class="btn-3r btn-3r-excel" data-bs-toggle="modal" data-bs-target="#modalExcelVista" title="Excel con estas columnas y los filtros aplicados">
+                        <i class="fas fa-file-excel"></i>Excel de esta vista
                     </button>
                 </div>
             </div>
         </div>
         
-        <div class="card-body p-0">
-            <div class="table-responsive">
+        <div class="card-body p-0 position-relative" id="cajaTabla">
+            {% comment %}
+            Flechas para recorrer la tabla de lado: en laptop no caben todas las columnas y la
+            barra horizontal queda hasta abajo. Van en las esquinas y se quedan visibles al bajar.
+            {% endcomment %}
+            <div class="tabla-flechas d-none">
+                <button type="button" class="tabla-flecha" data-dir="-1" title="Ver columnas a la izquierda"><i class="fas fa-chevron-left"></i></button>
+                <button type="button" class="tabla-flecha" data-dir="1" title="Ver columnas a la derecha"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            <div class="table-responsive" id="scrollTabla">
                 <table class="table table-hover table-sm mb-0" id="tablaRemisiones">
                     <thead style="background-color: #f0f7fc;">
                         <tr>
@@ -634,59 +695,107 @@
 </div>
 
 <div class="modal fade" id="exportExcelModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-centered">
+  {# scrollable: en laptop el encabezado queda fijo y solo se desplaza el contenido #}
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content border-0 shadow-lg">
       <div class="modal-header bg-success text-white">
         <h5 class="modal-title"><i class="fas fa-file-excel me-2"></i>Opciones de Descarga</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body p-4 bg-light">
-          <p class="text-muted text-center mb-1">Selecciona el formato en el que deseas exportar los datos filtrados:</p>
-          <p class="small text-center mb-4"><span class="badge bg-info-subtle text-info-emphasis border border-info-subtle"><i class="fas fa-calendar-day me-1"></i>Todos los reportes filtran y muestran la fecha de <strong>inicio de descarga</strong></span></p>
-          
-          <div class="row g-3">
-              <div class="col-md-3">
-                  <div class="card excel-card-option h-100" onclick="descargarExcel('normal')">
-                      <div class="card-body text-center">
-                          <i class="fas fa-file-excel fa-3x text-secondary mb-3"></i>
-                          <h5 class="fw-bold text-dark">Versión Normal</h5>
-                          <p class="small text-muted mb-0">1 fila por remisión. Agrupa todos los materiales y suma los kilos totales sin desgloses.</p>
-                      </div>
-                  </div>
-              </div>
-              
-              <div class="col-md-3">
-                  <div class="card excel-card-option h-100" onclick="descargarExcel('concentrado')">
-                      <div class="card-body text-center">
-                          <i class="fas fa-layer-group fa-3x text-primary mb-3"></i>
-                          <h5 class="fw-bold text-dark">Resumen Concentrado</h5>
-                          <p class="small text-muted mb-0">1 fila por remisión. Muestra el total de la carga y el desglose separado por ( | ).</p>
-                      </div>
-                  </div>
-              </div>
+      <div class="modal-body p-3 p-lg-4">
 
-              <div class="col-md-3">
-                  <div class="card excel-card-option h-100" onclick="descargarExcel('detallado')">
-                      <div class="card-body text-center">
-                          <i class="fas fa-list-ul fa-3x text-success mb-3"></i>
-                          <h5 class="fw-bold text-dark">Remisiones a Detalle</h5>
-                          <p class="small text-muted mb-0">1 fila por cada material individual. Ideal para análisis profundo.</p>
-                      </div>
-                  </div>
-              </div>
+          {# Reporte con IA: abre la página de Reportes con IA de Next en otra pestaña #}
+          <a href="{{ NEXT_APP_URL }}/reportes-ia" target="_blank" rel="noopener" class="descarga-ia mb-4">
+              <span class="icono"><i class="fas fa-magic"></i></span>
+              <span class="flex-grow-1">
+                  <strong>Reporte con IA</strong>
+                  <small>Personaliza un reporte tú mismo con la IA más potente del mercado.</small>
+              </span>
+              <span class="btn btn-success btn-sm fw-bold rounded-pill px-3 text-nowrap">Abrir <i class="fas fa-external-link-alt ms-1"></i></span>
+          </a>
 
-              <div class="col-md-3">
-                  <div class="card excel-card-option h-100" onclick="mostrarOpcionesMedline()">
-                      <div class="card-body text-center">
-                          <i class="fas fa-file-medical fa-3x text-danger mb-3"></i>
-                          <h5 class="fw-bold text-dark">Reportes Medline</h5>
-                          <p class="small text-muted mb-0">Generar reporte de Cartón o Archivo Muerto por separado.</p>
-                      </div>
+          {# Fecha y orden de folios: aplican a TODOS los reportes de esta ventana y se guardan en el perfil #}
+          <div class="descarga-prefs mb-4">
+              <div class="row g-2 g-lg-3 align-items-end">
+                  <div class="col-12 col-lg-4">
+                      <div class="fw-bold text-dark"><i class="fas fa-sliders-h text-success me-2"></i>Preferencias</div>
+                      <div class="small text-muted" id="avisoOpcionesDescarga"><i class="fas fa-save me-1"></i>Aplican a todos los reportes y se guardan solas.</div>
+                  </div>
+                  <div class="col-sm-6 col-lg-4">
+                      <label for="descargaFechaBase" class="small fw-bold text-muted"><i class="fas fa-calendar-alt me-1"></i>Filtrar y mostrar fechas por</label>
+                      <select id="descargaFechaBase" class="form-select form-select-sm" onchange="guardarOpcionesDescarga()">
+                          <option value="descarga">Inicio de descarga</option>
+                          <option value="captura" {% if opciones_descarga.fecha_base == 'captura' %}selected{% endif %}>Captura del folio</option>
+                      </select>
+                  </div>
+                  <div class="col-sm-6 col-lg-4">
+                      <label for="descargaOrdenFolio" class="small fw-bold text-muted"><i class="fas fa-sort-numeric-down me-1"></i>Orden de folios</label>
+                      <select id="descargaOrdenFolio" class="form-select form-select-sm" onchange="guardarOpcionesDescarga()">
+                          {# Sin orden de folio se deja el del reporte: por la fecha elegida arriba #}
+                          <option value="">Por fecha</option>
+                          <option value="asc" {% if opciones_descarga.orden_folio == 'asc' %}selected{% endif %}>Folio: menor a mayor</option>
+                          <option value="desc" {% if opciones_descarga.orden_folio == 'desc' %}selected{% endif %}>Folio: mayor a menor</option>
+                      </select>
                   </div>
               </div>
           </div>
 
-          <div id="opcionesMedline" class="row mt-4 d-none">
+          <section class="descarga-seccion">
+              <div class="descarga-titulo">
+                  <span class="chip"><i class="fas fa-filter"></i></span>
+                  <div>
+                      <h6>Reportes de la lista</h6>
+                      <small>Usan los filtros que tienes aplicados. Fechas por <strong id="textoFechaBase">{% if opciones_descarga.fecha_base == 'captura' %}captura del folio{% else %}inicio de descarga{% endif %}</strong>.</small>
+                  </div>
+              </div>
+              <div class="row g-2 g-lg-3">
+                  <div class="col-sm-6 col-lg-3">
+                      <div class="card excel-card-option compacta h-100" onclick="descargarExcel('normal')">
+                          <div class="card-body">
+                              <span class="icono bg-secondary-subtle text-secondary"><i class="fas fa-file-excel"></i></span>
+                              <div>
+                                  <h6>Versión Normal</h6>
+                                  <p>1 fila por remisión. Suma los kilos de todos los materiales, sin desglose.</p>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+                  <div class="col-sm-6 col-lg-3">
+                      <div class="card excel-card-option compacta h-100" onclick="descargarExcel('concentrado')">
+                          <div class="card-body">
+                              <span class="icono bg-primary-subtle text-primary"><i class="fas fa-layer-group"></i></span>
+                              <div>
+                                  <h6>Resumen Concentrado</h6>
+                                  <p>1 fila por remisión. Total de la carga y desglose separado por ( | ).</p>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+                  <div class="col-sm-6 col-lg-3">
+                      <div class="card excel-card-option compacta h-100" onclick="descargarExcel('detallado')">
+                          <div class="card-body">
+                              <span class="icono bg-success-subtle text-success"><i class="fas fa-list-ul"></i></span>
+                              <div>
+                                  <h6>Remisiones a Detalle</h6>
+                                  <p>1 fila por cada material. Ideal para análisis a fondo.</p>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+                  <div class="col-sm-6 col-lg-3">
+                      <div class="card excel-card-option compacta h-100" data-reporte="medline" onclick="mostrarOpcionesMedline()">
+                          <div class="card-body">
+                              <span class="icono bg-danger-subtle text-danger"><i class="fas fa-file-medical"></i></span>
+                              <div>
+                                  <h6>Reportes Medline</h6>
+                                  <p>Cartón y Archivo Muerto por mes, con su precio. No usa los filtros de la lista.</p>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+
+          <div id="opcionesMedline" class="row mt-3 d-none">
               <div class="col-12">
                   <div class="card border-danger shadow-sm">
                       <div class="card-header bg-danger text-white py-2">
@@ -718,72 +827,90 @@
               </div>
           </div>
 
-          <hr class="my-4">
-          <h6 class="fw-bold text-dark mb-3"><i class=""></i>Reportes Específicos por Origen</h6>
-          
-          <div class="row g-3">
-              <div class="col-md-3">
-                  <div class="card excel-card-option h-100" onclick="abrirMenuEspecifico('huaxing', 'HUAXING')">
-                      <div class="card-body text-center">
-                          <img src="https://3rrecycling.s3.amazonaws.com/static/Fotos_Reportes/HUAXING.jpg" alt="Logo HUAXING" style="height: 60px; width: auto; object-fit: contain;" class="mb-3">
-                          <h5 class="fw-bold text-dark">HUAXING</h5>
-                          <p class="small text-muted mb-0">Reporte de cargas y descargas.</p>
-                      </div>
-                  </div>
-              </div>
-              
-              <div class="col-md-3">
-                  <div class="card excel-card-option h-100" onclick="abrirMenuEspecifico('bachoco', 'BACHOCO')">
-                      <div class="card-body text-center">
-                          <img src="https://3rrecycling.s3.amazonaws.com/static/Fotos_Reportes/BACHOCO.png" alt="Logo BACHOCO" style="height: 60px; width: auto; object-fit: contain;" class="mb-3">
-                          <h5 class="fw-bold text-dark">BACHOCO</h5>
-                          <p class="small text-muted mb-0">Reporte de cargas y descargas.</p>
-                      </div>
-                  </div>
-              </div>
-              
-              <div class="col-md-3">
-                  <div class="card excel-card-option h-100" onclick="abrirMenuEspecifico('trane', 'TRANE')">
-                      <div class="card-body text-center">
-                          <img src="https://3rrecycling.s3.amazonaws.com/static/Fotos_Reportes/TRANE.png" alt="Logo TRANE" style="height: 60px; width: auto; object-fit: contain;" class="mb-3">
-                          <h5 class="fw-bold text-dark">TRANE</h5>
-                          <p class="small text-muted mb-0">Reporte de cargas y descargas.</p>
-                      </div>
-                  </div>
-              </div>
-              
-              <div class="col-md-3">
-                  <div class="card excel-card-option h-100" onclick="abrirMenuEspecifico('hudson', 'HUDSON')">
-                      <div class="card-body text-center">
-                          <img src="https://3rrecycling.s3.amazonaws.com/static/Fotos_Reportes/HUDSON.png" alt="Logo HUDSON" style="height: 60px; width: auto; object-fit: contain;" class="mb-3">
-                          <h5 class="fw-bold text-dark">HUDSON</h5>
-                          <p class="small text-muted mb-0">Reporte con precios y ventas.</p>
-                      </div>
-                  </div>
-              </div>
+          </section>
 
-              <div class="col-md-3">
-                  <div class="card excel-card-option h-100" onclick="abrirMenuEspecifico('sealed-air', 'SEALED-AIR')">
-                      <div class="card-body text-center">
-                          <i class="fas fa-box-open fa-3x text-info mb-3" style="height: 60px; line-height: 60px;"></i>
-                          <h5 class="fw-bold text-dark">SEALED-AIR</h5>
-                          <p class="small text-muted mb-0">Remisión, origen, destino, material, kg, precio y total. Una fila por material.</p>
+          {# Reporte por Empresa: descarga aparte, con su empresa y sus fechas (no usa los filtros de la lista) #}
+          <section class="descarga-seccion">
+              <div class="descarga-titulo">
+                  <span class="chip"><i class="fas fa-building"></i></span>
+                  <div>
+                      <h6>Reporte por Empresa</h6>
+                      <small>No usa los filtros de la lista. Sin fechas descarga todas las remisiones de la empresa.</small>
+                  </div>
+              </div>
+              <div class="card border-0 shadow-sm">
+                  <div class="card-body py-3">
+                      <div class="row g-2 align-items-end">
+                          <div class="col-12 col-lg-4">
+                              <label for="descargaEmpresa" class="small fw-bold text-muted">Empresa</label>
+                              <select id="descargaEmpresa" class="form-select form-select-sm" onchange="guardarOpcionesDescarga()">
+                                  <option value="">Seleccione Empresa...</option>
+                                  {% for emp in empresas_descarga %}
+                                  <option value="{{ emp.pk }}" {% if opciones_descarga.unidad_negocio == emp.pk|stringformat:"s" %}selected{% endif %}>{{ emp.nombre }}</option>
+                                  {% endfor %}
+                              </select>
+                          </div>
+                          <div class="col-6 col-lg-2">
+                              <label for="empresaFechaDesde" class="small fw-bold text-muted">Desde</label>
+                              <input type="date" id="empresaFechaDesde" class="form-control form-control-sm">
+                          </div>
+                          <div class="col-6 col-lg-2">
+                              <label for="empresaFechaHasta" class="small fw-bold text-muted">Hasta</label>
+                              <input type="date" id="empresaFechaHasta" class="form-control form-control-sm">
+                          </div>
+                          <div class="col-6 col-lg-2">
+                              <label for="empresaFormato" class="small fw-bold text-muted">Formato</label>
+                              <select id="empresaFormato" class="form-select form-select-sm">
+                                  <option value="normal">Normal</option>
+                                  <option value="concentrado">Concentrado</option>
+                                  <option value="detallado">A Detalle</option>
+                              </select>
+                          </div>
+                          <div class="col-6 col-lg-2">
+                              <button type="button" class="btn btn-success btn-sm w-100 fw-bold" onclick="descargarReporteEmpresa()">
+                                  <i class="fas fa-download me-2"></i>Descargar
+                              </button>
+                          </div>
                       </div>
                   </div>
               </div>
+          </section>
 
-              <div class="col-md-3">
-                  <div class="card excel-card-option h-100" onclick="abrirMenuEspecifico('proboca', 'PROBOCA')">
-                      <div class="card-body text-center">
-                          <i class="fas fa-sign-out-alt fa-3x text-primary mb-3" style="height: 60px; line-height: 60px;"></i>
-                          <h5 class="fw-bold text-dark">PROBOCA</h5>
-                          <p class="small text-muted mb-0">Reporte de cargas y descargas con Folio de Salida y estatus (terminadas, pendientes y canceladas).</p>
-                      </div>
+          {# Reportes por origen: los 6 en una fila en laptop; cada uno abre su panel de periodo abajo #}
+          <section class="descarga-seccion">
+              <div class="descarga-titulo">
+                  <span class="chip"><i class="fas fa-industry"></i></span>
+                  <div>
+                      <h6>Reportes Específicos por Origen</h6>
+                      <small>Cada uno con su propio mes o rango de fechas. No usan los filtros de la lista.</small>
                   </div>
               </div>
-          </div>
+              <div class="row g-2 g-lg-3">
+                  {% for r in reportes_origen %}
+                  <div class="col-6 col-md-4 col-xl-2">
+                      <div class="card excel-card-option origen-card h-100" data-reporte="{{ r.clave }}" onclick="abrirMenuEspecifico('{{ r.clave }}', '{{ r.nombre }}')">
+                          {% if puede_editar_logos %}
+                          {# Solo staff: subir o quitar el logo. No abre el panel del reporte. #}
+                          <div class="logo-acciones" onclick="event.stopPropagation()">
+                              <button type="button" class="btn btn-light btn-sm" title="Subir logo" onclick="elegirLogo('{{ r.clave }}')"><i class="fas fa-camera"></i></button>
+                              <button type="button" class="btn btn-light btn-sm text-danger quitar-logo {% if not r.personalizado %}d-none{% endif %}" title="Quitar el logo subido" onclick="quitarLogo('{{ r.clave }}')"><i class="fas fa-trash-alt"></i></button>
+                          </div>
+                          {% endif %}
+                          <div class="card-body">
+                              <div class="logo" data-icono="{{ r.icono }}">
+                                  {# Respaldo en línea: la imagen puede fallar antes de que cargue el script de la página #}
+                                  {% if r.logo %}<img src="{{ r.logo }}" alt="Logo {{ r.nombre }}" onerror="this.onerror=null; var i=document.createElement('i'); i.className='fas {{ r.icono }} fa-2x'; this.replaceWith(i);">{% else %}<i class="fas {{ r.icono }} fa-2x"></i>{% endif %}
+                              </div>
+                              <h6>{{ r.nombre }}</h6>
+                              <p>{{ r.descripcion }}</p>
+                          </div>
+                      </div>
+                  </div>
+                  {% endfor %}
+              </div>
+              {% if puede_editar_logos %}<input type="file" id="inputLogoReporte" class="d-none" accept="image/png,image/jpeg,image/webp,image/gif">{% endif %}
 
-          <div id="opcionesEspecificas" class="row mt-4 d-none">
+          <div id="opcionesEspecificas" class="row mt-3 d-none">
               <div class="col-12">
                   <div class="card border-primary shadow-sm">
                       <div class="card-header bg-primary text-white py-2">
@@ -794,7 +921,7 @@
                           
                           <div class="row g-3 align-items-end">
                               <div class="col-md-3">
-                                  <label class="small fw-bold text-muted d-block mb-1">Filtrar fechas por:</label>
+                                  <label class="small fw-bold text-muted d-block mb-1">Periodo</label>
                                   <div class="form-check form-check-inline">
                                       <input class="form-check-input" type="radio" name="tipoFiltroEspecifico" id="filtroMes" value="mes" checked onchange="toggleFiltroEspecifico()">
                                       <label class="form-check-label" for="filtroMes">Un Mes</label>
@@ -838,6 +965,7 @@
                   </div>
               </div>
           </div>
+          </section>
       </div>
     </div>
   </div>
@@ -901,9 +1029,11 @@
       </div>
       <div class="modal-body p-4 bg-light">
 
-        {# Token propio: el form de filtros es GET y los demás {% csrf_token %}
-           de la página son condicionales, así que la cookie csrftoken puede no
-           existir y el guardado se caía con 403. #}
+        {% comment %}
+        Token propio: el form de filtros es GET y los demás csrf_token
+        de la página son condicionales, así que la cookie csrftoken puede no
+        existir y el guardado se caía con 403.
+        {% endcomment %}
         {% csrf_token %}
 
         {# Selector de vista: la de siempre o la que armó el usuario #}
@@ -1432,12 +1562,91 @@ $(document).ready(function() {
     });
 });
 
+// --- FLECHAS PARA RECORRER LA TABLA DE LADO (solo si no caben las columnas) ---
+(function () {
+    const scroll = document.getElementById('scrollTabla');
+    const capa = document.querySelector('#cajaTabla .tabla-flechas');
+    if (!scroll || !capa) return;
+    const [izq, der] = capa.querySelectorAll('.tabla-flecha');
+    function actualizar() {
+        const sobra = scroll.scrollWidth - scroll.clientWidth;
+        capa.classList.toggle('d-none', sobra <= 1);
+        izq.disabled = scroll.scrollLeft <= 1;
+        der.disabled = scroll.scrollLeft >= sobra - 1;
+    }
+    capa.querySelectorAll('.tabla-flecha').forEach(b => b.addEventListener('click', () => {
+        scroll.scrollBy({ left: Number(b.dataset.dir) * scroll.clientWidth * 0.6, behavior: 'smooth' });
+    }));
+    scroll.addEventListener('scroll', actualizar, { passive: true });
+    window.addEventListener('resize', actualizar);
+    window.addEventListener('load', actualizar);  // las fuentes cambian el ancho de las columnas
+    actualizar();
+})();
+
+// --- FECHA (inicio de descarga / captura) Y ORDEN DE FOLIOS: aplican a todos los reportes ---
+function opcionesDescarga() {
+    return `&fecha_base=${encodeURIComponent($('#descargaFechaBase').val() || '')}`
+        + `&orden_folio=${encodeURIComponent($('#descargaOrdenFolio').val() || '')}`;
+}
+
+// --- REPORTE POR EMPRESA (aparte: solo empresa, fechas y formato) ---
+function descargarReporteEmpresa() {
+    const empresa = $('#descargaEmpresa').val();
+    if (!empresa) {
+        alert("Selecciona la empresa del reporte.");
+        return;
+    }
+    const params = new URLSearchParams({
+        tipo_reporte: $('#empresaFormato').val(),
+        q_empresa: empresa,
+        q_fecha_desde: $('#empresaFechaDesde').val(),
+        q_fecha_hasta: $('#empresaFechaHasta').val(),
+    });
+    $('#exportExcelModal').modal('hide');
+    $('#loadingOverlay').removeClass('d-none');
+    window.location.href = `{% url 'export_remisiones_to_excel' %}?${params.toString()}${opcionesDescarga()}`;
+    setTimeout(function(){ $('#loadingOverlay').addClass('d-none'); }, 4000);
+}
+
+// Se guardan en el perfil del usuario: la próxima vez (aquí o en Next) ya vienen elegidas.
+function guardarOpcionesDescarga() {
+    const aviso = $('#avisoOpcionesDescarga');
+    $('#textoFechaBase').text($('#descargaFechaBase').val() === 'captura' ? 'captura del folio' : 'inicio de descarga');
+    const csrfToken = document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] || '';
+    fetch("{% url 'api_opciones_descarga' %}", {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({
+            unidad_negocio: $('#descargaEmpresa').val() || '',
+            orden_folio: $('#descargaOrdenFolio').val() || '',
+            fecha_base: $('#descargaFechaBase').val() || '',
+        }),
+    })
+    .then(res => avisoGuardado(aviso, res.ok))
+    .catch(() => avisoGuardado(aviso, false));
+}
+
+function avisoGuardado(aviso, ok) {
+    aviso.removeClass('text-muted text-success text-danger').addClass(ok ? 'text-success' : 'text-danger')
+        .html(ok ? '<i class="fas fa-check-circle me-1"></i>Selección guardada.'
+                 : '<i class="fas fa-exclamation-circle me-1"></i>No se pudo guardar tu selección.');
+}
+
+// Resalta la tarjeta cuyo panel se abrió y lo trae a la vista: en laptop el panel
+// queda abajo del área visible de la ventana.
+function marcarReporteActivo(idReporte, idPanel) {
+    $('#exportExcelModal .excel-card-option').removeClass('activa');
+    $(`#exportExcelModal [data-reporte="${idReporte}"]`).addClass('activa');
+    document.getElementById(idPanel).scrollIntoView({ block: 'nearest' });
+}
+
 // --- DESCARGA DE REPORTES NORMALES ---
 function descargarExcel(tipoReporte) {
     $('#exportExcelModal').modal('hide');
     const formParams = $('#filterForm').serialize();
     const baseUrl = "{% url 'export_remisiones_to_excel' %}";
-    const finalUrl = `${baseUrl}?${formParams}&tipo_reporte=${tipoReporte}`;
+    const finalUrl = `${baseUrl}?${formParams}&tipo_reporte=${tipoReporte}${opcionesDescarga()}`;
     
     $('#loadingOverlay').removeClass('d-none');
     window.location.href = finalUrl;
@@ -1448,6 +1657,7 @@ function descargarExcel(tipoReporte) {
 function mostrarOpcionesMedline() {
     $('#opcionesMedline').removeClass('d-none');
     $('#opcionesEspecificas').addClass('d-none'); // Esconder el otro menú si está abierto
+    marcarReporteActivo('medline', 'opcionesMedline');
 }
 
 // --- DESCARGA DE REPORTE MEDLINE (CARTÓN + ARCHIVO MUERTO EN UN EXCEL) ---
@@ -1470,7 +1680,8 @@ function descargarMedlineCompleto() {
     const finalUrl = `${baseUrl}?tipo_reporte=medline`
         + `&precio_carton=${encodeURIComponent(precioCarton)}`
         + `&precio_archivo=${encodeURIComponent(precioArchivo)}`
-        + `&mes=${encodeURIComponent(mes)}`;
+        + `&mes=${encodeURIComponent(mes)}`
+        + opcionesDescarga();
 
     window.location.href = finalUrl;
     setTimeout(function(){ $('#loadingOverlay').addClass('d-none'); }, 4000);
@@ -1527,6 +1738,60 @@ function abrirMenuEspecifico(idReporte, nombreMostrar) {
     } else {
         $('#divPrecioHudson').addClass('d-none');
     }
+    marcarReporteActivo(idReporte, 'opcionesEspecificas');
+}
+
+// --- LOGOS DE REPORTES POR ORIGEN: staff los sube y se ven igual en Next ---
+let claveLogo = '';
+
+function elegirLogo(clave) {
+    claveLogo = clave;
+    $('#inputLogoReporte').val('').trigger('click');
+}
+
+$('#inputLogoReporte').on('change', function () {
+    const archivo = this.files[0];
+    if (!archivo || !claveLogo) return;
+    const datos = new FormData();
+    datos.append('clave', claveLogo);
+    datos.append('logo', archivo);
+    enviarLogo('POST', '', datos);
+});
+
+function quitarLogo(clave) {
+    if (!confirm('¿Quitar el logo subido? Se vuelve a mostrar el de siempre.')) return;
+    enviarLogo('DELETE', `?clave=${encodeURIComponent(clave)}`, null);
+}
+
+function enviarLogo(metodo, query, cuerpo) {
+    const csrfToken = document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] || '';
+    fetch(`{% url 'api_logos_reportes' %}${query}`, {
+        method: metodo,
+        credentials: 'include',
+        headers: { 'X-CSRFToken': csrfToken },
+        body: cuerpo,
+    })
+    .then(res => res.json().then(datos => ({ ok: res.ok, datos })))
+    .then(({ ok, datos }) => {
+        if (!ok) { alert(datos.detail || 'No se pudo guardar el logo.'); return; }
+        pintarLogo(datos.clave, datos.url, datos.personalizado);
+    })
+    .catch(() => alert('No se pudo guardar el logo.'));
+}
+
+function pintarLogo(clave, url, personalizado) {
+    const tarjeta = $(`#exportExcelModal [data-reporte="${clave}"]`);
+    const caja = tarjeta.find('.logo');
+    caja.empty().append(url
+        ? $('<img>', { src: url, alt: 'Logo' }).on('error', function () { logoFallido(this); })
+        : $('<i>', { 'class': `fas ${caja.data('icono')} fa-2x` }));
+    tarjeta.find('.quitar-logo').toggleClass('d-none', !personalizado);
+}
+
+// Si el navegador no puede cargar el logo (p. ej. bloquea S3) se muestra el ícono del reporte.
+function logoFallido(img) {
+    img.onerror = null;
+    $(img).replaceWith($('<i>', { 'class': `fas ${$(img).closest('.logo').data('icono')} fa-2x` }));
 }
 
 function toggleFiltroEspecifico() {
@@ -1562,18 +1827,19 @@ function ejecutarDescargaEspecifica() {
     const baseUrl = "{% url 'export_reportes_especificos' %}";
     
     // Armamos la URL con los nuevos parámetros
-    const finalUrl = `${baseUrl}?${formParams}&tipo_reporte=${tipoReporte}&tipo_filtro=${tipoFiltro}&mes=${mes}&fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}&precio_hudson=${precio}`;
+    const finalUrl = `${baseUrl}?${formParams}&tipo_reporte=${tipoReporte}&tipo_filtro=${tipoFiltro}&mes=${mes}&fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}&precio_hudson=${precio}${opcionesDescarga()}`;
     
     window.location.href = finalUrl;
     setTimeout(function(){ $('#loadingOverlay').addClass('d-none'); }, 4000); 
 }
 // ========================================================
 
-// --- FOLIO LD / DLV: buscar en toda la BD ignorando otros filtros ---
+// --- FOLIO LD / DLV / SALIDA: buscar en toda la BD ignorando otros filtros ---
 $('#filterForm').on('submit', function(e) {
     const folioLd = $('#q_folio_ld').val().trim();
     const folioDlv = $('#q_folio_dlv').val().trim();
-    if (folioLd || folioDlv) {
+    const folioSalida = $('#q_folio_salida').val().trim();
+    if (folioLd || folioDlv || folioSalida) {
         e.preventDefault();
         // Limpia todos los demás campos, deja solo los folios y page_size
         $('#q_remision, #q_prefijo, #q_material, #q_status, #q_origen, #q_destino, #q_operador, #q_fecha_desde, #q_fecha_hasta, #q_destruccion').val('').trigger('change');

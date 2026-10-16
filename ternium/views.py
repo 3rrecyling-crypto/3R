@@ -814,18 +814,21 @@ class RemisionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         q_remision = self.request.GET.get('q_remision')
         q_folio_ld_raw = self.request.GET.get('q_folio_ld', '').strip()
         q_folio_dlv_raw = self.request.GET.get('q_folio_dlv', '').strip()
+        q_folio_salida_raw = self.request.GET.get('q_folio_salida', '').strip()
 
         # --- CASO A: SI BUSCAN POR FOLIO PRINCIPAL (BÚSQUEDA GLOBAL) ---
         if q_remision:
             # Buscamos en TODA la base de datos, ignorando las fechas
             queryset = queryset.filter(remision__icontains=q_remision)
 
-        # --- CASO A2: FOLIO LD / DLV — búsqueda global, sin filtros de fecha ---
-        elif q_folio_ld_raw or q_folio_dlv_raw:
+        # --- CASO A2: FOLIO LD / DLV / SALIDA — búsqueda global, sin filtros de fecha ---
+        elif q_folio_ld_raw or q_folio_dlv_raw or q_folio_salida_raw:
             if q_folio_ld_raw:
                 queryset = queryset.filter(folio_ld__icontains=q_folio_ld_raw)
             if q_folio_dlv_raw:
                 queryset = queryset.filter(folio_dlv__icontains=q_folio_dlv_raw)
+            if q_folio_salida_raw:
+                queryset = queryset.filter(folio_salida__icontains=q_folio_salida_raw)
             return queryset.distinct()
 
         # --- CASO B: SI NO HAY FOLIO PRINCIPAL (FILTROS NORMALES + FECHAS) ---
@@ -882,7 +885,10 @@ class RemisionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         
         if q_folio_dlv:
             queryset = queryset.filter(folio_dlv__icontains=q_folio_dlv)
-            
+
+        if q_folio_salida_raw:
+            queryset = queryset.filter(folio_salida__icontains=q_folio_salida_raw)
+
         # ==============================================================
         # --- NUEVO: FILTRO DE DESTRUCCIÓN FISCAL (COMPLETO / PENDIENTE)
         # ==============================================================
@@ -941,6 +947,17 @@ class RemisionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         from .models import ControlManifiestoTrane
         context['trane_pendientes'] = ControlManifiestoTrane.objects.filter(remision_vinculada__isnull=True).order_by('-id')
         context['empresas_disponibles'] = Empresa.objects.all().order_by('nombre')
+        # Selector "Empresa" de Opciones de Descarga (solo las autorizadas) y lo
+        # último que eligió el usuario, guardado en su perfil.
+        from .columnas_remisiones import empresas_para_descarga, opciones_descarga_de
+        empresas_descarga = list(empresas_para_descarga(self.request.user))
+        context['empresas_descarga'] = empresas_descarga
+        context['opciones_descarga'] = opciones_descarga_de(
+            self.request.user, {e.pk for e in empresas_descarga})
+        # Tarjetas de "Reportes Específicos por Origen" con el logo vigente; staff puede cambiarlo.
+        from .logos_reportes import reportes_origen, puede_editar as puede_editar_logos
+        context['reportes_origen'] = reportes_origen(self.request)
+        context['puede_editar_logos'] = puede_editar_logos(self.request.user)
 
         # Columnas de la tabla. Se pinta la vista activa (por defecto o
         # personalizada) pero el panel siempre recibe la tabla que el usuario
@@ -5245,7 +5262,7 @@ def guardar_columnas_remisiones(request):
     entre la vista por defecto y la suya sin tener que rearmarla.
     Siempre escribe sobre request.user; el cliente no dice a quién afectar.
     """
-    from .columnas_remisiones import CLAVES_POR_DEFECTO, config_de, sanear
+    from .columnas_remisiones import CLAVES_POR_DEFECTO, config_de, guardado_de, sanear
     from .models import Profile
 
     try:
@@ -5264,7 +5281,8 @@ def guardar_columnas_remisiones(request):
     claves = sanear(recibidas) if recibidas else guardadas_previas
     personalizada = bool(datos.get('personalizada', True))
 
-    perfil.columnas_remisiones = {'columnas': claves, 'personalizada': personalizada}
+    # Se parte de lo guardado para no borrar las opciones de descarga.
+    perfil.columnas_remisiones = {**guardado_de(perfil), 'columnas': claves, 'personalizada': personalizada}
     perfil.save(update_fields=['columnas_remisiones'])
 
     return JsonResponse({
