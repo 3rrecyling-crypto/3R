@@ -334,7 +334,7 @@
                     </li>
 
                     {% comment %}
-                    Ocultos en la versión HTML: Portal Trane, Control Trane y Operaciones
+                    Ocultos en la versión HTML: Portal Trane y Control Trane
                     (siguen disponibles en Next.js). Para mostrarlos de nuevo, quitar este comment.
                     {% if perms.ternium.acceso_trane %}
                     <li class="nav-item dynamic-nav-item">
@@ -363,6 +363,8 @@
                             {% endfor %}
                         {% endif %}
                     {% endif %}
+                    {% endcomment %}
+
                     {% if perms.ternium.acceso_dashboard_patio %}
                     <li class="nav-item dynamic-nav-item">
                         <a class="nav-link" href="{% url 'dashboard_operaciones' %}">
@@ -370,7 +372,6 @@
                         </a>
                     </li>
                     {% endif %}
-                    {% endcomment %}
 
                     {% if perms.ternium.acceso_remisiones or perms.ternium.view_remision %}
                     <li class="nav-item dynamic-nav-item">
