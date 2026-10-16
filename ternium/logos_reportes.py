@@ -24,7 +24,7 @@ REPORTES_ORIGEN = [
      'logo': S3_LOGOS + 'HUDSON.png', 'icono': 'fa-industry text-secondary'},
     {'clave': 'sealed-air', 'nombre': 'SEALED-AIR', 'descripcion': 'Kg, precio y total por material.',
      'logo': '', 'icono': 'fa-box-open text-info'},
-    {'clave': 'proboca', 'nombre': 'PROBOCA', 'descripcion': 'Con Folio de Salida y estatus.',
+    {'clave': 'proboca', 'nombre': 'PROBOCA', 'descripcion': 'Folio de Salida y estatus, por fecha de captura.',
      'logo': '', 'icono': 'fa-sign-out-alt text-primary'},
 ]
 CLAVES = {r['clave'] for r in REPORTES_ORIGEN}

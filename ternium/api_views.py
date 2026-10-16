@@ -1322,16 +1322,16 @@ def api_remision_detalle(request, pk):
 # EXPORTS Y ACCIONES DE REMISIONES (MOVIDOS DESDE views.py)
 # =========================================================================
 
-def _con_fecha_reporte(queryset, request):
+def _con_fecha_reporte(queryset, request, fecha_base=None):
     """
     Agrega `fecha_reporte`: la fecha con la que se filtran, ordenan y muestran
-    TODOS los reportes de Excel. El usuario la elige en Opciones de Descarga
-    (fecha_base):
+    los reportes de Excel. El usuario la elige en Opciones de Descarga
+    (fecha_base), salvo que el reporte la fije con el argumento fecha_base:
       - 'descarga' (por defecto): día de INICIO DE DESCARGA (en hora local); si
         la remisión no lo tiene, se usa la fecha de captura.
       - 'captura': fecha de captura del folio.
     """
-    if request.GET.get('fecha_base') == 'captura':
+    if (fecha_base or request.GET.get('fecha_base')) == 'captura':
         return queryset.annotate(fecha_reporte=F('fecha'))
     return queryset.annotate(fecha_reporte=Coalesce(TruncDate('inicia_dlv'), 'fecha'))
 
@@ -1876,7 +1876,8 @@ def export_reportes_especificos(request):
 
     # 3. Aplicar Filtro Dinámico de Fechas
     # Por la fecha que eligió el usuario (inicio de descarga o captura), ver _con_fecha_reporte.
-    queryset = _con_fecha_reporte(queryset, request)
+    # PROBOCA va siempre por la fecha normal de captura del folio, sin importar esa preferencia.
+    queryset = _con_fecha_reporte(queryset, request, 'captura' if tipo_reporte == 'proboca' else None)
     if tipo_filtro == 'mes' and mes_req:
         try:
             year, month = mes_req.split('-')
@@ -1953,7 +1954,7 @@ def export_reportes_especificos(request):
             ws['A1'] = "PROBOCA - Remisiones"
             ws['A1'].font = Font(bold=True, size=14, color="1F4E79")
             ws['A2'] = periodo
-            ws['A3'] = "Incluye todos los estatus: Terminado, Auditado, Pendiente y Cancelado."
+            ws['A3'] = "Incluye todos los estatus: Terminado, Auditado, Pendiente y Cancelado. Fecha = captura del folio."
             ws['A3'].font = Font(italic=True, size=9, color="666666")
 
         headers = ["Remisión"]
