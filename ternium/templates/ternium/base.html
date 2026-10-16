@@ -51,11 +51,12 @@
             line-height: 1.6;
         }
 
-        /* Navbar */
+        /* Navbar: compacta (~60 px) para dejarle espacio al contenido en laptop */
         .navbar {
             background: var(--base-color);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            padding: 0.5rem 1rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 0.35rem 1rem;
             position: sticky;
             top: 0;
             z-index: 10000;
@@ -63,32 +64,32 @@
 
         .navbar-brand {
             font-weight: 700;
-            font-size: 1.8rem;
+            font-size: 1.2rem;
+            letter-spacing: 0.5px;
             display: flex;
             align-items: center;
             color: white !important;
             transition: var(--transition-base);
         }
 
-        .navbar-brand:hover { transform: translateY(-2px); }
-
         .navbar-brand img {
-            margin-right: 12px;
+            margin-right: 10px;
             border-radius: 8px;
             background: white;
-            padding: 5px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            padding: 3px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
             transition: var(--transition-base);
         }
 
         .navbar-brand:hover img { transform: rotate(-5deg); }
 
         .navbar-nav .nav-link {
-            color: rgba(255, 255, 255, 0.9) !important;
+            color: rgba(255, 255, 255, 0.85) !important;
             font-weight: 500;
-            padding: 0.8rem 1rem;
-            border-radius: 6px;
-            margin: 0 3px;
+            font-size: 0.92rem;
+            padding: 0.45rem 0.8rem;
+            border-radius: 8px;
+            margin: 0 2px;
             transition: var(--transition-base);
             position: relative;
             white-space: nowrap;
@@ -99,7 +100,7 @@
         .navbar-nav .nav-link:not(.dropdown-toggle)::after {
             content: '';
             position: absolute;
-            bottom: 5px;
+            bottom: 3px;
             left: 50%;
             width: 0;
             height: 2px;
@@ -121,29 +122,29 @@
         .user-profile {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 0.2rem 0.5rem;
-            border-radius: 8px;
+            gap: 10px;
+            padding: 0.25rem 0.6rem 0.25rem 0.3rem;
+            border-radius: 50rem;
             transition: var(--transition-base);
             position: relative;
         }
 
-        .user-profile:hover { background: rgba(255, 255, 255, 0.15); }
+        .user-profile:hover { background: rgba(255, 255, 255, 0.12); }
 
         .user-avatar {
-            width: 85px;
-            height: 85px;
+            width: 38px;
+            height: 38px;
             border-radius: 50%;
             object-fit: cover;
-            border: 3px solid rgba(255, 255, 255, 0.6);
-            box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.6);
         }
 
         .user-info { display: flex; flex-direction: column; }
 
         .user-name {
             font-weight: 600;
-            font-size: 1rem;
+            font-size: 0.9rem;
             color: white;
             margin-bottom: 0;
             line-height: 1.2;
@@ -160,12 +161,12 @@
             display: inline-flex;
             align-items: center;
             white-space: nowrap;
-            padding: 0.45rem 1rem;
+            padding: 0.35rem 0.9rem;
             border-radius: 50rem;
             background: #1a73e8;
             color: white;
             font-weight: 600;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             text-decoration: none;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
             transition: background-color 0.2s ease;
@@ -220,8 +221,8 @@
 
         /* Main Container */
         .main-container {
-            margin-top: 30px;
-            margin-bottom: 40px;
+            margin-top: 20px;
+            margin-bottom: 30px;
             flex: 1;
             animation: fadeIn 0.5s ease-out;
             position: relative;
@@ -237,7 +238,8 @@
         .footer {
             background: var(--base-color);
             color: rgba(255, 255, 255, 0.8);
-            padding: 25px 0;
+            padding: 14px 0;
+            font-size: 0.875rem;
             text-align: center;
             margin-top: auto;
         }
@@ -276,8 +278,8 @@
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
             transition: all 0.3s ease;
-            width: 38px;
-            height: 38px;
+            width: 32px;
+            height: 32px;
         }
 
         .nav-scroll-btn:hover {
@@ -316,7 +318,7 @@
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container-fluid">
             <a class="navbar-brand" href="{% url 'home' %}">
-                <img src="{% static 'r3_recycling/img/logo.png' %}" alt="Logo" height="85" class="d-inline-block align-text-top" loading="lazy">
+                <img src="{% static 'r3_recycling/img/logo.png' %}" alt="Logo" height="44" class="d-inline-block align-text-top" loading="lazy">
                 <span>3R RECYCLING</span>
             </a>
             
@@ -600,7 +602,8 @@
                         <div class="dropdown">
                             <a href="#" class="user-profile text-decoration-none dropdown-toggle" id="dropdownUser" data-bs-toggle="dropdown">
                                 {% if user.is_authenticated and user.ternium_profile and user.ternium_profile.avatar %}
-                                    <img src="{{ user.ternium_profile.avatar.url }}" alt="User" class="user-avatar">
+                                    {# Si la foto no carga (archivo faltante) se usa el avatar genérico #}
+                                    <img src="{{ user.ternium_profile.avatar.url }}" alt="User" class="user-avatar" onerror="this.onerror=null; this.src='{% static 'r3_recycling/img/user-avatar.png' %}'">
                                 {% else %}
                                     <img src="{% static 'r3_recycling/img/user-avatar.png' %}" alt="User" class="user-avatar">
                                 {% endif %}
@@ -616,7 +619,7 @@
                                 <li class="dropdown-header">
                                     <div class="d-flex align-items-center">
                                         {% if user.is_authenticated and user.ternium_profile and user.ternium_profile.avatar %}
-                                            <img src="{{ user.ternium_profile.avatar.url }}" alt="User" width="40" height="40" class="rounded-circle me-2">
+                                            <img src="{{ user.ternium_profile.avatar.url }}" alt="User" width="40" height="40" class="rounded-circle me-2" onerror="this.onerror=null; this.src='{% static 'r3_recycling/img/user-avatar.png' %}'">
                                         {% else %}
                                             <img src="{% static 'r3_recycling/img/user-avatar.png' %}" alt="User" width="40" height="40" class="rounded-circle me-2">
                                         {% endif %}
@@ -664,7 +667,7 @@
 
     <footer class="footer">
         <div class="container-fluid">
-            <p class="mb-2">&copy; <span id="current-year"></span> 3R Recycling.</p>
+            <p class="mb-1">&copy; <span id="current-year"></span> 3R Recycling.</p>
             <div class="footer-links">
                 <a href="#"><i class="fas fa-shield-alt me-1"></i> Privacidad</a>
                 <a href="#"><i class="fas fa-envelope me-1"></i> Contacto</a>
@@ -679,6 +682,16 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Actualizar año en el footer
             document.getElementById('current-year').textContent = new Date().getFullYear();
+
+            // Marca en la barra la sección actual (p. ej. "Remisiones" en /remisiones/...);
+            // si la página está dentro de un desplegable, se marca el desplegable.
+            const enRuta = a => { const r = a.getAttribute('href'); return r !== '/' && location.pathname.startsWith(r); };
+            document.querySelectorAll('#main-nav-list a.nav-link[href^="/"]').forEach(a => {
+                if (enRuta(a)) a.classList.add('active');
+            });
+            document.querySelectorAll('#main-nav-list .dropdown-item[href^="/"]').forEach(a => {
+                if (enRuta(a)) a.closest('.dropdown').querySelector('.dropdown-toggle').classList.add('active');
+            });
             
             // =========================================================
             // LÓGICA DE NAVEGACIÓN "SMART CAROUSEL" CON PERSISTENCIA
