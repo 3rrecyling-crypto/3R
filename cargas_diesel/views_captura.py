@@ -23,6 +23,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ternium.borrado import es_staff, revisar_borrado, uso as uso_registro
 from ternium.models import Unidad as UnidadCatalogo
 
 from .correo_carga import correo_invalido, programar_correo_carga, separar_correos
@@ -438,8 +439,32 @@ class PermisionariosAPIView(APIView):
 
 
 class PermisionarioDetalleAPIView(APIView):
-    """PUT/PATCH: actualiza solo los campos que vengan (activo=false lo da de baja)."""
+    """PUT/PATCH: actualiza solo los campos que vengan (activo=false lo da de baja).
+    GET ?uso=1: qué lo usa. DELETE (solo staff, ?confirmar=1 si lo usan): lo elimina; sus
+    cargas conservan el nombre del permisionario y sus thermos quedan sin permisionario."""
     parser_classes = [JSONParser]
+
+    def get(self, request, pk):
+        if not puede_administrar(request.user):
+            return _sin_permiso()
+        p = Permisionario.objects.filter(pk=pk).first()
+        if not p:
+            return Response({'detail': 'Permisionario no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        if request.query_params.get('uso') == '1':
+            return Response(uso_registro(p))
+        return Response(_permisionario_dict(_permisionarios().get(pk=p.pk)))
+
+    def delete(self, request, pk):
+        if not es_staff(request.user):
+            return Response({'detail': 'Solo el personal staff puede eliminar permisionarios.'}, status=status.HTTP_403_FORBIDDEN)
+        p = Permisionario.objects.filter(pk=pk).first()
+        if not p:
+            return Response({'detail': 'Permisionario no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        problema = revisar_borrado(p, f'el permisionario {p.nombre}', request.query_params.get('confirmar') == '1')
+        if problema:
+            return Response({'detail': problema[0]}, status=problema[1])
+        p.delete()
+        return Response({'ok': True})
 
     def _editar(self, request, pk):
         if not puede_administrar(request.user):

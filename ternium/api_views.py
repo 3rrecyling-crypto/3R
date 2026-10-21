@@ -9,6 +9,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction, IntegrityError
 from .models import Empresa, Material, Lugar, LineaTransporte, Operador, Unidad, Contenedor
+from .borrado import es_staff, revisar_borrado, uso as uso_registro
 import json
 import re
 from django.shortcuts import get_object_or_404
@@ -2906,6 +2907,8 @@ def api_cat_unidades(request):
 def api_cat_unidad_detail(request, pk):
     u = get_object_or_404(Unidad, pk=pk)
     if request.method == 'GET':
+        if request.GET.get('uso') == '1':  # qué la usa (antes de eliminarla)
+            return JsonResponse(uso_registro(u))
         return JsonResponse(_unidad_to_dict(u))
     if request.method in ('PUT', 'PATCH'):
         # Editar la unidad también se hace desde el detalle de un viaje
@@ -2919,8 +2922,12 @@ def api_cat_unidad_detail(request, pk):
         _set_empresas(u, body)
         return JsonResponse(_unidad_to_dict(u))
     if request.method == 'DELETE':
-        err = _perm_check(request, 'ternium.delete_unidad')
-        if err: return err
+        # Solo staff; no se borra si la usan viajes (PROTECT) y, si la usan remisiones u otros, pide confirmar.
+        if not es_staff(request.user):
+            return JsonResponse({'error': 'Solo el personal staff puede eliminar unidades.'}, status=403)
+        problema = revisar_borrado(u, f'la unidad {u.internal_id}', request.GET.get('confirmar') == '1')
+        if problema:
+            return JsonResponse({'error': problema[0]}, status=problema[1])
         u.delete()
         return JsonResponse({'ok': True})
     return JsonResponse({'error': 'Metodo no permitido'}, status=405)
