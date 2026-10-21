@@ -53,6 +53,60 @@ class ProveedorDiesel(models.Model):
         return self.nombre
 
 
+class Permisionario(models.Model):
+    """Titular del permiso de una o varias unidades. Al registrar una carga, la
+    unidad elegida trae su permisionario."""
+    nombre = models.CharField(max_length=150, verbose_name="Nombre / Razón social")
+    rfc = models.CharField(max_length=13, blank=True, verbose_name="RFC")
+    telefono = models.CharField(max_length=20, blank=True)
+    activo = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Permisionario"
+        verbose_name_plural = "Permisionarios"
+        ordering = ['nombre']
+
+    def __str__(self):
+        return self.nombre
+
+
+class PermisionarioUnidad(models.Model):
+    """Unidad de Catálogos (la misma de remisiones) asignada a un permisionario.
+    El vínculo vive aquí para no tocar el modelo ni los datos de remisiones; una
+    unidad tiene a lo más un permisionario."""
+    unidad = models.OneToOneField('ternium.Unidad', on_delete=models.CASCADE, related_name='permisionario_diesel')
+    permisionario = models.ForeignKey(Permisionario, on_delete=models.CASCADE, related_name='unidades_asignadas')
+
+    class Meta:
+        verbose_name = "Unidad del permisionario"
+        verbose_name_plural = "Unidades de permisionarios"
+
+    def __str__(self):
+        return f"{self.unidad} → {self.permisionario}"
+
+
+class Thermo(models.Model):
+    """Equipo de refrigeración que se carga de diésel por su cuenta. Es un
+    catálogo propio: no depende de una unidad."""
+    identificador = models.CharField(max_length=50, unique=True, verbose_name="Identificador / Número económico")
+    descripcion = models.CharField(max_length=150, blank=True, verbose_name="Marca / Modelo")
+    numero_serie = models.CharField(max_length=100, blank=True, verbose_name="Número de serie")
+    permisionario = models.ForeignKey(
+        Permisionario, on_delete=models.SET_NULL, null=True, blank=True, related_name='thermos',
+    )
+    activo = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Thermo"
+        verbose_name_plural = "Thermos"
+        ordering = ['identificador']
+
+    def __str__(self):
+        return self.identificador
+
+
 class Unidad(models.Model):
     numero_economico = models.CharField(max_length=50, unique=True, verbose_name="Número Económico")
     descripcion = models.CharField(max_length=255, blank=True, null=True, verbose_name="Descripción / Alias")
@@ -60,6 +114,12 @@ class Unidad(models.Model):
     patio = models.ForeignKey(Patio, on_delete=models.SET_NULL, null=True, blank=True, related_name='unidades')
     activo = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    # Unidad de Catálogos que representa: la captura desde el celular elige
+    # unidades de Catálogos y la carga se registra contra esta.
+    unidad_catalogo = models.OneToOneField(
+        'ternium.Unidad', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='unidad_diesel', verbose_name="Unidad de Catálogos",
+    )
 
     class Meta:
         verbose_name = "Unidad"
@@ -69,9 +129,30 @@ class Unidad(models.Model):
     def __str__(self):
         return self.numero_economico
 
+    @classmethod
+    def para_unidad_catalogo(cls, unidad_cat):
+        """Unidad de diesel de una unidad de Catálogos. Si no hay, liga la que ya
+        tenga el mismo número económico o crea una nueva."""
+        ligada = cls.objects.filter(unidad_catalogo=unidad_cat).first()
+        if ligada:
+            return ligada
+        numero = unidad_cat.internal_id[:50]
+        existente = cls.objects.filter(numero_economico__iexact=numero).first()
+        if existente and existente.unidad_catalogo_id is None:
+            existente.unidad_catalogo = unidad_cat
+            existente.save(update_fields=['unidad_catalogo'])
+            return existente
+        if existente:  # el número ya es de otra unidad de Catálogos
+            numero = f"{numero[:40]}-{unidad_cat.pk}"
+        return cls.objects.create(
+            numero_economico=numero, descripcion=unidad_cat.license_plate or '',
+            tipo=unidad_cat.get_asset_type_display(), unidad_catalogo=unidad_cat,
+        )
+
     def ultimo_rendimiento(self):
-        ultima = self.cargas.order_by('-fecha_carga').first()
-        if ultima and ultima.rendimiento:
+        # Solo las cargas de Unidad tienen rendimiento; las de Thermo no lo pisan.
+        ultima = self.cargas.filter(tipo_carga='unidad', rendimiento__isnull=False).order_by('-fecha_carga', '-pk').first()
+        if ultima:
             return float(ultima.rendimiento)
         return None
 
@@ -263,15 +344,31 @@ class AjusteInventario(models.Model):
 
 
 class CargaDiesel(models.Model):
+    # Desde el celular cada carga es de una Unidad (km y litros) o de un Thermo
+    # del catálogo de thermos (horas y litros), nunca de los dos. Las anteriores
+    # quedan como 'unidad'.
+    TIPO_CARGA = [('unidad', 'Unidad'), ('thermo', 'Thermo')]
+
     patio = models.ForeignKey(Patio, on_delete=models.PROTECT, related_name='cargas')
-    unidad = models.ForeignKey(Unidad, on_delete=models.PROTECT, related_name='cargas')
+    # Vacía en las cargas de Thermo (esas llevan `thermo`).
+    unidad = models.ForeignKey(Unidad, on_delete=models.PROTECT, null=True, blank=True, related_name='cargas')
+    thermo = models.ForeignKey(Thermo, on_delete=models.PROTECT, null=True, blank=True, related_name='cargas')
     usuario = models.ForeignKey(User, on_delete=models.PROTECT, verbose_name="Despachador")
+    tipo_carga = models.CharField("Tipo de carga", max_length=10, choices=TIPO_CARGA, default='unidad')
+    # Permisionario de la unidad al momento de la carga (el nombre se guarda por
+    # si después cambia o se da de baja).
+    permisionario = models.ForeignKey(
+        Permisionario, on_delete=models.SET_NULL, null=True, blank=True, related_name='cargas',
+    )
+    permisionario_nombre = models.CharField(max_length=150, blank=True, default='', editable=False)
 
     fecha_carga = models.DateTimeField(auto_now_add=True)
-    odometro = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Odómetro (km)")
+    # Vacío en las cargas de Thermo (no llevan kilometraje).
+    odometro = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Odómetro (km)")
     hrs_thermo = models.DecimalField(max_digits=10, decimal_places=1, default=0, verbose_name="Horas Thermo")
 
-    litros_diesel = models.DecimalField(max_digits=8, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
+    # En 0 cuando la carga es de Thermo (esos litros van en litros_thermo).
+    litros_diesel = models.DecimalField(max_digits=8, decimal_places=2, validators=[MinValueValidator(Decimal('0'))])
     litros_thermo = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     litros_urea = models.DecimalField(max_digits=8, decimal_places=2, default=0)
 
@@ -306,27 +403,48 @@ class CargaDiesel(models.Model):
         verbose_name = "Carga de Diésel"
         verbose_name_plural = "Cargas de Diésel"
         ordering = ['-fecha_carga']
+        permissions = [
+            # Captura desde el celular (PWA): el usuario que lo tiene es despachador.
+            ('acceso_carga_diesel', 'Acceso carga diesel'),
+        ]
+
+    @property
+    def equipo(self):
+        """Lo que se cargó: el número de la unidad o el identificador del thermo."""
+        if self.unidad_id:
+            return self.unidad.numero_economico
+        return self.thermo.identificador if self.thermo_id else ''
 
     def __str__(self):
-        return f"Carga {self.unidad} - {self.litros_diesel}L ({self.fecha_carga:%d/%m/%Y})"
+        litros = self.litros_thermo if self.tipo_carga == 'thermo' else self.litros_diesel
+        return f"Carga {self.equipo} - {litros}L ({self.fecha_carga:%d/%m/%Y})"
 
     def calcular_rendimiento(self):
-        """Calcula rendimiento basado en la carga anterior de la misma unidad."""
-        ultima = CargaDiesel.objects.filter(
-            unidad=self.unidad,
-            fecha_carga__lt=self.fecha_carga if self.fecha_carga else None
-        ).exclude(pk=self.pk).order_by('-fecha_carga').first()
+        """Km/L desde la carga de Unidad anterior de la misma unidad. Las cargas
+        de Thermo no llevan kilometraje: ni se calculan ni cuentan como anterior."""
+        if self.tipo_carga != 'unidad' or self.odometro is None or not self.litros_diesel:
+            return None
+        anteriores = CargaDiesel.objects.filter(
+            unidad=self.unidad, tipo_carga='unidad', odometro__isnull=False,
+        ).exclude(pk=self.pk)
+        if self.fecha_carga:  # al crear todavía no tiene fecha
+            anteriores = anteriores.filter(fecha_carga__lt=self.fecha_carga)
+        # pk desempata dos cargas con la misma hora exacta.
+        ultima = anteriores.order_by('-fecha_carga', '-pk').first()
 
-        if not ultima:
-            # Intentar con la última sin fecha (nuevo registro)
-            ultima = CargaDiesel.objects.filter(
-                unidad=self.unidad
-            ).exclude(pk=self.pk).order_by('-fecha_carga').first()
-
-        if ultima and ultima.odometro < self.odometro and self.litros_diesel > 0:
+        if ultima and ultima.odometro < self.odometro:
             km = float(self.odometro - ultima.odometro)
             return round(km / float(self.litros_diesel), 2)
         return None
+
+    def descontar_del_totem(self):
+        """Saca del tótem del patio lo cargado: el diésel del motor y el del thermo
+        salen de la misma bomba; la urea, de su propio depósito."""
+        totem = self.patio.totem
+        totem.cantidad_diesel = max(totem.cantidad_diesel - self.litros_diesel - self.litros_thermo, Decimal('0'))
+        if self.litros_urea > 0:
+            totem.cantidad_urea = max(totem.cantidad_urea - self.litros_urea, Decimal('0'))
+        totem.save()
 
     def calcular_costo(self):
         """Calcula el costo basado en último precio de compra."""

@@ -31,6 +31,12 @@ class ProfileCompletionMiddleware:
             '/admin/',
             settings.STATIC_URL,
             settings.MEDIA_URL,
+            # Next lee y completa el perfil por la API (equivale a url_perfil).
+            '/api/perfil/',
+            # Captura de diesel desde el celular: el despachador registra cargas
+            # aunque su perfil no tenga correo o teléfono.
+            '/diesel/api/captura/',
+            '/diesel/api/csrf/',
         ]
 
         # Si la ruta actual empieza con alguna de las exentas, dejar pasar

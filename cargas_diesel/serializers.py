@@ -2,7 +2,7 @@ from rest_framework import serializers
 from decimal import Decimal
 from .models import (
     Patio, PerfilUsuarioDiesel, ProveedorDiesel, Unidad,
-    Totem, CompraCombustible, AjusteInventario, CargaDiesel
+    Totem, CompraCombustible, AjusteInventario, CargaDiesel, Thermo,
 )
 
 
@@ -65,8 +65,15 @@ class TotemConfigSerializer(serializers.ModelSerializer):
         ]
 
 
+class ThermoMiniSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Thermo
+        fields = ['id', 'identificador', 'descripcion']
+
+
 class CargaDieselSerializer(serializers.ModelSerializer):
     unidad_detalle = UnidadSerializer(source='unidad', read_only=True)
+    thermo_detalle = ThermoMiniSerializer(source='thermo', read_only=True)  # cargas de Thermo (sin unidad)
     patio_detalle = PatioMiniSerializer(source='patio', read_only=True)
     usuario_nombre = serializers.SerializerMethodField()
 
@@ -80,7 +87,8 @@ class CargaDieselSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         patio = data.get('patio')
-        litros = data.get('litros_diesel', Decimal('0'))
+        # Motor y thermo salen de la misma bomba de diésel.
+        litros = data.get('litros_diesel', Decimal('0')) + data.get('litros_thermo', Decimal('0'))
         litros_urea = data.get('litros_urea', Decimal('0'))
 
         if patio:
@@ -103,14 +111,7 @@ class CargaDieselSerializer(serializers.ModelSerializer):
         carga.rendimiento = carga.calcular_rendimiento()
         carga.calcular_costo()
         carga.save()
-
-        # Descontar del tótem
-        totem = carga.patio.totem
-        totem.cantidad_diesel = max(totem.cantidad_diesel - carga.litros_diesel, Decimal('0'))
-        if carga.litros_urea > 0:
-            totem.cantidad_urea = max(totem.cantidad_urea - carga.litros_urea, Decimal('0'))
-        totem.save()
-
+        carga.descontar_del_totem()
         return carga
 
 

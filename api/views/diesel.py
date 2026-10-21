@@ -132,12 +132,9 @@ class CargaDieselViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         obj = serializer.save(usuario=self.request.user)
-        # Descontar del totem
+        # Descontar del totem (motor + thermo + urea)
         try:
-            totem = obj.patio.totem
-            totem.cantidad_diesel = max(0, (totem.cantidad_diesel or 0) - (obj.litros_diesel or 0))
-            totem.cantidad_urea = max(0, (totem.cantidad_urea or 0) - (obj.litros_urea or 0))
-            totem.save(update_fields=['cantidad_diesel', 'cantidad_urea'])
+            obj.descontar_del_totem()
         except Exception:
             pass
 

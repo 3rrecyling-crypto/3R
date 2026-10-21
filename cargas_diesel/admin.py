@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
     Patio, PerfilUsuarioDiesel, ProveedorDiesel, Unidad,
-    Totem, CompraCombustible, AjusteInventario, CargaDiesel
+    Totem, CompraCombustible, AjusteInventario, CargaDiesel,
+    Permisionario, PermisionarioUnidad, Thermo,
 )
 
 
@@ -24,6 +25,27 @@ class ProveedorDieselAdmin(admin.ModelAdmin):
     list_display = ['nombre', 'rfc', 'contacto', 'activo']
     list_filter = ['activo']
     search_fields = ['nombre', 'rfc']
+
+
+class PermisionarioUnidadInline(admin.TabularInline):
+    model = PermisionarioUnidad
+    extra = 0
+    autocomplete_fields = ['unidad']
+
+
+@admin.register(Permisionario)
+class PermisionarioAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'rfc', 'telefono', 'activo']
+    list_filter = ['activo']
+    search_fields = ['nombre', 'rfc']
+    inlines = [PermisionarioUnidadInline]
+
+
+@admin.register(Thermo)
+class ThermoAdmin(admin.ModelAdmin):
+    list_display = ['identificador', 'descripcion', 'numero_serie', 'permisionario', 'activo']
+    list_filter = ['activo', 'permisionario']
+    search_fields = ['identificador', 'descripcion', 'numero_serie']
 
 
 @admin.register(Unidad)
@@ -69,11 +91,11 @@ class AjusteInventarioAdmin(admin.ModelAdmin):
 @admin.register(CargaDiesel)
 class CargaDieselAdmin(admin.ModelAdmin):
     list_display = [
-        'fecha_carga', 'patio', 'unidad', 'odometro',
+        'fecha_carga', 'patio', 'unidad', 'thermo', 'tipo_carga', 'odometro',
         'litros_diesel', 'litros_thermo', 'litros_urea',
-        'costo_total', 'rendimiento', 'usuario'
+        'costo_total', 'rendimiento', 'permisionario_nombre', 'usuario'
     ]
-    list_filter = ['patio', 'unidad']
+    list_filter = ['patio', 'tipo_carga', 'unidad']
     search_fields = ['unidad__numero_economico']
     date_hierarchy = 'fecha_carga'
     readonly_fields = ['rendimiento', 'costo_total', 'precio_litro']

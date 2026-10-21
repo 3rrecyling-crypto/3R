@@ -3320,6 +3320,7 @@ _MODULE_PERMS = [
     ('ternium.acceso_trane',       'Portal Trane'),
     ('ternium.acceso_bancos',      'Flujo Bancario'),
     ('ternium.acceso_diesel',      'Control Diésel'),
+    ('cargas_diesel.acceso_carga_diesel', 'Acceso carga diesel (captura desde el celular)'),
     ('ternium.acceso_catalogos',   'Catálogos'),
     # ── CRUD Remisiones ──────────────────────────────────────────────────────
     ('ternium.view_remision',      'Ver Remisiones'),
