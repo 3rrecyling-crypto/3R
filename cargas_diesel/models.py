@@ -53,12 +53,20 @@ class ProveedorDiesel(models.Model):
         return self.nombre
 
 
+def es_3r_nombre(nombre):
+    """¿El nombre es el de 3R RECYCLING (flota propia)? Sin importar mayúsculas ni lo que siga.
+    Solo la flota propia maneja rendimiento; los permisionarios son unidades ajenas."""
+    return ' '.join((nombre or '').upper().split()).startswith('3R RECYCLING')
+
+
 class Permisionario(models.Model):
     """Titular del permiso de una o varias unidades. Al registrar una carga, la
     unidad elegida trae su permisionario."""
     nombre = models.CharField(max_length=150, verbose_name="Nombre / Razón social")
     rfc = models.CharField(max_length=13, blank=True, verbose_name="RFC")
     telefono = models.CharField(max_length=20, blank=True)
+    # A estos correos les llega el detalle de cada carga de sus unidades o thermos.
+    correo = models.CharField(max_length=500, blank=True, verbose_name="Correos (separados por coma)")
     activo = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -361,6 +369,9 @@ class CargaDiesel(models.Model):
         Permisionario, on_delete=models.SET_NULL, null=True, blank=True, related_name='cargas',
     )
     permisionario_nombre = models.CharField(max_length=150, blank=True, default='', editable=False)
+    # Correo con el detalle de la carga que se le mandó al permisionario (vacío = no se mandó).
+    correo_enviado_a = models.CharField(max_length=500, blank=True, default='', editable=False)
+    correo_enviado_en = models.DateTimeField(null=True, blank=True, editable=False)
 
     fecha_carga = models.DateTimeField(auto_now_add=True)
     # Vacío en las cargas de Thermo (no llevan kilometraje).
@@ -385,6 +396,9 @@ class CargaDiesel(models.Model):
     cinchos_actuales   = models.CharField("Cinchos actuales",   max_length=120, blank=True, default='')
     # Persona que estuvo presente / llenó el equipo. Si no se especifica,
     # la view lo llena con el usuario logueado.
+    # Operador (chofer) de la unidad o del thermo al momento de la carga: texto
+    # libre en MAYÚSCULAS. Va en el mensaje de WhatsApp y en el correo.
+    operador_nombre = models.CharField("Operador", max_length=150, blank=True, default='')
     persona_relleno = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='diesel_cargas_realizadas',
@@ -459,3 +473,21 @@ class CargaDiesel(models.Model):
             total += self.litros_thermo
         if ultima_compra:
             self.costo_total = total * self.precio_litro
+
+
+class FotoComplementaria(models.Model):
+    """Fotos extra que el despachador anexa a una carga si aplican (además de
+    las fijas: bomba, odómetro, thermo). Se capturan desde el celular."""
+    MAXIMO = 6  # por carga
+
+    carga = models.ForeignKey(CargaDiesel, on_delete=models.CASCADE, related_name='fotos_complementarias')
+    foto = models.ImageField(upload_to='diesel/complementarias/%Y/%m/', verbose_name="Foto")
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Foto complementaria"
+        verbose_name_plural = "Fotos complementarias"
+        ordering = ['pk']
+
+    def __str__(self):
+        return f"Foto complementaria de la carga {self.carga_id}"

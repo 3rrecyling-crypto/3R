@@ -35,9 +35,9 @@ class PermisionarioUnidadInline(admin.TabularInline):
 
 @admin.register(Permisionario)
 class PermisionarioAdmin(admin.ModelAdmin):
-    list_display = ['nombre', 'rfc', 'telefono', 'activo']
+    list_display = ['nombre', 'rfc', 'telefono', 'correo', 'activo']
     list_filter = ['activo']
-    search_fields = ['nombre', 'rfc']
+    search_fields = ['nombre', 'rfc', 'correo']
     inlines = [PermisionarioUnidadInline]
 
 

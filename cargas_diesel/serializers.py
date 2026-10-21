@@ -76,6 +76,7 @@ class CargaDieselSerializer(serializers.ModelSerializer):
     thermo_detalle = ThermoMiniSerializer(source='thermo', read_only=True)  # cargas de Thermo (sin unidad)
     patio_detalle = PatioMiniSerializer(source='patio', read_only=True)
     usuario_nombre = serializers.SerializerMethodField()
+    fotos_complementarias = serializers.SerializerMethodField()
 
     class Meta:
         model = CargaDiesel
@@ -84,6 +85,16 @@ class CargaDieselSerializer(serializers.ModelSerializer):
 
     def get_usuario_nombre(self, obj):
         return obj.usuario.get_full_name() or obj.usuario.username
+
+    def get_fotos_complementarias(self, obj):
+        """URLs de las fotos extra que anexó el despachador."""
+        request = self.context.get('request')
+        urls = []
+        for f in obj.fotos_complementarias.all():
+            if f.foto:
+                url = f.foto.url
+                urls.append(request.build_absolute_uri(url) if request and not url.startswith('http') else url)
+        return urls
 
     def validate(self, data):
         patio = data.get('patio')

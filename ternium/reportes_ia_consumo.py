@@ -1,6 +1,7 @@
 """
 Panel "Consumo de IA" (solo staff): conversaciones y peticiones de Reportes con
-IA, tokens y dinero gastado por usuario. Lee la bitácora RegistroReporteIA.
+IA y del asistente de Control Diésel, tokens y dinero gastado por usuario y por
+módulo. Lee la bitácora RegistroReporteIA.
 
 Los costos se guardan en USD (lo que cobra Anthropic) y se muestran también en
 MXN con el tipo de cambio de Configuración (bancos_tc_default).
@@ -21,6 +22,19 @@ from .models import RegistroReporteIA
 
 POR_PAGINA = 25
 TOKENS = ('tokens_entrada', 'tokens_salida', 'tokens_cache_lectura', 'tokens_cache_escritura')
+
+# El asistente del tablero de diésel (cargas_diesel/ia_tablero.py) guarda sus
+# peticiones en la misma bitácora con este prefijo en la pregunta.
+PREFIJO_DIESEL = '[Diésel] '
+MODULOS = {'remisiones': 'Reportes con IA (remisiones)', 'diesel': 'Control Diésel'}
+
+
+def _q_diesel():
+    return Q(pregunta__startswith=PREFIJO_DIESEL)
+
+
+def _modulo(registro):
+    return 'diesel' if registro.pregunta.startswith(PREFIJO_DIESEL) else 'remisiones'
 
 
 def _es_staff(user):
@@ -75,13 +89,16 @@ def _dinero(usd, tc):
 
 
 def _registro_dict(r, tc, completo=False):
+    modulo = _modulo(r)
+    pregunta = r.pregunta[len(PREFIJO_DIESEL):] if modulo == 'diesel' else r.pregunta
     datos = {
         'id': r.id,
         'fecha': timezone.localtime(r.creado_en).isoformat(),
         'usuario_id': r.usuario_id,
         'usuario': _nombre(r.usuario),
         'conversacion': r.conversacion,
-        'pregunta': r.pregunta if completo else r.pregunta[:240],
+        'modulo': modulo,
+        'pregunta': pregunta if completo else pregunta[:240],
         'respuesta': r.respuesta if completo else r.respuesta[:240],
         'motor': r.motor,
         'proveedor': r.proveedor,
@@ -103,7 +120,8 @@ def _registro_dict(r, tc, completo=False):
 @require_http_methods(['GET'])
 @_solo_staff
 def api_consumo_ia(request):
-    """GET ?desde&hasta&usuario&q&conversacion&page → totales, por usuario, por día y peticiones."""
+    """GET ?desde&hasta&modulo&usuario&q&conversacion&page → totales, por módulo, por usuario,
+    por día y peticiones. ?modulo=remisiones|diesel filtra todo lo demás."""
     hoy = timezone.localdate()
     desde = _fecha(request.GET.get('desde'), hoy - dt.timedelta(days=29))
     hasta = _fecha(request.GET.get('hasta'), hoy)
@@ -112,6 +130,19 @@ def api_consumo_ia(request):
     tc = _tipo_cambio()
 
     periodo = RegistroReporteIA.objects.filter(creado_en__date__gte=desde, creado_en__date__lte=hasta)
+
+    # Por módulo (siempre los dos, sin el filtro de módulo, para comparar)
+    por_modulo = []
+    for clave, etiqueta in MODULOS.items():
+        m = periodo.filter(_q_diesel() if clave == 'diesel' else ~_q_diesel()).aggregate(
+            **_sumas(), usuarios=Count('usuario', distinct=True))
+        por_modulo.append({
+            'modulo': clave, 'etiqueta': etiqueta, 'peticiones': m['peticiones'], 'usuarios': m['usuarios'],
+            'tokens_total': sum(m[k] for k in TOKENS), **_dinero(m['costo_usd'], tc),
+        })
+    modulo = request.GET.get('modulo', '')
+    if modulo in MODULOS:
+        periodo = periodo.filter(_q_diesel() if modulo == 'diesel' else ~_q_diesel())
 
     # Totales del periodo (para todos los usuarios)
     t = periodo.aggregate(**_sumas(), usuarios=Count('usuario', distinct=True),
@@ -167,6 +198,8 @@ def api_consumo_ia(request):
         'periodo': {'desde': desde.isoformat(), 'hasta': hasta.isoformat()},
         'tipo_cambio': float(tc),
         'totales': totales,
+        'modulo': modulo if modulo in MODULOS else '',
+        'por_modulo': por_modulo,
         'por_usuario': por_usuario,
         'por_dia': por_dia,
         'registros': {

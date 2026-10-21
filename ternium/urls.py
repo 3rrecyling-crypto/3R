@@ -4,7 +4,8 @@ from django.urls import path
 from . import views
 from django.urls import path, include
 from .forms import CustomLoginForm  # <--- Nombre correcto
-from . import api_views, api_viajes, api_liquidaciones, reportes_ia, reportes_ia_consumo, alertas_merma
+from . import api_views, api_viajes, api_liquidaciones, reportes_ia, reportes_ia_consumo, alertas_merma, asignacion_factura
+from . import reporte_facturas
 from .views import (
     UnidadDetailView, UnidadUpdateView, LugarDetailView, LugarUpdateView, 
     EmpresaDetailView, EmpresaUpdateView, ContenedorDetailView, ContenedorUpdateView,
@@ -54,6 +55,18 @@ urlpatterns = [
     # Columnas que cada usuario elige para la tabla de remisiones
     path('remisiones/columnas/', views.guardar_columnas_remisiones, name='guardar_columnas_remisiones'),
     path('remisiones/exportar-vista/', views.exportar_vista_remisiones, name='exportar_vista_remisiones'),
+    # Asignación de factura (permiso acceso_asignacion_factura; HTML y Next usan las mismas APIs)
+    path('remisiones/asignacion-factura/', asignacion_factura.pagina, name='asignacion_factura'),
+    path('api/asignacion-factura/', asignacion_factura.api_lista, name='api_asignacion_factura'),
+    # Facturas dadas de alta (número, total) con sus folios ligados
+    path('api/asignacion-factura/facturas/', asignacion_factura.api_facturas, name='api_asignacion_facturas'),
+    path('api/asignacion-factura/facturas/leer-xml/', asignacion_factura.api_leer_xml, name='api_asignacion_factura_leer_xml'),
+    path('api/asignacion-factura/facturas/reporte/', reporte_facturas.api_reporte, name='api_asignacion_facturas_reporte'),
+    path('api/asignacion-factura/facturas/xml-zip/', asignacion_factura.api_xml_zip, name='api_asignacion_facturas_xml_zip'),
+    path('api/asignacion-factura/facturas/<int:pk>/xml/', asignacion_factura.api_factura_xml, name='api_asignacion_factura_xml'),
+    path('api/asignacion-factura/facturas/<int:pk>/', asignacion_factura.api_factura, name='api_asignacion_factura_detalle'),
+    path('api/asignacion-factura/disponibles/', asignacion_factura.api_disponibles, name='api_asignacion_factura_disponibles'),
+    path('api/asignacion-factura/<int:pk>/', asignacion_factura.api_remision, name='api_asignacion_factura_remision'),
     path('api/remisiones/columnas/', api_views.api_columnas_remisiones, name='api_columnas_remisiones'),
     # Empresa y orden de folios que el usuario eligió en el diálogo de descarga (HTML y Next)
     path('api/remisiones/opciones-descarga/', api_views.api_opciones_descarga, name='api_opciones_descarga'),

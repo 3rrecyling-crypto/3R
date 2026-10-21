@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views, views_captura
+from . import excel_cargas, ia_tablero, views, views_captura, views_config, views_tablero
 
 app_name = 'diesel'
 
@@ -20,6 +20,7 @@ urlpatterns = [
     # Cargas
     path('api/cargas/', views.CargaDieselListAPIView.as_view(), name='api_cargas_lista'),
     path('api/cargas/crear/', views.CargaDieselCreateAPIView.as_view(), name='api_carga_crear'),
+    path('api/cargas/excel/', excel_cargas.CargasExcelAPIView.as_view(), name='api_cargas_excel'),
 
     # Compras
     path('api/compras/', views.CompraListAPIView.as_view(), name='api_compras_lista'),
@@ -31,10 +32,19 @@ urlpatterns = [
 
     # Configuración Tótem
     path('api/totem/<int:patio_id>/', views.TotemConfigAPIView.as_view(), name='api_totem_config'),
+    # Configuración de tótems (solo staff): alta, nombres, capacidad, alerta y nivel
+    path('api/config/totems/', views_config.TotemsConfigAPIView.as_view(), name='api_config_totems'),
+    path('api/config/totems/<int:patio_id>/', views_config.TotemConfigDetalleAPIView.as_view(), name='api_config_totem'),
+
+    # Tablero BI: 3R RECYCLING (unidades y thermos) y permisionarios con sus cargas
+    path('api/tablero/', views_tablero.TableroDieselAPIView.as_view(), name='api_tablero'),
+    path('api/tablero/ia/', ia_tablero.TableroIAAPIView.as_view(), name='api_tablero_ia'),
+    path('api/tablero/ia/excel/', ia_tablero.TableroIAExcelAPIView.as_view(), name='api_tablero_ia_excel'),
 
     # Captura desde el celular (PWA de Next en /diesel/captura)
     path('api/captura/datos/', views_captura.CapturaDatosAPIView.as_view(), name='api_captura_datos'),
     path('api/captura/cargas/', views_captura.CapturaCargaAPIView.as_view(), name='api_captura_cargas'),
+    path('api/captura/cargas/<int:pk>/fotos/<str:clave>/', views_captura.CargaFotoAPIView.as_view(), name='api_captura_carga_foto'),
 
     # Catálogos de la captura: Permisionarios (con unidades de Catálogos), Thermos y Despachadores
     path('api/permisionarios/', views_captura.PermisionariosAPIView.as_view(), name='api_permisionarios'),

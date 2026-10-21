@@ -1,0 +1,932 @@
+{% extends 'ternium/base.html' %}
+
+{% block title %}Asignación de factura{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Asignación de factura: mismos colores y botones que Remisiones. */
+    :root { --af-primario: #2c3e50; --af-azul: #2563eb; --af-borde: #e2e8f0; --af-tenue: #64748b; }
+    .af-card { background: #fff; border: 1px solid var(--af-borde); border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.06); }
+    .af-titulo { font-weight: 800; color: var(--af-primario); }
+    .af-mayus { text-transform: uppercase; }
+    /* Selector Todas / Sin factura / Con factura */
+    .af-segmento { display: inline-flex; gap: .35rem; padding: .35rem; background: #fff; border: 1px solid var(--af-borde);
+                   border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,.05); }
+    .af-chip { display: flex; align-items: center; gap: .6rem; border: 0; background: transparent; color: #334155;
+               border-radius: 12px; padding: .45rem .9rem .45rem .5rem; cursor: pointer; transition: all .15s; text-align: left; }
+    .af-chip:hover { background: #f1f5f9; }
+    .af-chip .ico { width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: .95rem; }
+    .af-chip .txt { display: block; font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; opacity: .75; }
+    .af-chip .num { display: block; font-size: 1.15rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .af-chip[data-factura=""] .ico { background: #e2e8f0; color: #334155; }
+    .af-chip[data-factura="sin"] .ico { background: #fef3c7; color: #b45309; }
+    .af-chip[data-factura="con"] .ico { background: #dcfce7; color: #15803d; }
+    .af-chip.activo[data-factura=""] { background: #1e293b; color: #fff; }
+    .af-chip.activo[data-factura="sin"] { background: #d97706; color: #fff; }
+    .af-chip.activo[data-factura="con"] { background: #16a34a; color: #fff; }
+    .af-chip.activo .ico { background: rgba(255,255,255,.2); color: #fff; }
+    .af-chip.activo .txt { opacity: .9; }
+    .af-tabla th { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--af-tenue); background: #f8fafc;
+                   white-space: nowrap; vertical-align: middle; text-align: center; }
+    .af-tabla td { vertical-align: middle; text-align: center; font-size: .86rem; }
+    .af-remision { font-weight: 800; color: var(--af-primario); }
+    .af-factura-asignada { display: inline-block; padding: .2rem .7rem; border-radius: 8px; font-weight: 800; background: #f0fdf4; color: #166534; }
+    .af-badge { font-size: .7rem; font-weight: 800; border-radius: 50rem; padding: .25rem .6rem; }
+    .af-PENDIENTE { background: #fef3c7; color: #92400e; } .af-TERMINADO { background: #e0f2fe; color: #075985; }
+    .af-AUDITADO { background: #dcfce7; color: #166534; }
+    .af-dato { border: 1px solid var(--af-borde); border-radius: 10px; padding: .55rem .75rem; height: 100%; }
+    .af-dato small { display: block; font-size: .68rem; font-weight: 700; text-transform: uppercase; color: var(--af-tenue); letter-spacing: .04em; }
+    .af-dato span { font-weight: 700; color: #0f172a; word-break: break-word; }
+    .af-toast { position: fixed; bottom: 24px; right: 24px; z-index: 2100; display: none; }
+    /* Las ventanas van por encima de la barra superior fija de la base. */
+    #af-modal, #af-fact-modal, #af-zip { z-index: 2000 !important; --bs-modal-margin: 5.5rem; }
+    .af-folio { display: flex; align-items: center; gap: .75rem; width: 100%; padding: .45rem .75rem; border: 0; border-bottom: 1px solid #f1f5f9;
+                background: transparent; text-align: left; font-size: .86rem; }
+    .af-folio:hover { background: #f8fafc; } .af-folio.activo { background: #f0fdfa; }
+    .af-folio .check { width: 18px; height: 18px; border: 2px solid #cbd5e1; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .af-folio-enc { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: .75rem; padding: .4rem .75rem;
+                    background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: .66rem; font-weight: 800; text-transform: uppercase;
+                    letter-spacing: .05em; color: #64748b; }
+    .af-folio .check i { visibility: hidden; }
+    .af-folio.activo .check { background: #0f766e; border-color: #0f766e; color: #fff; }
+    .af-folio.activo .check i { visibility: visible; }
+    .af-chip-folio { background: #0f766e; color: #fff; border: 0; border-radius: 6px; font-size: .72rem; font-weight: 700; padding: .1rem .45rem; }
+    .af-total-link { font-size: .72rem; font-weight: 800; color: #0f766e; background: none; border: 0; padding: 0; margin-top: .2rem; }
+    #af-tabs .nav-link { color: #2c3e50; } #af-tabs .nav-link.active { background: #2c3e50; color: #fff; }
+    /* XML (CFDI) e importes */
+    .af-xml-zona { display: flex; gap: 1rem; align-items: center; border: 2px dashed #cbd5e1; border-radius: 14px; padding: .9rem 1.1rem; cursor: pointer; }
+    .af-xml-zona:hover, .af-xml-zona.arrastrando { border-color: #0284c7; background: #f0f9ff; }
+    .af-xml-icono { width: 44px; height: 44px; border-radius: 12px; background: #0284c7; color: #fff; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1.15rem; }
+    .af-xml-datos { border: 1px solid #bae6fd; background: #f0f9ff; border-radius: 14px; padding: .9rem 1.1rem; }
+    .af-xml-datos small { display: block; font-size: .66rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: #64748b; }
+    .af-xml-datos b { word-break: break-word; }
+    .af-desglose { background: #f8fafc; border-radius: 10px; padding: .5rem .75rem; font-size: .88rem; }
+    .af-desglose .fila { display: flex; justify-content: space-between; gap: .75rem; padding: .1rem 0; }
+    .af-desglose .neg { color: #e11d48; }
+    .af-desglose .total { border-top: 1px solid #e2e8f0; margin-top: .3rem; padding-top: .35rem; font-weight: 800; font-size: 1.05rem; }
+    .af-xf { border: 1px solid #cbd5e1; border-radius: 8px; font-size: .72rem; font-weight: 700; padding: .15rem .5rem; background: #fff; }
+    .af-xf.ligado { background: #059669; border-color: #059669; color: #fff; }
+    .af-xf.ocupado, .af-xf.otra { border-color: #fcd34d; background: #fffbeb; color: #92400e; }
+    .af-xf.no { border-color: #fda4af; background: #fff1f2; color: #9f1239; }
+    .af-badge-xml { font-size: .62rem; font-weight: 800; background: #e0f2fe; color: #0369a1; border-radius: 4px; padding: .1rem .35rem; vertical-align: middle; }
+    .af-folio-xml { background: #ccfbf1; color: #115e59; border-radius: 4px; padding: 0 .3rem; font-weight: 800; margin-left: .3rem; }
+    .modal-backdrop { z-index: 1990 !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3 px-lg-4">
+    {% if sin_permiso %}
+    <div class="af-card p-5 text-center">
+        <i class="fas fa-lock fa-2x text-secondary mb-3"></i>
+        <h4 class="af-titulo">Sin acceso</h4>
+        <p class="text-muted mb-0">Necesitas el permiso <b>Asignación de Factura</b> (Permisos de usuario).</p>
+    </div>
+    {% else %}
+    <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
+        <div>
+            <h3 class="af-titulo mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>Asignación de factura</h3>
+            <div class="text-muted small">Remisiones no canceladas · la factura se asigna en “Facturas (alta y folios)”</div>
+        </div>
+        <div class="af-segmento flex-wrap" id="af-chips" role="group" aria-label="Filtrar por factura">
+            <button type="button" class="af-chip activo" data-factura=""><span class="ico"><i class="fas fa-layer-group"></i></span>
+                <span><span class="txt">Todas</span><span class="num" id="af-n-total">0</span></span></button>
+            <button type="button" class="af-chip" data-factura="sin"><span class="ico"><i class="fas fa-hourglass-half"></i></span>
+                <span><span class="txt">Sin factura</span><span class="num" id="af-n-sin">0</span></span></button>
+            <button type="button" class="af-chip" data-factura="con"><span class="ico"><i class="fas fa-file-invoice-dollar"></i></span>
+                <span><span class="txt">Con factura</span><span class="num" id="af-n-con">0</span></span></button>
+        </div>
+    </div>
+
+    <ul class="nav nav-pills mb-3" id="af-tabs">
+        <li class="nav-item"><button type="button" class="nav-link active fw-bold" data-vista="remisiones">Remisiones</button></li>
+        <li class="nav-item"><button type="button" class="nav-link fw-bold" data-vista="facturas">Facturas (alta y folios)</button></li>
+    </ul>
+
+    <div id="af-vista-remisiones">
+    <div class="af-card p-3 mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-lg-3">
+                <label class="form-label small fw-bold text-muted mb-1">Buscar</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" id="af-q" class="form-control af-mayus" placeholder="REMISIÓN, FACTURA, CLIENTE, FOLIO, OPERADOR…" autocomplete="off">
+                </div>
+            </div>
+            <div class="col-6 col-lg-2">
+                <label class="form-label small fw-bold text-muted mb-1">Unidad de negocio</label>
+                <select id="af-empresa" class="form-select"><option value="">Todas</option></select>
+            </div>
+            <div class="col-6 col-lg-2">
+                <label class="form-label small fw-bold text-muted mb-1">Estatus</label>
+                <select id="af-status" class="form-select">
+                    <option value="">Todos (menos cancelados)</option>
+                    <option value="PENDIENTE">Pendiente</option><option value="TERMINADO">Terminado</option><option value="AUDITADO">Auditado</option>
+                </select>
+            </div>
+            <div class="col-6 col-lg-2">
+                <label class="form-label small fw-bold text-muted mb-1">Fecha de</label>
+                <select id="af-fecha-de" class="form-select">
+                    <option value="carga">Inicio de carga</option>
+                    <option value="captura">Captura en sistema</option>
+                    <option value="timbrado">Timbrado de la factura</option>
+                </select>
+            </div>
+            <div class="col-6 col-lg-1"><label class="form-label small fw-bold text-muted mb-1">Desde</label><input type="date" id="af-desde" class="form-control"></div>
+            <div class="col-6 col-lg-1"><label class="form-label small fw-bold text-muted mb-1">Hasta</label><input type="date" id="af-hasta" class="form-control"></div>
+            <div class="col-6 col-lg-1 d-grid"><button type="button" id="af-limpiar" class="btn btn-outline-secondary" title="Limpiar filtros"><i class="fas fa-eraser"></i></button></div>
+        </div>
+    </div>
+
+    <div class="af-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 af-tabla">
+                <thead><tr>
+                    <th>Remisión</th><th>Factura</th><th>Fecha</th><th>Unidad de negocio</th><th>Cliente / Destino</th>
+                    <th>Estatus</th><th>Asignada por</th><th>Datos</th>
+                </tr></thead>
+                <tbody id="af-filas"><tr><td colspan="8" class="py-5 text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Cargando…</td></tr></tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top small text-muted">
+            <span id="af-conteo"></span>
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary" id="af-ant"><i class="fas fa-chevron-left"></i></button>
+                <span class="btn btn-outline-secondary disabled" id="af-pag">1 / 1</span>
+                <button class="btn btn-outline-secondary" id="af-sig"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </div>
+    </div>
+    </div>{# /af-vista-remisiones #}
+
+    <!-- Facturas dadas de alta: número, total y los folios que amparan -->
+    <div id="af-vista-facturas" class="d-none">
+        <div class="af-card p-3 mb-3">
+            <div class="row g-2 align-items-end">
+                <div class="col-lg-3">
+                    <label class="form-label small fw-bold text-muted mb-1">Buscar factura</label>
+                    <div class="input-group"><span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" id="af-f-q" class="form-control af-mayus" placeholder="NÚMERO, CLIENTE O FOLIO…" autocomplete="off"></div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Unidad de negocio</label>
+                    <select id="af-f-empresa" class="form-select"><option value="">Todas</option></select>
+                </div>
+                <div class="col-6 col-lg-1"><label class="form-label small fw-bold text-muted mb-1">Desde</label><input type="date" id="af-f-desde" class="form-control"></div>
+                <div class="col-6 col-lg-1"><label class="form-label small fw-bold text-muted mb-1">Hasta</label><input type="date" id="af-f-hasta" class="form-control"></div>
+                <div class="col-6 col-lg-2"><div class="af-dato"><small>Total</small><span id="af-f-total">$0.00</span></div></div>
+                <div class="col-lg-3 d-flex gap-2">
+                    <button type="button" class="btn btn-outline-success fw-bold flex-fill" id="af-f-reporte"
+                        title="Excel con el detalle de cada concepto y el desglose de cada factura (con los filtros)"><i class="fas fa-file-excel me-1"></i>Reporte</button>
+                    <button type="button" class="btn btn-outline-primary fw-bold flex-fill" id="af-f-zip"
+                        title="Descargar en un ZIP los XML guardados, por fecha de timbrado"><i class="fas fa-file-zipper me-1"></i>XML (ZIP)</button>
+                </div>
+                <div class="col-12 d-flex justify-content-end"><button type="button" class="btn btn-success fw-bold px-4" id="af-f-alta"><i class="fas fa-plus me-1"></i>Alta de factura</button></div>
+            </div>
+        </div>
+        <div class="af-card">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 af-tabla">
+                    <thead><tr><th>Factura</th><th>Fecha</th><th>Unidad de negocio</th><th>Cliente</th><th>Folios ligados</th><th>Total</th><th></th></tr></thead>
+                    <tbody id="af-f-filas"><tr><td colspan="7" class="py-5 text-muted">Cargando…</td></tr></tbody>
+                </table>
+            </div>
+            <div class="d-flex justify-content-end align-items-center px-3 py-2 border-top small text-muted gap-2">
+                <button class="btn btn-sm btn-outline-secondary" id="af-f-ant"><i class="fas fa-chevron-left"></i></button>
+                <span id="af-f-pag">1 / 1</span>
+                <button class="btn btn-sm btn-outline-secondary" id="af-f-sig"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Alta / edición de factura con sus folios -->
+<div class="modal fade" id="af-fact-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:16px">
+            <div class="modal-header text-white" style="background:linear-gradient(90deg,#1e293b,#115e59)">
+                <h5 class="modal-title fw-bold" id="af-ff-titulo"><i class="fas fa-file-invoice-dollar me-2"></i>Alta de factura</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <!-- XML (CFDI): llena todo solo -->
+                    <div class="col-12">
+                        <input type="file" id="af-xml-archivo" accept=".xml,text/xml,application/xml" class="d-none">
+                        <div id="af-xml-zona" class="af-xml-zona" role="button" tabindex="0">
+                            <span class="af-xml-icono"><i class="fas fa-file-code"></i></span>
+                            <div>
+                                <div class="fw-bold" id="af-xml-zona-titulo">Subir el XML de la factura (CFDI)</div>
+                                <div class="small text-muted">Se llenan solos el número, la fecha, el cliente, el IVA, el IEPS, las retenciones y el total, y se ligan los folios que vengan en la descripción. Puedes arrastrarlo aquí. O captúrala a mano abajo.</div>
+                            </div>
+                        </div>
+                        <div id="af-xml-datos" class="af-xml-datos d-none">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                <div class="fw-bold" style="color:#075985"><i class="fas fa-file-code me-1"></i><span id="af-xml-titulo"></span></div>
+                                <div class="d-flex gap-2">
+                                    <a id="af-xml-descargar" class="btn btn-sm btn-outline-secondary fw-bold d-none"><i class="fas fa-download me-1"></i>Descargar XML</a>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" id="af-xml-cambiar"><i class="fas fa-upload me-1"></i><span>Cambiar XML</span></button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger fw-bold" id="af-xml-quitar"><i class="fas fa-times me-1"></i>Quitar XML</button>
+                                </div>
+                            </div>
+                            <div class="row g-2 small" id="af-xml-campos"></div>
+                        </div>
+                    </div>
+                    <div class="col-lg-5">
+                        <label class="form-label small fw-bold text-muted mb-1">Unidad de negocio *</label>
+                        <select id="af-ff-empresa" class="form-select mb-2"><option value="">Elige…</option></select>
+                        <div class="row g-2 mb-2">
+                            <div class="col-7"><label class="form-label small fw-bold text-muted mb-1">Número de factura *</label>
+                                <input type="text" id="af-ff-numero" class="form-control af-mayus fw-bold" maxlength="100" placeholder="EJ. A-1520"></div>
+                            <div class="col-5"><label class="form-label small fw-bold text-muted mb-1">Fecha *</label>
+                                <input type="date" id="af-ff-fecha" class="form-control"></div>
+                        </div>
+                        <label class="form-label small fw-bold text-muted mb-1" id="af-ff-cliente-etq" for="af-ff-cliente">Cliente</label>
+                        <input type="text" id="af-ff-cliente" class="form-control af-mayus mb-2" maxlength="200" placeholder="NOMBRE DEL CLIENTE">
+                        <!-- Importes como en un CFDI -->
+                        <div class="border rounded-3 p-2 mb-2">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <small class="fw-bold text-uppercase text-muted" id="af-imp-titulo">Importes</small>
+                                <select id="af-ff-moneda" class="form-select form-select-sm" style="width:auto" aria-label="Moneda"><option>MXN</option><option>USD</option></select>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-6"><label class="form-label small fw-bold text-muted mb-1">Subtotal *</label>
+                                    <div class="input-group"><span class="input-group-text fw-bold">$</span>
+                                        <input type="text" inputmode="decimal" id="af-ff-subtotal" class="form-control fw-bold af-imp" placeholder="0.00"></div></div>
+                                <div class="col-6"><label class="form-label small fw-bold text-muted mb-1">Descuento</label>
+                                    <div class="input-group"><span class="input-group-text fw-bold">$</span>
+                                        <input type="text" inputmode="decimal" id="af-ff-descuento" class="form-control fw-bold af-imp" placeholder="0.00"></div></div>
+                                <div class="col-6"><label class="form-label small fw-bold text-muted mb-1">IVA trasladado</label>
+                                    <div class="input-group"><input type="text" inputmode="decimal" id="af-ff-iva_tasa" class="form-control fw-bold af-imp af-tasa" list="af-l-iva" placeholder="0"><span class="input-group-text fw-bold">%</span></div></div>
+                                <div class="col-6"><label class="form-label small fw-bold text-muted mb-1">IEPS</label>
+                                    <div class="input-group"><input type="text" inputmode="decimal" id="af-ff-ieps_tasa" class="form-control fw-bold af-imp af-tasa" list="af-l-ieps" placeholder="0"><span class="input-group-text fw-bold">%</span></div></div>
+                                <div class="col-6"><label class="form-label small fw-bold text-muted mb-1">Retención IVA</label>
+                                    <div class="input-group"><input type="text" inputmode="decimal" id="af-ff-ret_iva_tasa" class="form-control fw-bold af-imp af-tasa" list="af-l-riva" placeholder="0"><span class="input-group-text fw-bold">%</span></div></div>
+                                <div class="col-6"><label class="form-label small fw-bold text-muted mb-1">Retención ISR</label>
+                                    <div class="input-group"><input type="text" inputmode="decimal" id="af-ff-ret_isr_tasa" class="form-control fw-bold af-imp af-tasa" list="af-l-risr" placeholder="0"><span class="input-group-text fw-bold">%</span></div></div>
+                            </div>
+                            <datalist id="af-l-iva"><option value="16"><option value="8"><option value="0"></datalist>
+                            <datalist id="af-l-ieps"><option value="8"><option value="6"><option value="7"><option value="9"><option value="26.5"><option value="30"><option value="53"><option value="160"></datalist>
+                            <datalist id="af-l-riva"><option value="16"><option value="10.6667"><option value="6"><option value="4"></datalist>
+                            <datalist id="af-l-risr"><option value="1.25"><option value="10"></datalist>
+                            <div id="af-ff-desglose" class="af-desglose mt-2"></div>
+                        </div>
+                        <label class="form-label small fw-bold text-muted mb-1">Notas</label>
+                        <textarea id="af-ff-notas" class="form-control af-mayus mb-3" rows="2" maxlength="2000"></textarea>
+                        <div class="p-3 rounded-3" style="background:#f0fdfa;border:1px solid #99f6e4">
+                            <small class="fw-bold text-uppercase text-muted">Esta factura ampara</small>
+                            <div class="fs-4 fw-bold" id="af-ff-n">0 folio(s)</div>
+                            <div class="small fw-bold" id="af-ff-resumen">—</div>
+                            <div class="d-flex flex-wrap gap-1 mt-2" id="af-ff-elegidos" style="max-height:110px;overflow:auto"></div>
+                        </div>
+                    </div>
+                    <div class="col-lg-7">
+                        <div class="border rounded-3 h-100 d-flex flex-column">
+                            <div id="af-xml-folios" class="p-2 border-bottom d-none" style="background:#f0f9ff"></div>
+                            <div class="p-2 border-bottom">
+                                <input type="text" id="af-fd-q" class="form-control af-mayus mb-2" placeholder="BUSCAR FOLIO O CLIENTE…">
+                                <div class="row g-2">
+                                    <div class="col-4"><input type="text" id="af-fd-desde" class="form-control af-mayus" placeholder="DESDE FOLIO"></div>
+                                    <div class="col-4"><input type="text" id="af-fd-hasta" class="form-control af-mayus" placeholder="HASTA FOLIO"></div>
+                                    <div class="col-4 d-grid"><button type="button" class="btn btn-outline-secondary btn-sm fw-bold" id="af-fd-todos">Ligar visibles</button></div>
+                                </div>
+                            </div>
+                            <div id="af-fd-lista" style="max-height:52vh;overflow:auto" class="flex-grow-1">
+                                <p class="text-center text-muted p-4 mb-0">Elige la unidad de negocio para ver sus folios sin factura.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Modificaciones: quién, cuándo y qué cambió -->
+                    <div class="col-12 order-last d-none" id="af-historial-caja">
+                        <div class="border rounded-3">
+                            <div class="fw-bold small px-3 py-2 border-bottom"><i class="fas fa-clock-rotate-left me-1 text-success"></i><span id="af-historial-titulo">Modificaciones</span></div>
+                            <div id="af-historial"></div>
+                        </div>
+                    </div>
+                    <!-- Conceptos del CFDI -->
+                    <div class="col-12 d-none" id="af-conceptos-caja">
+                        <div class="border rounded-3">
+                            <button type="button" class="btn w-100 text-start fw-bold d-flex justify-content-between align-items-center" id="af-conceptos-ver" aria-expanded="false">
+                                <span id="af-conceptos-titulo">Conceptos del XML</span><i class="fas fa-chevron-down"></i></button>
+                            <div class="table-responsive d-none" id="af-conceptos-tabla"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer justify-content-between">
+                <span class="text-danger fw-bold small" id="af-ff-error"></span>
+                <div>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success fw-bold" id="af-ff-guardar"><i class="fas fa-check me-1"></i>Dar de alta</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Descargar en un ZIP los XML guardados, por fecha de timbrado -->
+<div class="modal fade" id="af-zip" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border-radius:16px">
+            <div class="modal-header text-white" style="background:linear-gradient(90deg,#1e293b,#075985)">
+                <h5 class="modal-title fw-bold"><i class="fas fa-file-zipper me-2"></i>Descargar XML (ZIP)</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-2">Fecha de timbrado de las facturas:</p>
+                <div class="row g-2">
+                    <div class="col-6"><label class="form-label small fw-bold text-muted mb-1" for="af-zip-desde">Desde *</label><input type="date" id="af-zip-desde" class="form-control"></div>
+                    <div class="col-6"><label class="form-label small fw-bold text-muted mb-1" for="af-zip-hasta">Hasta *</label><input type="date" id="af-zip-hasta" class="form-control"></div>
+                </div>
+                <div class="text-danger fw-bold small mt-2" id="af-zip-error"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary fw-bold" id="af-zip-bajar"><i class="fas fa-download me-1"></i>Descargar ZIP</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ventana con los datos de la remisión -->
+<div class="modal fade" id="af-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:16px">
+            <div class="modal-header" style="background:#2c3e50;color:#fff">
+                <h5 class="modal-title fw-bold"><i class="fas fa-file-alt me-2"></i>Remisión <span id="af-m-remision"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body" id="af-m-cuerpo"></div>
+            <div class="modal-footer justify-content-between">
+                <small class="text-muted">La factura se asigna en la pestaña “Facturas (alta y folios)”.</small>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="af-toast alert mb-0 shadow fw-bold" id="af-toast" role="status"></div>
+{% endblock %}
+
+{% block extra_js %}
+{% if not sin_permiso %}
+<script>
+(function () {
+    const API = '/api/asignacion-factura/';
+    const CSRF = '{{ csrf_token }}';
+    const estado = { q: '', factura: '', empresa: '', status: '', fecha_de: 'carga', desde: '', hasta: '', page: 1 };
+    const $ = (id) => document.getElementById(id);
+    // Las ventanas van directo en <body> para que no queden debajo de la barra superior.
+    ['af-modal', 'af-fact-modal', 'af-zip'].forEach(id => document.body.appendChild($(id)));
+    const dinero = (n, m) => Number(n || 0).toLocaleString('es-MX', { style: 'currency', currency: m === 'USD' ? 'USD' : 'MXN' }) + ' ' + (m || 'MXN');
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const num = (v, d = 2) => Number(v || 0).toLocaleString('es-MX', { minimumFractionDigits: d, maximumFractionDigits: d });
+    const fecha = (iso) => iso ? iso.split('-').reverse().join('/') : '—';
+    const monto = (n) => (n < 0 ? '−' : '') + '$' + num(Math.abs(n));
+    const pct = (n) => Number(n || 0).toLocaleString('es-MX', { maximumFractionDigits: 4 }) + ' %';
+    let modal = null, actual = null;
+
+    function aviso(texto, ok = true) {
+        const t = $('af-toast');
+        t.className = 'af-toast alert mb-0 shadow fw-bold ' + (ok ? 'alert-success' : 'alert-danger');
+        t.textContent = texto; t.style.display = 'block';
+        clearTimeout(aviso._t); aviso._t = setTimeout(() => { t.style.display = 'none'; }, 3000);
+    }
+
+    // Todo lo que se escribe va en MAYÚSCULAS
+    function mayusculas(input) {
+        input.addEventListener('input', () => {
+            const pos = input.selectionStart; input.value = input.value.toUpperCase(); input.setSelectionRange(pos, pos);
+        });
+    }
+
+    async function cargar() {
+        const p = new URLSearchParams();
+        Object.entries(estado).forEach(([k, v]) => { if (v) p.set(k, v); });
+        try {
+            const r = await fetch(API + '?' + p, { credentials: 'same-origin' });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.detail || 'Error ' + r.status);
+            pintar(d);
+        } catch (e) {
+            $('af-filas').innerHTML = `<tr><td colspan="8" class="py-5 text-danger fw-bold">${esc(e.message)}</td></tr>`;
+        }
+    }
+
+    function filaHtml(f) {
+        return `<tr data-id="${f.id}">
+            <td class="af-remision">${esc(f.remision)}</td>
+            <td>${f.factura ? `<span class="af-factura-asignada">${esc(f.factura)}</span>` : '<small class="text-muted fw-bold">Sin factura</small>'}
+                ${f.factura_id ? `<button type="button" class="af-total-link d-block mx-auto" data-factura="${f.factura_id}" title="Ver la factura y sus folios">Total factura: ${dinero(f.factura_total, f.factura_moneda)}</button>` : ''}</td>
+            <td>${fecha(f.fecha)}</td><td>${esc(f.empresa)}</td><td>${esc(f.cliente) || '—'}</td>
+            <td><span class="af-badge af-${esc(f.status)}">${esc(f.status_texto)}</span></td>
+            <td class="small text-muted">${f.asignada_por ? esc(f.asignada_por) + '<br>' + esc(f.asignada_en) : '—'}</td>
+            <td><button type="button" class="btn btn-sm btn-outline-primary af-ver"><i class="fas fa-eye me-1"></i>Ver</button></td>
+        </tr>`;
+    }
+
+    function pintar(d) {
+        const sel = $('af-empresa');
+        if (sel.options.length === 1) d.empresas.forEach(e => sel.add(new Option(e.nombre, e.id)));
+        $('af-n-total').textContent = num(d.conteos.total, 0); $('af-n-sin').textContent = num(d.conteos.sin_factura, 0); $('af-n-con').textContent = num(d.conteos.con_factura, 0);
+        $('af-filas').innerHTML = d.resultados.length ? d.resultados.map(filaHtml).join('')
+            : '<tr><td colspan="8" class="py-5 text-muted">No hay remisiones con estos filtros.</td></tr>';
+        $('af-conteo').textContent = `${d.count} remisiones`;
+        $('af-pag').textContent = `${d.page} / ${d.pages}`;
+        $('af-ant').disabled = d.page <= 1; $('af-sig').disabled = d.page >= d.pages;
+        estado.page = d.page; estado.pages = d.pages;
+    }
+
+    const dato = (titulo, valor) => `<div class="col-6 col-md-3"><div class="af-dato"><small>${titulo}</small><span>${valor ? esc(valor) : '—'}</span></div></div>`;
+
+    // Renglones de total al pie de una tabla de conceptos (antes = columnas entre la descripción y la cantidad)
+    function pieConceptos(conceptos, antes = 0) {
+        const s = conceptos.reduce((a, c) => ({ importe: a.importe + c.importe,
+            descuento: a.descuento + (c.descuento || 0), traslados: a.traslados + c.traslados, retenciones: a.retenciones + c.retenciones }),
+            { importe: 0, descuento: 0, traslados: 0, retenciones: 0 });
+        // La cantidad se suma por unidad (no se suman kilos con servicios)
+        const porUnidad = new Map();
+        conceptos.forEach(c => { const u = c.unidad || c.clave_unidad || ''; porUnidad.set(u, (porUnidad.get(u) || 0) + c.cantidad); });
+        const cantidades = [...porUnidad].map(([u, n], i) => `<span class="d-block">${i ? '+ ' : ''}${Number(n).toLocaleString('es-MX', { maximumFractionDigits: 3 })} ${esc(u)}</span>`).join('');
+        const total = Math.round((s.importe - s.descuento + s.traslados - s.retenciones) * 100) / 100;
+        return `<tfoot class="table-light fw-bold" style="border-top:2px solid #94a3b8"><tr>
+            <td>Total · ${conceptos.length} concepto(s)</td>${'<td></td>'.repeat(antes)}
+            <td class="text-end">${cantidades}</td><td></td>
+            <td class="text-end">${monto(s.importe)}</td><td class="text-end">${monto(s.traslados)}</td><td class="text-end">${s.retenciones ? monto(-s.retenciones) : '—'}</td></tr>
+            <tr><td colspan="${6 + antes}" class="text-end">Total (importe${s.descuento ? ' − descuento' : ''} + impuestos − retenciones): <span class="fs-6">${monto(total)}</span></td></tr></tfoot>`;
+    }
+
+    // Fotografías (miniaturas que abren la original) y documentos cargados a la remisión
+    function archivosHtml(archivos) {
+        if (!archivos || !archivos.length) return '';
+        const fotos = archivos.filter(a => a.imagen), docs = archivos.filter(a => !a.imagen);
+        return `<div class="mt-3"><div class="fw-bold small mb-2"><i class="fas fa-camera me-1 text-success"></i>Fotografías y documentos (${archivos.length})</div>
+            ${fotos.length ? `<div class="row g-2">${fotos.map(a => `<div class="col-4 col-md-2"><a href="${esc(a.url)}" target="_blank" rel="noopener" class="d-block border rounded-3 overflow-hidden text-decoration-none" title="${esc(a.nombre)}">
+                <img src="${esc(a.url)}" alt="${esc(a.nombre)}" loading="lazy" style="width:100%;height:90px;object-fit:cover;background:#f1f5f9">
+                <small class="d-block text-truncate px-1 py-1 fw-bold text-dark">${esc(a.nombre)}</small></a></div>`).join('')}</div>` : ''}
+            ${docs.length ? `<div class="d-flex flex-wrap gap-2 mt-2">${docs.map(a => `<a href="${esc(a.url)}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary fw-bold"><i class="fas fa-file me-1"></i>${esc(a.nombre)}</a>`).join('')}</div>` : ''}
+        </div>`;
+    }
+
+    // La factura asociada: datos del XML (CFDI), desglose y conceptos (los de esta remisión, resaltados)
+    function facturaDeRemision(f) {
+        const cat = {
+            uso: { G01: 'Adquisición de mercancías', G03: 'Gastos en general', S01: 'Sin efectos fiscales', I08: 'Otra maquinaria y equipo' },
+            metodo: { PUE: 'Una sola exhibición', PPD: 'Parcialidades o diferido' },
+            forma: { '01': 'Efectivo', '02': 'Cheque', '03': 'Transferencia', '04': 'Tarjeta de crédito', '28': 'Tarjeta de débito', '99': 'Por definir' },
+        };
+        const conNombre = (c, k) => k ? (c[k] ? `${k} · ${c[k]}` : k) : '';
+        const importes = [['Subtotal', f.subtotal]];
+        if (f.descuento) importes.push(['Descuento', -f.descuento]);
+        if (f.ieps_importe) importes.push(['IEPS ' + pct(f.ieps_tasa), f.ieps_importe]);
+        importes.push(['IVA ' + pct(f.iva_tasa), f.iva_importe]);
+        if (f.ret_iva_importe) importes.push(['IVA retenido ' + pct(f.ret_iva_tasa), -f.ret_iva_importe]);
+        if (f.ret_isr_importe) importes.push(['ISR retenido ' + pct(f.ret_isr_tasa), -f.ret_isr_importe]);
+        const conceptos = f.conceptos.length ? `<div class="table-responsive mt-2"><table class="table table-sm small mb-0">
+            <thead class="table-light"><tr><th>Concepto del XML</th><th class="text-end">Clave SAT</th><th class="text-end">Cantidad</th>
+            <th class="text-end">P. unitario</th><th class="text-end">Importe</th><th class="text-end">Impuestos</th><th class="text-end">Retenciones</th></tr></thead><tbody>`
+            + f.conceptos.map(c => `<tr${c.de_esta_remision ? ' style="background:#f0fdfa"' : ''}><td>${esc(c.descripcion)}${c.de_esta_remision ? ' <span class="badge bg-success">ESTA REMISIÓN</span>' : ''}</td>
+                <td class="text-end">${esc(c.clave_prod_serv)}<small class="d-block text-muted">${esc(c.clave_sat_desc)}</small></td>
+                <td class="text-end text-nowrap">${Number(c.cantidad).toLocaleString('es-MX')} ${esc(c.unidad || c.clave_unidad)}</td>
+                <td class="text-end">${monto(c.valor_unitario)}</td><td class="text-end fw-bold">${monto(c.importe)}</td>
+                <td class="text-end">${monto(c.traslados)}</td><td class="text-end">${c.retenciones ? monto(-c.retenciones) : '—'}</td></tr>`).join('')
+            + '</tbody>' + pieConceptos(f.conceptos, 1) + '</table></div>' : '';
+        return `<div class="mt-3 p-3 rounded-3" style="border:1px solid #bae6fd;background:#f0f9ff">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                <div class="fw-bold" style="color:#075985"><i class="fas fa-file-invoice-dollar me-1"></i>Factura ${esc(f.numero)}
+                    <span class="af-badge-xml">${f.tiene_xml ? 'XML' : 'SIN XML'}</span></div>
+                ${f.xml_url ? `<a class="btn btn-sm btn-outline-secondary fw-bold" href="${esc(f.xml_url)}"><i class="fas fa-download me-1"></i>Descargar XML</a>` : ''}
+            </div>
+            <div class="row g-2">${dato('Fecha', fecha(f.fecha))}${dato('Folio fiscal (UUID)', f.uuid)}${dato('Razón social', f.cliente)}${dato('RFC', f.receptor_rfc)}
+                ${dato('Uso CFDI', conNombre(cat.uso, f.uso_cfdi))}${dato('Método de pago', conNombre(cat.metodo, f.metodo_pago))}
+                ${dato('Forma de pago', conNombre(cat.forma, f.forma_pago))}${dato('Remisiones aplicadas', f.remisiones.join(', '))}</div>
+            <div class="d-flex flex-wrap gap-3 small mt-2 px-2 py-1 border rounded bg-white">${importes.map(([k, n]) =>
+                `<span><span class="text-muted">${k}</span> <b class="${n < 0 ? 'text-danger' : ''}">${monto(n)}</b></span>`).join('')}
+                <span class="ms-auto fw-bold">Total ${dinero(f.total, f.moneda)}</span></div>
+            ${conceptos}
+        </div>`;
+    }
+
+    async function ver(id) {
+        try {
+            const r = await fetch(API + id + '/', { credentials: 'same-origin' });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.detail || 'Error ' + r.status);
+            actual = d;
+            $('af-m-remision').textContent = d.remision;
+            const materiales = d.materiales.length ? `<div class="table-responsive mt-3"><table class="table table-sm af-tabla mb-0">
+                <thead><tr><th>Material</th><th>Cliente</th><th>Carga (kg)</th><th>Descarga (kg)</th><th>Rechazo (kg)</th><th>Unidad</th><th>Bultos</th></tr></thead>
+                <tbody>${d.materiales.map(m => `<tr><td class="fw-bold">${esc(m.material)}</td><td>${esc(m.cliente) || '—'}</td><td>${num(m.carga, 3)}</td><td>${num(m.descarga, 3)}</td><td>${num(m.rechazo, 3)}</td><td>${esc(m.unidad)}</td><td>${m.bultos ?? '—'}</td></tr>`).join('')}</tbody>
+            </table></div>` : '';
+            $('af-m-cuerpo').innerHTML = `<div class="row g-2">
+                ${dato('Remisión', d.remision)}${dato('Factura', d.factura)}${dato('Fecha', fecha(d.fecha))}${dato('Estatus', d.status_texto)}
+                ${dato('Unidad de negocio', d.empresa)}${dato('Cliente', d.cliente)}${dato('Origen', d.origen)}${dato('Destino', d.destino)}
+                ${dato('Operador', d.operador)}${dato('Unidad', d.unidad)}${dato('Placas', d.placas_unidad)}${dato('Contenedor', d.contenedor)}
+                ${dato('Línea de transporte', d.linea_transporte)}${dato('Folio carga', d.folio_ld)}${dato('Folio descarga', d.folio_dlv)}${dato('Folio Medline', d.folio_medline)}
+                ${dato('Inicia carga', d.inicia_ld)}${dato('Termina carga', d.termina_ld)}${dato('Inicia descarga', d.inicia_dlv)}${dato('Termina descarga', d.termina_dlv)}
+                ${dato('Carga total (kg)', num(d.carga_kg, 3))}${dato('Descarga total (kg)', num(d.descarga_kg, 3))}${dato('Rechazo (kg)', num(d.rechazo_kg, 3))}${dato('Merma', num(d.merma_pct) + ' %')}
+                ${dato('Factura asignada por', d.asignada_por ? d.asignada_por + ' · ' + d.asignada_en : '')}${dato('Auditado por', d.auditado_por ? d.auditado_por + ' · ' + d.auditado_en : '')}
+                ${dato('Facturas CFDI', d.cfdi.map(c => c.folio + (c.estado ? ' (' + c.estado + ')' : '')).join(', '))}${dato('Folio de salida', d.folio_salida)}
+            </div>${materiales}${archivosHtml(d.archivos)}
+            ${d.comentario ? `<div class="af-dato mt-3"><small>Comentario</small><span>${esc(d.comentario)}</span></div>` : ''}
+            ${d.factura_alta ? facturaDeRemision(d.factura_alta) : ''}`;
+            modal = modal || new bootstrap.Modal($('af-modal'));
+            modal.show();
+        } catch (e) { aviso(e.message, false); }
+    }
+
+    // Eventos
+    let espera;
+    mayusculas($('af-q'));
+    $('af-q').addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(() => { estado.q = $('af-q').value.trim(); estado.page = 1; cargar(); }, 350); });
+    [['af-empresa', 'empresa'], ['af-status', 'status'], ['af-fecha-de', 'fecha_de'], ['af-desde', 'desde'], ['af-hasta', 'hasta']].forEach(([id, k]) =>
+        $(id).addEventListener('change', () => { estado[k] = $(id).value; estado.page = 1; cargar(); }));
+    $('af-chips').addEventListener('click', (e) => {
+        const b = e.target.closest('.af-chip'); if (!b) return;
+        document.querySelectorAll('.af-chip').forEach(x => x.classList.toggle('activo', x === b));
+        estado.factura = b.dataset.factura; estado.page = 1; cargar();
+    });
+    $('af-limpiar').addEventListener('click', () => {
+        ['af-q', 'af-empresa', 'af-status', 'af-desde', 'af-hasta'].forEach(id => { $(id).value = ''; });
+        $('af-fecha-de').value = 'carga';
+        Object.assign(estado, { q: '', empresa: '', status: '', fecha_de: 'carga', desde: '', hasta: '', page: 1 }); cargar();
+    });
+    $('af-ant').addEventListener('click', () => { if (estado.page > 1) { estado.page--; cargar(); } });
+    $('af-sig').addEventListener('click', () => { if (estado.page < estado.pages) { estado.page++; cargar(); } });
+    $('af-filas').addEventListener('click', (e) => {
+        const total = e.target.closest('.af-total-link');
+        if (total) { mostrarVista('facturas'); abrirFacturaPorId(total.dataset.factura); return; }
+        const tr = e.target.closest('tr[data-id]'); if (!tr) return;
+        if (e.target.closest('.af-ver')) ver(tr.dataset.id);
+    });
+
+    // ── Pestañas ──
+    function mostrarVista(v) {
+        document.querySelectorAll('#af-tabs .nav-link').forEach(b => b.classList.toggle('active', b.dataset.vista === v));
+        $('af-vista-remisiones').classList.toggle('d-none', v !== 'remisiones');
+        $('af-vista-facturas').classList.toggle('d-none', v !== 'facturas');
+        $('af-chips').classList.toggle('d-none', v !== 'remisiones');
+        if (v === 'facturas') {
+            if ($('af-f-empresa').options.length === 1) [...$('af-empresa').options].filter(o => o.value).forEach(o => $('af-f-empresa').add(new Option(o.text, o.value)));
+            cargarFacturas();
+        }
+    }
+    $('af-tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-vista]'); if (b) mostrarVista(b.dataset.vista); });
+
+    // ── Facturas dadas de alta (número, total y sus folios) ──
+    const FAPI = API + 'facturas/';
+    const fEstado = { q: '', empresa: '', desde: '', hasta: '', page: 1, pages: 1 };
+    let facturasPagina = [];
+    const filtrosFacturas = () => {
+        const p = new URLSearchParams();
+        ['q', 'empresa', 'desde', 'hasta'].forEach(k => { if (fEstado[k]) p.set(k, fEstado[k]); });
+        return p;
+    };
+    async function cargarFacturas() {
+        const p = filtrosFacturas(); p.set('page', fEstado.page);
+        try {
+            const r = await fetch(FAPI + '?' + p, { credentials: 'same-origin' });
+            const d = await r.json(); if (!r.ok) throw new Error(d.detail || 'Error ' + r.status);
+            facturasPagina = d.resultados;
+            $('af-f-total').textContent = dinero(d.totales.MXN, 'MXN') + (d.totales.USD ? ' · ' + dinero(d.totales.USD, 'USD') : '');
+            $('af-f-filas').innerHTML = d.resultados.length ? d.resultados.map(f => `<tr>
+                <td class="af-remision">${esc(f.numero)}${f.tiene_xml ? ` <span class="af-badge-xml" title="CFDI ${esc(f.uuid)}">XML</span>` : ''}</td><td>${fecha(f.fecha)}</td><td>${esc(f.empresa.nombre)}</td><td>${esc(f.cliente) || '—'}</td>
+                <td style="max-width:340px">${f.folios.slice(0, 6).map(x => `<button type="button" class="badge border-0 bg-success bg-opacity-10 text-success me-1 af-folio-ver" data-remision="${x.id}" title="Ver datos y fotografías de la remisión">${esc(x.remision)}</button>`).join('')}${f.num_folios > 6 ? `<small class="text-muted">+${f.num_folios - 6}</small>` : ''}${f.num_folios ? '' : '<small class="text-muted">Sin folios</small>'}</td>
+                <td><b>${dinero(f.total, f.moneda)}</b>${(f.iva_importe || f.ret_iva_importe || f.ieps_importe || f.ret_isr_importe)
+                    ? `<small class="d-block text-muted">Subtotal ${monto(f.subtotal - f.descuento)}${f.iva_importe ? ' · IVA ' + pct(f.iva_tasa) : ''}${f.ret_iva_importe ? ' · Ret. ' + pct(f.ret_iva_tasa) : ''}</small>` : ''}</td>
+                <td class="text-nowrap"><button type="button" class="btn btn-sm btn-outline-success af-f-reporte" data-id="${f.id}" title="Reporte detallado de esta factura (Excel)"><i class="fas fa-file-excel"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-primary af-f-editar" data-id="${f.id}" title="Editar"><i class="fas fa-pen"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-danger af-f-borrar" data-id="${f.id}" title="Eliminar"><i class="fas fa-trash"></i></button></td></tr>`).join('')
+                : '<tr><td colspan="7" class="py-5 text-muted">No hay facturas dadas de alta. Usa “Alta de factura”.</td></tr>';
+            $('af-f-pag').textContent = `${d.page} / ${d.pages}`; fEstado.page = d.page; fEstado.pages = d.pages;
+            $('af-f-ant').disabled = d.page <= 1; $('af-f-sig').disabled = d.page >= d.pages;
+        } catch (e) { $('af-f-filas').innerHTML = `<tr><td colspan="7" class="py-5 text-danger fw-bold">${esc(e.message)}</td></tr>`; }
+    }
+    let esperaF;
+    mayusculas($('af-f-q'));
+    $('af-f-q').addEventListener('input', () => { clearTimeout(esperaF); esperaF = setTimeout(() => { fEstado.q = $('af-f-q').value.trim(); fEstado.page = 1; cargarFacturas(); }, 350); });
+    $('af-f-empresa').addEventListener('change', () => { fEstado.empresa = $('af-f-empresa').value; fEstado.page = 1; cargarFacturas(); });
+    ['desde', 'hasta'].forEach(k => $('af-f-' + k).addEventListener('change', () => { fEstado[k] = $('af-f-' + k).value; fEstado.page = 1; cargarFacturas(); }));
+    // Reporte detallado (Excel): de las facturas filtradas o de una sola
+    async function reporte(p, boton) {
+        const antes = boton.innerHTML; boton.disabled = true; boton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        try {
+            const r = await fetch(FAPI + 'reporte/?' + p, { credentials: 'same-origin' });
+            if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Error ' + r.status);
+            const nombre = (/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || '') || [])[1] || 'Reporte facturas.xlsx';
+            const url = URL.createObjectURL(await r.blob());
+            const a = document.createElement('a'); a.href = url; a.download = nombre; a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+        } catch (e) { aviso(e.message, false); }
+        finally { boton.disabled = false; boton.innerHTML = antes; }
+    }
+    $('af-f-reporte').addEventListener('click', () => reporte(filtrosFacturas(), $('af-f-reporte')));
+    // ZIP de XML por fecha de timbrado
+    let modalZip = null;
+    $('af-f-zip').addEventListener('click', () => {
+        const hoy = new Date();
+        if (!$('af-zip-hasta').value) $('af-zip-hasta').value = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+        $('af-zip-error').textContent = '';
+        modalZip = modalZip || new bootstrap.Modal($('af-zip')); modalZip.show();
+    });
+    $('af-zip-bajar').addEventListener('click', async () => {
+        const desde = $('af-zip-desde').value, hasta = $('af-zip-hasta').value, boton = $('af-zip-bajar');
+        $('af-zip-error').textContent = '';
+        if (!desde || !hasta) { $('af-zip-error').textContent = 'Escribe la fecha de timbrado desde y hasta.'; return; }
+        const antes = boton.innerHTML; boton.disabled = true; boton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        try {
+            const r = await fetch(FAPI + 'xml-zip/?' + new URLSearchParams({ desde, hasta }), { credentials: 'same-origin' });
+            if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Error ' + r.status);
+            const nombre = (/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || '') || [])[1] || `XML facturas ${desde} a ${hasta}.zip`;
+            const url = URL.createObjectURL(await r.blob());
+            const a = document.createElement('a'); a.href = url; a.download = nombre; a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+            modalZip.hide(); aviso('ZIP de XML descargado.');
+        } catch (e) { $('af-zip-error').textContent = e.message; }
+        finally { boton.disabled = false; boton.innerHTML = antes; }
+    });
+    $('af-f-ant').addEventListener('click', () => { if (fEstado.page > 1) { fEstado.page--; cargarFacturas(); } });
+    $('af-f-sig').addEventListener('click', () => { if (fEstado.page < fEstado.pages) { fEstado.page++; cargarFacturas(); } });
+    $('af-f-filas').addEventListener('click', async (e) => {
+        const folio = e.target.closest('.af-folio-ver'); if (folio) { ver(folio.dataset.remision); return; }
+        const rep = e.target.closest('.af-f-reporte'); if (rep) { reporte(new URLSearchParams({ factura: rep.dataset.id }), rep); return; }
+        const ed = e.target.closest('.af-f-editar'); if (ed) { abrirFacturaPorId(ed.dataset.id); return; }
+        const bo = e.target.closest('.af-f-borrar'); if (!bo) return;
+        const f = facturasPagina.find(x => String(x.id) === bo.dataset.id);
+        if (!confirm(`¿Eliminar la factura ${f.numero}? Sus ${f.num_folios} folios quedarán sin factura.`)) return;
+        try {
+            const r = await fetch(FAPI + f.id + '/', { method: 'DELETE', credentials: 'same-origin', headers: { 'X-CSRFToken': CSRF } });
+            const d = await r.json(); if (!r.ok) throw new Error(d.detail || 'Error ' + r.status);
+            aviso(d.detail); cargarFacturas(); cargar();
+        } catch (err) { aviso(err.message, false); }
+    });
+
+    // Formulario de alta / edición
+    let modalFactura = null, facturaEditando = null, disponibles = [];
+    const elegidos = new Map();
+    ['af-ff-numero', 'af-ff-cliente', 'af-fd-q', 'af-fd-desde', 'af-fd-hasta'].forEach(id => mayusculas($(id)));
+    $('af-ff-notas').addEventListener('input', () => { const t = $('af-ff-notas'), pos = t.selectionStart; t.value = t.value.toUpperCase(); t.setSelectionRange(pos, pos); });
+    function pintarElegidos() {
+        const lista = [...elegidos.values()];
+        const kgDesc = lista.reduce((s, x) => s + x.descarga_kg, 0);
+        const total = importes().total;
+        pintarFoliosXml();
+        $('af-ff-n').textContent = `${lista.length} folio(s)`;
+        $('af-ff-resumen').textContent = `${num(kgDesc, 0)} kg de descarga · Total ${total > 0 ? dinero(total, $('af-ff-moneda').value) : '—'}`;
+        $('af-ff-elegidos').innerHTML = lista.map(x => `<button type="button" class="af-chip-folio" data-id="${x.id}" title="Quitar folio">${esc(x.remision)} ×</button>`).join('');
+        document.querySelectorAll('#af-fd-lista .af-folio').forEach(b => b.classList.toggle('activo', elegidos.has(Number(b.dataset.id))));
+        const visibles = disponibles.length && disponibles.every(x => elegidos.has(x.id));
+        $('af-fd-todos').textContent = visibles ? 'Quitar visibles' : `Ligar ${disponibles.length} visibles`;
+    }
+    let esperaD;
+    async function cargarDisponibles() {
+        const empresa = $('af-ff-empresa').value;
+        if (!empresa) { disponibles = []; $('af-fd-lista').innerHTML = '<p class="text-center text-muted p-4 mb-0">Elige la unidad de negocio para ver sus folios sin factura.</p>'; pintarElegidos(); return; }
+        const p = new URLSearchParams({ empresa });
+        if (facturaEditando) p.set('factura', facturaEditando.id);
+        [['af-fd-q', 'q'], ['af-fd-desde', 'folio_desde'], ['af-fd-hasta', 'folio_hasta']].forEach(([id, k]) => { if ($(id).value.trim()) p.set(k, $(id).value.trim()); });
+        try {
+            const d = await (await fetch(API + 'disponibles/?' + p, { credentials: 'same-origin' })).json();
+            disponibles = d.resultados;
+            // Nombres de las columnas (fijos al desplazar la lista)
+            const encabezado = `<div class="af-folio-enc"><span style="width:18px"></span><span style="width:110px">Remisión</span>
+                <span style="width:80px">Fecha</span><span class="flex-grow-1">Cliente</span><span style="width:90px;text-align:right">Descarga</span></div>`;
+            $('af-fd-lista').innerHTML = disponibles.length ? encabezado + disponibles.map(x => `<button type="button" class="af-folio" data-id="${x.id}">
+                <span class="check"><i class="fas fa-check" style="font-size:.6rem"></i></span><b style="width:110px">${esc(x.remision)}</b>
+                <span class="text-muted" style="width:80px">${fecha(x.fecha)}</span><span class="flex-grow-1 text-truncate">${esc(x.cliente) || '—'}</span>
+                <small class="text-muted" style="width:90px;text-align:right">${num(x.descarga_kg, 0)} kg</small></button>`).join('')
+                + (d.limitado ? '<p class="small text-warning fw-bold p-2 mb-0">Se muestran los primeros 1,000: usa el rango de folios.</p>' : '')
+                : '<p class="text-center text-muted p-4 mb-0">No hay folios sin factura con esos filtros.</p>';
+            pintarElegidos();
+        } catch (e) { $('af-ff-error').textContent = e.message; }
+    }
+    const recargarDisponibles = () => { clearTimeout(esperaD); esperaD = setTimeout(cargarDisponibles, 300); };
+    ['af-fd-q', 'af-fd-desde', 'af-fd-hasta'].forEach(id => $(id).addEventListener('input', recargarDisponibles));
+    $('af-ff-empresa').addEventListener('change', () => { elegidos.clear(); cargarDisponibles(); });
+    $('af-ff-moneda').addEventListener('input', pintarImportes);
+    document.querySelectorAll('#af-fact-modal .af-imp').forEach(i => i.addEventListener('input', () => {
+        i.value = i.value.replace(i.classList.contains('af-tasa') ? /[^0-9.]/g : /[^0-9.,]/g, ''); pintarImportes();
+    }));
+
+    // ── Importes: a mano se calculan con las tasas (igual que el servidor); con XML salen del CFDI ──
+    const IMPORTES = ['subtotal', 'descuento', 'iva_tasa', 'ieps_tasa', 'ret_iva_tasa', 'ret_isr_tasa'];
+    const valor = (id) => Number(String($(id).value || '').replace(/[$,%\s]/g, '')) || 0;
+    const r2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+    let xmlArchivo = null, lectura = null;
+    const fiscal = () => (lectura ? lectura.cfdi : (facturaEditando && facturaEditando.tiene_xml ? facturaEditando : null));
+    function calcular() {
+        const subtotal = valor('af-ff-subtotal'), descuento = valor('af-ff-descuento'), base = subtotal - descuento;
+        const t = { iva: valor('af-ff-iva_tasa'), ieps: valor('af-ff-ieps_tasa'), riva: valor('af-ff-ret_iva_tasa'), risr: valor('af-ff-ret_isr_tasa') };
+        const ieps = r2(base * t.ieps / 100), iva = r2((base + ieps) * t.iva / 100), riva = r2(base * t.riva / 100), risr = r2(base * t.risr / 100);
+        return { subtotal, descuento, iva_tasa: t.iva, iva_importe: iva, ieps_tasa: t.ieps, ieps_importe: ieps, ret_iva_tasa: t.riva,
+                 ret_iva_importe: riva, ret_isr_tasa: t.risr, ret_isr_importe: risr, total: r2(base + ieps + iva - riva - risr) };
+    }
+    const importes = () => fiscal() || calcular();
+    function pintarImportes() {
+        const fx = fiscal(), v = importes();
+        IMPORTES.forEach(k => { const i = $('af-ff-' + k); i.disabled = !!fx; if (fx) i.value = fx[k] ? String(fx[k]) : ''; });
+        $('af-ff-moneda').disabled = !!fx;
+        $('af-imp-titulo').textContent = fx ? 'Importes · del XML' : 'Importes';
+        const filas = [['Subtotal', v.subtotal]];
+        if (v.descuento) filas.push(['Descuento', -v.descuento]);
+        if (v.ieps_tasa || v.ieps_importe) filas.push(['IEPS ' + pct(v.ieps_tasa), v.ieps_importe]);
+        filas.push(['IVA trasladado ' + pct(v.iva_tasa), v.iva_importe]);
+        if (v.ret_iva_tasa || v.ret_iva_importe) filas.push(['IVA retenido ' + pct(v.ret_iva_tasa), -v.ret_iva_importe]);
+        if (v.ret_isr_tasa || v.ret_isr_importe) filas.push(['ISR retenido ' + pct(v.ret_isr_tasa), -v.ret_isr_importe]);
+        $('af-ff-desglose').innerHTML = filas.map(([k, n]) => `<div class="fila"><span class="text-muted">${k}</span><b class="${n < 0 ? 'neg' : ''}">${monto(n)}</b></div>`).join('')
+            + `<div class="fila total"><span>Total</span><span>${v.total > 0 ? dinero(v.total, $('af-ff-moneda').value) : '—'}</span></div>`;
+        pintarElegidos();
+    }
+
+    // ── XML (CFDI) ──
+    const FORMA_PAGO = { '01': 'Efectivo', '02': 'Cheque', '03': 'Transferencia', '04': 'Tarjeta de crédito', '28': 'Tarjeta de débito', '99': 'Por definir' };
+    const METODO_PAGO = { PUE: 'Una sola exhibición', PPD: 'Parcialidades o diferido' };
+    const USO_CFDI = { G01: 'Adquisición de mercancías', G03: 'Gastos en general', S01: 'Sin efectos fiscales', I08: 'Otra maquinaria y equipo' };
+    const TIPO = { I: 'Ingreso', E: 'Egreso' };
+    const conNombre = (cat, c) => c ? (cat[c] ? `${c} · ${cat[c]}` : c) : '—';
+    const fechaHora = (iso) => iso && iso.includes('T') ? `${fecha(iso.slice(0, 10))} ${iso.slice(11, 16)}` : (iso || '');
+    function pintarXml() {
+        const c = lectura && lectura.cfdi, f = facturaEditando;
+        const datos = c ? { uuid: c.uuid, emisor: `${c.emisor.rfc} · ${c.emisor.nombre}`, receptor: `${c.receptor.rfc} · ${c.receptor.nombre}`,
+                            uso: c.receptor.uso_cfdi, metodo: c.metodo_pago, forma: c.forma_pago, tipo: c.tipo_comprobante, timbrado: fechaHora(c.fecha_timbrado) }
+            : (f && f.tiene_xml) ? { uuid: f.uuid, emisor: `${f.emisor_rfc} · ${f.emisor_nombre}`, receptor: `${f.receptor_rfc} · ${f.cliente}`,
+                                     uso: f.uso_cfdi, metodo: f.metodo_pago, forma: f.forma_pago, tipo: f.tipo_comprobante, timbrado: f.fecha_timbrado } : null;
+        $('af-xml-zona').classList.toggle('d-none', !!datos);
+        $('af-xml-datos').classList.toggle('d-none', !datos);
+        $('af-ff-fecha').disabled = !!lectura;
+        // Con XML el cliente es el receptor de la factura: no se cambia a mano
+        $('af-ff-cliente').disabled = !!datos;
+        $('af-ff-cliente-etq').textContent = datos ? 'Cliente · del XML' : 'Cliente';
+        if (datos) {
+            $('af-xml-titulo').textContent = lectura ? `XML leído: ${xmlArchivo.name} · los importes y la fecha salen del XML` : 'Factura con XML (CFDI)';
+            $('af-xml-descargar').classList.toggle('d-none', !!lectura || !f || !f.xml_url);
+            if (f && f.xml_url) $('af-xml-descargar').href = f.xml_url;
+            $('af-xml-cambiar').querySelector('span').textContent = lectura ? 'Cambiar XML' : 'Reemplazar XML';
+            $('af-xml-quitar').classList.toggle('d-none', !lectura);
+            $('af-xml-campos').innerHTML = [
+                ['Folio fiscal (UUID)', datos.uuid || '—'], ['Emisor', datos.emisor], ['Receptor', datos.receptor], ['Timbrado', datos.timbrado || '—'],
+                ['Tipo', conNombre(TIPO, datos.tipo)], ['Uso CFDI', conNombre(USO_CFDI, datos.uso)],
+                ['Método de pago', conNombre(METODO_PAGO, datos.metodo)], ['Forma de pago', conNombre(FORMA_PAGO, datos.forma)],
+            ].map(([k, v]) => `<div class="col-sm-6 col-lg-3"><small>${k}</small><b>${esc(v)}</b></div>`).join('');
+        }
+        const conceptos = c ? c.conceptos : (f && f.conceptos) || [];
+        $('af-conceptos-caja').classList.toggle('d-none', !conceptos.length);
+        $('af-conceptos-titulo').textContent = `Conceptos del XML (${conceptos.length})`;
+        $('af-conceptos-tabla').innerHTML = `<table class="table table-sm small mb-0"><thead class="table-light"><tr><th>Descripción</th>
+            <th class="text-end">Cantidad</th><th class="text-end">P. unitario</th><th class="text-end">Importe</th><th class="text-end">Impuestos</th><th class="text-end">Retenciones</th></tr></thead><tbody>`
+            + conceptos.map(cp => `<tr><td>${esc(cp.descripcion)}${(cp.folios || []).map(x => `<span class="af-folio-xml">${esc(x)}</span>`).join('')}
+                <small class="d-block text-muted">${esc(cp.clave_prod_serv)}${cp.no_identificacion ? ' · ' + esc(cp.no_identificacion) : ''}</small></td>
+                <td class="text-end text-nowrap">${Number(cp.cantidad).toLocaleString('es-MX')} ${esc(cp.clave_unidad)}</td><td class="text-end">${monto(cp.valor_unitario)}</td>
+                <td class="text-end fw-bold">${monto(cp.importe)}</td><td class="text-end">${monto(cp.traslados)}</td><td class="text-end">${cp.retenciones ? monto(-cp.retenciones) : '—'}</td></tr>`).join('')
+            + '</tbody>' + (conceptos.length ? pieConceptos(conceptos) : '') + '</table>';
+        pintarImportes();
+    }
+    // Estado de cada folio escrito en el XML frente a la unidad de negocio elegida
+    function foliosXml() {
+        const empresa = $('af-ff-empresa').value;
+        return (lectura ? lectura.coincidencias : []).map(co => {
+            const propias = co.remisiones.filter(x => String(x.empresa_id) === empresa);
+            const propia = propias.find(x => x.libre) || propias[0];
+            if (!co.remisiones.length) return { folio: co.folio, tipo: 'no', texto: 'No existe en el sistema' };
+            if (!propia) return { folio: co.folio, tipo: 'otra', texto: 'Es de ' + co.remisiones[0].empresa };
+            if (!propia.libre) return { folio: co.folio, tipo: 'ocupado', texto: 'Ya tiene factura ' + propia.factura };
+            return elegidos.has(propia.id) ? { folio: co.folio, tipo: 'ligado', texto: 'Ligado · clic para quitar', remision: propia }
+                : { folio: co.folio, tipo: 'libre', texto: 'Sin ligar · clic para ligar', remision: propia };
+        });
+    }
+    function pintarFoliosXml() {
+        const caja = $('af-xml-folios');
+        caja.classList.toggle('d-none', !lectura);
+        if (!lectura) return;
+        const lista = foliosXml(), ligados = lista.filter(x => x.tipo === 'ligado').length;
+        const icono = { ligado: 'fa-circle-check', no: 'fa-circle-xmark' };
+        caja.innerHTML = `<div class="fw-bold small">Folios escritos en el XML: ${ligados} de ${lista.length} ligados</div>
+            <div class="small text-muted mb-2">${lista.length ? 'Se leyeron de la descripción de los conceptos. Verifica que sean los correctos.' : 'La descripción de los conceptos no trae folios: elígelos en la lista.'}</div>
+            <div class="d-flex flex-wrap gap-1">${lista.map(x => `<button type="button" class="af-xf ${x.tipo}" title="${esc(x.texto)}" ${x.remision ? `data-xml-id="${x.remision.id}"` : 'disabled'}>
+                <i class="fas ${icono[x.tipo] || 'fa-circle-exclamation'} me-1"></i>${esc(x.folio)}${x.tipo !== 'ligado' ? ` <span class="fw-normal">· ${esc(x.texto)}</span>` : ''}</button>`).join('')}</div>`;
+    }
+    $('af-xml-folios').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-xml-id]'); if (!b) return;
+        const id = Number(b.dataset.xmlId);
+        const r = lectura.coincidencias.flatMap(c => c.remisiones).find(x => x.id === id);
+        elegidos.has(id) ? elegidos.delete(id) : elegidos.set(id, r); pintarElegidos();
+    });
+    async function leerXml(archivo) {
+        if (!archivo) return;
+        if (!archivo.name.toLowerCase().endsWith('.xml')) { $('af-ff-error').textContent = 'Sube el archivo .xml de la factura.'; return; }
+        $('af-ff-error').textContent = ''; $('af-xml-zona-titulo').textContent = 'Leyendo el XML…';
+        const fd = new FormData(); fd.append('xml', archivo);
+        if (facturaEditando) fd.append('factura', facturaEditando.id);
+        try {
+            const r = await fetch(FAPI + 'leer-xml/', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': CSRF }, body: fd });
+            const d = await r.json(); if (!r.ok) throw new Error(d.detail || 'Error ' + r.status);
+            if (d.ya_registrada) throw new Error(`Este XML ya está dado de alta en la factura ${d.ya_registrada.numero}.`);
+            const c = d.cfdi, sel = $('af-ff-empresa');
+            const empresa = d.empresa_sugerida && [...sel.options].some(o => o.value === String(d.empresa_sugerida)) ? String(d.empresa_sugerida) : sel.value;
+            if (empresa !== sel.value) { elegidos.clear(); sel.value = empresa; }
+            $('af-ff-numero').value = c.numero_sugerido || $('af-ff-numero').value;
+            if (c.fecha) $('af-ff-fecha').value = c.fecha;
+            if (c.receptor.nombre) $('af-ff-cliente').value = c.receptor.nombre.toUpperCase().slice(0, 200);
+            $('af-ff-moneda').value = c.moneda === 'USD' ? 'USD' : 'MXN';
+            // Los folios escritos en la descripción quedan ligados; el usuario solo los verifica
+            d.coincidencias.forEach(co => { const x = co.remisiones.find(y => String(y.empresa_id) === empresa && y.libre); if (x) elegidos.set(x.id, x); });
+            lectura = d; xmlArchivo = archivo;
+            pintarXml(); cargarDisponibles();
+        } catch (e) { $('af-ff-error').textContent = e.message; }
+        finally { $('af-xml-zona-titulo').textContent = 'Subir el XML de la factura (CFDI)'; }
+    }
+    const zona = $('af-xml-zona');
+    zona.addEventListener('click', () => $('af-xml-archivo').click());
+    zona.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('af-xml-archivo').click(); } });
+    zona.addEventListener('dragover', (e) => { e.preventDefault(); zona.classList.add('arrastrando'); });
+    zona.addEventListener('dragleave', () => zona.classList.remove('arrastrando'));
+    zona.addEventListener('drop', (e) => { e.preventDefault(); zona.classList.remove('arrastrando'); leerXml(e.dataTransfer.files[0]); });
+    $('af-xml-archivo').addEventListener('change', (e) => { leerXml(e.target.files[0]); e.target.value = ''; });
+    $('af-xml-cambiar').addEventListener('click', () => $('af-xml-archivo').click());
+    $('af-xml-quitar').addEventListener('click', () => { lectura = null; xmlArchivo = null; pintarXml(); });
+    $('af-conceptos-ver').addEventListener('click', () => {
+        const t = $('af-conceptos-tabla'), abrir = t.classList.contains('d-none');
+        t.classList.toggle('d-none', !abrir); $('af-conceptos-ver').setAttribute('aria-expanded', String(abrir));
+    });
+    $('af-fd-lista').addEventListener('click', (e) => {
+        const b = e.target.closest('.af-folio'); if (!b) return;
+        const x = disponibles.find(y => y.id === Number(b.dataset.id));
+        elegidos.has(x.id) ? elegidos.delete(x.id) : elegidos.set(x.id, x); pintarElegidos();
+    });
+    $('af-ff-elegidos').addEventListener('click', (e) => { const b = e.target.closest('[data-id]'); if (b) { elegidos.delete(Number(b.dataset.id)); pintarElegidos(); } });
+    $('af-fd-todos').addEventListener('click', () => {
+        const todos = disponibles.length && disponibles.every(x => elegidos.has(x.id));
+        disponibles.forEach(x => todos ? elegidos.delete(x.id) : elegidos.set(x.id, x)); pintarElegidos();
+    });
+    function abrirForm(f) {
+        facturaEditando = f;
+        const sel = $('af-ff-empresa');
+        if (sel.options.length === 1) [...$('af-empresa').options].filter(o => o.value).forEach(o => sel.add(new Option(o.text, o.value)));
+        $('af-ff-titulo').innerHTML = `<i class="fas fa-file-invoice-dollar me-2"></i>${f ? 'Editar factura ' + esc(f.numero) : 'Alta de factura'}`;
+        $('af-ff-guardar').innerHTML = `<i class="fas fa-check me-1"></i>${f ? 'Guardar cambios' : 'Dar de alta'}`;
+        sel.value = f ? f.empresa.id : (sel.options.length === 2 ? sel.options[1].value : '');
+        const hoy = new Date(), hoyIso = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+        $('af-ff-numero').value = f ? f.numero : ''; $('af-ff-fecha').value = f ? f.fecha : hoyIso;
+        $('af-ff-cliente').value = f ? f.cliente : '';
+        $('af-ff-moneda').value = f ? f.moneda : 'MXN'; $('af-ff-notas').value = f ? f.notas : '';
+        // Las facturas de antes solo tenían total: ese es su subtotal sin impuestos
+        const tasa = (n) => n ? String(n) : '';
+        $('af-ff-subtotal').value = f ? (f.subtotal || f.total) : ''; $('af-ff-descuento').value = f && f.descuento ? f.descuento : '';
+        $('af-ff-iva_tasa').value = f ? tasa(f.iva_tasa) : '16'; $('af-ff-ieps_tasa').value = f ? tasa(f.ieps_tasa) : '';
+        $('af-ff-ret_iva_tasa').value = f ? tasa(f.ret_iva_tasa) : ''; $('af-ff-ret_isr_tasa').value = f ? tasa(f.ret_isr_tasa) : '';
+        ['af-fd-q', 'af-fd-desde', 'af-fd-hasta'].forEach(id => { $(id).value = ''; });
+        $('af-ff-error').textContent = '';
+        lectura = null; xmlArchivo = null;
+        $('af-conceptos-tabla').classList.add('d-none');
+        elegidos.clear(); (f ? f.folios : []).forEach(x => elegidos.set(x.id, x));
+        // Bitácora de la factura (al editar)
+        const historial = (f && f.historial) || [];
+        $('af-historial-caja').classList.toggle('d-none', !historial.length);
+        $('af-historial-titulo').textContent = `Modificaciones (${historial.length})`;
+        $('af-historial').innerHTML = historial.map(h => `<div class="d-flex flex-column flex-sm-row gap-1 gap-sm-3 px-3 py-2 border-bottom small">
+            <div style="min-width:210px"><span class="badge ${h.accion === 'Alta' ? 'bg-success' : 'bg-info text-dark'} me-1">${esc(h.accion.toUpperCase())}</span>
+                <b>${esc(h.fecha)}</b><div class="text-muted">${esc(h.usuario)}</div></div>
+            ${h.cambios.length ? `<ul class="mb-0 ps-3 flex-grow-1">${h.cambios.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`
+                : '<span class="text-muted flex-grow-1">Sin detalle (dada de alta antes de la bitácora)</span>'}
+        </div>`).join('');
+        pintarXml();
+        cargarDisponibles();
+        modalFactura = modalFactura || new bootstrap.Modal($('af-fact-modal')); modalFactura.show();
+    }
+    async function abrirFacturaPorId(id) {
+        try {
+            const r = await fetch(FAPI + id + '/', { credentials: 'same-origin' });
+            const d = await r.json(); if (!r.ok) throw new Error(d.detail || 'Error ' + r.status);
+            abrirForm(d);
+        } catch (e) { aviso(e.message, false); }
+    }
+    $('af-f-alta').addEventListener('click', () => abrirForm(null));
+    $('af-ff-guardar').addEventListener('click', async () => {
+        $('af-ff-error').textContent = '';
+        const cuerpo = { empresa: $('af-ff-empresa').value, numero: $('af-ff-numero').value, fecha: $('af-ff-fecha').value,
+            cliente: $('af-ff-cliente').value, moneda: $('af-ff-moneda').value,
+            notas: $('af-ff-notas').value, remisiones: [...elegidos.keys()] };
+        if (!fiscal()) IMPORTES.forEach(k => { cuerpo[k] = $('af-ff-' + k).value; });
+        const url = facturaEditando ? FAPI + facturaEditando.id + '/' : FAPI;
+        let opciones;
+        if (xmlArchivo) {   // con XML va como multipart: los importes salen del XML
+            const fd = new FormData(); fd.append('datos', JSON.stringify(cuerpo)); fd.append('xml', xmlArchivo);
+            opciones = { method: 'POST', headers: { 'X-CSRFToken': CSRF }, body: fd };
+        } else {
+            opciones = { method: facturaEditando ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF }, body: JSON.stringify(cuerpo) };
+        }
+        try {
+            const r = await fetch(url, { ...opciones, credentials: 'same-origin' });
+            const d = await r.json(); if (!r.ok) throw new Error(d.detail || 'Error ' + r.status);
+            modalFactura.hide();
+            aviso(`Factura ${d.numero}: ${d.num_folios} folio(s) ligados · ${dinero(d.total, d.moneda)}.`);
+            cargarFacturas(); cargar();
+        } catch (e) { $('af-ff-error').textContent = e.message; }
+    });
+
+    cargar();
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,18 +1,22 @@
 """
 Captura de diesel desde el celular (PWA de Next en /diesel/captura) y los
 catálogos que usa: Permisionarios (con sus unidades de Catálogos), Thermos y
-Despachadores (usuarios con el permiso "Acceso carga diesel").
+Despachadores (usuarios con el permiso "App PWA diésel", acceso_carga_diesel).
 
 La captura tiene dos apartados: Unidad (unidades de Catálogos, km y litros) y
-Thermo (catálogo de thermos, horas y litros). Las unidades son las mismas de
+Thermo (el despachador lo escribe; si es nuevo se da de alta solo; solo litros, sin horas).
+En los dos el nombre del operador es obligatorio. Las unidades son las mismas de
 remisiones; su vínculo con el permisionario y con la unidad de diesel vive en
 esta app, así que remisiones no cambia.
 """
+import mimetypes
+import os
 from decimal import Decimal
 
 from django.contrib.auth.models import Permission, User
 from django.db import transaction
 from django.db.models import OuterRef, Q, Subquery
+from django.http import FileResponse
 from django.utils import timezone
 from rest_framework import serializers, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -21,8 +25,10 @@ from rest_framework.views import APIView
 
 from ternium.models import Unidad as UnidadCatalogo
 
+from .correo_carga import correo_invalido, programar_correo_carga, separar_correos
 from .models import (
-    CargaDiesel, Patio, PerfilUsuarioDiesel, Permisionario, PermisionarioUnidad, Thermo, Totem, Unidad,
+    CargaDiesel, FotoComplementaria, Patio, PerfilUsuarioDiesel, Permisionario, PermisionarioUnidad, Thermo, Totem,
+    Unidad, es_3r_nombre,
 )
 from .views import get_patios_usuario
 
@@ -65,13 +71,39 @@ def _perm_dict(p):
 
 
 def es_3r_recycling(permisionario):
-    """Flota propia: a sus thermos no se les piden horas, solo los litros."""
-    return bool(permisionario) and ' '.join(permisionario.nombre.upper().split()).startswith('3R RECYCLING')
+    """Flota propia de 3R RECYCLING: en sus unidades la foto del odómetro es obligatoria."""
+    return bool(permisionario) and es_3r_nombre(permisionario.nombre)
 
 
 def _permisionario_activo(thermo):
     p = thermo.permisionario
     return p if p and p.activo else None
+
+
+def _permisionario_de_unidad(unidad_cat):
+    vinculo = PermisionarioUnidad.objects.select_related('permisionario').filter(
+        unidad=unidad_cat, permisionario__activo=True,
+    ).first()
+    return vinculo.permisionario if vinculo else None
+
+
+def normalizar_thermo(texto):
+    """Identificador del thermo como lo escribe el despachador: en mayúsculas y sin espacios de más."""
+    return ' '.join(str(texto or '').split()).upper()[:50]
+
+
+def fotos_obligatorias(tipo_carga, permisionario):
+    """La foto de la bomba siempre; la del odómetro si la unidad es de 3R RECYCLING."""
+    if tipo_carga == 'thermo':
+        return ['foto_thermo']
+    return ['foto_bomba'] + (['foto_odometro'] if es_3r_recycling(permisionario) else [])
+
+
+AVISO_FOTO = {
+    'foto_bomba': 'Toma la foto de la bomba.',
+    'foto_thermo': 'Toma la foto de la bomba del thermo.',
+    'foto_odometro': 'Toma la foto del odómetro (obligatoria en unidades de 3R RECYCLING).',
+}
 
 
 # ─────────────────────────────────────────────
@@ -84,7 +116,7 @@ class CapturaDatosAPIView(APIView):
 
     def get(self, request):
         if not puede_capturar(request.user):
-            return _sin_permiso('No tienes el permiso "Acceso carga diesel".')
+            return _sin_permiso('No tienes el permiso "App PWA diésel".')
 
         # Un permisionario dado de baja ya no se ofrece ni se guarda en cargas nuevas.
         vinculos = {
@@ -99,60 +131,88 @@ class CapturaDatosAPIView(APIView):
             for u in Unidad.objects.filter(unidad_catalogo__isnull=False).annotate(
                 ultimo_km=Subquery(cargas_unidad.values('odometro')[:1]))
         }
-        # pide_lectura: la unidad siempre pide km; el thermo pide horas salvo si es de 3R RECYCLING.
+        # pide_lectura: solo las unidades de 3R RECYCLING piden km (y foto del odómetro);
+        # las de permisionarios no. A ningún thermo se le piden horas (solo litros).
         unidades = [{
             'id': u.pk,
             'nombre': u.internal_id,
             'detalle': ' · '.join(x for x in (u.license_plate or '', u.get_asset_type_display()) if x),
             'permisionario': _perm_dict(vinculos.get(u.pk)),
-            'pide_lectura': True,
+            'pide_lectura': es_3r_recycling(vinculos.get(u.pk)),
+            'fotos_obligatorias': fotos_obligatorias('unidad', vinculos.get(u.pk)),
             'ultima_lectura': float(ultimo_km[u.pk]) if ultimo_km.get(u.pk) is not None else None,
         } for u in UnidadCatalogo.objects.order_by('internal_id')]
 
-        cargas_thermo = CargaDiesel.objects.filter(thermo=OuterRef('pk'), hrs_thermo__gt=0).order_by('-fecha_carga', '-pk')
         thermos = [{
             'id': t.pk,
             'nombre': t.identificador,
             'detalle': t.descripcion,
             'permisionario': _perm_dict(_permisionario_activo(t)),
-            'pide_lectura': not es_3r_recycling(_permisionario_activo(t)),
-            'ultima_lectura': float(t.ultimas_hrs) if t.ultimas_hrs is not None else None,
-        } for t in Thermo.objects.filter(activo=True).select_related('permisionario').annotate(
-            ultimas_hrs=Subquery(cargas_thermo.values('hrs_thermo')[:1]))]
+            'pide_lectura': False,
+            'fotos_obligatorias': fotos_obligatorias('thermo', _permisionario_activo(t)),
+            'ultima_lectura': None,
+        } for t in Thermo.objects.filter(activo=True).select_related('permisionario')]
 
         hoy = CargaDiesel.objects.filter(
             usuario=request.user, fecha_carga__date=timezone.localdate(),
-        ).select_related('unidad', 'thermo').order_by('-fecha_carga', '-pk')[:30]
+        ).select_related('unidad', 'thermo', 'patio', 'usuario').prefetch_related('fotos_complementarias') \
+            .order_by('-fecha_carga', '-pk')[:30]
 
         return Response({
             'despachador': {'id': request.user.pk, 'nombre': _nombre(request.user)},
             'patios': [{'id': p.pk, 'nombre': p.nombre, 'codigo': p.codigo} for p in get_patios_usuario(request.user)],
             'unidades': unidades,
             'thermos': thermos,
+            'max_complementarias': FotoComplementaria.MAXIMO,
             'hoy': [_carga_resumen(c) for c in hoy],
         })
 
 
+# Fotos fijas de una carga: campo → nombre (en el orden en que se comparten).
+FOTOS_CARGA = [
+    ('foto_bomba', 'Bomba'), ('foto_odometro', 'Odómetro'), ('foto_thermo', 'Bomba del thermo'),
+    ('foto_horas_thermo', 'Horas del thermo'), ('foto_sticker', 'Sticker'), ('foto_motor', 'Motor'),
+]
+
+
+def fotos_de_carga(c):
+    """Las fotos de la carga (fijas y complementarias) como [{clave, nombre}]; la clave sirve
+    para descargarla en /api/captura/cargas/<id>/fotos/<clave>/ (y compartirla por WhatsApp)."""
+    fotos = [{'clave': campo, 'nombre': nombre} for campo, nombre in FOTOS_CARGA if getattr(c, campo)]
+    fotos += [{'clave': f'c{f.pk}', 'nombre': f'Complementaria {n}'}
+              for n, f in enumerate(c.fotos_complementarias.all(), 1) if f.foto]
+    return fotos
+
+
 def _carga_resumen(c):
+    local = timezone.localtime(c.fecha_carga)
     return {
         'id': c.pk,
-        'hora': timezone.localtime(c.fecha_carga).strftime('%H:%M'),
+        'fecha': local.strftime('%d/%m/%Y'),
+        'hora': local.strftime('%H:%M'),
         'equipo': c.equipo,
         'tipo_carga': c.tipo_carga,
         'litros': float(c.litros_thermo if c.tipo_carga == 'thermo' else c.litros_diesel),
         'odometro': float(c.odometro) if c.odometro is not None else None,
         'hrs_thermo': float(c.hrs_thermo),
-        'rendimiento': float(c.rendimiento) if c.rendimiento is not None else None,
+        # Solo la flota de 3R maneja rendimiento; las unidades de permisionarios son ajenas.
+        'rendimiento': float(c.rendimiento) if c.rendimiento is not None and es_3r_nombre(c.permisionario_nombre) else None,
         'permisionario': c.permisionario_nombre,
+        'operador': c.operador_nombre,
+        'patio': c.patio.nombre,
+        'despachador': _nombre(c.usuario),
+        'fotos': fotos_de_carga(c),
     }
 
 
 class CapturaCargaSerializer(serializers.Serializer):
     patio = serializers.PrimaryKeyRelatedField(queryset=Patio.objects.filter(activo=True))
     tipo_carga = serializers.ChoiceField(choices=CargaDiesel.TIPO_CARGA)
-    # Apartado Unidad: unidad de Catálogos + kilometraje. Apartado Thermo: thermo + horas.
+    # Apartado Unidad: unidad de Catálogos + kilometraje. Apartado Thermo: thermo + litros (sin horas).
     unidad = serializers.PrimaryKeyRelatedField(queryset=UnidadCatalogo.objects.all(), required=False, allow_null=True)
     thermo = serializers.PrimaryKeyRelatedField(queryset=Thermo.objects.filter(activo=True), required=False, allow_null=True)
+    # El despachador escribe el thermo: si ya existe se usa (con su permisionario); si no, se da de alta solo.
+    thermo_texto = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
     odometro = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=0, required=False, allow_null=True)
     hrs_thermo = serializers.DecimalField(max_digits=10, decimal_places=1, min_value=0, required=False, allow_null=True)
     litros = serializers.DecimalField(max_digits=8, decimal_places=2, min_value=Decimal('0.01'))
@@ -162,23 +222,44 @@ class CapturaCargaSerializer(serializers.Serializer):
     foto_bomba = serializers.ImageField(required=False, allow_null=True)
     foto_thermo = serializers.ImageField(required=False, allow_null=True)
     foto_horas_thermo = serializers.ImageField(required=False, allow_null=True)
+    operador = serializers.CharField(max_length=150, required=False, allow_blank=True, default='')
+    # Fotos extra que el despachador anexa si aplican (varias con la misma clave).
+    fotos_complementarias = serializers.ListField(
+        child=serializers.ImageField(), required=False, default=list, max_length=FotoComplementaria.MAXIMO,
+        error_messages={'max_length': f'Máximo {FotoComplementaria.MAXIMO} fotos complementarias.'},
+    )
 
     def validate(self, data):
+        data['operador'] = ' '.join(data.get('operador', '').split()).upper()  # texto libre, en MAYÚSCULAS
         user = self.context['request'].user
         if not get_patios_usuario(user).filter(pk=data['patio'].pk).exists():
             raise serializers.ValidationError('No tienes acceso a ese patio.')
         if data['tipo_carga'] == 'unidad':
             if not data.get('unidad'):
                 raise serializers.ValidationError('Elige la unidad.')
-            if data.get('odometro') is None:
+            permisionario = _permisionario_de_unidad(data['unidad'])
+            # Solo las unidades de 3R RECYCLING llevan kilometraje; las de permisionarios no.
+            if not es_3r_recycling(permisionario):
+                data['odometro'] = None
+            elif data.get('odometro') is None:
                 raise serializers.ValidationError('Escribe el kilometraje de la unidad.')
         else:
-            if not data.get('thermo'):
-                raise serializers.ValidationError('Elige el thermo.')
-            if es_3r_recycling(_permisionario_activo(data['thermo'])):
-                data['hrs_thermo'] = Decimal('0')  # flota propia: solo los litros
-            elif data.get('hrs_thermo') is None:
-                raise serializers.ValidationError('Escribe las horas del thermo.')
+            texto = normalizar_thermo(data.get('thermo_texto'))
+            data['thermo_nuevo'] = ''
+            if texto:
+                existente = Thermo.objects.select_related('permisionario').filter(identificador__iexact=texto).first()
+                data['thermo'] = existente
+                data['thermo_nuevo'] = '' if existente else texto
+            elif not data.get('thermo'):
+                raise serializers.ValidationError('Escribe el thermo.')
+            permisionario = _permisionario_activo(data['thermo']) if data['thermo'] else None
+            data['hrs_thermo'] = Decimal('0')  # a ningún thermo se le piden horas: solo los litros
+        if not data['operador']:
+            raise serializers.ValidationError('Escribe el nombre del operador.')
+        for foto in fotos_obligatorias(data['tipo_carga'], permisionario):
+            if not data.get(foto):
+                raise serializers.ValidationError(AVISO_FOTO[foto])
+        data['permisionario'] = permisionario
         return data
 
 
@@ -189,7 +270,7 @@ class CapturaCargaAPIView(APIView):
 
     def post(self, request):
         if not puede_capturar(request.user):
-            return _sin_permiso('No tienes el permiso "Acceso carga diesel".')
+            return _sin_permiso('No tienes el permiso "App PWA diésel".')
         ser = CapturaCargaSerializer(data=request.data, context={'request': request})
         if not ser.is_valid():
             return Response({'detail': _primer_error(ser.errors)}, status=status.HTTP_400_BAD_REQUEST)
@@ -205,19 +286,20 @@ class CapturaCargaAPIView(APIView):
                 return Response({'detail': f"Diésel insuficiente en el tótem: hay {totem.cantidad_diesel} L."},
                                 status=status.HTTP_400_BAD_REQUEST)
 
-            unidad = thermo = permisionario = None
+            unidad = thermo = None
+            permisionario = d['permisionario']  # lo resolvió validate()
             if es_thermo:
                 thermo = d['thermo']
-                permisionario = _permisionario_activo(thermo)
+                if not thermo:  # escrito por el despachador y nuevo: se da de alta (sin permisionario)
+                    thermo, _ = Thermo.objects.get_or_create(identificador=d['thermo_nuevo'])
+                elif not thermo.activo:  # dado de baja pero se volvió a cargar: vuelve a estar activo
+                    thermo.activo = True
+                    thermo.save(update_fields=['activo'])
             else:
                 unidad = Unidad.para_unidad_catalogo(d['unidad'])
                 if unidad.patio_id is None:
                     unidad.patio = d['patio']
                     unidad.save(update_fields=['patio'])
-                vinculo = PermisionarioUnidad.objects.select_related('permisionario').filter(
-                    unidad=d['unidad'], permisionario__activo=True,
-                ).first()
-                permisionario = vinculo.permisionario if vinculo else None
 
             carga = CargaDiesel(
                 patio=d['patio'], unidad=unidad, thermo=thermo,
@@ -228,6 +310,7 @@ class CapturaCargaAPIView(APIView):
                 litros_thermo=d['litros'] if es_thermo else 0,
                 cinchos_anteriores=d['cinchos_anteriores'], cinchos_actuales=d['cinchos_actuales'],
                 permisionario=permisionario, permisionario_nombre=permisionario.nombre if permisionario else '',
+                operador_nombre=d['operador'],
             )
             for campo in ('foto_odometro', 'foto_bomba', 'foto_thermo', 'foto_horas_thermo'):
                 if d.get(campo):
@@ -235,9 +318,46 @@ class CapturaCargaAPIView(APIView):
             carga.rendimiento = carga.calcular_rendimiento()
             carga.calcular_costo()
             carga.save()
+            for foto in d['fotos_complementarias']:
+                FotoComplementaria.objects.create(carga=carga, foto=foto)
             carga.descontar_del_totem()
+            # Correo al permisionario con el detalle y las fotos (sale después del commit).
+            correo_a = programar_correo_carga(carga)
 
-        return Response(_carga_resumen(carga), status=status.HTTP_201_CREATED)
+        return Response({**_carga_resumen(carga), 'correo_a': correo_a}, status=status.HTTP_201_CREATED)
+
+
+class CargaFotoAPIView(APIView):
+    """GET: una foto de la carga (clave = campo fijo como 'foto_bomba' o 'c<id>' para una
+    complementaria). Pasa por la API para que el celular pueda compartirla por WhatsApp
+    (las URLs del almacenamiento no siempre permiten leerlas desde otro dominio).
+    El despachador solo ve las fotos de sus cargas; quien administra diésel, todas."""
+
+    def get(self, request, pk, clave):
+        if not puede_capturar(request.user):
+            return _sin_permiso('No tienes el permiso "App PWA diésel".')
+        cargas = CargaDiesel.objects.filter(pk=pk, patio__in=get_patios_usuario(request.user))
+        if not (request.user.is_superuser or request.user.has_perm('ternium.acceso_diesel')):
+            cargas = cargas.filter(usuario=request.user)
+        carga = cargas.first()
+        if not carga:
+            return Response({'detail': 'Carga no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        if clave in dict(FOTOS_CARGA):
+            archivo = getattr(carga, clave)
+        elif clave.startswith('c') and clave[1:].isdigit():
+            extra = carga.fotos_complementarias.filter(pk=int(clave[1:])).first()
+            archivo = extra.foto if extra else None
+        else:
+            archivo = None
+        if not archivo:
+            return Response({'detail': 'Esa foto no existe.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            contenido = archivo.open('rb')
+        except Exception:
+            return Response({'detail': 'No se pudo leer la foto.'}, status=status.HTTP_404_NOT_FOUND)
+        ext = os.path.splitext(archivo.name)[1].lower() or '.jpg'
+        return FileResponse(contenido, content_type=mimetypes.guess_type(f'x{ext}')[0] or 'image/jpeg',
+                            filename=f'{carga.equipo}-{clave}{ext}')
 
 
 # ─────────────────────────────────────────────
@@ -246,7 +366,7 @@ class CapturaCargaAPIView(APIView):
 def _permisionario_dict(p):
     vinculos = sorted(p.unidades_asignadas.all(), key=lambda v: v.unidad.internal_id)
     return {
-        'id': p.pk, 'nombre': p.nombre, 'rfc': p.rfc, 'telefono': p.telefono, 'activo': p.activo,
+        'id': p.pk, 'nombre': p.nombre, 'rfc': p.rfc, 'telefono': p.telefono, 'correo': p.correo, 'activo': p.activo,
         'unidades': [v.unidad_id for v in vinculos],
         'unidades_detalle': [{'id': v.unidad_id, 'nombre': _etiqueta_unidad(v.unidad)} for v in vinculos],
         # Los thermos se asignan desde su propio catálogo; aquí solo se muestran.
@@ -267,6 +387,14 @@ def _guardar_permisionario(p, body):
     for campo, largo in (('rfc', 13), ('telefono', 20)):
         if campo in body:
             setattr(p, campo, str(body.get(campo) or '').strip()[:largo])
+    if 'correo' in body:
+        texto = str(body.get('correo') or '')
+        malo = correo_invalido(texto)
+        if malo:
+            return f'El correo "{malo}" no es válido.'
+        p.correo = ', '.join(separar_correos(texto))
+        if len(p.correo) > 500:
+            return 'Son demasiados correos (máximo 500 caracteres).'
     if 'activo' in body:
         p.activo = bool(body['activo'])
 

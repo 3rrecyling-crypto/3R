@@ -5306,7 +5306,7 @@ def exportar_vista_remisiones(request):
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
 
-    from .columnas_remisiones import columnas_de, valor_plano
+    from .columnas_remisiones import POR_CLAVE, columnas_de, valor_plano
 
     if not (request.user.has_perm('ternium.acceso_remisiones')
             or request.user.has_perm('ternium.view_remision')):
@@ -5317,7 +5317,17 @@ def exportar_vista_remisiones(request):
     vista.kwargs = {}
     queryset = vista.get_queryset()
 
-    columnas = columnas_de(request.user)
+    # Todos los Excel de remisiones llevan la Factura (factura_nombre, la que se
+    # asigna en Asignación de factura) junto a la Remisión, aunque el usuario no
+    # la tenga en su tabla y sin repetirla si sí la tiene. La columna 'factura'
+    # de la tabla son las facturas CFDI: en el Excel se llama "Factura CFDI".
+    columnas = []
+    for col in columnas_de(request.user):
+        if col['clave'] == 'factura_nombre':
+            continue
+        columnas.append(dict(col, etiqueta='Factura CFDI') if col['clave'] == 'factura' else col)
+        if col['clave'] == 'remision':
+            columnas.append(dict(POR_CLAVE['factura_nombre'], etiqueta='Factura'))
 
     wb = Workbook()
     ws = wb.active

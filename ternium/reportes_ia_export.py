@@ -43,10 +43,16 @@ FORMATOS = {'kg': '#,##0.00', 'ton': '#,##0.000', 'pct': '0.00"%"', 'entero': '#
 
 def con_columnas_para_formulas(consulta):
     """Copia de la consulta con las columnas que necesitan las fórmulas (merma y
-    diferencia necesitan carga, descarga y rechazo; los promedios, remisiones)."""
+    diferencia necesitan carga, descarga y rechazo; los promedios, remisiones).
+    En las listas, la Factura (factura_nombre) va siempre junto a la Remisión,
+    como en todos los Excel de remisiones."""
     c = copy.deepcopy(consulta)
     clave = 'columnas' if c['tipo'] == 'lista' else 'metricas'
     lista = c[clave]
+    if c['tipo'] == 'lista' and 'remision' in lista:
+        if 'factura' in lista:
+            lista.remove('factura')
+        lista.insert(lista.index('remision') + 1, 'factura')
     if any(k in lista for k in ('merma_pct', 'diferencia_kg')):
         pos = min(lista.index(k) for k in ('merma_pct', 'diferencia_kg') if k in lista)
         for k in ('carga_kg', 'descarga_kg', 'rechazo_kg'):

@@ -175,27 +175,33 @@ class CargaDieselListAPIView(generics.ListAPIView):
     search_fields = ['unidad__numero_economico']
 
     def get_queryset(self):
-        patios = get_patios_usuario(self.request.user)
-        qs = CargaDiesel.objects.filter(
-            patio__in=patios
-        ).select_related('unidad', 'patio', 'usuario')
+        return filtrar_cargas(self.request.user, self.request.query_params)
 
-        patio_id = self.request.query_params.get('patio')
-        if patio_id:
-            qs = qs.filter(patio_id=patio_id)
 
-        unidad = self.request.query_params.get('unidad')
-        if unidad:
-            qs = qs.filter(unidad__numero_economico__icontains=unidad)
+def filtrar_cargas(user, params):
+    """Cargas de los patios del usuario con los filtros del listado (?patio, ?unidad,
+    ?fecha_inicio, ?fecha_fin). La usan el listado y su Excel."""
+    qs = CargaDiesel.objects.filter(
+        patio__in=get_patios_usuario(user)
+    ).select_related('unidad', 'thermo', 'patio', 'usuario').prefetch_related('fotos_complementarias')
 
-        fecha_inicio = self.request.query_params.get('fecha_inicio')
-        fecha_fin = self.request.query_params.get('fecha_fin')
-        if fecha_inicio:
-            qs = qs.filter(fecha_carga__date__gte=fecha_inicio)
-        if fecha_fin:
-            qs = qs.filter(fecha_carga__date__lte=fecha_fin)
+    patio_id = params.get('patio')
+    if patio_id:
+        qs = qs.filter(patio_id=patio_id)
 
-        return qs
+    unidad = params.get('unidad')
+    if unidad:
+        # El buscador encuentra unidades y también thermos.
+        qs = qs.filter(Q(unidad__numero_economico__icontains=unidad) | Q(thermo__identificador__icontains=unidad))
+
+    fecha_inicio = params.get('fecha_inicio')
+    fecha_fin = params.get('fecha_fin')
+    if fecha_inicio:
+        qs = qs.filter(fecha_carga__date__gte=fecha_inicio)
+    if fecha_fin:
+        qs = qs.filter(fecha_carga__date__lte=fecha_fin)
+
+    return qs
 
 
 class CargaDieselCreateAPIView(APIView):
@@ -285,6 +291,9 @@ class TotemConfigAPIView(APIView):
             return Response({"error": "Tótem no encontrado"}, status=404)
 
     def patch(self, request, patio_id):
+        # La configuración de tótems es solo de staff (igual que /api/config/totems/).
+        if not request.user.is_staff:
+            return Response({"detail": "Solo el staff puede cambiar la configuración de diésel."}, status=403)
         try:
             patio = get_patios_usuario(request.user).get(id=patio_id)
             totem = patio.totem

@@ -1462,17 +1462,17 @@ def export_remisiones_to_excel(request):
         green_header = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
 
         medline_headers = [
-            "Remisión", "Origen", "Material", "Peso Carga (Kg)",
+            "Remisión", "Factura", "Origen", "Material", "Peso Carga (Kg)",
             "Folio Carga", "Inicia Carga", "PRECIO", "VENTA", "BULTOS", "FOLIO"
         ]
 
         def _estilo_encabezados_medline(sheet):
             for col_idx, cell in enumerate(sheet[1], start=1):
                 cell.alignment = center_style
-                cell.font = Font(bold=True, color="FFFFFF" if col_idx <= 6 else "000000")
-                if col_idx <= 6: cell.fill = header_pink
-                elif col_idx in [7, 8]: cell.fill = yellow_header
-                elif col_idx in [9, 10]: cell.fill = green_header
+                cell.font = Font(bold=True, color="FFFFFF" if col_idx <= 7 else "000000")
+                if col_idx <= 7: cell.fill = header_pink
+                elif col_idx in [8, 9]: cell.fill = yellow_header
+                elif col_idx in [10, 11]: cell.fill = green_header
 
         def _poblar_hoja_medline(sheet, tipo_mat, solo_totales=False):
             """
@@ -1504,6 +1504,7 @@ def export_remisiones_to_excel(request):
                     folio_generado = remision.folio_medline or "N/A"
                     row_data = [
                         remision.remision,
+                        remision.factura_nombre or '',
                         remision.origen.nombre if remision.origen else 'MEDLINE',
                         mat_nom,
                         peso_ld,
@@ -1516,20 +1517,20 @@ def export_remisiones_to_excel(request):
                     ]
                     sheet.append(row_data)
                     current_row = sheet.max_row
-                    for col_idx in range(1, 11):
+                    for col_idx in range(1, 12):
                         cell = sheet.cell(row=current_row, column=col_idx)
                         cell.alignment = center_style
-                        if col_idx <= 6: cell.fill = pink_fill
-                        if col_idx == 4: cell.number_format = '#,##0.000'
-                        if col_idx == 7: cell.number_format = '"$"#,##0.00'
+                        if col_idx <= 7: cell.fill = pink_fill
+                        if col_idx == 5: cell.number_format = '#,##0.000'
                         if col_idx == 8: cell.number_format = '"$"#,##0.00'
+                        if col_idx == 9: cell.number_format = '"$"#,##0.00'
             # Fila de totales
-            sheet.append(["", "", "", total_peso, "", "", "", total_venta, "", ""])
+            sheet.append(["", "", "", "", total_peso, "", "", "", total_venta, "", ""])
             last = sheet.max_row
-            sheet.cell(row=last, column=4).font = Font(bold=True)
-            sheet.cell(row=last, column=4).number_format = '#,##0.000'
-            sheet.cell(row=last, column=8).font = Font(bold=True)
-            sheet.cell(row=last, column=8).number_format = '"$"#,##0.00'
+            sheet.cell(row=last, column=5).font = Font(bold=True)
+            sheet.cell(row=last, column=5).number_format = '#,##0.000'
+            sheet.cell(row=last, column=9).font = Font(bold=True)
+            sheet.cell(row=last, column=9).number_format = '"$"#,##0.00'
             return total_peso, total_venta
 
         # Opciones del diálogo de descarga: "solo manifiesto" (sin tabla) vs "con
@@ -1559,7 +1560,7 @@ def export_remisiones_to_excel(request):
     elif tipo_reporte == 'concentrado':
         ws.title = "Resumen Concentrado"
         headers = [
-            "Remisión", "Fecha", "Estatus", "Empresa", "Origen", "Destino",
+            "Remisión", "Factura", "Fecha", "Estatus", "Empresa", "Origen", "Destino",
             "Transporte", "Operador", "Unidad", "Contenedor", "Materiales",
             "Desglose Carga (Kg)", "Total Carga (Kg)", "Folio Carga", "Inicia Carga",
             "Desglose Descarga (Kg)", "Total Descarga (Kg)", "Folio Descarga", "Termina Descarga",
@@ -1601,7 +1602,7 @@ def export_remisiones_to_excel(request):
             rechazo_val = total_rechazo if total_rechazo > 0 else "N/A"
 
             row_data = [
-                remision.remision, remision.fecha_reporte, remision.get_status_display(),
+                remision.remision, remision.factura_nombre or '', remision.fecha_reporte, remision.get_status_display(),
                 remision.empresa.nombre if remision.empresa else '',
                 remision.origen.nombre if remision.origen else '',
                 remision.destino.nombre if remision.destino else '',
@@ -1623,19 +1624,19 @@ def export_remisiones_to_excel(request):
                 cell.alignment = center_style
                 if is_pendiente: cell.fill = yellow_fill
 
-            for col_idx in [2, 15, 19]: ws.cell(row=current_row, column=col_idx).number_format = 'dd/mm/yyyy'
-            for col_idx in [13, 17, 22]: ws.cell(row=current_row, column=col_idx).number_format = '#,##0.000'
-            if rechazo_val != "N/A": ws.cell(row=current_row, column=21).number_format = '#,##0.000'
+            for col_idx in [3, 16, 20]: ws.cell(row=current_row, column=col_idx).number_format = 'dd/mm/yyyy'
+            for col_idx in [14, 18, 23]: ws.cell(row=current_row, column=col_idx).number_format = '#,##0.000'
+            if rechazo_val != "N/A": ws.cell(row=current_row, column=22).number_format = '#,##0.000'
 
             if not is_pendiente:
-                cell_diff = ws.cell(row=current_row, column=22)
+                cell_diff = ws.cell(row=current_row, column=23)
                 if diff < 0: cell_diff.font = red_font
                 elif diff > 0: cell_diff.font = green_font
 
-            ws.cell(row=current_row, column=23).number_format = '0.00%'
+            ws.cell(row=current_row, column=24).number_format = '0.00%'
 
             if len(evidencias_urls) == 1:
-                cell_link = ws.cell(row=current_row, column=25)
+                cell_link = ws.cell(row=current_row, column=26)
                 cell_link.hyperlink = evidencias_urls[0]; cell_link.font = link_font
 
     # =========================================================================
@@ -1644,7 +1645,7 @@ def export_remisiones_to_excel(request):
     elif tipo_reporte == 'detallado':
         ws.title = "Remisiones a Detalle"
         headers = [
-            "Remisión", "Fecha", "Estatus", "Empresa", "Origen", "Destino",
+            "Remisión", "Factura", "Fecha", "Estatus", "Empresa", "Origen", "Destino",
             "Transporte", "Operador", "Unidad", "Contenedor", "Material",
             "Peso Carga (Kg)", "Folio Carga", "Inicia Carga",
             "Peso Descarga (Kg)", "Folio Descarga", "Termina Descarga",
@@ -1688,7 +1689,7 @@ def export_remisiones_to_excel(request):
                 rechazo_val = peso_rechazado if peso_rechazado > 0 else "N/A"
 
                 row_data = [
-                    remision.remision, remision.fecha_reporte, remision.get_status_display(),
+                    remision.remision, remision.factura_nombre or '', remision.fecha_reporte, remision.get_status_display(),
                     remision.empresa.nombre if remision.empresa else '',
                     remision.origen.nombre if remision.origen else '',
                     remision.destino.nombre if remision.destino else '',
@@ -1711,19 +1712,19 @@ def export_remisiones_to_excel(request):
                     cell.alignment = center_style
                     if is_pendiente: cell.fill = yellow_fill
 
-                for col_idx in [2, 14, 17]: ws.cell(row=current_row, column=col_idx).number_format = 'dd/mm/yyyy'
-                for col_idx in [12, 15, 20]: ws.cell(row=current_row, column=col_idx).number_format = '#,##0.000'
-                if rechazo_val != "N/A": ws.cell(row=current_row, column=19).number_format = '#,##0.000'
+                for col_idx in [3, 15, 18]: ws.cell(row=current_row, column=col_idx).number_format = 'dd/mm/yyyy'
+                for col_idx in [13, 16, 21]: ws.cell(row=current_row, column=col_idx).number_format = '#,##0.000'
+                if rechazo_val != "N/A": ws.cell(row=current_row, column=20).number_format = '#,##0.000'
 
                 if not is_pendiente:
-                    cell_diff = ws.cell(row=current_row, column=20)
+                    cell_diff = ws.cell(row=current_row, column=21)
                     if diff < 0: cell_diff.font = red_font
                     elif diff > 0: cell_diff.font = green_font
 
-                ws.cell(row=current_row, column=21).number_format = '0.00%'
+                ws.cell(row=current_row, column=22).number_format = '0.00%'
 
                 if len(evidencias_urls) == 1:
-                    cell_link = ws.cell(row=current_row, column=23)
+                    cell_link = ws.cell(row=current_row, column=24)
                     cell_link.hyperlink = evidencias_urls[0]; cell_link.font = link_font
 
     # =========================================================================
@@ -1732,7 +1733,7 @@ def export_remisiones_to_excel(request):
     else:
         ws.title = "Remisiones (Normal)"
         headers = [
-            "Remisión", "Fecha", "Estatus", "Empresa", "Origen", "Destino",
+            "Remisión", "Factura", "Fecha", "Estatus", "Empresa", "Origen", "Destino",
             "Transporte", "Operador", "Unidad", "Contenedor", "Materiales",
             "Peso Carga (Kg)", "Folio Carga", "Inicia Carga",
             "Peso Descarga (Kg)", "Folio Descarga", "Termina Descarga",
@@ -1767,7 +1768,7 @@ def export_remisiones_to_excel(request):
             rechazo_val = peso_rechazado if peso_rechazado > 0 else "N/A"
 
             row_data = [
-                remision.remision, remision.fecha_reporte, remision.get_status_display(),
+                remision.remision, remision.factura_nombre or '', remision.fecha_reporte, remision.get_status_display(),
                 remision.empresa.nombre if remision.empresa else '',
                 remision.origen.nombre if remision.origen else '',
                 remision.destino.nombre if remision.destino else '',
@@ -1790,19 +1791,19 @@ def export_remisiones_to_excel(request):
                 cell.alignment = center_style
                 if is_pendiente: cell.fill = yellow_fill
 
-            for col_idx in [2, 14, 17]: ws.cell(row=current_row, column=col_idx).number_format = 'dd/mm/yyyy'
-            for col_idx in [12, 15, 20]: ws.cell(row=current_row, column=col_idx).number_format = '#,##0.000'
-            if rechazo_val != "N/A": ws.cell(row=current_row, column=19).number_format = '#,##0.000'
+            for col_idx in [3, 15, 18]: ws.cell(row=current_row, column=col_idx).number_format = 'dd/mm/yyyy'
+            for col_idx in [13, 16, 21]: ws.cell(row=current_row, column=col_idx).number_format = '#,##0.000'
+            if rechazo_val != "N/A": ws.cell(row=current_row, column=20).number_format = '#,##0.000'
 
             if not is_pendiente:
-                cell_diff = ws.cell(row=current_row, column=20)
+                cell_diff = ws.cell(row=current_row, column=21)
                 if diff < 0: cell_diff.font = red_font
                 elif diff > 0: cell_diff.font = green_font
 
-            ws.cell(row=current_row, column=21).number_format = '0.00%'
+            ws.cell(row=current_row, column=22).number_format = '0.00%'
 
             if len(evidencias_urls) == 1:
-                cell_link = ws.cell(row=current_row, column=23)
+                cell_link = ws.cell(row=current_row, column=24)
                 cell_link.hyperlink = evidencias_urls[0]; cell_link.font = link_font
 
     if ws.max_row > 1 and tipo_reporte != 'medline':
@@ -1957,7 +1958,7 @@ def export_reportes_especificos(request):
             ws['A3'] = "Incluye todos los estatus: Terminado, Auditado, Pendiente y Cancelado. Fecha = captura del folio."
             ws['A3'].font = Font(italic=True, size=9, color="666666")
 
-        headers = ["Remisión"]
+        headers = ["Remisión", "Factura"]
         if con_folio_salida:
             headers.append("Estatus")
         headers += ["Origen", "Destino", "Fecha", "Folio Carga", "Folio Descarga"]
@@ -1989,7 +1990,7 @@ def export_reportes_especificos(request):
             texto_evidencias = "Descargar Evidencia" if len(evidencias_urls) == 1 else ("Múltiples Archivos" if len(evidencias_urls) > 1 else "Sin adjuntos")
 
             for d in remision.detalles.all():
-                row_data = [remision.remision]
+                row_data = [remision.remision, remision.factura_nombre or '']
                 if con_folio_salida:
                     row_data.append(remision.get_status_display())
                 row_data += [
@@ -2017,7 +2018,7 @@ def export_reportes_especificos(request):
                 ws.cell(row=current_row, column=col_peso_ld).number_format = '#,##0.000'
                 ws.cell(row=current_row, column=col_peso_dlv).number_format = '#,##0.000'
                 if con_folio_salida:
-                    ws.cell(row=current_row, column=2).font = Font(
+                    ws.cell(row=current_row, column=headers.index("Estatus") + 1).font = Font(
                         bold=True, color=color_estatus.get(remision.status, '000000'))
 
                 # Link de evidencia
@@ -2041,7 +2042,7 @@ def export_reportes_especificos(request):
     elif tipo_reporte == 'hudson':
         ws.title = "Reporte_Hudson"
         headers = [
-            "Remisión", "Empresa", "Operador", "Unidad", "Material",
+            "Remisión", "Factura", "Empresa", "Operador", "Unidad", "Material",
             "Peso Carga (Kg)", "Folio Carga", "Inicia Carga", "PRECIO", "VENTA"
         ]
         ws.append(headers)
@@ -2052,9 +2053,9 @@ def export_reportes_especificos(request):
 
         for col_idx, cell in enumerate(ws[start_row_table], start=1):
             cell.alignment = center_style
-            cell.font = Font(bold=True, color="FFFFFF" if col_idx <= 8 else "000000")
-            if col_idx <= 8: cell.fill = header_pink
-            elif col_idx in [9, 10]: cell.fill = green_header
+            cell.font = Font(bold=True, color="FFFFFF" if col_idx <= 9 else "000000")
+            if col_idx <= 9: cell.fill = header_pink
+            elif col_idx in [10, 11]: cell.fill = green_header
 
         total_peso = 0
         total_venta = 0
@@ -2074,6 +2075,7 @@ def export_reportes_especificos(request):
 
                 row_data = [
                     remision.remision,
+                    remision.factura_nombre or '',
                     remision.empresa.nombre if remision.empresa else 'HUDSON',
                     remision.operador.nombre if remision.operador else (remision.operador_manual or ''),
                     remision.unidad.internal_id if remision.unidad else (remision.unidad_manual or ''),
@@ -2087,21 +2089,21 @@ def export_reportes_especificos(request):
                 ws.append(row_data)
 
                 current_row = ws.max_row
-                for col_idx in range(1, 11):
+                for col_idx in range(1, 12):
                     cell = ws.cell(row=current_row, column=col_idx)
                     cell.alignment = center_style
-                    if col_idx <= 8: cell.fill = pink_fill
-                    if col_idx == 6: cell.number_format = '#,##0.000'
-                    if col_idx == 9: cell.number_format = '"$"#,##0.00'
+                    if col_idx <= 9: cell.fill = pink_fill
+                    if col_idx == 7: cell.number_format = '#,##0.000'
                     if col_idx == 10: cell.number_format = '"$"#,##0.00'
+                    if col_idx == 11: cell.number_format = '"$"#,##0.00'
 
         # Fila de Totales de Hudson
-        ws.append(["", "", "", "", "TOTALES:", total_peso, "", "", "", total_venta])
+        ws.append(["", "", "", "", "", "TOTALES:", total_peso, "", "", "", total_venta])
         last_row = ws.max_row
-        ws.cell(row=last_row, column=6).font = Font(bold=True)
-        ws.cell(row=last_row, column=6).number_format = '#,##0.000'
-        ws.cell(row=last_row, column=10).font = Font(bold=True)
-        ws.cell(row=last_row, column=10).number_format = '"$"#,##0.00'
+        ws.cell(row=last_row, column=7).font = Font(bold=True)
+        ws.cell(row=last_row, column=7).number_format = '#,##0.000'
+        ws.cell(row=last_row, column=11).font = Font(bold=True)
+        ws.cell(row=last_row, column=11).number_format = '"$"#,##0.00'
 
     # =========================================================================
     # ESTRUCTURA PARA SEALED AIR (1 fila por material, con el folio de la remisión)
@@ -2116,7 +2118,7 @@ def export_reportes_especificos(request):
         ws['A3'] = "Total = Kg de descarga × precio por Kg"
         ws['A3'].font = Font(italic=True, color="666666")
 
-        headers = ["Remisión", "Origen", "Destino", "Material", "Kg", "Precio", "Total"]
+        headers = ["Remisión", "Factura", "Origen", "Destino", "Material", "Kg", "Precio", "Total"]
         ws.append(headers)
         for cell in ws[start_row_table]:
             cell.alignment = center_style
@@ -2135,6 +2137,7 @@ def export_reportes_especificos(request):
 
                 ws.append([
                     remision.remision,
+                    remision.factura_nombre or '',
                     remision.origen.nombre if remision.origen else '',
                     remision.destino.nombre if remision.destino else '',
                     d.material.nombre if d.material else "S/M",
@@ -2144,27 +2147,27 @@ def export_reportes_especificos(request):
                 ])
 
                 current_row = ws.max_row
-                for col_idx in range(1, 8):
+                for col_idx in range(1, 9):
                     ws.cell(row=current_row, column=col_idx).alignment = center_style
-                ws.cell(row=current_row, column=5).number_format = '#,##0.000'
-                ws.cell(row=current_row, column=6).number_format = '"$"#,##0.00##'
-                ws.cell(row=current_row, column=7).number_format = '"$"#,##0.00'
+                ws.cell(row=current_row, column=6).number_format = '#,##0.000'
+                ws.cell(row=current_row, column=7).number_format = '"$"#,##0.00##'
+                ws.cell(row=current_row, column=8).number_format = '"$"#,##0.00'
 
         # Formato tabla de Excel (filtros y filas alternadas). Una tabla necesita
         # al menos una fila de datos, aunque el periodo no tenga remisiones.
         ultima_fila = max(ws.max_row, start_row_table + 1)
-        tabla = Table(displayName="TablaSealedAir", ref=f"A{start_row_table}:G{ultima_fila}")
+        tabla = Table(displayName="TablaSealedAir", ref=f"A{start_row_table}:H{ultima_fila}")
         tabla.tableStyleInfo = TableStyleInfo(name="TableStyleMedium9", showFirstColumn=False, showLastColumn=False, showRowStripes=True, showColumnStripes=False)
         ws.add_table(tabla)
 
         # Fila de totales, debajo de la tabla
         fila_totales = ultima_fila + 1
-        for col_idx, valor in ((4, "TOTALES:"), (5, total_kg), (7, total_importe)):
+        for col_idx, valor in ((5, "TOTALES:"), (6, total_kg), (8, total_importe)):
             cell = ws.cell(row=fila_totales, column=col_idx, value=valor)
             cell.font = Font(bold=True)
             cell.alignment = center_style
-        ws.cell(row=fila_totales, column=5).number_format = '#,##0.000'
-        ws.cell(row=fila_totales, column=7).number_format = '"$"#,##0.00'
+        ws.cell(row=fila_totales, column=6).number_format = '#,##0.000'
+        ws.cell(row=fila_totales, column=8).number_format = '"$"#,##0.00'
 
     # Ajustar ancho de columnas automáticamente (desde la tabla; las filas de
     # arriba son para logo/título y no deben ensanchar la columna A)
@@ -3320,8 +3323,9 @@ _MODULE_PERMS = [
     ('ternium.acceso_trane',       'Portal Trane'),
     ('ternium.acceso_bancos',      'Flujo Bancario'),
     ('ternium.acceso_diesel',      'Control Diésel'),
-    ('cargas_diesel.acceso_carga_diesel', 'Acceso carga diesel (captura desde el celular)'),
+    ('cargas_diesel.acceso_carga_diesel', 'App PWA diésel (captura desde el celular)'),
     ('ternium.acceso_catalogos',   'Catálogos'),
+    ('ternium.acceso_asignacion_factura', 'Asignación de Factura'),
     # ── CRUD Remisiones ──────────────────────────────────────────────────────
     ('ternium.view_remision',      'Ver Remisiones'),
     ('ternium.add_remision',       'Crear Remisiones'),

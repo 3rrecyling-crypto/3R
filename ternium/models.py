@@ -570,6 +570,13 @@ class Remision(models.Model):
     hora_salida = models.TimeField(null=True, blank=True, verbose_name="Hora de Salida")
     peso_bascula = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True, verbose_name="Peso Báscula")
     factura_nombre = models.CharField(max_length=100, null=True, blank=True, verbose_name="Nombre/Folio Factura")
+    # Quién y cuándo asignó la factura desde el módulo "Asignación de factura".
+    factura_asignada_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                             related_name='facturas_asignadas', verbose_name="Factura asignada por")
+    factura_asignada_en = models.DateTimeField(null=True, blank=True, verbose_name="Factura asignada en")
+    # Factura dada de alta (con su total) a la que está ligado este folio; factura_nombre lleva su número.
+    factura_registro = models.ForeignKey('FacturaRemision', on_delete=models.SET_NULL, null=True, blank=True,
+                                         related_name='remisiones', verbose_name="Factura (alta)")
 
     # --- EVIDENCIAS Y DATOS DE DESTRUCCIÓN FISCAL ---
     fecha_destruccion = models.DateField(null=True, blank=True, verbose_name="Fecha de Destrucción")
@@ -804,6 +811,7 @@ class Remision(models.Model):
             ("ver_kpis_remisiones", "Puede ver KPIs y métricas de remisiones"),
             ("exportar_remisiones", "Puede exportar reportes de remisiones a Excel"),
             ("acceso_utilidades", "Acceso al módulo de Utilidades / Herramientas"),
+            ("acceso_asignacion_factura", "Acceso a Asignación de Factura"),
         ]
 
         # Folio Medline MANUAL y único: la unicidad se valida a NIVEL APLICACIÓN
@@ -811,6 +819,86 @@ class Remision(models.Model):
         # NO se usa un UniqueConstraint de BD porque la base de producción (Render) ya
         # tenía folios_medline duplicados y el índice único no podía crearse sin modificar
         # esos datos. Ver migración 0093 (neutralizada).
+
+class FacturaRemision(models.Model):
+    """Factura dada de alta en "Asignación de factura": número, importes (IVA, IEPS,
+    retenciones) y los folios (remisiones) que ampara. Se captura a mano o subiendo el
+    XML del CFDI, del que salen todos los datos. Es el registro interno para ligar
+    remisiones con su factura (la facturación propia vive en la app facturacion). Los
+    folios ligados llevan el número en Remision.factura_nombre."""
+    MONEDAS = [('MXN', 'MXN'), ('USD', 'USD')]
+
+    empresa = models.ForeignKey('Empresa', on_delete=models.PROTECT, related_name='facturas_remisiones',
+                                verbose_name="Unidad de Negocio")
+    numero = models.CharField(max_length=100, unique=True, verbose_name="Número de factura")
+    fecha = models.DateField(verbose_name="Fecha de la factura")
+    cliente = models.CharField(max_length=200, blank=True, default='', verbose_name="Cliente")
+    total = models.DecimalField(max_digits=14, decimal_places=2, verbose_name="Total de la factura")
+    moneda = models.CharField(max_length=3, choices=MONEDAS, default='MXN')
+    notas = models.TextField(blank=True, default='')
+
+    # Importes (como en un CFDI). Tasas en % (16 = 16 %). Total = subtotal − descuento
+    # + IEPS + IVA trasladado − IVA retenido − ISR retenido.
+    subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    descuento = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    iva_tasa = models.DecimalField("IVA %", max_digits=8, decimal_places=4, default=0)
+    iva_importe = models.DecimalField("IVA trasladado", max_digits=14, decimal_places=2, default=0)
+    ieps_tasa = models.DecimalField("IEPS %", max_digits=8, decimal_places=4, default=0)
+    ieps_importe = models.DecimalField("IEPS", max_digits=14, decimal_places=2, default=0)
+    ret_iva_tasa = models.DecimalField("Retención IVA %", max_digits=8, decimal_places=4, default=0)
+    ret_iva_importe = models.DecimalField("IVA retenido", max_digits=14, decimal_places=2, default=0)
+    ret_isr_tasa = models.DecimalField("Retención ISR %", max_digits=8, decimal_places=4, default=0)
+    ret_isr_importe = models.DecimalField("ISR retenido", max_digits=14, decimal_places=2, default=0)
+    tipo_cambio = models.DecimalField(max_digits=12, decimal_places=4, default=1)
+
+    # Datos del CFDI (se llenan solos al subir el XML)
+    serie = models.CharField(max_length=25, blank=True, default='')
+    folio = models.CharField(max_length=40, blank=True, default='')
+    uuid = models.CharField("Folio fiscal (UUID)", max_length=40, blank=True, default='', db_index=True)
+    fecha_timbrado = models.DateTimeField(null=True, blank=True)
+    tipo_comprobante = models.CharField(max_length=2, blank=True, default='')
+    forma_pago = models.CharField(max_length=5, blank=True, default='')
+    metodo_pago = models.CharField(max_length=5, blank=True, default='')
+    uso_cfdi = models.CharField(max_length=5, blank=True, default='')
+    lugar_expedicion = models.CharField(max_length=10, blank=True, default='')
+    emisor_rfc = models.CharField(max_length=13, blank=True, default='')
+    emisor_nombre = models.CharField(max_length=255, blank=True, default='')
+    receptor_rfc = models.CharField(max_length=13, blank=True, default='')
+    conceptos = models.JSONField(default=list, blank=True)
+    xml = models.FileField(upload_to='facturas_remisiones/xml/%Y/%m/', null=True, blank=True, verbose_name="XML (CFDI)")
+    creado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name='facturas_remision_creadas')
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Factura (asignación de remisiones)"
+        verbose_name_plural = "Facturas (asignación de remisiones)"
+        ordering = ['-fecha', '-pk']
+
+    def __str__(self):
+        return f"{self.numero} · {self.total} {self.moneda}"
+
+
+class HistorialFacturaRemision(models.Model):
+    """Bitácora de una factura de "Asignación de factura": quién y cuándo la dio de alta o la
+    modificó, y qué cambió (número, fecha, importes, folios ligados, XML…)."""
+    ACCIONES = [('ALTA', 'Alta'), ('MODIFICACION', 'Modificación')]
+
+    factura = models.ForeignKey(FacturaRemision, on_delete=models.CASCADE, related_name='historial')
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    fecha = models.DateTimeField(auto_now_add=True)
+    accion = models.CharField(max_length=20, choices=ACCIONES)
+    cambios = models.JSONField(default=list, blank=True)  # ["Total: $1,000.00 → $1,160.00", "Folios agregados: MTY-1"]
+
+    class Meta:
+        verbose_name = "Modificación de factura (asignación)"
+        verbose_name_plural = "Modificaciones de facturas (asignación)"
+        ordering = ['-fecha', '-pk']
+
+    def __str__(self):
+        return f"{self.factura.numero} · {self.get_accion_display()} · {self.fecha:%d/%m/%Y %H:%M}"
+
 
 class Cliente(models.Model):
     """
