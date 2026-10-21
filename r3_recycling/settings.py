@@ -228,8 +228,14 @@ if AWS_STORAGE_BUCKET_NAME:
     AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com"
     STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_STATIC_LOCATION}/"
     MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_MEDIA_LOCATION}/"
-    STATICFILES_STORAGE = "storages.backends.s3boto3.S3StaticStorage"
-    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    # Django 5.1 ya no lee DEFAULT_FILE_STORAGE ni STATICFILES_STORAGE: sin STORAGES las
+    # subidas (fotos de perfil, evidencias, logos) se guardaban en el disco de Render, que
+    # se borra en cada deploy, y sus URLs apuntaban a S3, donde no existían.
+    # Los estáticos se quedan como venían funcionando (collectstatic local, sin subir a S3).
+    STORAGES = {
+        "default": {"BACKEND": "storages.backends.s3boto3.S3Boto3Storage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
 else:
     STATIC_URL = "/static/"
     MEDIA_URL = "/media/"

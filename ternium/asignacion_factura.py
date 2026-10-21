@@ -22,6 +22,7 @@ Permiso: ternium.acceso_asignacion_factura (Permisos de usuario › Asignación 
 import datetime as dt
 import json
 import re
+import secrets
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from functools import wraps
 
@@ -441,11 +442,11 @@ def _importes_cfdi(cfdi):
                                                     'ret_isr_importe', 'tipo_cambio', 'total')}}
 
 
-def _borrar_xml_al_confirmar(archivo):
-    """Borra del almacenamiento el XML guardado, solo si la transacción se confirma."""
-    if not archivo:
+def _borrar_xml_al_confirmar(archivo, nombre=None):
+    """Borra del almacenamiento el XML guardado (o el archivo `nombre`), solo si la transacción se confirma."""
+    if not archivo and not nombre:
         return
-    almacen, nombre = archivo.storage, archivo.name
+    almacen, nombre = archivo.storage, nombre or archivo.name
 
     def borrar():
         try:
@@ -549,8 +550,15 @@ def _guardar_factura(user, body, factura=None, xml=None):
             factura.emisor_rfc, factura.emisor_nombre = cfdi['emisor']['rfc'][:13], cfdi['emisor']['nombre'][:255]
             factura.receptor_rfc = cfdi['receptor']['rfc'][:13]
             factura.conceptos = cfdi['conceptos']
-            _borrar_xml_al_confirmar(factura.xml)  # el XML anterior (si se reemplaza)
-            factura.xml.save(f'{(cfdi["uuid"] or numero)[:40]}.xml', ContentFile(contenido_xml), save=False)
+            anterior = factura.xml.name if factura.xml else None
+            # Nombre con una parte aleatoria: el UUID viene impreso en la factura y no debe bastar
+            # para adivinar la ruta del XML en el almacenamiento.
+            factura.xml.save(f'{re.sub(r"[^A-Za-z0-9-]", "_", (cfdi["uuid"] or numero)[:40])}_{secrets.token_hex(8)}.xml',
+                             ContentFile(contenido_xml), save=False)
+            # El XML anterior se borra si se reemplazó por otro archivo. En S3 el mismo nombre
+            # se sobrescribe: borrarlo entonces quitaría el XML nuevo.
+            if anterior and anterior != factura.xml.name:
+                _borrar_xml_al_confirmar(factura.xml, anterior)
         factura.save()
         # Los folios que se quitaron quedan otra vez sin factura
         Remision.objects.filter(factura_registro=factura).exclude(pk__in=ids).update(
