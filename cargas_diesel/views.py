@@ -9,6 +9,7 @@ from decimal import Decimal
 from django.shortcuts import render
 from rest_framework.permissions import IsAuthenticated
 
+from .archivos import ErrorArchivo
 from .models import (
     Patio, Totem, CargaDiesel, Unidad, CompraCombustible,
     AjusteInventario, ProveedorDiesel, PerfilUsuarioDiesel
@@ -217,7 +218,10 @@ class CargaDieselCreateAPIView(APIView):
             extra = {'usuario': request.user}
             if not serializer.validated_data.get('persona_relleno'):
                 extra['persona_relleno'] = request.user
-            serializer.save(**extra)
+            try:
+                serializer.save(**extra)
+            except ErrorArchivo as e:  # la carga no se guardó
+                return Response({'detail': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -246,7 +250,10 @@ class CompraCreateAPIView(APIView):
     def post(self, request):
         serializer = CompraCombustibleSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(usuario=request.user)
+            try:
+                serializer.save(usuario=request.user)
+            except ErrorArchivo as e:  # la compra no se guardó
+                return Response({'detail': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

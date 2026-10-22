@@ -1,9 +1,12 @@
 from rest_framework import serializers
 from decimal import Decimal
+from . import archivos
 from .models import (
     Patio, PerfilUsuarioDiesel, ProveedorDiesel, Unidad,
     Totem, CompraCombustible, AjusteInventario, CargaDiesel, Thermo,
 )
+
+FOTOS_CARGA = ('foto_bomba', 'foto_odometro', 'foto_sticker', 'foto_motor', 'foto_thermo', 'foto_horas_thermo')
 
 
 class PatioSerializer(serializers.ModelSerializer):
@@ -117,8 +120,12 @@ class CargaDieselSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        # Calcular rendimiento
+        fotos = {campo: validated_data.pop(campo) for campo in FOTOS_CARGA if validated_data.get(campo)}
         carga = CargaDiesel(**validated_data)
+        # Las fotos van a S3 como las de remisiones (si falla una, no se guarda la carga).
+        for campo, foto in fotos.items():
+            archivos.subir(carga, campo, foto)
+        # Calcular rendimiento
         carga.rendimiento = carga.calcular_rendimiento()
         carga.calcular_costo()
         carga.save()
@@ -138,6 +145,14 @@ class CompraCombustibleSerializer(serializers.ModelSerializer):
 
     def get_usuario_nombre(self, obj):
         return obj.usuario.get_full_name() or obj.usuario.username
+
+    def create(self, validated_data):
+        pdf = validated_data.pop('factura_pdf', None)
+        compra = CompraCombustible(**validated_data)
+        if pdf:  # a S3 como las de remisiones
+            archivos.subir(compra, 'factura_pdf', pdf, 'la factura PDF')
+        compra.save()
+        return compra
 
 
 class AjusteInventarioSerializer(serializers.ModelSerializer):

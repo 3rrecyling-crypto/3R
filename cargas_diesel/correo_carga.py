@@ -21,6 +21,7 @@ from django.db import connection, transaction
 from django.utils import timezone
 from django.utils.html import escape
 
+from .archivos import leer
 from .models import es_3r_nombre
 
 logger = logging.getLogger(__name__)
@@ -132,8 +133,7 @@ def enviar_correo_carga(carga_id):
             if not archivo:
                 continue
             try:
-                with archivo.open('rb') as f:
-                    contenido = f.read()
+                contenido = leer(archivo)
                 ext = os.path.splitext(archivo.name)[1].lower() or '.jpg'
                 adjuntos.append((f'{nombre}{ext}', contenido, mimetypes.guess_type(f'x{ext}')[0] or 'image/jpeg'))
             except Exception:

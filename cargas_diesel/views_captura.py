@@ -9,6 +9,7 @@ En los dos el nombre del operador es obligatorio. Las unidades son las mismas de
 remisiones; su vínculo con el permisionario y con la unidad de diesel vive en
 esta app, así que remisiones no cambia.
 """
+import io
 import mimetypes
 import os
 from decimal import Decimal
@@ -26,6 +27,7 @@ from rest_framework.views import APIView
 from ternium.borrado import es_staff, revisar_borrado, uso as uso_registro
 from ternium.models import Unidad as UnidadCatalogo
 
+from . import archivos
 from .correo_carga import correo_invalido, programar_correo_carga, separar_correos
 from .models import (
     CargaDiesel, FotoComplementaria, Patio, PerfilUsuarioDiesel, Permisionario, PermisionarioUnidad, Thermo, Totem,
@@ -192,6 +194,19 @@ def fotos_de_carga(c):
     return fotos
 
 
+def _totem_carga(c):
+    """Diésel del tótem antes y después de la carga y el % en que quedó (None si la carga es de
+    antes de que se guardara)."""
+    if c.totem_antes is None or c.totem_despues is None:
+        return None
+    return {
+        'antes': float(c.totem_antes),
+        'cargado': float(c.litros_diesel + c.litros_thermo),
+        'despues': float(c.totem_despues),
+        'porcentaje': round(float(c.totem_despues / c.totem_capacidad) * 100) if c.totem_capacidad else None,
+    }
+
+
 def _carga_resumen(c):
     local = timezone.localtime(c.fecha_carga)
     return {
@@ -209,6 +224,7 @@ def _carga_resumen(c):
         'operador': c.operador_nombre,
         'patio': c.patio.nombre,
         'despachador': _nombre(c.usuario),
+        'totem': _totem_carga(c),
         'fotos': fotos_de_carga(c),
     }
 
@@ -284,7 +300,12 @@ class CapturaCargaAPIView(APIView):
             return Response({'detail': _primer_error(ser.errors)}, status=status.HTTP_400_BAD_REQUEST)
         d = ser.validated_data
         es_thermo = d['tipo_carga'] == 'thermo'
+        try:
+            return self._registrar(d, es_thermo, request)
+        except archivos.ErrorArchivo as e:  # la carga no se guardó: que la vuelvan a mandar
+            return Response({'detail': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
+    def _registrar(self, d, es_thermo, request):
         with transaction.atomic():
             # Bloquea el tótem: dos cargas a la vez no deben dejar mal el inventario.
             totem = Totem.objects.select_for_update().filter(patio=d['patio']).first()
@@ -320,14 +341,17 @@ class CapturaCargaAPIView(APIView):
                 permisionario=permisionario, permisionario_nombre=permisionario.nombre if permisionario else '',
                 operador_nombre=d['operador'],
             )
+            # Las fotos van a S3 como las de remisiones (si falla una, no se guarda la carga).
             for campo in ('foto_odometro', 'foto_bomba', 'foto_thermo', 'foto_horas_thermo'):
                 if d.get(campo):
-                    setattr(carga, campo, d[campo])
+                    archivos.subir(carga, campo, d[campo], f'la foto "{dict(FOTOS_CARGA)[campo]}"')
             carga.rendimiento = carga.calcular_rendimiento()
             carga.calcular_costo()
             carga.save()
-            for foto in d['fotos_complementarias']:
-                FotoComplementaria.objects.create(carga=carga, foto=foto)
+            for n, foto in enumerate(d['fotos_complementarias'], 1):
+                extra = FotoComplementaria(carga=carga)
+                archivos.subir(extra, 'foto', foto, f'la foto "Complementaria {n}"')
+                extra.save()
             carga.descontar_del_totem()
             # Correo al permisionario con el detalle y las fotos (sale después del commit).
             correo_a = programar_correo_carga(carga)
@@ -379,11 +403,11 @@ class CargaFotoAPIView(APIView):
         if not archivo:
             return Response({'detail': 'Esa foto no existe.'}, status=status.HTTP_404_NOT_FOUND)
         try:
-            contenido = archivo.open('rb')
+            contenido = archivos.leer(archivo)
         except Exception:
             return Response({'detail': 'No se pudo leer la foto.'}, status=status.HTTP_404_NOT_FOUND)
         ext = os.path.splitext(archivo.name)[1].lower() or '.jpg'
-        return FileResponse(contenido, content_type=mimetypes.guess_type(f'x{ext}')[0] or 'image/jpeg',
+        return FileResponse(io.BytesIO(contenido), content_type=mimetypes.guess_type(f'x{ext}')[0] or 'image/jpeg',
                             filename=f'{carga.equipo}-{clave}{ext}')
 
 

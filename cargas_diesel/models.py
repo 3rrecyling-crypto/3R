@@ -413,6 +413,12 @@ class CargaDiesel(models.Model):
 
     rendimiento = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, verbose_name="Rendimiento Km/L")
 
+    # Diésel del tótem antes y después de esta carga y su capacidad en ese momento (van en el
+    # mensaje de WhatsApp). Vacíos en las cargas registradas antes de guardarlos.
+    totem_antes = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, editable=False, verbose_name="Tótem antes (L)")
+    totem_despues = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, editable=False, verbose_name="Tótem después (L)")
+    totem_capacidad = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, editable=False, verbose_name="Capacidad del tótem (L)")
+
     class Meta:
         verbose_name = "Carga de Diésel"
         verbose_name_plural = "Cargas de Diésel"
@@ -455,10 +461,17 @@ class CargaDiesel(models.Model):
         """Saca del tótem del patio lo cargado: el diésel del motor y el del thermo
         salen de la misma bomba; la urea, de su propio depósito."""
         totem = self.patio.totem
-        totem.cantidad_diesel = max(totem.cantidad_diesel - self.litros_diesel - self.litros_thermo, Decimal('0'))
+        antes = totem.cantidad_diesel
+        totem.cantidad_diesel = max(antes - self.litros_diesel - self.litros_thermo, Decimal('0'))
         if self.litros_urea > 0:
             totem.cantidad_urea = max(totem.cantidad_urea - self.litros_urea, Decimal('0'))
         totem.save()
+        # Cómo quedó el tótem con esta carga (para el mensaje de WhatsApp).
+        nivel = {'totem_antes': antes, 'totem_despues': totem.cantidad_diesel, 'totem_capacidad': totem.capacidad_diesel}
+        for campo, valor in nivel.items():
+            setattr(self, campo, valor)
+        if self.pk:
+            CargaDiesel.objects.filter(pk=self.pk).update(**nivel)
 
     def calcular_costo(self):
         """Calcula el costo basado en último precio de compra."""
