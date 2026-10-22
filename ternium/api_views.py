@@ -1854,14 +1854,19 @@ def export_reportes_especificos(request):
     mes_req = request.GET.get('mes', '')
     fecha_inicio = request.GET.get('fecha_inicio', '')
     fecha_fin = request.GET.get('fecha_fin', '')
-    # Semana (lunes a domingo) del día que se elija
+    # Semana ISO (lunes a domingo): «2026-W43»; también acepta un día («2026-10-22»).
     lunes = domingo = None
     if tipo_filtro == 'semana':
+        valor = request.GET.get('semana', '').strip().upper()
         try:
-            dia = datetime.date.fromisoformat(request.GET.get('semana', ''))
+            if '-W' in valor:
+                anio, num = valor.split('-W')
+                lunes = datetime.date.fromisocalendar(int(anio), int(num), 1)
+            else:
+                dia = datetime.date.fromisoformat(valor)
+                lunes = dia - datetime.timedelta(days=dia.weekday())
         except ValueError:
-            return HttpResponse("Elige un día de la semana a reportar.", status=400)
-        lunes = dia - datetime.timedelta(days=dia.weekday())
+            return HttpResponse("Elige la semana a reportar.", status=400)
         domingo = lunes + datetime.timedelta(days=6)
 
     precio_hudson_req = request.GET.get('precio_hudson', '0')
@@ -1918,7 +1923,8 @@ def export_reportes_especificos(request):
     if tipo_filtro == 'mes' and mes_req:
         periodo = f"Mes: {mes_req}"
     elif tipo_filtro == 'semana':
-        periodo = f"Semana {lunes.isocalendar()[1]}: del {lunes:%d/%m/%Y} al {domingo:%d/%m/%Y}"
+        anio_iso, semana_iso, _ = lunes.isocalendar()
+        periodo = f"Semana {semana_iso} de {anio_iso}: del {lunes:%d/%m/%Y} al {domingo:%d/%m/%Y}"
     elif tipo_filtro == 'rango' and (fecha_inicio or fecha_fin):
         periodo = f"Del {fecha_inicio or 'inicio'} al {fecha_fin or 'hoy'}"
     else:
@@ -2207,7 +2213,7 @@ def export_reportes_especificos(request):
         ws.column_dimensions[col_letter].width = (max_length + 2)
 
     # 5. Retornar el archivo Excel
-    sufijo = f"Semana{lunes.isocalendar()[1]}_{lunes:%Y%m%d}" if lunes else timezone.now().strftime('%Y%m%d')
+    sufijo = f"{lunes.isocalendar()[0]}_Semana{lunes.isocalendar()[1]:02d}" if lunes else timezone.now().strftime('%Y%m%d')
     nombre_archivo = f"Reporte_{tipo_reporte.capitalize()}_{sufijo}.xlsx"
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
