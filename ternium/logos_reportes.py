@@ -28,6 +28,8 @@ REPORTES_ORIGEN = [
      'logo': '', 'icono': 'fa-sign-out-alt text-primary'},
 ]
 CLAVES = {r['clave'] for r in REPORTES_ORIGEN}
+# Solo estos usan logo subido por staff (no tienen logo en S3); los demás siempre usan el de S3.
+EDITABLES = {'sealed-air', 'proboca'}
 
 EXTENSIONES = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
 MAX_BYTES = 5 * 1024 * 1024
@@ -44,7 +46,7 @@ def _subidos(request):
     from .models import LogoReporte
 
     subidos = {}
-    for logo in LogoReporte.objects.filter(clave__in=CLAVES):
+    for logo in LogoReporte.objects.filter(clave__in=EDITABLES):
         try:
             url = logo.imagen.url
         except Exception:
@@ -54,10 +56,11 @@ def _subidos(request):
 
 
 def logos_reportes(request):
-    """{clave: {'url': str ('' = ícono), 'personalizado': bool}} para la API (Next)."""
+    """{clave: {'url': str ('' = ícono), 'personalizado': bool, 'editable': bool}} para la API (Next)."""
     subidos = _subidos(request)
     return {
-        r['clave']: {'url': subidos.get(r['clave'], r['logo']), 'personalizado': r['clave'] in subidos}
+        r['clave']: {'url': subidos.get(r['clave'], r['logo']), 'personalizado': r['clave'] in subidos,
+                     'editable': r['clave'] in EDITABLES}
         for r in REPORTES_ORIGEN
     }
 
@@ -66,7 +69,8 @@ def reportes_origen(request):
     """Tarjetas para la plantilla HTML: la definición con el logo vigente."""
     subidos = _subidos(request)
     return [
-        {**r, 'logo': subidos.get(r['clave'], r['logo']), 'personalizado': r['clave'] in subidos}
+        {**r, 'logo': subidos.get(r['clave'], r['logo']), 'personalizado': r['clave'] in subidos,
+         'editable': r['clave'] in EDITABLES}
         for r in REPORTES_ORIGEN
     ]
 
@@ -97,16 +101,36 @@ def preparar_logo(archivo):
     return ContentFile(salida.getvalue(), name=f'{uuid.uuid4().hex[:10]}.png'), None
 
 
+def _usa_s3():
+    from django.conf import settings
+    return bool(settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY)
+
+
 def guardar_logo(clave, contenido, usuario):
-    """Sube o reemplaza el logo de un reporte y borra el archivo anterior."""
+    """
+    Sube o reemplaza el logo de un reporte y borra el archivo anterior.
+    Igual que las fotos de remisiones: se sube con _subir_archivo_a_s3 a media/logos_reportes/…
+    y en el campo queda solo la ruta (con imagen.save() se quedaba en el disco del servidor y
+    la URL de S3 no existía, así que el logo no cambiaba). Sin AWS (en local) va al disco.
+    Regresa un mensaje de error o None.
+    """
     from .models import LogoReporte
+    from .views import _subir_archivo_a_s3
 
     logo = LogoReporte.objects.filter(clave=clave).first() or LogoReporte(clave=clave)
     anterior = logo.imagen.name if logo.imagen else ''
-    logo.imagen.save(f'{clave}-{contenido.name}', contenido, save=False)
+    if _usa_s3():
+        ruta_s3 = _subir_archivo_a_s3(contenido, f'logos_reportes/{clave}_{contenido.name}')
+        if not ruta_s3:
+            return 'No se pudo subir el logo. Intenta de nuevo.'
+        logo.imagen = ruta_s3
+    else:
+        logo.imagen.save(f'{clave}_{contenido.name}', contenido, save=False)
     logo.actualizado_por = usuario
     logo.save()
-    _borrar_archivo(logo.imagen.storage, anterior)
+    if anterior != logo.imagen.name:
+        _borrar_archivo(anterior)
+    return None
 
 
 def quitar_logo(clave):
@@ -115,14 +139,21 @@ def quitar_logo(clave):
 
     logo = LogoReporte.objects.filter(clave=clave).first()
     if logo:
-        nombre, storage = logo.imagen.name, logo.imagen.storage
+        nombre = logo.imagen.name
         logo.delete()
-        _borrar_archivo(storage, nombre)
+        _borrar_archivo(nombre)
 
 
-def _borrar_archivo(storage, nombre):
-    if nombre:
+def _borrar_archivo(nombre):
+    if not nombre:
+        return
+    if _usa_s3():
+        from django.conf import settings
+        from .views import _eliminar_archivo_de_s3
+        _eliminar_archivo_de_s3(f'{settings.AWS_MEDIA_LOCATION}/{nombre}')
+    else:
+        from django.core.files.storage import default_storage
         try:
-            storage.delete(nombre)
+            default_storage.delete(nombre)
         except Exception:
             pass

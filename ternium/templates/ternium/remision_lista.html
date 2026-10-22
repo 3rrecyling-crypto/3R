@@ -889,8 +889,8 @@
                   {% for r in reportes_origen %}
                   <div class="col-6 col-md-4 col-xl-2">
                       <div class="card excel-card-option origen-card h-100" data-reporte="{{ r.clave }}" onclick="abrirMenuEspecifico('{{ r.clave }}', '{{ r.nombre }}')">
-                          {% if puede_editar_logos %}
-                          {# Solo staff: subir o quitar el logo. No abre el panel del reporte. #}
+                          {% if puede_editar_logos and r.editable %}
+                          {# Solo staff y solo SEALED-AIR / PROBOCA: subir o quitar el logo. No abre el panel del reporte. #}
                           <div class="logo-acciones" onclick="event.stopPropagation()">
                               <button type="button" class="btn btn-light btn-sm" title="Subir logo" onclick="elegirLogo('{{ r.clave }}')"><i class="fas fa-camera"></i></button>
                               <button type="button" class="btn btn-light btn-sm text-danger quitar-logo {% if not r.personalizado %}d-none{% endif %}" title="Quitar el logo subido" onclick="quitarLogo('{{ r.clave }}')"><i class="fas fa-trash-alt"></i></button>

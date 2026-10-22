@@ -359,11 +359,14 @@ def api_remisiones_lista(request):
     # --- NUEVOS FILTROS DE FOLIOS OPERATIVOS ---
     q_folio_ld = params.get('q_folio_ld', '').strip()
     q_folio_dlv = params.get('q_folio_dlv', '').strip()
+    q_folio_salida = params.get('q_folio_salida', '').strip()
 
     if q_folio_ld:
         queryset = queryset.filter(folio_ld__icontains=q_folio_ld)
     if q_folio_dlv:
         queryset = queryset.filter(folio_dlv__icontains=q_folio_dlv)
+    if q_folio_salida:  # PROBOCA (como en la lista HTML)
+        queryset = queryset.filter(folio_salida__icontains=q_folio_salida)
 
     # --- FILTRO DE DESTRUCCIÓN FISCAL (COMPLETO / PENDIENTE) ---
     q_destruccion = params.get('q_destruccion', '').strip()
@@ -1847,10 +1850,19 @@ def export_reportes_especificos(request):
     tipo_reporte = request.GET.get('tipo_reporte', '')
 
     # Nuevos parámetros de fechas
-    tipo_filtro = request.GET.get('tipo_filtro', 'mes') # 'mes' o 'rango'
+    tipo_filtro = request.GET.get('tipo_filtro', 'mes') # 'mes', 'semana' o 'rango'
     mes_req = request.GET.get('mes', '')
     fecha_inicio = request.GET.get('fecha_inicio', '')
     fecha_fin = request.GET.get('fecha_fin', '')
+    # Semana (lunes a domingo) del día que se elija
+    lunes = domingo = None
+    if tipo_filtro == 'semana':
+        try:
+            dia = datetime.date.fromisoformat(request.GET.get('semana', ''))
+        except ValueError:
+            return HttpResponse("Elige un día de la semana a reportar.", status=400)
+        lunes = dia - datetime.timedelta(days=dia.weekday())
+        domingo = lunes + datetime.timedelta(days=6)
 
     precio_hudson_req = request.GET.get('precio_hudson', '0')
     try:
@@ -1893,6 +1905,8 @@ def export_reportes_especificos(request):
             queryset = queryset.filter(fecha_reporte__year=year, fecha_reporte__month=month)
         except ValueError:
             pass
+    elif tipo_filtro == 'semana':
+        queryset = queryset.filter(fecha_reporte__gte=lunes, fecha_reporte__lte=domingo)
     elif tipo_filtro == 'rango':
         if fecha_inicio:
             queryset = queryset.filter(fecha_reporte__gte=fecha_inicio)
@@ -1903,6 +1917,8 @@ def export_reportes_especificos(request):
     # Texto del periodo para los reportes que no llevan logo (título arriba)
     if tipo_filtro == 'mes' and mes_req:
         periodo = f"Mes: {mes_req}"
+    elif tipo_filtro == 'semana':
+        periodo = f"Semana {lunes.isocalendar()[1]}: del {lunes:%d/%m/%Y} al {domingo:%d/%m/%Y}"
     elif tipo_filtro == 'rango' and (fecha_inicio or fecha_fin):
         periodo = f"Del {fecha_inicio or 'inicio'} al {fecha_fin or 'hoy'}"
     else:
@@ -2191,7 +2207,8 @@ def export_reportes_especificos(request):
         ws.column_dimensions[col_letter].width = (max_length + 2)
 
     # 5. Retornar el archivo Excel
-    nombre_archivo = f"Reporte_{tipo_reporte.capitalize()}_{timezone.now().strftime('%Y%m%d')}.xlsx"
+    sufijo = f"Semana{lunes.isocalendar()[1]}_{lunes:%Y%m%d}" if lunes else timezone.now().strftime('%Y%m%d')
+    nombre_archivo = f"Reporte_{tipo_reporte.capitalize()}_{sufijo}.xlsx"
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
     wb.save(response)
@@ -3190,6 +3207,8 @@ def api_logos_reportes(request):
     clave = (request.POST if request.method == 'POST' else request.GET).get('clave', '')
     if clave not in logos.CLAVES:
         return JsonResponse({'detail': 'Reporte no válido.'}, status=400)
+    if clave not in logos.EDITABLES:
+        return JsonResponse({'detail': 'Solo SEALED-AIR y PROBOCA usan logo subido; los demás usan el de S3.'}, status=400)
 
     if request.method == 'DELETE':
         logos.quitar_logo(clave)
@@ -3200,7 +3219,9 @@ def api_logos_reportes(request):
         contenido, error = logos.preparar_logo(archivo)
         if error:
             return JsonResponse({'detail': error}, status=400)
-        logos.guardar_logo(clave, contenido, request.user)
+        error = logos.guardar_logo(clave, contenido, request.user)
+        if error:
+            return JsonResponse({'detail': error}, status=502)
 
     return JsonResponse({'clave': clave, **logos.logos_reportes(request)[clave]})
 

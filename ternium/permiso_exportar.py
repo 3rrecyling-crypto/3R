@@ -1,17 +1,18 @@
 """
-Permiso "Exportar reportes a Excel" (ternium.exportar_remisiones, en /admin/permisos › Dashboard
-de Remisiones). Lo piden todas las descargas de reportes de remisiones: el Excel, el Excel de lo
-que se ve, los reportes específicos, el ZIP de documentos Medline y el reporte de destrucción.
-Sin él, Next no muestra esos botones. El superusuario siempre puede.
+Quién descarga reportes de remisiones (el Excel, el Excel de lo que se ve, los reportes
+específicos, el ZIP de documentos Medline y el reporte de destrucción): quien puede ver
+remisiones (acceso al módulo Remisiones o "Ver Remisiones") o tiene "Exportar reportes a Excel".
+Un usuario con sesión pero sin acceso a remisiones no descarga nada. Sin permiso, Next no muestra
+esos botones. El superusuario siempre puede.
 """
 from django.http import JsonResponse
 
-PERMISO = 'ternium.exportar_remisiones'
-MENSAJE = 'No tienes el permiso "Exportar reportes a Excel". Pídelo a un administrador.'
+PERMISOS = ('ternium.acceso_remisiones', 'ternium.view_remision', 'ternium.exportar_remisiones')
+MENSAJE = 'No tienes acceso a Remisiones para descargar sus reportes. Pídelo a un administrador.'
 
 
 def puede_exportar(user):
-    return user.is_authenticated and (user.is_superuser or user.has_perm(PERMISO))
+    return user.is_authenticated and (user.is_superuser or any(user.has_perm(p) for p in PERMISOS))
 
 
 def sin_permiso():
