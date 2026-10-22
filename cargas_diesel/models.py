@@ -419,6 +419,17 @@ class CargaDiesel(models.Model):
     totem_despues = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, editable=False, verbose_name="Tótem después (L)")
     totem_capacidad = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, editable=False, verbose_name="Capacidad del tótem (L)")
 
+    # Auditoría con IA de la foto de la bomba (botón "Auditar con IA"). La IA solo lee la foto y
+    # deja el estatus; nunca cambia los litros ni otro dato. Vacío = todavía no se audita.
+    AUDITORIA = [('verificado', 'Verificado'), ('alerta', 'Alerta')]
+    auditoria_estado = models.CharField("Auditoría IA", max_length=12, choices=AUDITORIA, blank=True, default='', editable=False)
+    auditoria_litros_foto = models.DecimalField("Litros según la foto", max_digits=10, decimal_places=2, null=True, blank=True, editable=False)
+    auditoria_totalizador = models.DecimalField("Totalizador según la foto", max_digits=14, decimal_places=2, null=True, blank=True, editable=False)
+    auditoria_nota = models.CharField("Nota de la auditoría", max_length=255, blank=True, default='', editable=False)
+    auditoria_fecha = models.DateTimeField("Auditada el", null=True, blank=True, editable=False)
+    auditoria_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, editable=False,
+                                      related_name='+', verbose_name="Auditó")
+
     class Meta:
         verbose_name = "Carga de Diésel"
         verbose_name_plural = "Cargas de Diésel"

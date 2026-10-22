@@ -10,6 +10,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction, IntegrityError
 from .models import Empresa, Material, Lugar, LineaTransporte, Operador, Unidad, Contenedor
 from .borrado import es_staff, revisar_borrado, uso as uso_registro
+from .permiso_exportar import de_mis_empresas, puede_exportar, sin_permiso as sin_permiso_exportar
 import json
 import re
 from django.shortcuts import get_object_or_404
@@ -1359,6 +1360,8 @@ def _opciones_descarga(queryset, request):
 
 @login_required
 def export_remisiones_to_excel(request):
+    if not puede_exportar(request.user):
+        return sin_permiso_exportar()
     # 1. Recuperar filtros del GET
     tipo_reporte = request.GET.get('tipo_reporte', 'normal')
 
@@ -1399,6 +1402,8 @@ def export_remisiones_to_excel(request):
     queryset = _con_fecha_reporte(Remision.objects.all().select_related(
         'empresa', 'origen', 'destino', 'linea_transporte', 'operador', 'unidad', 'contenedor'
     ).prefetch_related('detalles', 'detalles__material', 'evidencias'), request)
+    # Solo de las empresas autorizadas del usuario (igual que el listado)
+    queryset = de_mis_empresas(request.user, queryset)
 
     # =========================================================================
     # SI ES MEDLINE: solo filtrar por mes y origen Medline, SIN filtros generales
@@ -1837,6 +1842,8 @@ def export_remisiones_to_excel(request):
 
 @login_required
 def export_reportes_especificos(request):
+    if not puede_exportar(request.user):
+        return sin_permiso_exportar()
     tipo_reporte = request.GET.get('tipo_reporte', '')
 
     # Nuevos parámetros de fechas
@@ -2203,6 +2210,11 @@ def exportar_zip_medline(request):
         con respaldo en Remision.remision si folio_medline está vacío)
     Devuelve siempre JSON en caso de error (consumido desde la SPA Next.js).
     """
+    # Antes no pedía sesión: cualquiera con la dirección podía bajar las boletas.
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'NO_AUTORIZADO', 'detail': 'Sesión no válida.'}, status=401)
+    if not puede_exportar(request.user):
+        return sin_permiso_exportar()
     queryset = Remision.objects.filter(
         origen__nombre__icontains='MEDLINE'
     ).exclude(boleta_salida_medline__exact='').exclude(boleta_salida_medline__isnull=True)
@@ -2287,6 +2299,8 @@ def exportar_zip_medline(request):
 
 @login_required
 def descargar_reporte_destruccion(request, remision_id):
+    if not puede_exportar(request.user):
+        return sin_permiso_exportar()
     try:
         remision = get_object_or_404(Remision, pk=remision_id)
 
@@ -3352,6 +3366,8 @@ _MODULE_PERMS = [
     ('ternium.change_unidad',      'Editar Unidades'),
     ('ternium.add_contenedor',     'Agregar Contenedores'),
     ('ternium.change_contenedor',  'Editar Contenedores'),
+    ('cargas_diesel.add_permisionario',    'Agregar Permisionarios'),
+    ('cargas_diesel.change_permisionario', 'Editar Permisionarios'),
     # ── Mesa de Ayuda ────────────────────────────────────────────────────────
     ('tickets.atender_tickets',    'Atender tickets (Mesa de Ayuda)'),
 ]

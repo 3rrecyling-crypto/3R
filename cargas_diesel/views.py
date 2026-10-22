@@ -187,7 +187,7 @@ SIN_PERMISIONARIO = '__sin__'  # ?permisionario= para las cargas sin permisionar
 
 def filtrar_cargas(user, params):
     """Cargas de los patios del usuario con los filtros del listado (?patio, ?unidad,
-    ?permisionario, ?fecha_inicio, ?fecha_fin). La usan el listado y su Excel."""
+    ?permisionario, ?auditoria, ?fecha_inicio, ?fecha_fin). La usan el listado y su Excel."""
     qs = CargaDiesel.objects.filter(
         patio__in=get_patios_usuario(user)
     ).select_related('unidad', 'thermo', 'patio', 'usuario').prefetch_related('fotos_complementarias')
@@ -203,6 +203,13 @@ def filtrar_cargas(user, params):
         qs = qs.filter(permisionario_nombre='')
     elif permisionario:
         qs = qs.filter(permisionario_nombre__iexact=permisionario)
+
+    # Auditoría con IA de la foto: verificado, alerta o "sin" (todavía sin estatus)
+    auditoria = params.get('auditoria')
+    if auditoria in ('verificado', 'alerta'):
+        qs = qs.filter(auditoria_estado=auditoria)
+    elif auditoria == 'sin':
+        qs = qs.filter(auditoria_estado='')
 
     unidad = params.get('unidad')
     if unidad:

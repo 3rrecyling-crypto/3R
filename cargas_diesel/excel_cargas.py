@@ -5,6 +5,8 @@ Una tabla de Excel (con filtros y renglones alternados), todo centrado, con
 hipervínculos "Ver foto" a cada foto de la carga y una fila de totales.
 Usa los mismos filtros que el listado. El rendimiento solo aplica a 3R
 RECYCLING: los permisionarios son unidades ajenas.
+La pestaña "Por permisionario" trae los totales, una tabla por permisionario y las
+compras y ajustes de diésel del periodo.
 """
 import io
 
@@ -14,8 +16,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import es_3r_nombre
-from .views import SIN_PERMISIONARIO, filtrar_cargas
+from .models import AjusteInventario, CompraCombustible, es_3r_nombre
+from .views import SIN_PERMISIONARIO, filtrar_cargas, get_patios_usuario
 
 MAX_FILAS = 20000
 # Sin cinchos, foto de horas del thermo ni foto del sticker: ya no se capturan.
@@ -34,9 +36,24 @@ def _url(request, archivo):
     return url if url.startswith('http') else request.build_absolute_uri(url)
 
 
-def _hoja_permisionarios(wb, cargas, subtitulo):
-    """Pestaña "Por permisionario": arriba los totales de cada permisionario y abajo el detalle
-    de cada una de sus unidades y thermos (dos tablas de Excel con filtros)."""
+def compras_y_ajustes(user, params):
+    """Compras y ajustes de diésel de los patios del usuario con el patio y las fechas del listado
+    (no dependen del permisionario ni de la unidad)."""
+    filtros = {'patio__in': get_patios_usuario(user)}
+    if params.get('patio'):
+        filtros['patio_id'] = params['patio']
+    if params.get('fecha_inicio'):
+        filtros['fecha__date__gte'] = params['fecha_inicio']
+    if params.get('fecha_fin'):
+        filtros['fecha__date__lte'] = params['fecha_fin']
+    compras = CompraCombustible.objects.filter(tipo='diesel', **filtros).select_related('patio', 'usuario').order_by('fecha', 'pk')
+    ajustes = AjusteInventario.objects.filter(tipo_combustible='diesel', **filtros).select_related('patio', 'usuario').order_by('fecha', 'pk')
+    return list(compras[:MAX_FILAS]), list(ajustes[:MAX_FILAS])
+
+
+def _hoja_permisionarios(wb, cargas, subtitulo, compras, ajustes):
+    """Pestaña "Por permisionario": los totales de cada permisionario, una tabla por permisionario
+    con sus unidades y thermos, y las compras y ajustes de diésel del periodo (tablas con filtros)."""
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter as L
     from openpyxl.worksheet.table import Table, TableStyleInfo
@@ -95,37 +112,72 @@ def _hoja_permisionarios(wb, cargas, subtitulo):
             celda.border = Border(top=Side(style='medium', color='1D4ED8'))
         return total
 
-    def titulo(fila, texto, tamano=13):
-        ws.cell(row=fila, column=1, value=texto).font = Font(bold=True, size=tamano, color='0B1730')
+    def titulo(fila, texto, tamano=13, color='0B1730'):
+        ws.cell(row=fila, column=1, value=texto).font = Font(bold=True, size=tamano, color=color)
 
-    titulo(1, 'Desglose por permisionario · 3R Recycling', 15)
-    ws.cell(row=2, column=1, value=subtitulo).font = Font(italic=True, size=10, color='475569')
+    def nota(fila, texto):
+        ws.cell(row=fila, column=1, value=texto).font = Font(italic=True, size=10, color='475569')
+
+    def seccion(fila, texto, nombre_tabla, columnas, valores, sumar, vacio):
+        """Título, tabla y fila de total; si no hay filas, solo el aviso. Devuelve la última fila usada."""
+        titulo(fila, texto)
+        if not valores:
+            nota(fila + 1, vacio)
+            return fila + 1
+        encabezado(fila + 1, columnas)
+        return tabla(nombre_tabla, fila + 1, filas(fila + 2, columnas, valores), columnas, sumar)
+
+    titulo(1, 'Desglose por permisionario, compras y ajustes · 3R Recycling', 15)
+    nota(2, subtitulo)
+    fila = 4
 
     # 1) Totales de cada permisionario
-    titulo(4, 'Totales por permisionario')
-    totales = [('Permisionario', 28, None), ('Unidades', 11, '0'), ('Thermos', 11, '0'), ('Cargas', 10, '0'),
-               ('Litros unidades', 16, LITROS), ('Litros thermos', 16, LITROS), ('Total litros', 16, LITROS), ('Costo', 16, DINERO)]
-    encabezado(5, totales)
-    ultima = filas(6, totales, [[n, len(perms[n]['unidades']), len(perms[n]['thermos']), perms[n]['cargas'],
-                                 perms[n]['litros_u'], perms[n]['litros_t'], perms[n]['litros_u'] + perms[n]['litros_t'], perms[n]['costo']]
-                                for n in orden])
-    fin = tabla('TotalesPermisionario', 5, ultima, totales, {'Unidades', 'Thermos', 'Cargas', 'Litros unidades', 'Litros thermos', 'Total litros', 'Costo'})
+    if orden:
+        totales = [('Permisionario', 28, None), ('Unidades', 11, '0'), ('Thermos', 11, '0'), ('Cargas', 10, '0'),
+                   ('Litros unidades', 16, LITROS), ('Litros thermos', 16, LITROS), ('Total litros', 16, LITROS), ('Costo', 16, DINERO)]
+        fila = seccion(fila, 'Totales por permisionario', 'TotalesPermisionario', totales,
+                       [[n, len(perms[n]['unidades']), len(perms[n]['thermos']), perms[n]['cargas'], perms[n]['litros_u'],
+                         perms[n]['litros_t'], perms[n]['litros_u'] + perms[n]['litros_t'], perms[n]['costo']] for n in orden],
+                       {'Unidades', 'Thermos', 'Cargas', 'Litros unidades', 'Litros thermos', 'Total litros', 'Costo'}, '')
 
-    # 2) Cada unidad y cada thermo de cada permisionario
-    inicio = fin + 3
-    titulo(inicio, 'Detalle por unidad y thermo')
-    detalle = [('Permisionario', 28, None), ('Tipo', 11, None), ('Unidad / Thermo', 22, None), ('Cargas', 10, '0'),
-               ('Litros', 16, LITROS), ('% del permisionario', 16, '0.0%'), ('Costo', 16, DINERO), ('Última carga', 16, None)]
-    encabezado(inicio + 1, detalle)
-    valores = []
-    for n in orden:
-        total_perm = perms[n]['litros_u'] + perms[n]['litros_t']
-        suyos = sorted(((k, v) for k, v in equipos.items() if k[0] == n), key=lambda kv: (kv[0][1] != 'Unidad', -kv[1]['litros'], kv[0][2]))
-        for (_, tipo, equipo), v in suyos:
-            valores.append([n, tipo, equipo, v['cargas'], v['litros'], v['litros'] / total_perm if total_perm else None,
-                            v['costo'], timezone.localtime(v['ultima']).strftime('%d/%m/%Y')])
-    ultima = filas(inicio + 2, detalle, valores)
-    tabla('DetallePermisionario', inicio + 1, ultima, detalle, {'Cargas', 'Litros', 'Costo'})
+        # 2) Una tabla por permisionario con sus unidades y sus thermos
+        fila += 3
+        titulo(fila, 'Detalle por permisionario', 14)
+        detalle = [('Tipo', 11, None), ('Unidad / Thermo', 24, None), ('Cargas', 10, '0'), ('Litros', 16, LITROS),
+                   ('% del permisionario', 16, '0.0%'), ('Costo', 16, DINERO), ('Última carga', 16, None)]
+        for k, n in enumerate(orden, 1):
+            p = perms[n]
+            total_perm = p['litros_u'] + p['litros_t']
+            suyos = sorted(((e, v) for e, v in equipos.items() if e[0] == n), key=lambda ev: (ev[0][1] != 'Unidad', -ev[1]['litros'], ev[0][2]))
+            def cuenta(k, uno, varios):
+                return f'{k} {uno if k == 1 else varios}'
+            fila = seccion(
+                fila + 2, f'{n} · {cuenta(len(p["unidades"]), "unidad", "unidades")} · {cuenta(len(p["thermos"]), "thermo", "thermos")}'
+                          f' · {cuenta(p["cargas"], "carga", "cargas")} · {total_perm:,.2f} L',
+                f'Permisionario{k}', detalle,
+                [[tipo, equipo, v['cargas'], v['litros'], v['litros'] / total_perm if total_perm else None, v['costo'],
+                  timezone.localtime(v['ultima']).strftime('%d/%m/%Y')] for (_, tipo, equipo), v in suyos],
+                {'Cargas', 'Litros', 'Costo'}, '')
+
+    # 3) Compras y 4) ajustes de diésel del periodo (por patio: no dependen del permisionario)
+    fila += 3
+    nota(fila + 1, 'Compras y ajustes de diésel de los patios y fechas del reporte (no dependen del permisionario ni de la unidad).')
+    compras_cols = [('Fecha', 17, None), ('Patio', 20, None), ('Proveedor', 26, None), ('Factura', 14, None),
+                    ('Litros', 14, LITROS), ('Precio/L', 13, DINERO), ('Total', 16, DINERO), ('Registró', 22, None)]
+    fila = seccion(fila + 2, 'Compras de diésel', 'Compras', compras_cols,
+                   [[timezone.localtime(c.fecha).strftime('%d/%m/%Y %H:%M'), c.patio.nombre, c.proveedor_nombre or '—',
+                     c.numero_factura or '—', float(c.litros), float(c.precio_unitario), float(c.total),
+                     c.usuario.get_full_name() or c.usuario.username] for c in compras],
+                   {'Litros', 'Total'}, 'Sin compras de diésel en el periodo.')
+    ajustes_cols = [('Fecha', 17, None), ('Patio', 20, None), ('Movimiento', 12, None), ('Litros (+/−)', 14, LITROS),
+                    ('Motivo', 40, None), ('Antes', 13, LITROS), ('Después', 13, LITROS), ('Registró', 22, None)]
+    seccion(fila + 3, 'Ajustes de inventario', 'Ajustes', ajustes_cols,
+            [[timezone.localtime(a.fecha).strftime('%d/%m/%Y %H:%M'), a.patio.nombre,
+              'Entrada' if a.tipo_movimiento == 'entrada' else 'Salida',
+              float(a.litros) * (1 if a.tipo_movimiento == 'entrada' else -1), a.motivo or '—',
+              float(a.cantidad_anterior), float(a.cantidad_posterior), a.usuario.get_full_name() or a.usuario.username]
+             for a in ajustes],
+            {'Litros (+/−)'}, 'Sin ajustes de diésel en el periodo.')
 
 
 class CargasExcelAPIView(APIView):
@@ -147,7 +199,7 @@ class CargasExcelAPIView(APIView):
             ('Permisionario', 26, None), ('Operador', 24, None), ('Patio', 20, None), ('Odómetro (km)', 15, '#,##0'), ('Horas thermo', 13, '#,##0.0'),
             ('Litros diésel', 13, '#,##0.00'), ('Litros thermo', 13, '#,##0.00'), ('Total litros', 13, '#,##0.00'),
             ('Precio/L', 12, '"$"#,##0.00'), ('Costo', 15, '"$"#,##0.00'), ('Rendimiento (km/L)', 17, '0.00'),
-            ('Despachador', 22, None),
+            ('Despachador', 22, None), ('Auditoría IA', 13, None), ('Litros según foto', 15, '#,##0.00'), ('Nota de auditoría', 40, None),
             *[(nombre, 16, None) for _, nombre in FOTOS],
             *[(f'Foto complementaria {n}', 16, None) for n in range(1, COMPLEMENTARIAS + 1)],
         ]
@@ -170,7 +222,8 @@ class CargasExcelAPIView(APIView):
         perm = (p.get('permisionario') or '').strip()
         filtros = [f'Desde {p["fecha_inicio"]}' if p.get('fecha_inicio') else '', f'hasta {p["fecha_fin"]}' if p.get('fecha_fin') else '',
                    f'Unidad/thermo: {p["unidad"]}' if p.get('unidad') else '',
-                   ('Sin permisionario' if perm == SIN_PERMISIONARIO else f'Permisionario: {perm}') if perm else '']
+                   ('Sin permisionario' if perm == SIN_PERMISIONARIO else f'Permisionario: {perm}') if perm else '',
+                   {'verificado': 'Auditoría: Verificado', 'alerta': 'Auditoría: Alerta', 'sin': 'Auditoría: sin estatus'}.get(p.get('auditoria'), '')]
         ws.merge_cells(f'A2:{ultima_col}2')
         subtitulo = (' · '.join(f for f in filtros if f) or 'Todas las cargas') + \
             f' · {len(cargas)} cargas · generado por {user.get_full_name() or user.username} el {timezone.localtime():%d/%m/%Y %H:%M}'
@@ -188,6 +241,7 @@ class CargasExcelAPIView(APIView):
         ws.row_dimensions[enc].height = 30
 
         primera_foto = len(columnas) - len(FOTOS) - COMPLEMENTARIAS + 1
+        col_auditoria = [t for t, _, _ in columnas].index('Auditoría IA') + 1
         for n, c in enumerate(cargas, 1):
             r = enc + n
             local = timezone.localtime(c.fecha_carga)
@@ -202,11 +256,16 @@ class CargasExcelAPIView(APIView):
                 float(c.precio_litro) or None, float(c.costo_total),
                 float(c.rendimiento) if es3r and c.rendimiento is not None else None,
                 c.usuario.get_full_name() or c.usuario.username,
+                c.get_auditoria_estado_display() or None,
+                float(c.auditoria_litros_foto) if c.auditoria_litros_foto is not None else None,
+                c.auditoria_nota or None,
             ]
             for i, v in enumerate(valores, 1):
                 celda = ws.cell(row=r, column=i, value=v if v is not None else '—')
                 if columnas[i - 1][2] and v is not None:
                     celda.number_format = columnas[i - 1][2]
+            if c.auditoria_estado:  # Alerta en rojo, Verificado en verde
+                ws.cell(row=r, column=col_auditoria).font = Font(bold=True, color='B91C1C' if c.auditoria_estado == 'alerta' else '15803D')
             archivos = [getattr(c, campo) for campo, _ in FOTOS]
             extras = [f.foto for f in c.fotos_complementarias.all()][:COMPLEMENTARIAS]
             archivos += extras + [None] * (COMPLEMENTARIAS - len(extras))
@@ -242,8 +301,9 @@ class CargasExcelAPIView(APIView):
         else:
             ws.cell(row=enc + 1, column=1, value='No hay cargas con esos filtros.')
         ws.freeze_panes = ws.cell(row=enc + 1, column=6)
-        if cargas:
-            _hoja_permisionarios(wb, cargas, subtitulo)
+        compras, ajustes = compras_y_ajustes(user, request.query_params)
+        if cargas or compras or ajustes:
+            _hoja_permisionarios(wb, cargas, subtitulo, compras, ajustes)
 
         salida = io.BytesIO()
         wb.save(salida)

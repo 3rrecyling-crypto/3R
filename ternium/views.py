@@ -5311,6 +5311,9 @@ def exportar_vista_remisiones(request):
     if not (request.user.has_perm('ternium.acceso_remisiones')
             or request.user.has_perm('ternium.view_remision')):
         raise PermissionDenied("No tienes permiso para exportar remisiones.")
+    from .permiso_exportar import puede_exportar, sin_permiso
+    if not puede_exportar(request.user):
+        return sin_permiso()
 
     vista = RemisionListView()
     vista.request = request

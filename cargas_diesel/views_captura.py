@@ -505,6 +505,12 @@ def _guardar_permisionario(p, body):
     return None
 
 
+def puede_permisionarios(user, accion):
+    """Agregar ('add') o editar ('change') permisionarios: como los demás catálogos, con su permiso
+    de /admin/permisos › Catálogos (además del acceso a Catálogos)."""
+    return puede_administrar(user) and (user.is_superuser or user.has_perm(f'cargas_diesel.{accion}_permisionario'))
+
+
 class PermisionariosAPIView(APIView):
     parser_classes = [JSONParser]
 
@@ -514,8 +520,8 @@ class PermisionariosAPIView(APIView):
         return Response({'results': [_permisionario_dict(p) for p in _permisionarios()]})
 
     def post(self, request):
-        if not puede_administrar(request.user):
-            return _sin_permiso()
+        if not puede_permisionarios(request.user, 'add'):
+            return _sin_permiso('No tienes el permiso "Agregar Permisionarios".')
         p = Permisionario()
         error = _guardar_permisionario(p, request.data)
         if error:
@@ -552,8 +558,8 @@ class PermisionarioDetalleAPIView(APIView):
         return Response({'ok': True})
 
     def _editar(self, request, pk):
-        if not puede_administrar(request.user):
-            return _sin_permiso()
+        if not puede_permisionarios(request.user, 'change'):
+            return _sin_permiso('No tienes el permiso "Editar Permisionarios".')
         p = Permisionario.objects.filter(pk=pk).first()
         if not p:
             return Response({'detail': 'Permisionario no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
