@@ -12,6 +12,7 @@ esta app, así que remisiones no cambia.
 import io
 import mimetypes
 import os
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import Permission, User
@@ -207,6 +208,39 @@ def _totem_carga(c):
     }
 
 
+DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+MAX_RELLENOS = 14  # en el mensaje de WhatsApp
+
+
+def _litros(c):
+    return float(c.litros_thermo if c.tipo_carga == 'thermo' else c.litros_diesel)
+
+
+def _semana_carga(c):
+    """Semana (lunes a domingo, número ISO) de la carga y los rellenos de esa misma unidad o thermo
+    en la semana hasta esta carga: si se manda después, no se mezclan los posteriores."""
+    if not (c.unidad_id or c.thermo_id):
+        return None
+    local = timezone.localtime(c.fecha_carga)
+    lunes = timezone.make_aware(datetime.combine(local.date() - timedelta(days=local.weekday()), time.min))
+    equipo = {'unidad_id': c.unidad_id} if c.unidad_id else {'thermo_id': c.thermo_id}
+    semana = list(CargaDiesel.objects.filter(**equipo, fecha_carga__gte=lunes).filter(
+        Q(fecha_carga__lt=c.fecha_carga) | Q(fecha_carga=c.fecha_carga, pk__lte=c.pk),
+    ).order_by('fecha_carga', 'pk'))
+    rellenos = []
+    for r in semana[-MAX_RELLENOS:]:
+        hora = timezone.localtime(r.fecha_carga)
+        rellenos.append({'dia': f'{DIAS[hora.weekday()]} {hora:%d/%m}', 'hora': f'{hora:%H:%M}',
+                         'litros': _litros(r), 'esta': r.pk == c.pk})
+    return {
+        'numero': local.isocalendar()[1],
+        'rellenos': rellenos,
+        'omitidos': max(len(semana) - MAX_RELLENOS, 0),
+        'cargas': len(semana),
+        'litros': round(sum(_litros(r) for r in semana), 2),
+    }
+
+
 def _carga_resumen(c):
     local = timezone.localtime(c.fecha_carga)
     return {
@@ -215,7 +249,7 @@ def _carga_resumen(c):
         'hora': local.strftime('%H:%M'),
         'equipo': c.equipo,
         'tipo_carga': c.tipo_carga,
-        'litros': float(c.litros_thermo if c.tipo_carga == 'thermo' else c.litros_diesel),
+        'litros': _litros(c),
         'odometro': float(c.odometro) if c.odometro is not None else None,
         'hrs_thermo': float(c.hrs_thermo),
         # Solo la flota de 3R maneja rendimiento; las unidades de permisionarios son ajenas.
@@ -224,6 +258,7 @@ def _carga_resumen(c):
         'operador': c.operador_nombre,
         'patio': c.patio.nombre,
         'despachador': _nombre(c.usuario),
+        'semana': _semana_carga(c),
         'totem': _totem_carga(c),
         'fotos': fotos_de_carga(c),
     }

@@ -5,7 +5,7 @@ from . import views
 from django.urls import path, include
 from .forms import CustomLoginForm  # <--- Nombre correcto
 from . import api_views, api_viajes, api_liquidaciones, reportes_ia, reportes_ia_consumo, alertas_merma, asignacion_factura
-from . import reporte_facturas
+from . import excel_tabla, reporte_facturas
 from .views import (
     UnidadDetailView, UnidadUpdateView, LugarDetailView, LugarUpdateView, 
     EmpresaDetailView, EmpresaUpdateView, ContenedorDetailView, ContenedorUpdateView,
@@ -242,6 +242,8 @@ urlpatterns = [
     path('api/cat/unidades/<int:pk>/', api_views.api_cat_unidad_detail, name='api_cat_unidad_detail'),
     path('api/cat/contenedores/', api_views.api_cat_contenedores, name='api_cat_contenedores'),
     path('api/cat/contenedores/<int:pk>/', api_views.api_cat_contenedor_detail, name='api_cat_contenedor_detail'),
+    # Excel de lo que se ve en una tabla (Catálogos)
+    path('api/excel/tabla/', excel_tabla.api_excel_tabla, name='api_excel_tabla'),
 
     # ── Módulo de Viajes / Carta de Traslado ─────────────────────────
     path('api/operadores/', api_viajes.api_operadores, name='api_operadores'),
