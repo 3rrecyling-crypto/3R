@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import es_3r_nombre
-from .views import filtrar_cargas
+from .views import SIN_PERMISIONARIO, filtrar_cargas
 
 MAX_FILAS = 20000
 FOTOS = [('foto_bomba', 'Foto bomba'), ('foto_odometro', 'Foto odómetro'), ('foto_thermo', 'Foto bomba thermo'),
@@ -34,7 +34,7 @@ def _url(request, archivo):
 
 
 class CargasExcelAPIView(APIView):
-    """GET con los filtros del listado (?patio, ?unidad, ?fecha_inicio, ?fecha_fin): descarga .xlsx."""
+    """GET con los filtros del listado (?patio, ?unidad, ?permisionario, ?fecha_inicio, ?fecha_fin): descarga .xlsx."""
 
     def get(self, request):
         user = request.user
@@ -72,8 +72,10 @@ class CargasExcelAPIView(APIView):
         ws['A1'].alignment = centro
         ws.row_dimensions[1].height = 30
         p = request.query_params
+        perm = (p.get('permisionario') or '').strip()
         filtros = [f'Desde {p["fecha_inicio"]}' if p.get('fecha_inicio') else '', f'hasta {p["fecha_fin"]}' if p.get('fecha_fin') else '',
-                   f'Unidad/thermo: {p["unidad"]}' if p.get('unidad') else '']
+                   f'Unidad/thermo: {p["unidad"]}' if p.get('unidad') else '',
+                   ('Sin permisionario' if perm == SIN_PERMISIONARIO else f'Permisionario: {perm}') if perm else '']
         ws.merge_cells(f'A2:{ultima_col}2')
         ws['A2'] = (' · '.join(f for f in filtros if f) or 'Todas las cargas') + \
             f' · {len(cargas)} cargas · generado por {user.get_full_name() or user.username} el {timezone.localtime():%d/%m/%Y %H:%M}'

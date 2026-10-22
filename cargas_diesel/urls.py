@@ -21,6 +21,7 @@ urlpatterns = [
     path('api/cargas/', views.CargaDieselListAPIView.as_view(), name='api_cargas_lista'),
     path('api/cargas/crear/', views.CargaDieselCreateAPIView.as_view(), name='api_carga_crear'),
     path('api/cargas/excel/', excel_cargas.CargasExcelAPIView.as_view(), name='api_cargas_excel'),
+    path('api/cargas/permisionarios/', views.CargasPermisionariosAPIView.as_view(), name='api_cargas_permisionarios'),
 
     # Compras
     path('api/compras/', views.CompraListAPIView.as_view(), name='api_compras_lista'),

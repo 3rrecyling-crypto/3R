@@ -179,9 +179,12 @@ class CargaDieselListAPIView(generics.ListAPIView):
         return filtrar_cargas(self.request.user, self.request.query_params)
 
 
+SIN_PERMISIONARIO = '__sin__'  # ?permisionario= para las cargas sin permisionario
+
+
 def filtrar_cargas(user, params):
     """Cargas de los patios del usuario con los filtros del listado (?patio, ?unidad,
-    ?fecha_inicio, ?fecha_fin). La usan el listado y su Excel."""
+    ?permisionario, ?fecha_inicio, ?fecha_fin). La usan el listado y su Excel."""
     qs = CargaDiesel.objects.filter(
         patio__in=get_patios_usuario(user)
     ).select_related('unidad', 'thermo', 'patio', 'usuario').prefetch_related('fotos_complementarias')
@@ -189,6 +192,14 @@ def filtrar_cargas(user, params):
     patio_id = params.get('patio')
     if patio_id:
         qs = qs.filter(patio_id=patio_id)
+
+    # Por el nombre guardado en la carga (el que se ve en el listado), aunque después
+    # al permisionario lo hayan renombrado o eliminado.
+    permisionario = (params.get('permisionario') or '').strip()
+    if permisionario == SIN_PERMISIONARIO:
+        qs = qs.filter(permisionario_nombre='')
+    elif permisionario:
+        qs = qs.filter(permisionario_nombre__iexact=permisionario)
 
     unidad = params.get('unidad')
     if unidad:
@@ -203,6 +214,20 @@ def filtrar_cargas(user, params):
         qs = qs.filter(fecha_carga__date__lte=fecha_fin)
 
     return qs
+
+
+class CargasPermisionariosAPIView(APIView):
+    """GET: opciones del filtro de permisionario del listado: los que tienen cargas en los
+    patios del usuario y si hay cargas sin permisionario."""
+
+    def get(self, request):
+        cargas = CargaDiesel.objects.filter(patio__in=get_patios_usuario(request.user))
+        nombres = cargas.exclude(permisionario_nombre='').values_list('permisionario_nombre', flat=True).distinct()
+        return Response({
+            'permisionarios': sorted(set(nombres), key=str.upper),
+            'hay_sin_permisionario': cargas.filter(permisionario_nombre='').exists(),
+            'sin_permisionario': SIN_PERMISIONARIO,
+        })
 
 
 class CargaDieselCreateAPIView(APIView):
