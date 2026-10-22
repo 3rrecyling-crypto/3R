@@ -29,13 +29,16 @@ def get_patios_usuario(user):
         return Patio.objects.none()
 
     try:
-        perfil = user.perfil_diesel
-        return perfil.get_patios_permitidos()
+        patios = user.perfil_diesel.get_patios_permitidos()
     except PerfilUsuarioDiesel.DoesNotExist:
-        # Si no tiene perfil, y es superuser, ve todo
-        if getattr(user, 'is_superuser', False):
-            return Patio.objects.filter(activo=True)
-        return Patio.objects.none()
+        patios = None
+    if patios is not None and patios.exists():
+        return patios
+    # Superusuario, o con acceso al módulo "Control Diésel" sin patios asignados: ve todos.
+    # (Antes veía todo en 0 si no tenía perfil de diésel.)
+    if user.is_superuser or user.has_perm('ternium.acceso_diesel'):
+        return Patio.objects.filter(activo=True)
+    return patios if patios is not None else Patio.objects.none()
 
 
 # ─────────────────────────────────────────────
