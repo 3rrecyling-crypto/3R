@@ -72,8 +72,13 @@ def _perm_dict(p):
 
 
 def es_3r_recycling(permisionario):
-    """Flota propia de 3R RECYCLING: en sus unidades la foto del odómetro es obligatoria."""
+    """Flota propia de 3R RECYCLING: sus unidades piden kilometraje y foto del odómetro."""
     return bool(permisionario) and es_3r_nombre(permisionario.nombre)
+
+
+# Por ahora el kilometraje y la foto del odómetro se piden en las unidades de 3R RECYCLING
+# pero no se exigen. En True vuelven a ser obligatorios.
+ODOMETRO_OBLIGATORIO = False
 
 
 def _permisionario_activo(thermo):
@@ -94,10 +99,10 @@ def normalizar_thermo(texto):
 
 
 def fotos_obligatorias(tipo_carga, permisionario):
-    """La foto de la bomba siempre; la del odómetro si la unidad es de 3R RECYCLING."""
+    """La foto de la bomba siempre; la del odómetro si la unidad es de 3R RECYCLING (y se exige)."""
     if tipo_carga == 'thermo':
         return ['foto_thermo']
-    return ['foto_bomba'] + (['foto_odometro'] if es_3r_recycling(permisionario) else [])
+    return ['foto_bomba'] + (['foto_odometro'] if ODOMETRO_OBLIGATORIO and es_3r_recycling(permisionario) else [])
 
 
 AVISO_FOTO = {
@@ -140,6 +145,7 @@ class CapturaDatosAPIView(APIView):
             'detalle': ' · '.join(x for x in (u.license_plate or '', u.get_asset_type_display()) if x),
             'permisionario': _perm_dict(vinculos.get(u.pk)),
             'pide_lectura': es_3r_recycling(vinculos.get(u.pk)),
+            'lectura_obligatoria': ODOMETRO_OBLIGATORIO and es_3r_recycling(vinculos.get(u.pk)),
             'fotos_obligatorias': fotos_obligatorias('unidad', vinculos.get(u.pk)),
             'ultima_lectura': float(ultimo_km[u.pk]) if ultimo_km.get(u.pk) is not None else None,
         } for u in UnidadCatalogo.objects.order_by('internal_id')]
@@ -150,6 +156,7 @@ class CapturaDatosAPIView(APIView):
             'detalle': t.descripcion,
             'permisionario': _perm_dict(_permisionario_activo(t)),
             'pide_lectura': False,
+            'lectura_obligatoria': False,
             'fotos_obligatorias': fotos_obligatorias('thermo', _permisionario_activo(t)),
             'ultima_lectura': None,
         } for t in Thermo.objects.filter(activo=True).select_related('permisionario')]
@@ -242,7 +249,7 @@ class CapturaCargaSerializer(serializers.Serializer):
             # Solo las unidades de 3R RECYCLING llevan kilometraje; las de permisionarios no.
             if not es_3r_recycling(permisionario):
                 data['odometro'] = None
-            elif data.get('odometro') is None:
+            elif ODOMETRO_OBLIGATORIO and data.get('odometro') is None:
                 raise serializers.ValidationError('Escribe el kilometraje de la unidad.')
         else:
             texto = normalizar_thermo(data.get('thermo_texto'))
@@ -305,7 +312,7 @@ class CapturaCargaAPIView(APIView):
             carga = CargaDiesel(
                 patio=d['patio'], unidad=unidad, thermo=thermo,
                 usuario=request.user, persona_relleno=request.user, tipo_carga=d['tipo_carga'],
-                odometro=None if es_thermo else d['odometro'],
+                odometro=None if es_thermo else d.get('odometro'),
                 hrs_thermo=d['hrs_thermo'] if es_thermo else 0,
                 litros_diesel=0 if es_thermo else d['litros'],
                 litros_thermo=d['litros'] if es_thermo else 0,
