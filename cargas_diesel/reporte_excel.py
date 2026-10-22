@@ -84,7 +84,6 @@ def datos(user, spec):
             'litros': litros, 'precio': float(c.precio_litro) or None, 'costo': float(c.costo_total),
             'rendimiento': float(c.rendimiento) if es3r and c.rendimiento is not None else None,
             'despachador': c.usuario.get_full_name() or c.usuario.username,
-            'cinchos': ' → '.join(x for x in (c.cinchos_anteriores, c.cinchos_actuales) if x),
         }
         if es3r:
             filas_3r.append(fila)
@@ -303,7 +302,7 @@ def construir(user, spec, pregunta='', respuesta='') -> bytes:
                         ('Km / horas', 'lectura', 'n', 13), ('Litros', 'litros', 'L', 12),
                         *([('Rendimiento', 'rendimiento', 'r', 14)] if s == 'cargas_3r' else []),
                         ('Precio/L tótem', 'precio', '$L', 15), ('Costo', 'costo', '$', 15),
-                        ('Despachador', 'despachador', 't', 20), ('Cinchos', 'cinchos', 't', 20)]
+                        ('Despachador', 'despachador', 't', 20)]
             tabla(h, f, columnas, d[s], totales=('litros', 'costo'))
         elif s == 'permisionarios':
             tabla(h, f, [('Permisionario', 'nombre', 't', 28), ('Cargas', 'cargas', 'n', 10), ('Unidades', 'unidades', 'n', 10),

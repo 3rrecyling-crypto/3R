@@ -135,7 +135,6 @@ def _fila(c, con_rendimiento=True):
         'litros': float(c.litros_diesel + c.litros_thermo),
         'precio_litro': float(c.precio_litro) if c.precio_litro else None,
         'costo': float(c.costo_total),
-        'cinchos': ' → '.join(x for x in (c.cinchos_anteriores, c.cinchos_actuales) if x),
         'fotos': _fotos(c),
     }
     if con_rendimiento:
