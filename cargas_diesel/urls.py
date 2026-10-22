@@ -45,6 +45,7 @@ urlpatterns = [
     path('api/captura/datos/', views_captura.CapturaDatosAPIView.as_view(), name='api_captura_datos'),
     path('api/captura/cargas/', views_captura.CapturaCargaAPIView.as_view(), name='api_captura_cargas'),
     path('api/captura/cargas/<int:pk>/fotos/<str:clave>/', views_captura.CargaFotoAPIView.as_view(), name='api_captura_carga_foto'),
+    path('api/captura/cargas/<int:pk>/resumen/', views_captura.CargaResumenAPIView.as_view(), name='api_captura_carga_resumen'),
 
     # Catálogos de la captura: Permisionarios (con unidades de Catálogos), Thermos y Despachadores
     path('api/permisionarios/', views_captura.PermisionariosAPIView.as_view(), name='api_permisionarios'),

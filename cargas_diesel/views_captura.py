@@ -328,6 +328,28 @@ class CapturaCargaAPIView(APIView):
         return Response({**_carga_resumen(carga), 'correo_a': correo_a}, status=status.HTTP_201_CREATED)
 
 
+def _carga_visible(user, pk):
+    """La carga, si el usuario la puede ver: el despachador las suyas; quien administra diésel, todas
+    (de sus patios)."""
+    cargas = CargaDiesel.objects.filter(pk=pk, patio__in=get_patios_usuario(user))
+    if not (user.is_superuser or user.has_perm('ternium.acceso_diesel')):
+        cargas = cargas.filter(usuario=user)
+    return cargas.select_related('patio', 'usuario').first()
+
+
+class CargaResumenAPIView(APIView):
+    """GET: datos de una carga para enviarla por WhatsApp (mensaje + fotos), igual que en
+    "Mis cargas de hoy". Lo usa también el listado "Cargas de diésel" del sistema."""
+
+    def get(self, request, pk):
+        if not puede_capturar(request.user):
+            return _sin_permiso('No tienes el permiso "App PWA diésel".')
+        carga = _carga_visible(request.user, pk)
+        if not carga:
+            return Response({'detail': 'Carga no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(_carga_resumen(carga))
+
+
 class CargaFotoAPIView(APIView):
     """GET: una foto de la carga (clave = campo fijo como 'foto_bomba' o 'c<id>' para una
     complementaria). Pasa por la API para que el celular pueda compartirla por WhatsApp
@@ -337,10 +359,7 @@ class CargaFotoAPIView(APIView):
     def get(self, request, pk, clave):
         if not puede_capturar(request.user):
             return _sin_permiso('No tienes el permiso "App PWA diésel".')
-        cargas = CargaDiesel.objects.filter(pk=pk, patio__in=get_patios_usuario(request.user))
-        if not (request.user.is_superuser or request.user.has_perm('ternium.acceso_diesel')):
-            cargas = cargas.filter(usuario=request.user)
-        carga = cargas.first()
+        carga = _carga_visible(request.user, pk)
         if not carga:
             return Response({'detail': 'Carga no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
         if clave in dict(FOTOS_CARGA):

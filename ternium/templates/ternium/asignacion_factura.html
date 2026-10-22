@@ -285,6 +285,17 @@
                         <div class="border rounded-3 h-100 d-flex flex-column">
                             <div id="af-xml-folios" class="p-2 border-bottom d-none" style="background:#f0f9ff"></div>
                             <div class="p-2 border-bottom">
+                                <!-- Unidades de negocio de las remisiones: la de la factura y las que se agreguen -->
+                                <div id="af-fd-empresas-caja" class="mb-2">
+                                    <small class="fw-bold text-uppercase text-muted d-block mb-1" style="font-size:.66rem">Remisiones de las unidades de negocio</small>
+                                    <div class="d-flex flex-wrap gap-1" id="af-fd-empresas"></div>
+                                </div>
+                                <!-- Todas (las ligadas primero) / solo ligadas / sin ligar; la búsqueda aplica en las tres -->
+                                <div class="btn-group w-100 mb-2" role="group" aria-label="Ver remisiones" id="af-fd-vista">
+                                    <button type="button" class="btn btn-sm btn-outline-success fw-bold active" data-vista="todas">Todas</button>
+                                    <button type="button" class="btn btn-sm btn-outline-success fw-bold" data-vista="ligadas">Ligadas (<span id="af-fd-n-ligadas">0</span>)</button>
+                                    <button type="button" class="btn btn-sm btn-outline-success fw-bold" data-vista="sin">Sin ligar</button>
+                                </div>
                                 <input type="text" id="af-fd-q" class="form-control af-mayus mb-2" placeholder="BUSCAR FOLIO O CLIENTE…">
                                 <div class="row g-2">
                                     <div class="col-4"><input type="text" id="af-fd-desde" class="form-control af-mayus" placeholder="DESDE FOLIO"></div>
@@ -663,8 +674,12 @@
     });
 
     // Formulario de alta / edición
-    let modalFactura = null, facturaEditando = null, disponibles = [];
+    let modalFactura = null, facturaEditando = null, disponibles = [], limitadoD = false;
     const elegidos = new Map();
+    // Unidades de negocio de donde se ligan remisiones (además de la de la factura) y lo que se ve en la lista
+    const empresasFolios = new Set();
+    let vistaFolios = 'todas', visiblesFolios = [];
+    const numFolio = (s) => Number((/(\d+)\s*$/.exec(s || '') || [])[1] || 0);
     ['af-ff-numero', 'af-ff-cliente', 'af-fd-q', 'af-fd-desde', 'af-fd-hasta'].forEach(id => mayusculas($(id)));
     $('af-ff-notas').addEventListener('input', () => { const t = $('af-ff-notas'), pos = t.selectionStart; t.value = t.value.toUpperCase(); t.setSelectionRange(pos, pos); });
     function pintarElegidos() {
@@ -675,35 +690,74 @@
         $('af-ff-n').textContent = `${lista.length} folio(s)`;
         $('af-ff-resumen').textContent = `${num(kgDesc, 0)} kg de descarga · Total ${total > 0 ? dinero(total, $('af-ff-moneda').value) : '—'}`;
         $('af-ff-elegidos').innerHTML = lista.map(x => `<button type="button" class="af-chip-folio" data-id="${x.id}" title="Quitar folio">${esc(x.remision)} ×</button>`).join('');
-        document.querySelectorAll('#af-fd-lista .af-folio').forEach(b => b.classList.toggle('activo', elegidos.has(Number(b.dataset.id))));
-        const visibles = disponibles.length && disponibles.every(x => elegidos.has(x.id));
-        $('af-fd-todos').textContent = visibles ? 'Quitar visibles' : `Ligar ${disponibles.length} visibles`;
+        $('af-fd-n-ligadas').textContent = lista.length;
+        pintarListaFolios();
+    }
+    // Unidades de negocio donde se buscan remisiones: la de la factura y las elegidas
+    const empresasBusqueda = () => [...new Set([$('af-ff-empresa').value, ...empresasFolios].filter(Boolean))];
+    function pintarEmpresasFolios() {
+        const principal = $('af-ff-empresa').value, opciones = [...$('af-empresa').options].filter(o => o.value);
+        $('af-fd-empresas-caja').classList.toggle('d-none', opciones.length < 2);
+        $('af-fd-empresas').innerHTML = opciones.map(o => {
+            const propia = o.value === principal, activa = propia || empresasFolios.has(o.value);
+            return `<button type="button" class="btn btn-sm rounded-pill fw-bold ${activa ? 'btn-success' : 'btn-outline-secondary'}" data-empresa="${esc(o.value)}"
+                ${propia ? 'disabled title="Unidad de negocio de la factura"' : ''}>${activa ? '<i class="fas fa-check me-1"></i>' : ''}${esc(o.text)}</button>`;
+        }).join('');
+    }
+    // Lista: las ligadas primero (también las que no trae la búsqueda del servidor); la búsqueda las filtra
+    function pintarListaFolios() {
+        if (!$('af-ff-empresa').value) {
+            visiblesFolios = [];
+            $('af-fd-lista').innerHTML = '<p class="text-center text-muted p-4 mb-0">Elige la unidad de negocio para ver sus folios sin factura.</p>';
+            $('af-fd-todos').textContent = 'Ligar visibles'; return;
+        }
+        const q = $('af-fd-q').value.trim().toUpperCase();
+        const ligadas = [...elegidos.values()].filter(x => !q || `${x.remision} ${x.cliente}`.toUpperCase().includes(q))
+            .sort((a, b) => numFolio(a.remision) - numFolio(b.remision) || a.remision.localeCompare(b.remision));
+        const sinLigar = disponibles.filter(x => !elegidos.has(x.id));
+        visiblesFolios = vistaFolios === 'ligadas' ? ligadas : vistaFolios === 'sin' ? sinLigar : [...ligadas, ...sinLigar];
+        const principal = $('af-ff-empresa').value, varias = empresasBusqueda().length > 1;
+        // Nombres de las columnas (fijos al desplazar la lista)
+        const encabezado = `<div class="af-folio-enc"><span style="width:18px"></span><span style="width:110px">Remisión</span>
+            <span style="width:80px">Fecha</span><span class="flex-grow-1">Cliente</span><span style="width:90px;text-align:right">Descarga</span></div>`;
+        $('af-fd-lista').innerHTML = visiblesFolios.length ? encabezado + visiblesFolios.map(x => `<button type="button" class="af-folio ${elegidos.has(x.id) ? 'activo' : ''}" data-id="${x.id}">
+            <span class="check"><i class="fas fa-check" style="font-size:.6rem"></i></span><b style="width:110px">${esc(x.remision)}</b>
+            <span class="text-muted" style="width:80px">${fecha(x.fecha)}</span>
+            <span class="flex-grow-1 text-truncate">${esc(x.cliente) || '—'}${(varias || (x.empresa_id && String(x.empresa_id) !== principal)) && x.empresa
+                ? `<small class="d-block text-muted text-uppercase fw-bold" style="font-size:.62rem">${esc(x.empresa)}</small>` : ''}</span>
+            <small class="text-muted" style="width:90px;text-align:right">${num(x.descarga_kg, 0)} kg</small></button>`).join('')
+            + (limitadoD && vistaFolios !== 'ligadas' ? '<p class="small text-warning fw-bold p-2 mb-0">Se muestran los primeros 1,000: usa el rango de folios.</p>' : '')
+            : `<p class="text-center text-muted p-4 mb-0">${vistaFolios === 'ligadas' ? 'No hay remisiones ligadas con esa búsqueda.' : 'No hay folios sin factura con esos filtros.'}</p>`;
+        const todas = visiblesFolios.length && visiblesFolios.every(x => elegidos.has(x.id));
+        $('af-fd-todos').textContent = todas ? 'Quitar visibles' : `Ligar ${visiblesFolios.length} visibles`;
     }
     let esperaD;
     async function cargarDisponibles() {
-        const empresa = $('af-ff-empresa').value;
-        if (!empresa) { disponibles = []; $('af-fd-lista').innerHTML = '<p class="text-center text-muted p-4 mb-0">Elige la unidad de negocio para ver sus folios sin factura.</p>'; pintarElegidos(); return; }
-        const p = new URLSearchParams({ empresa });
+        pintarEmpresasFolios();
+        if (!$('af-ff-empresa').value) { disponibles = []; pintarElegidos(); return; }
+        const p = new URLSearchParams({ empresas: empresasBusqueda().join(',') });
         if (facturaEditando) p.set('factura', facturaEditando.id);
         [['af-fd-q', 'q'], ['af-fd-desde', 'folio_desde'], ['af-fd-hasta', 'folio_hasta']].forEach(([id, k]) => { if ($(id).value.trim()) p.set(k, $(id).value.trim()); });
         try {
             const d = await (await fetch(API + 'disponibles/?' + p, { credentials: 'same-origin' })).json();
-            disponibles = d.resultados;
-            // Nombres de las columnas (fijos al desplazar la lista)
-            const encabezado = `<div class="af-folio-enc"><span style="width:18px"></span><span style="width:110px">Remisión</span>
-                <span style="width:80px">Fecha</span><span class="flex-grow-1">Cliente</span><span style="width:90px;text-align:right">Descarga</span></div>`;
-            $('af-fd-lista').innerHTML = disponibles.length ? encabezado + disponibles.map(x => `<button type="button" class="af-folio" data-id="${x.id}">
-                <span class="check"><i class="fas fa-check" style="font-size:.6rem"></i></span><b style="width:110px">${esc(x.remision)}</b>
-                <span class="text-muted" style="width:80px">${fecha(x.fecha)}</span><span class="flex-grow-1 text-truncate">${esc(x.cliente) || '—'}</span>
-                <small class="text-muted" style="width:90px;text-align:right">${num(x.descarga_kg, 0)} kg</small></button>`).join('')
-                + (d.limitado ? '<p class="small text-warning fw-bold p-2 mb-0">Se muestran los primeros 1,000: usa el rango de folios.</p>' : '')
-                : '<p class="text-center text-muted p-4 mb-0">No hay folios sin factura con esos filtros.</p>';
+            disponibles = d.resultados; limitadoD = d.limitado;
             pintarElegidos();
         } catch (e) { $('af-ff-error').textContent = e.message; }
     }
     const recargarDisponibles = () => { clearTimeout(esperaD); esperaD = setTimeout(cargarDisponibles, 300); };
     ['af-fd-q', 'af-fd-desde', 'af-fd-hasta'].forEach(id => $(id).addEventListener('input', recargarDisponibles));
-    $('af-ff-empresa').addEventListener('change', () => { elegidos.clear(); cargarDisponibles(); });
+    $('af-ff-empresa').addEventListener('change', cargarDisponibles);
+    $('af-fd-empresas').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-empresa]'); if (!b || b.disabled) return;
+        empresasFolios.has(b.dataset.empresa) ? empresasFolios.delete(b.dataset.empresa) : empresasFolios.add(b.dataset.empresa);
+        cargarDisponibles();
+    });
+    $('af-fd-vista').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-vista]'); if (!b) return;
+        vistaFolios = b.dataset.vista;
+        document.querySelectorAll('#af-fd-vista [data-vista]').forEach(x => x.classList.toggle('active', x === b));
+        pintarListaFolios();
+    });
     $('af-ff-moneda').addEventListener('input', pintarImportes);
     document.querySelectorAll('#af-fact-modal .af-imp').forEach(i => i.addEventListener('input', () => {
         i.value = i.value.replace(i.classList.contains('af-tasa') ? /[^0-9.]/g : /[^0-9.,]/g, ''); pintarImportes();
@@ -755,6 +809,8 @@
         $('af-xml-zona').classList.toggle('d-none', !!datos);
         $('af-xml-datos').classList.toggle('d-none', !datos);
         $('af-ff-fecha').disabled = !!lectura;
+        // Con XML el número es la serie y el folio de la factura: no se cambia a mano
+        $('af-ff-numero').disabled = !!datos;
         // Con XML el cliente es el receptor de la factura: no se cambia a mano
         $('af-ff-cliente').disabled = !!datos;
         $('af-ff-cliente-etq').textContent = datos ? 'Cliente · del XML' : 'Cliente';
@@ -782,17 +838,16 @@
             + '</tbody>' + (conceptos.length ? pieConceptos(conceptos) : '') + '</table>';
         pintarImportes();
     }
-    // Estado de cada folio escrito en el XML frente a la unidad de negocio elegida
+    // Estado de cada folio escrito en el XML (puede ser de cualquier unidad de negocio)
     function foliosXml() {
         const empresa = $('af-ff-empresa').value;
         return (lectura ? lectura.coincidencias : []).map(co => {
-            const propias = co.remisiones.filter(x => String(x.empresa_id) === empresa);
-            const propia = propias.find(x => x.libre) || propias[0];
-            if (!co.remisiones.length) return { folio: co.folio, tipo: 'no', texto: 'No existe en el sistema' };
-            if (!propia) return { folio: co.folio, tipo: 'otra', texto: 'Es de ' + co.remisiones[0].empresa };
-            if (!propia.libre) return { folio: co.folio, tipo: 'ocupado', texto: 'Ya tiene factura ' + propia.factura };
-            return elegidos.has(propia.id) ? { folio: co.folio, tipo: 'ligado', texto: 'Ligado · clic para quitar', remision: propia }
-                : { folio: co.folio, tipo: 'libre', texto: 'Sin ligar · clic para ligar', remision: propia };
+            const propia = co.remisiones.find(x => x.libre && String(x.empresa_id) === empresa) || co.remisiones.find(x => x.libre) || co.remisiones[0];
+            if (!propia) return { folio: co.folio, tipo: 'no', texto: 'No existe en el sistema' };
+            const deOtra = String(propia.empresa_id) !== empresa ? ' · ' + propia.empresa : '';
+            if (!propia.libre) return { folio: co.folio, tipo: 'ocupado', texto: 'Ya tiene factura ' + propia.factura + deOtra };
+            return elegidos.has(propia.id) ? { folio: co.folio, tipo: 'ligado', texto: 'Ligado' + deOtra + ' · clic para quitar', remision: propia }
+                : { folio: co.folio, tipo: 'libre', texto: 'Sin ligar' + deOtra + ' · clic para ligar', remision: propia };
         });
     }
     function pintarFoliosXml() {
@@ -824,13 +879,19 @@
             if (d.ya_registrada) throw new Error(`Este XML ya está dado de alta en la factura ${d.ya_registrada.numero}.`);
             const c = d.cfdi, sel = $('af-ff-empresa');
             const empresa = d.empresa_sugerida && [...sel.options].some(o => o.value === String(d.empresa_sugerida)) ? String(d.empresa_sugerida) : sel.value;
-            if (empresa !== sel.value) { elegidos.clear(); sel.value = empresa; }
+            sel.value = empresa;
             $('af-ff-numero').value = c.numero_sugerido || $('af-ff-numero').value;
             if (c.fecha) $('af-ff-fecha').value = c.fecha;
             if (c.receptor.nombre) $('af-ff-cliente').value = c.receptor.nombre.toUpperCase().slice(0, 200);
             $('af-ff-moneda').value = c.moneda === 'USD' ? 'USD' : 'MXN';
-            // Los folios escritos en la descripción quedan ligados; el usuario solo los verifica
-            d.coincidencias.forEach(co => { const x = co.remisiones.find(y => String(y.empresa_id) === empresa && y.libre); if (x) elegidos.set(x.id, x); });
+            // Los folios escritos en la descripción quedan ligados (de cualquier unidad de negocio,
+            // primero la de la factura); el usuario solo los verifica. Salen al principio de la lista.
+            d.coincidencias.forEach(co => {
+                const x = co.remisiones.find(y => y.libre && String(y.empresa_id) === empresa) || co.remisiones.find(y => y.libre);
+                if (x) { elegidos.set(x.id, x); empresasFolios.add(String(x.empresa_id)); }
+            });
+            vistaFolios = 'todas';
+            document.querySelectorAll('#af-fd-vista [data-vista]').forEach(x => x.classList.toggle('active', x.dataset.vista === 'todas'));
             lectura = d; xmlArchivo = archivo;
             pintarXml(); cargarDisponibles();
         } catch (e) { $('af-ff-error').textContent = e.message; }
@@ -851,13 +912,13 @@
     });
     $('af-fd-lista').addEventListener('click', (e) => {
         const b = e.target.closest('.af-folio'); if (!b) return;
-        const x = disponibles.find(y => y.id === Number(b.dataset.id));
+        const x = visiblesFolios.find(y => y.id === Number(b.dataset.id)); if (!x) return;
         elegidos.has(x.id) ? elegidos.delete(x.id) : elegidos.set(x.id, x); pintarElegidos();
     });
     $('af-ff-elegidos').addEventListener('click', (e) => { const b = e.target.closest('[data-id]'); if (b) { elegidos.delete(Number(b.dataset.id)); pintarElegidos(); } });
     $('af-fd-todos').addEventListener('click', () => {
-        const todos = disponibles.length && disponibles.every(x => elegidos.has(x.id));
-        disponibles.forEach(x => todos ? elegidos.delete(x.id) : elegidos.set(x.id, x)); pintarElegidos();
+        const lista = [...visiblesFolios], todos = lista.length && lista.every(x => elegidos.has(x.id));
+        lista.forEach(x => todos ? elegidos.delete(x.id) : elegidos.set(x.id, x)); pintarElegidos();
     });
     function abrirForm(f) {
         facturaEditando = f;
@@ -880,6 +941,10 @@
         lectura = null; xmlArchivo = null;
         $('af-conceptos-tabla').classList.add('d-none');
         elegidos.clear(); (f ? f.folios : []).forEach(x => elegidos.set(x.id, x));
+        // Al editar, se buscan remisiones también en las unidades de negocio de sus folios
+        empresasFolios.clear(); (f ? f.folios : []).forEach(x => { if (x.empresa_id) empresasFolios.add(String(x.empresa_id)); });
+        vistaFolios = 'todas';
+        document.querySelectorAll('#af-fd-vista [data-vista]').forEach(x => x.classList.toggle('active', x.dataset.vista === 'todas'));
         // Bitácora de la factura (al editar)
         const historial = (f && f.historial) || [];
         $('af-historial-caja').classList.toggle('d-none', !historial.length);

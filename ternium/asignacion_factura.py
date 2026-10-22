@@ -8,7 +8,7 @@ que se escribe se guarda en MAYÚSCULAS.
 
 Facturas dadas de alta (FacturaRemision): número, fecha, cliente e importes
 (subtotal, descuento, IVA, IEPS, retenciones de IVA e ISR, total), con los folios
-que ampara (solo folios sin factura de la misma unidad de negocio). Se capturan a
+que ampara (folios sin factura de una o varias unidades de negocio del usuario). Se capturan a
 mano (los impuestos se calculan con las tasas) o subiendo el XML del CFDI: de ahí
 salen todos los datos y los folios escritos en la descripción de los conceptos se
 proponen ya ligados para que el usuario solo los verifique. Los folios ligados
@@ -285,8 +285,8 @@ def _numero_folio(texto):
 
 # ════════════════════════════════════════════════════════════════════════════
 # FACTURAS DADAS DE ALTA: número, fecha, cliente, total y los folios que ampara.
-# Solo se ligan folios SIN factura de la misma unidad de negocio; al ligarlos
-# toman el número (factura_nombre). Quitar un folio o borrar la factura los deja
+# Solo se ligan folios SIN factura de las unidades de negocio del usuario (pueden ser
+# de varias, no solo la de la factura); al ligarlos toman el número (factura_nombre). Quitar un folio o borrar la factura los deja
 # otra vez sin factura.
 # ════════════════════════════════════════════════════════════════════════════
 MAX_DISPONIBLES = 1000
@@ -312,7 +312,7 @@ def _folio_dict(r, kg):
         'id': r.pk, 'remision': r.remision, 'fecha': r.fecha.isoformat() if r.fecha else None,
         'cliente': (r.cliente.nombre if r.cliente_id else '') or (r.destino.nombre if r.destino_id else ''),
         'status_texto': ESTATUS.get(r.status, r.status), 'carga_kg': carga, 'descarga_kg': descarga,
-        'factura': r.factura_nombre or '',
+        'factura': r.factura_nombre or '', 'empresa_id': r.empresa_id, 'empresa': r.empresa.nombre,
     }
 
 
@@ -335,7 +335,7 @@ def _factura_dict(f, folios=True):
         'xml_url': f'/api/asignacion-factura/facturas/{f.pk}/xml/' if f.xml else None,
     }
     if folios:
-        lista = list(f.remisiones.exclude(status='CANCELADO').select_related('cliente', 'destino')
+        lista = list(f.remisiones.exclude(status='CANCELADO').select_related('cliente', 'destino', 'empresa')
                      .order_by('remision'))
         kg = _kg_por_remision([r.pk for r in lista])
         datos['folios'] = sorted((_folio_dict(r, kg) for r in lista),
@@ -478,7 +478,13 @@ def _guardar_factura(user, body, factura=None, xml=None):
             otra = otra.first()
             if otra:
                 raise ErrorFactura(f'Este XML (UUID {cfdi["uuid"]}) ya está dado de alta en la factura {otra.numero}.')
-    numero = _mayusculas(body.get('numero')) or (cfdi['numero_sugerido'] if cfdi else '')
+    # Con XML el número sale del CFDI (serie + folio) y no se cambia a mano
+    if cfdi:
+        numero = _mayusculas(cfdi['numero_sugerido'])
+    elif factura and factura.xml:
+        numero = factura.numero
+    else:
+        numero = _mayusculas(body.get('numero'))
     if not numero:
         raise ErrorFactura('Escribe el número de factura.')
     repetida = FacturaRemision.objects.filter(numero__iexact=numero)
@@ -508,9 +514,7 @@ def _guardar_factura(user, body, factura=None, xml=None):
     faltan = ids - set(folios)
     if faltan:
         raise ErrorFactura(f'{len(faltan)} folio(s) no existen, están cancelados o no son de tus unidades de negocio.')
-    otra_empresa = [r.remision for r in folios.values() if r.empresa_id != empresa.pk]
-    if otra_empresa:
-        raise ErrorFactura(f'Estos folios no son de {empresa.nombre}: {", ".join(otra_empresa[:10])}.')
+    # Se pueden ligar remisiones de cualquiera de las unidades de negocio del usuario (no solo la de la factura).
     con_otra = [f'{r.remision} ({r.factura_nombre})' for r in folios.values()
                 if r.factura_nombre and (not factura or r.factura_registro_id != factura.pk)]
     if con_otra:
@@ -783,12 +787,14 @@ def api_leer_xml(request):
 @require_http_methods(['GET'])
 @_api
 def api_disponibles(request):
-    """GET ?empresa&q&folio_desde&folio_hasta&factura=<id> → folios que se pueden ligar: los de la unidad de
-    negocio que no tienen factura (y, al editar, los que ya son de esa factura)."""
+    """GET ?empresas=1,2 (o ?empresa=1)&q&folio_desde&folio_hasta&factura=<id> → folios que se pueden
+    ligar: los de esas unidades de negocio que no tienen factura (y, al editar, los que ya son de esa
+    factura)."""
     p = request.GET
-    if not str(p.get('empresa', '')).isdigit():
+    ids = [int(x) for x in str(p.get('empresas') or p.get('empresa') or '').split(',') if x.strip().isdigit()]
+    if not ids:
         return JsonResponse({'resultados': [], 'limitado': False})
-    qs = _base(request.user).filter(empresa_id=int(p['empresa']))
+    qs = _base(request.user).filter(empresa_id__in=ids)
     # Al editar, los folios que ya son de la factura siempre salen (aunque sean viejos).
     propios = []
     if str(p.get('factura', '')).isdigit():

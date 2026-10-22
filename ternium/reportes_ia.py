@@ -32,7 +32,7 @@ import unicodedata
 from django.core.cache import cache
 from django.contrib.auth.models import User
 from django.db.models import (
-    Avg, Case, Count, DateField, DurationField, ExpressionWrapper, F, FloatField, Prefetch, Q,
+    Avg, Case, CharField, Count, DateField, DurationField, ExpressionWrapper, F, FloatField, Prefetch, Q,
     Sum, Value, When,
 )
 from django.db.models.functions import (
@@ -63,6 +63,26 @@ CAMPOS_FECHA = {
     'destruccion': 'fecha de destrucción',
 }
 STATUS = dict(Remision.STATUS_CHOICES)
+# Si no piden estatus se toman las terminadas: es el estatus final de una remisión
+# ("Auditado" casi no se usa, pero también es una remisión completa).
+STATUS_DEFECTO = ['TERMINADO', 'AUDITADO']
+
+# Tramo del viaje según si el origen y el destino son patio (Catálogos › Lugares › "Es patio").
+# El material va del cliente a un patio y del patio al cliente final: sumar los dos tramos
+# cuenta dos veces el mismo material.
+TRAMOS = {
+    'recoleccion': 'Cliente → patio',
+    'entrega': 'Patio → cliente final',
+    'traspaso': 'Patio → patio',
+    'directo': 'Directo (sin pasar por patio)',
+}
+
+
+def _q_tramo(tramo, p=''):
+    """Condición del tramo. `p` es el prefijo hacia Remision ('' o 'remision__')."""
+    origen, destino = Q(**{f'{p}origen__es_patio': True}), Q(**{f'{p}destino__es_patio': True})
+    return {'recoleccion': destino & ~origen, 'entrega': origen & ~destino,
+            'traspaso': origen & destino, 'directo': ~origen & ~destino}[tramo]
 
 # Filtros por nombre: clave → (etiqueta, modelo, campo con el nombre, ruta desde
 # Remision, campo de texto libre que también se captura en la remisión).
@@ -118,7 +138,7 @@ RANGOS = {
 DIM_DETALLE = {'material': 'material__nombre', 'patio_rechazo': 'patio_rechazo__nombre'}
 
 DIMENSIONES = {
-    'empresa': 'Unidad de negocio', 'origen': 'Origen', 'destino': 'Destino',
+    'empresa': 'Unidad de negocio', 'origen': 'Origen', 'destino': 'Destino', 'tramo': 'Tramo',
     'cliente': 'Cliente', 'material': 'Material', 'operador': 'Operador',
     'linea_transporte': 'Línea de transporte', 'unidad': 'Unidad',
     'contenedor': 'Contenedor', 'status': 'Estatus', 'patio_rechazo': 'Patio de rechazo',
@@ -372,6 +392,9 @@ def normalizar(cruda) -> dict:
     status = [s for s in (str(x).upper() for x in _lista_str(f.get('status'))) if s in STATUS]
     if status:
         filtros['status'] = status
+    tramo = [t for t in (str(x).lower() for x in _lista_str(f.get('tramo'))) if t in TRAMOS]
+    if tramo:
+        filtros['tramo'] = tramo
 
     for clave in TEXTOS:
         valor = ' '.join(str(f.get(clave) or '').split())[:80]
@@ -542,6 +565,9 @@ def _expr_dimension(dim, p_rem='', p_det='detalles__'):
         return Coalesce(F(p_det + DIM_DETALLE[dim]), Value(''))
     if dim == 'status':
         return F(p_rem + 'status')
+    if dim == 'tramo':
+        return Case(*[When(_q_tramo(t, p_rem), then=Value(t)) for t in ('recoleccion', 'entrega', 'traspaso')],
+                    default=Value('directo'), output_field=CharField())
     if dim == 'auditado_por':
         return Coalesce(F(p_rem + 'auditado_por__username'), Value(''))
     if dim == 'dia':
@@ -597,6 +623,8 @@ def _etiqueta_dimension(dim, valor, usuarios=None):
         return str(valor.year)
     if dim == 'status':
         return STATUS.get(valor, valor or '')
+    if dim == 'tramo':
+        return TRAMOS.get(valor, valor or '')
     if dim == 'auditado_por':
         return (usuarios or {}).get(valor) or valor or '(sin auditar)'
     return valor or f'(sin {DIMENSIONES[dim].lower()})'
@@ -636,7 +664,9 @@ def _texto_filtros(f, nombres):
     if f.get('status'):
         chips.append('Estatus: ' + ', '.join(STATUS[s] for s in f['status']))
     else:
-        chips.append('Sin canceladas')
+        chips.append('Estatus: Terminadas (sin pendientes ni canceladas)')
+    if f.get('tramo'):
+        chips.append('Tramo: ' + ', '.join(TRAMOS[t] for t in f['tramo']))
     for clave, (etiqueta, _) in TEXTOS.items():
         if f.get(clave):
             chips.append(f'{etiqueta} contiene "{f[clave]}"')
@@ -759,7 +789,12 @@ def ejecutar(c, user, para_excel=False) -> dict:
                 cond |= Q(**{f'{manual}__icontains': t})
         qs = qs.filter(cond)
 
-    qs = qs.filter(status__in=f['status']) if f.get('status') else qs.exclude(status='CANCELADO')
+    qs = qs.filter(status__in=f.get('status') or STATUS_DEFECTO)
+    if f.get('tramo'):
+        cond = Q()
+        for t in f['tramo']:
+            cond |= _q_tramo(t)
+        qs = qs.filter(cond)
     for clave, (_, campos) in TEXTOS.items():
         if not f.get(clave):
             continue
@@ -1195,6 +1230,7 @@ def _catalogo_prompt(user):
     return (
         f'Unidades de negocio que este usuario puede consultar: {nombres(_empresas_permitidas(user).order_by("nombre"))}\n'
         f'Lugares (orígenes y destinos): {nombres(Lugar.objects.order_by("nombre"))}\n'
+        f'Patios de 3R (lugares marcados como patio): {nombres(Lugar.objects.filter(es_patio=True).order_by("nombre"))}\n'
         f'Materiales: {nombres(Material.objects.order_by("nombre"))}'
     )
 
@@ -1206,16 +1242,23 @@ def _conocimiento(user, hoy):
 
 QUÉ ES UNA REMISIÓN: el registro de un viaje de material de un origen a un destino. Tiene unidad de negocio (empresa), folio de remisión, fecha de captura, fechas y horas de carga y de descarga, folio de carga, folio de descarga, folio de salida (solo PROBOCA), folio Medline, operador, línea de transporte, unidad (tracto) y contenedor con sus placas, cliente, estatus (PENDIENTE, TERMINADO, AUDITADO, CANCELADO), horas de entrada y salida, peso de báscula, factura, evidencias, manifiesto, descripción, notas de trazabilidad, comentario, datos de destrucción fiscal, quién y cuándo la auditó, y una o varias líneas de material con peso de carga, de descarga y rechazado (kg), patio de rechazo, cliente, bultos y precio por kg (solo SEALED AIR; importe = kg de descarga × precio). Merma % = (carga − descarga − rechazo) / carga × 100. Un "viaje" es una remisión.
 
+CÓMO SE MUEVE EL MATERIAL (TRAMOS)
+El material normalmente va del cliente (la planta donde se recoge) a un patio de 3R, y del patio al cliente final (a quien se entrega o vende). Por eso el mismo material aparece en dos remisiones: la de cliente → patio y la de patio → cliente final; sumarlas cuenta el material dos veces. También hay viajes directos (de cliente a cliente final sin pasar por patio) y traspasos entre patios. El filtro "tramo" separa esto: recoleccion = cliente → patio, entrega = patio → cliente final, traspaso = patio → patio, directo = sin pasar por patio. Un lugar es patio si en Catálogos está marcado como patio (lista abajo); con agrupar_por "tramo" se ven los tramos por separado.
+
+ESTATUS
+La remisión termina en TERMINADO: ese es el estatus de una remisión completa. AUDITADO casi no se usa; no lo uses para referirte a remisiones completas ni "por auditar". Si no piden estatus, el sistema toma solo las terminadas (sin pendientes ni canceladas).
+
 CÓMO SE ARMA UNA CONSULTA
 - tipo: "lista" = remisiones una por una; "agrupado" = totales por una o dos dimensiones; "total" = solo totales generales (¿cuántas…?, ¿cuánto se cargó…?).
 - Fechas: convierte expresiones relativas a fechas exactas (hoy, ayer, esta semana = lunes a hoy, la semana pasada = lunes a domingo, este mes = día 1 a hoy, el mes pasado, "septiembre", el año pasado, los últimos 15 días). Un mes sin año es el más reciente que ya empezó. Si NO mencionan periodo, no pongas fechas.
 - campo_fecha: "descarga" por defecto (fecha de inicio de descarga, la que usan todos los reportes). "captura" si piden la fecha de captura; "carga" la fecha de carga; "auditoria" si preguntan por lo auditado en un periodo; "registro" si preguntan qué se dio de alta en el sistema en un periodo; "destruccion" la fecha de destrucción fiscal.
 - Nombres: escríbelos como aparecen en los catálogos de abajo si los reconoces (corrige errores de dictado); si no, tal como los dijo el usuario. PROBOCA y SEALED AIR son unidades de negocio; HUAXING, BACHOCO, TRANE, MEDLINE y HUDSON suelen ser orígenes.
-- status: no lo pongas si no lo piden (el sistema excluye las canceladas). "Por auditar" = TERMINADO.
+- status: no lo pongas si no lo piden (se toman las terminadas). PENDIENTE si piden pendientes, en tránsito o sin terminar; ["PENDIENTE", "TERMINADO", "AUDITADO"] si piden todas incluyendo las pendientes; CANCELADO solo si piden canceladas.
+- tramo: recoleccion, entrega, traspaso o directo (ver TRAMOS). "Lo recolectado / lo que llegó al patio" = recoleccion; "lo entregado / vendido al cliente final / lo que salió del patio" = entrega.
 - Texto (contiene): factura (nombre/folio de factura o CFDI), placas (de unidad o contenedor), auditado_por (nombre de quien auditó), texto (busca en comentario, descripción, notas de trazabilidad y comentarios de destrucción: úsalo para "que diga…", "que mencione…").
 - Rangos: merma en %, carga y descarga en KILOS (20 toneladas = 20000), antiguedad = días transcurridos desde la fecha del periodo ("pendientes de más de 7 días" → status PENDIENTE y antiguedad_min 7).
 - Sí/no: con_X true = que lo tenga, false = que NO lo tenga ("sin factura" → con_factura false; "sin evidencias" → con_evidencia false; "sin descargar" → con_descarga false). destruccion_completa false = destrucción fiscal pendiente.
-- agrupar_por (máximo 2): empresa, origen, destino, cliente, material, operador, linea_transporte, unidad, contenedor, status, patio_rechazo, auditado_por, dia, semana, mes, anio, dia_semana.
+- agrupar_por (máximo 2): empresa, origen, destino, tramo, cliente, material, operador, linea_transporte, unidad, contenedor, status, patio_rechazo, auditado_por, dia, semana, mes, anio, dia_semana.
 - metricas: remisiones, carga_kg, descarga_kg, rechazo_kg, diferencia_kg, merma_pct, carga_ton, descarga_ton, rechazo_ton, bultos, promedio_carga_kg, promedio_descarga_kg (por remisión), importe ($, SEALED AIR), peso_bascula_kg, tiempo_carga_h, tiempo_descarga_h, tiempo_transito_h (promedios en horas; tránsito = de fin de carga a inicio de descarga). Usa las *_ton si hablan de toneladas.
 - columnas (solo en lista): remision, fecha_descarga, fecha, empresa, origen, destino, cliente, materiales, operador, linea_transporte, unidad, contenedor, placas_unidad, placas_contenedor, status, folio_carga, folio_descarga, folio_salida, folio_medline, inicia_carga, termina_carga, inicia_descarga, termina_descarga, hora_entrada, hora_salida, carga_kg, descarga_kg, rechazo_kg, diferencia_kg, merma_pct, carga_ton, descarga_ton, rechazo_ton, bultos, importe, precio_kg, tiempo_carga_h, tiempo_descarga_h, tiempo_transito_h, dias_antiguedad, peso_bascula, unidad_medida, patio_rechazo, cliente_detalle, factura, facturas_cfdi, evidencias, manifiesto, boleta_medline, fecha_destruccion, destruccion, destruccion_completa, comentarios_destruccion, descripcion, trazabilidad, comentario, auditado_por, auditado_en, creado_en, actualizado_en, ultimo_cambio. Si no piden datos concretos, omite "columnas" (hay unas por defecto). Si piden un dato concreto, incluye las columnas básicas (remision, fecha_descarga, empresa, origen, destino, materiales) más lo pedido. Si piden "todo" o "todos los datos" de una remisión, incluye todas las columnas.
 - orden.campo: una métrica, una columna o una dimensión. "Top N" o "los N con más…" → dir "desc" y limite N.
@@ -1234,8 +1277,9 @@ def _prompt_sistema(user, hoy):
                   'filtros': {'empresa': ['PROBOCA'], 'fecha_desde': hoy.replace(day=1).isoformat(),
                               'fecha_hasta': hoy.isoformat()}},
         'agrupado': {'tipo': 'agrupado',
-                     'titulo': f'Toneladas por material · {MESES[mes_ant_ini.month - 1]} {mes_ant_ini.year}',
-                     'filtros': {'fecha_desde': mes_ant_ini.isoformat(), 'fecha_hasta': mes_ant_fin.isoformat()},
+                     'titulo': f'Toneladas recolectadas por material · {MESES[mes_ant_ini.month - 1]} {mes_ant_ini.year}',
+                     'filtros': {'fecha_desde': mes_ant_ini.isoformat(), 'fecha_hasta': mes_ant_fin.isoformat(),
+                                 'tramo': ['recoleccion']},
                      'agrupar_por': ['material'], 'metricas': ['remisiones', 'descarga_ton'],
                      'orden': {'campo': 'descarga_ton', 'dir': 'desc'}},
         'lista': {'tipo': 'lista', 'titulo': 'Remisiones pendientes de esta semana',
@@ -1257,7 +1301,7 @@ Responde SOLO con un objeto JSON, sin texto adicional ni ```. Forma (omite las c
 {{"tipo": "lista|agrupado|total|conversacion", "titulo": "título corto",
  "filtros": {{"fecha_desde": "AAAA-MM-DD", "fecha_hasta": "AAAA-MM-DD", "campo_fecha": "descarga|captura|carga|auditoria|registro|destruccion",
    "empresa": [], "origen": [], "destino": [], "cliente": [], "material": [], "operador": [], "linea_transporte": [], "unidad": [], "contenedor": [], "patio_rechazo": [],
-   "status": [], "remision": "", "folio_carga": "", "folio_descarga": "", "folio_salida": "", "folio_medline": "",
+   "status": [], "tramo": [], "remision": "", "folio_carga": "", "folio_descarga": "", "folio_salida": "", "folio_medline": "",
    "factura": "", "placas": "", "auditado_por": "", "texto": "",
    "merma_min": número, "merma_max": número, "carga_min": kg, "carga_max": kg, "descarga_min": kg, "descarga_max": kg,
    "antiguedad_min": días, "antiguedad_max": días,
@@ -1269,11 +1313,13 @@ Responde SOLO con un objeto JSON, sin texto adicional ni ```. Forma (omite las c
 REGLAS DE ESTE FORMATO
 - tipo "conversacion": saludos, ayuda o temas que NO son remisiones (pon una respuesta breve y amable en "mensaje"; si piden otra cosa, como diésel o nómina, explica que este módulo consulta remisiones).
 - Seguimiento: si viene una CONSULTA ANTERIOR y la petición la modifica ("ahora por material", "solo las de septiembre", "¿y de PROBOCA?"), parte de ella y cambia solo lo pedido. Si es un tema nuevo, empieza de cero.
-- No hagas preguntas: si algo es ambiguo, elige la interpretación más razonable.
+- Tramo: si piden cantidades de material movido y no se sabe qué tramo contar (ver TRAMOS), responde tipo "conversacion" con esta pregunta en "mensaje": "¿Cómo lo cuento? 1) De cliente a patio (lo que se recoge) · 2) De patio a cliente final (lo que se entrega) · 3) Todo, separado por tramo".
+- Si la PETICIÓN es solo la respuesta a esa pregunta ("1", "2", "3", "de cliente a patio"…), toma la última de PREGUNTAS ANTERIORES y arma su consulta con ese tramo (3 = agrupar_por ["tramo"]).
+- Fuera de eso no hagas preguntas: si algo es ambiguo, elige la interpretación más razonable.
 
 EJEMPLOS
 "cuántas remisiones de proboca llevamos este mes" → {js(ej['total'])}
-"toneladas descargadas por material el mes pasado" → {js(ej['agrupado'])}
+"toneladas recolectadas por material el mes pasado" → {js(ej['agrupado'])}
 "dame las remisiones pendientes de esta semana con operador y folios" → {js(ej['lista'])}
 "top 5 operadores con más viajes este año" → {js(ej['top'])}"""
 
@@ -1405,7 +1451,11 @@ def _esquema_consulta():
         'fecha_hasta': {'type': 'string', 'description': 'AAAA-MM-DD'},
         'campo_fecha': {'type': 'string', 'enum': list(CAMPOS_FECHA)},
         **{k: {'type': 'array', 'items': texto, 'description': f'{v[0]} (nombres)'} for k, v in CATALOGOS.items()},
-        'status': {'type': 'array', 'items': {'type': 'string', 'enum': list(STATUS)}},
+        'status': {'type': 'array', 'items': {'type': 'string', 'enum': list(STATUS)},
+                   'description': 'Si se omite, solo las terminadas (el estatus final). PENDIENTE para pendientes.'},
+        'tramo': {'type': 'array', 'items': {'type': 'string', 'enum': list(TRAMOS)},
+                  'description': 'recoleccion = cliente → patio; entrega = patio → cliente final; '
+                                 'traspaso = patio → patio; directo = sin pasar por patio'},
         **{k: {'type': 'string', 'description': f'{v[0]} contiene'} for k, v in TEXTOS.items()},
         **{f'{k}_{s}': {'type': 'number', 'description': f'{v[0]} {"mínima" if s == "min" else "máxima"} ({v[1]})'}
            for k, v in RANGOS.items() for s in ('min', 'max')},
@@ -1534,7 +1584,26 @@ CÓMO TRABAJAS
 - Para datos de los catálogos en sí (qué materiales o lugares existen, claves SAT, operadores activos, placas o vencimientos de una unidad) usa consultar_catalogo.
 - Nunca inventes cifras ni nombres: todo lo que afirmes debe salir de los resultados de la herramienta. Puedes calcular diferencias, porcentajes y promedios a partir de esos resultados; hazlo con cuidado y, si es útil, menciona de dónde sale el cálculo.
 - Si la herramienta devuelve avisos (un nombre que no existe, una empresa no autorizada) o no hay datos, dilo con claridad y sugiere otra forma de preguntar.
-- No hagas preguntas de aclaración: si algo es ambiguo, elige la interpretación más razonable y menciona brevemente cuál usaste.
+
+CUÁNDO PREGUNTAR (antes de consultar)
+- Tramo: si piden cantidades de material movido (kilos, toneladas, "cuánto se movió", reportes de volumen) y no queda claro qué tramo contar, pregunta primero con opciones numeradas para que contesten con el número, así:
+  "¿Cómo lo cuento? 1) De cliente a patio (lo que se recoge) · 2) De patio a cliente final (lo que se entrega) · 3) Todo, separado por tramo"
+  No lo preguntes si ya se entiende: dicen "recolectado", "lo que llegó al patio", "de cliente a patio", "entregado" o "vendido al cliente final", "lo que salió del patio", nombran un origen o un destino concretos, o la pregunta es de pendientes, folios, una remisión en particular, tiempos, facturas o evidencias.
+- Periodo: si piden un reporte, un Excel o una presentación sin decir el periodo, pregúntalo con opciones (1) este mes · 2) el mes pasado · 3) este año). Puedes juntar en la misma pregunta el tramo y el periodo si faltan los dos.
+- Una sola pregunta por turno, corta, y en ese turno no consultes nada. Cuando contesten (aunque sea solo "1", "el 3" o "de cliente a patio"), usa la conversación previa para saber a qué responden y continúa con la petición original sin volver a preguntar.
+- Fuera de esos casos no preguntes: elige la interpretación más razonable y dila en una frase.
+- Si eligen "todo": agrupa por tramo y aclara que cliente → patio y patio → cliente final pueden ser el mismo material.
+
+REPORTES (cuando piden un reporte, resumen, informe, Excel o presentación)
+- Arma un reporte completo con varias consultas; cada una será una hoja del Excel o una diapositiva. En este orden y con el tramo y periodo acordados:
+  1. Total del periodo (remisiones, carga y descarga en toneladas, merma %).
+  2. Por tramo, si eligieron "todo".
+  3. Por material (toneladas, de mayor a menor).
+  4. Por cliente u origen (los 10 principales).
+  5. Tendencia: por semana si el periodo es de un mes o menos; por mes si es más largo.
+  6. Las 10 remisiones con mayor merma %, si hay merma.
+- Pide las consultas que no dependen entre sí en la misma respuesta (varias a la vez).
+- En el texto: un resumen ejecutivo de 4 a 6 viñetas con las cifras clave, lo que más destaca (material y cliente principales con su % del total), alertas (merma alta, remisiones pendientes) y al final el tramo y el estatus usados.
 - Si la pregunta no es sobre remisiones (por ejemplo diésel, nómina o bancos), explica amablemente que este módulo consulta remisiones y que esos datos están en su propio módulo. Saludos y dudas de uso se contestan sin consultar.
 - Si hay conversación previa, úsala para entender preguntas de seguimiento ("¿y en abril?", "ahora por material").
 - Excel y presentaciones: la pantalla genera con los datos de tus consultas un Excel (con fórmulas, totales, hoja de resumen y gráfica) y una presentación de PowerPoint (portada, tu respuesta, indicadores, gráficas y tablas). Si el usuario pide un Excel, un reporte para descargar o una presentación, haz las consultas que necesite ese reporte (puedes hacer varias: cada una será una hoja o una diapositiva) y dile que el archivo se está descargando; nunca digas que no puedes generarlo.
@@ -1543,6 +1612,7 @@ CÓMO RESPONDES
 - En español de México, claro y directo; empieza por la respuesta. Breve: unas pocas frases o viñetas.
 - Usa **negritas** para las cifras clave y viñetas con "• " cuando enumeres. No uses tablas markdown ni encabezados (#): la pantalla ya muestra la tabla de cada consulta y el usuario puede descargarla en Excel.
 - Cantidades en formato mexicano (1,234.56), toneladas con "t" y kilos con "kg".
+- Cuando des cantidades de material, termina con una línea corta entre paréntesis con el tramo y el estatus usados, por ejemplo "(Tramo: cliente → patio · solo terminadas)".
 
 {_conocimiento(user, hoy)}"""
 
@@ -1982,6 +2052,17 @@ def interpretar_reglas(pregunta, user, contexto, hoy):
         if status == ['AUDITADO'] and (desde or hasta) and 'descarg' not in t:
             filtros['campo_fecha'] = 'auditoria'
 
+    # Tramo: de cliente a patio (recolección) o de patio a cliente final (entrega)
+    tramo = []
+    if re.search(r'de(?:l)? cliente al? patio|\brecolect|\brecog|llego al patio|entr(?:o|aron) al patio', t):
+        tramo.append('recoleccion')
+    if re.search(r'de(?:l)? patio al? cliente|cliente final|\bentregad|\bvendid|salio del patio|salieron del patio', t):
+        tramo.append('entrega')
+    if re.search(r'patio a patio|entre patios|\btraspaso', t):
+        tramo.append('traspaso')
+    if tramo:
+        filtros['tramo'] = tramo
+
     m = re.search(r'merma\s+(?:(?:mayor|superior)\s+(?:a|al|de)|(?:de\s+)?mas\s+del?|(?:arriba|encima)\s+del?'
                   r'|por encima\s+del?|>=?)\s*(\d+(?:\.\d+)?)', tp)
     if m:
@@ -1994,7 +2075,7 @@ def interpretar_reglas(pregunta, user, contexto, hoy):
     # Agrupación (el orden importa: "día de la semana" antes que "día")
     dims = {
         'empresa': r'unidad(?:es)? de negocio|empresas?', 'material': r'materia(?:l|les)',
-        'cliente': r'clientes?', 'origen': r'origen(?:es)?', 'destino': r'destinos?',
+        'cliente': r'clientes?', 'origen': r'origen(?:es)?', 'destino': r'destinos?', 'tramo': r'tramos?',
         'operador': r'operador(?:es)?|chofer(?:es)?', 'linea_transporte': r'lineas?(?: de transporte)?|transportistas?',
         'patio_rechazo': r'patios? de rechazo',
         'unidad': r'unidad(?:es)?|camion(?:es)?|tractos?', 'contenedor': r'contenedor(?:es)?|cajas?',
@@ -2151,6 +2232,22 @@ def _bloque(consulta, resultado):
     }
 
 
+def _es_pregunta_ia(respuesta):
+    """La respuesta anterior de la IA fue una pregunta (tramo o periodo, con opciones)."""
+    r = (respuesta or '').strip()
+    return r.endswith('?') or bool(re.search(r'\b1\)', r) and re.search(r'\b2\)', r))
+
+
+def _entregable_de(pregunta, historial):
+    """El archivo que pidieron: en la pregunta o, si se está contestando una pregunta de la IA
+    ("1", "de cliente a patio"…), en la petición original."""
+    if _entregable(pregunta):
+        return _entregable(pregunta)
+    if historial and _es_pregunta_ia(historial[-1].get('respuesta')):
+        return _entregable(historial[-1].get('pregunta') or '')
+    return None
+
+
 def _entregable(pregunta):
     """'presentacion' o 'excel' si la pregunta pide ese archivo (se descarga solo)."""
     t = _norm(pregunta)
@@ -2234,7 +2331,7 @@ def api_reportes_ia(request):
                 'proveedor_nombre': _nombre_modelo(MODELO_AGENTE),
                 'titulo': bloques[-1]['titulo'] if bloques else '', 'respuesta': texto, 'avisos': avisos,
                 'resultados': bloques, 'consulta': bloques[-1]['consulta'] if bloques else contexto,
-                'entregable': _entregable(pregunta) if bloques else None, 'duracion_ms': duracion(),
+                'entregable': _entregable_de(pregunta, historial) if bloques else None, 'duracion_ms': duracion(),
             })
         except AgenteNoDisponible as e:
             avisos_motor.append(e.aviso)
@@ -2264,7 +2361,7 @@ def api_reportes_ia(request):
     return responder({
         **base, 'tipo': 'datos', 'titulo': resultado['titulo'], 'respuesta': redactar(consulta, resultado),
         'avisos': avisos_motor + resultado['avisos'], 'resultados': [_bloque(consulta, resultado)],
-        'consulta': consulta, 'entregable': _entregable(pregunta), 'duracion_ms': duracion(),
+        'consulta': consulta, 'entregable': _entregable_de(pregunta, historial), 'duracion_ms': duracion(),
     })
 
 
