@@ -174,6 +174,9 @@ class CapturaDatosAPIView(APIView):
             'patios': [{'id': p.pk, 'nombre': p.nombre, 'codigo': p.codigo} for p in get_patios_usuario(request.user)],
             'unidades': unidades,
             'thermos': thermos,
+            # Para elegir el permisionario de la carga de thermo.
+            'permisionarios': [{'id': p.pk, 'nombre': p.nombre}
+                               for p in Permisionario.objects.filter(activo=True).order_by('nombre')],
             'max_complementarias': FotoComplementaria.MAXIMO,
             'hoy': [_carga_resumen(c) for c in hoy],
         })
@@ -272,6 +275,10 @@ class CapturaCargaSerializer(serializers.Serializer):
     thermo = serializers.PrimaryKeyRelatedField(queryset=Thermo.objects.filter(activo=True), required=False, allow_null=True)
     # El despachador escribe el thermo: si ya existe se usa (con su permisionario); si no, se da de alta solo.
     thermo_texto = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
+    # Thermo: el permisionario que elige el despachador ('' = sin permisionario). Si no se manda,
+    # se usa el del thermo.
+    permisionario = serializers.PrimaryKeyRelatedField(
+        queryset=Permisionario.objects.filter(activo=True), required=False, allow_null=True)
     odometro = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=0, required=False, allow_null=True)
     hrs_thermo = serializers.DecimalField(max_digits=10, decimal_places=1, min_value=0, required=False, allow_null=True)
     litros = serializers.DecimalField(max_digits=8, decimal_places=2, min_value=Decimal('0.01'))
@@ -311,7 +318,10 @@ class CapturaCargaSerializer(serializers.Serializer):
                 data['thermo_nuevo'] = '' if existente else texto
             elif not data.get('thermo'):
                 raise serializers.ValidationError('Escribe el thermo.')
-            permisionario = _permisionario_activo(data['thermo']) if data['thermo'] else None
+            if 'permisionario' in self.initial_data:
+                permisionario = data.get('permisionario')
+            else:
+                permisionario = _permisionario_activo(data['thermo']) if data['thermo'] else None
             data['hrs_thermo'] = Decimal('0')  # a ningún thermo se le piden horas: solo los litros
         if not data['operador']:
             raise serializers.ValidationError('Escribe el nombre del operador.')
@@ -354,11 +364,17 @@ class CapturaCargaAPIView(APIView):
             permisionario = d['permisionario']  # lo resolvió validate()
             if es_thermo:
                 thermo = d['thermo']
-                if not thermo:  # escrito por el despachador y nuevo: se da de alta (sin permisionario)
-                    thermo, _ = Thermo.objects.get_or_create(identificador=d['thermo_nuevo'])
+                if not thermo:  # escrito por el despachador y nuevo: se da de alta con el permisionario elegido
+                    thermo, _ = Thermo.objects.get_or_create(identificador=d['thermo_nuevo'],
+                                                             defaults={'permisionario': permisionario})
                 elif not thermo.activo:  # dado de baja pero se volvió a cargar: vuelve a estar activo
                     thermo.activo = True
                     thermo.save(update_fields=['activo'])
+                # Un thermo sin permisionario se queda con el que eligieron; si ya tiene uno, el
+                # catálogo no cambia (solo la carga lleva el elegido).
+                if permisionario and not _permisionario_activo(thermo):
+                    thermo.permisionario = permisionario
+                    thermo.save(update_fields=['permisionario'])
             else:
                 unidad = Unidad.para_unidad_catalogo(d['unidad'])
                 if unidad.patio_id is None:
