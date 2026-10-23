@@ -102,8 +102,9 @@ class DashboardAPIView(APIView):
                                'bajo' if cap_urea and (total_urea / cap_urea) >= 0.15 else 'critico',
             }
 
-        # Estadísticas del mes
-        inicio_mes = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        # Estadísticas del mes (en hora de México: con la de UTC el mes empezaba a las 6 p.m. del día anterior)
+        inicio_hoy = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
+        inicio_mes = inicio_hoy.replace(day=1)
         patio_ids = patios.values_list('id', flat=True)
 
         cargas_mes = CargaDiesel.objects.filter(
@@ -112,9 +113,13 @@ class DashboardAPIView(APIView):
         stats_mes = cargas_mes.aggregate(
             total_cargas=Count('id'),
             litros_despachados=Sum('litros_diesel'),
+            litros_thermo=Sum('litros_thermo'),
             costo_total=Sum('costo_total'),
             rendimiento_promedio=Avg('rendimiento')
         )
+        # Hoy (la página /diesel): cargas y litros que salieron del tótem (unidades + thermos).
+        stats_hoy = cargas_mes.filter(fecha_carga__gte=inicio_hoy).aggregate(
+            total_cargas=Count('id'), litros_diesel=Sum('litros_diesel'), litros_thermo=Sum('litros_thermo'))
 
         # Cargas recientes
         cargas_recientes = CargaDiesel.objects.filter(
@@ -130,6 +135,11 @@ class DashboardAPIView(APIView):
                 'litros_despachados_mes': float(stats_mes['litros_despachados'] or 0),
                 'costo_total_mes': float(stats_mes['costo_total'] or 0),
                 'rendimiento_promedio': round(float(stats_mes['rendimiento_promedio'] or 0), 2),
+                # Los que lee la página /diesel (antes no venían y mostraba 0).
+                'cargas_hoy': stats_hoy['total_cargas'] or 0,
+                'litros_hoy': float((stats_hoy['litros_diesel'] or 0) + (stats_hoy['litros_thermo'] or 0)),
+                'cargas_mes': stats_mes['total_cargas'] or 0,
+                'litros_mes': float((stats_mes['litros_despachados'] or 0) + (stats_mes['litros_thermo'] or 0)),
             },
             'patios': PatioSerializer(patios, many=True).data,
             'ultima_actualizacion': timezone.now().isoformat(),
