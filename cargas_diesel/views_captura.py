@@ -275,8 +275,8 @@ class CapturaCargaSerializer(serializers.Serializer):
     thermo = serializers.PrimaryKeyRelatedField(queryset=Thermo.objects.filter(activo=True), required=False, allow_null=True)
     # El despachador escribe el thermo: si ya existe se usa (con su permisionario); si no, se da de alta solo.
     thermo_texto = serializers.CharField(max_length=50, required=False, allow_blank=True, default='')
-    # Thermo: el permisionario que elige el despachador ('' = sin permisionario). Si no se manda,
-    # se usa el del thermo.
+    # Thermo: el permisionario que elige el despachador (obligatorio). Si no se manda (versión
+    # anterior de la app), se usa el del thermo.
     permisionario = serializers.PrimaryKeyRelatedField(
         queryset=Permisionario.objects.filter(activo=True), required=False, allow_null=True)
     odometro = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=0, required=False, allow_null=True)
@@ -320,6 +320,8 @@ class CapturaCargaSerializer(serializers.Serializer):
                 raise serializers.ValidationError('Escribe el thermo.')
             if 'permisionario' in self.initial_data:
                 permisionario = data.get('permisionario')
+                if not permisionario:
+                    raise serializers.ValidationError('Elige el permisionario.')
             else:
                 permisionario = _permisionario_activo(data['thermo']) if data['thermo'] else None
             data['hrs_thermo'] = Decimal('0')  # a ningún thermo se le piden horas: solo los litros
