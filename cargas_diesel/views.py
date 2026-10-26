@@ -200,7 +200,7 @@ def filtrar_cargas(user, params):
     ?permisionario, ?auditoria, ?fecha_inicio, ?fecha_fin). La usan el listado y su Excel."""
     qs = CargaDiesel.objects.filter(
         patio__in=get_patios_usuario(user)
-    ).select_related('unidad', 'thermo', 'patio', 'usuario').prefetch_related('fotos_complementarias')
+    ).select_related('unidad', 'thermo', 'patio', 'usuario', 'registrada_por').prefetch_related('fotos_complementarias')
 
     patio_id = params.get('patio')
     if patio_id:

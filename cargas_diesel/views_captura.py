@@ -48,6 +48,12 @@ def puede_administrar(user):
     return user.is_superuser or user.has_perm('ternium.acceso_catalogos')
 
 
+def puede_registrar_olvidadas(user):
+    """Quien entra a Control Diésel registra desde el sistema la carga que se le pasó a un
+    despachador: a nombre de él y con la fecha y hora en que se hizo."""
+    return user.is_superuser or user.has_perm('ternium.acceso_diesel')
+
+
 def _sin_permiso(mensaje='No tienes permiso para esta acción.'):
     return Response({'detail': mensaje}, status=status.HTTP_403_FORBIDDEN)
 
@@ -169,7 +175,7 @@ class CapturaDatosAPIView(APIView):
         ).select_related('unidad', 'thermo', 'patio', 'usuario').prefetch_related('fotos_complementarias') \
             .order_by('-fecha_carga', '-pk')[:30]
 
-        return Response({
+        datos = {
             'despachador': {'id': request.user.pk, 'nombre': _nombre(request.user)},
             'patios': [{'id': p.pk, 'nombre': p.nombre, 'codigo': p.codigo} for p in get_patios_usuario(request.user)],
             'unidades': unidades,
@@ -179,7 +185,14 @@ class CapturaDatosAPIView(APIView):
                                for p in Permisionario.objects.filter(activo=True).order_by('nombre')],
             'max_complementarias': FotoComplementaria.MAXIMO,
             'hoy': [_carga_resumen(c) for c in hoy],
-        })
+        }
+        # Para registrar desde el sistema la carga que se le pasó a un despachador.
+        if puede_registrar_olvidadas(request.user):
+            datos['despachadores'] = [
+                {'id': u.pk, 'nombre': _nombre(u), 'patios': list(get_patios_usuario(u).values_list('pk', flat=True))}
+                for u in _despachadores()
+            ]
+        return Response(datos)
 
 
 # Fotos fijas de una carga: campo → nombre (en el orden en que se comparten).
@@ -294,12 +307,29 @@ class CapturaCargaSerializer(serializers.Serializer):
         child=serializers.ImageField(), required=False, default=list, max_length=FotoComplementaria.MAXIMO,
         error_messages={'max_length': f'Máximo {FotoComplementaria.MAXIMO} fotos complementarias.'},
     )
+    # Carga que se le pasó al despachador, registrada desde el sistema: a nombre de él y con la
+    # fecha y hora en que se hizo. La app no los manda (la carga es de quien la captura, ahora).
+    despachador = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(is_active=True), required=False, allow_null=True)
+    fecha_carga = serializers.DateTimeField(required=False, allow_null=True)
 
     def validate(self, data):
         data['operador'] = ' '.join(data.get('operador', '').split()).upper()  # texto libre, en MAYÚSCULAS
         user = self.context['request'].user
         if not get_patios_usuario(user).filter(pk=data['patio'].pk).exists():
             raise serializers.ValidationError('No tienes acceso a ese patio.')
+        despachador, fecha = data.get('despachador'), data.get('fecha_carga')
+        if despachador or fecha:
+            if not puede_registrar_olvidadas(user):
+                raise serializers.ValidationError('No tienes permiso para registrar cargas a nombre de un despachador.')
+            if not despachador:
+                raise serializers.ValidationError('Elige el despachador que hizo la carga.')
+            if not fecha:
+                raise serializers.ValidationError('Escribe la fecha y hora de la carga.')
+            if not despachador.has_perm(PERM_CAPTURA) or not get_patios_usuario(despachador).filter(pk=data['patio'].pk).exists():
+                raise serializers.ValidationError(f'{_nombre(despachador)} no es despachador de ese patio.')
+            if fecha > timezone.now() + timedelta(minutes=5):
+                raise serializers.ValidationError('La fecha de la carga no puede ser futura.')
         if data['tipo_carga'] == 'unidad':
             if not data.get('unidad'):
                 raise serializers.ValidationError('Elige la unidad.')
@@ -334,9 +364,23 @@ class CapturaCargaSerializer(serializers.Serializer):
         return data
 
 
+def _recalcular_siguiente(carga):
+    """Una carga olvidada que queda en medio de otras pasa a ser la anterior de la siguiente carga
+    de esa unidad: a esa se le vuelve a calcular el rendimiento."""
+    if carga.tipo_carga != 'unidad' or carga.odometro is None:
+        return
+    siguiente = CargaDiesel.objects.filter(
+        unidad=carga.unidad, tipo_carga='unidad', odometro__isnull=False, fecha_carga__gt=carga.fecha_carga,
+    ).order_by('fecha_carga', 'pk').first()
+    if siguiente:
+        CargaDiesel.objects.filter(pk=siguiente.pk).update(rendimiento=siguiente.calcular_rendimiento())
+
+
 class CapturaCargaAPIView(APIView):
     """POST (multipart): registra una carga de Unidad o de Thermo. El despachador
-    es el usuario que la registra y el permisionario sale de la unidad o del thermo."""
+    es el usuario que la registra y el permisionario sale de la unidad o del thermo.
+    Desde el sistema (carga que se le pasó al despachador) llegan también el despachador
+    y la fecha y hora de la carga."""
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
@@ -383,9 +427,10 @@ class CapturaCargaAPIView(APIView):
                     unidad.patio = d['patio']
                     unidad.save(update_fields=['patio'])
 
+            despachador = d.get('despachador') or request.user
             carga = CargaDiesel(
                 patio=d['patio'], unidad=unidad, thermo=thermo,
-                usuario=request.user, persona_relleno=request.user, tipo_carga=d['tipo_carga'],
+                usuario=despachador, persona_relleno=despachador, tipo_carga=d['tipo_carga'],
                 odometro=None if es_thermo else d.get('odometro'),
                 hrs_thermo=d['hrs_thermo'] if es_thermo else 0,
                 litros_diesel=0 if es_thermo else d['litros'],
@@ -394,6 +439,10 @@ class CapturaCargaAPIView(APIView):
                 permisionario=permisionario, permisionario_nombre=permisionario.nombre if permisionario else '',
                 operador_nombre=d['operador'],
             )
+            fecha = d.get('fecha_carga')
+            if fecha:  # carga olvidada: el rendimiento y el precio van contra lo anterior a esa fecha
+                carga.fecha_carga = fecha
+                carga.registrada_por, carga.registrada_en = request.user, timezone.now()
             # Las fotos van a S3 como las de remisiones (si falla una, no se guarda la carga).
             for campo in ('foto_odometro', 'foto_bomba', 'foto_thermo', 'foto_horas_thermo'):
                 if d.get(campo):
@@ -401,6 +450,10 @@ class CapturaCargaAPIView(APIView):
             carga.rendimiento = carga.calcular_rendimiento()
             carga.calcular_costo()
             carga.save()
+            if fecha:  # auto_now_add le pone la hora de ahora al guardar
+                carga.fecha_carga = fecha
+                CargaDiesel.objects.filter(pk=carga.pk).update(fecha_carga=fecha)
+                _recalcular_siguiente(carga)
             for n, foto in enumerate(d['fotos_complementarias'], 1):
                 extra = FotoComplementaria(carga=carga)
                 archivos.subir(extra, 'foto', foto, f'la foto "Complementaria {n}"')
@@ -689,6 +742,14 @@ def _permiso_captura():
     return Permission.objects.get(content_type__app_label=app, codename=codename)
 
 
+def _despachadores():
+    """Usuarios activos con el permiso de captura (directo o por grupo)."""
+    perm = _permiso_captura()
+    return User.objects.filter(
+        Q(user_permissions=perm) | Q(groups__permissions=perm), is_active=True,
+    ).distinct().select_related('perfil_diesel').order_by('first_name', 'username')
+
+
 def _despachador_dict(u, activo=True):
     perfil = getattr(u, 'perfil_diesel', None)
     patios = list(perfil.patios.order_by('nombre')) if perfil else []
@@ -714,11 +775,7 @@ class DespachadoresAPIView(APIView):
     def get(self, request):
         if not puede_administrar(request.user):
             return _sin_permiso()
-        perm = _permiso_captura()
-        usuarios = User.objects.filter(
-            Q(user_permissions=perm) | Q(groups__permissions=perm), is_active=True,
-        ).distinct().select_related('perfil_diesel').order_by('first_name', 'username')
-        return Response({'results': [_despachador_dict(u) for u in usuarios]})
+        return Response({'results': [_despachador_dict(u) for u in _despachadores()]})
 
     def post(self, request):
         """Da el permiso a un usuario existente y le asigna sus patios."""

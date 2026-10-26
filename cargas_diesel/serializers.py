@@ -79,6 +79,7 @@ class CargaDieselSerializer(serializers.ModelSerializer):
     thermo_detalle = ThermoMiniSerializer(source='thermo', read_only=True)  # cargas de Thermo (sin unidad)
     patio_detalle = PatioMiniSerializer(source='patio', read_only=True)
     usuario_nombre = serializers.SerializerMethodField()
+    registrada_por_nombre = serializers.SerializerMethodField()
     fotos_complementarias = serializers.SerializerMethodField()
 
     class Meta:
@@ -88,6 +89,11 @@ class CargaDieselSerializer(serializers.ModelSerializer):
 
     def get_usuario_nombre(self, obj):
         return obj.usuario.get_full_name() or obj.usuario.username
+
+    def get_registrada_por_nombre(self, obj):
+        """Quién capturó desde el sistema la carga que se le pasó al despachador ('' si la capturó él)."""
+        u = obj.registrada_por
+        return (u.get_full_name() or u.username) if u else ''
 
     def get_fotos_complementarias(self, obj):
         """URLs de las fotos extra que anexó el despachador."""

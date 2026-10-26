@@ -404,6 +404,11 @@ class CargaDiesel(models.Model):
         related_name='diesel_cargas_realizadas',
         verbose_name="Persona que realizó el llenado",
     )
+    # Carga que se le pasó registrar al despachador y se capturó después desde el sistema
+    # (Cargas de diésel › Nueva carga): quién la capturó y cuándo. Vacíos si la capturó él.
+    registrada_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, editable=False,
+                                       related_name='+', verbose_name="Registrada por")
+    registrada_en = models.DateTimeField("Registrada el", null=True, blank=True, editable=False)
 
     # Fotos opcionales adicionales (igual que el formulario operativo en campo).
     foto_sticker      = models.ImageField(upload_to='diesel/stickers/%Y/%m/',      verbose_name="Foto Sticker",       blank=True, null=True)
@@ -485,10 +490,12 @@ class CargaDiesel(models.Model):
             CargaDiesel.objects.filter(pk=self.pk).update(**nivel)
 
     def calcular_costo(self):
-        """Calcula el costo basado en último precio de compra."""
-        ultima_compra = CompraCombustible.objects.filter(
-            patio=self.patio, tipo='diesel'
-        ).order_by('-fecha').first()
+        """Calcula el costo basado en último precio de compra (a la fecha de la carga, si ya la
+        tiene: una carga que se registra después lleva el precio de ese día)."""
+        compras = CompraCombustible.objects.filter(patio=self.patio, tipo='diesel')
+        if self.fecha_carga:
+            compras = compras.filter(fecha__lte=self.fecha_carga)
+        ultima_compra = compras.order_by('-fecha').first()
         if ultima_compra:
             self.precio_litro = ultima_compra.precio_unitario
             self.costo_total = self.litros_diesel * self.precio_litro
