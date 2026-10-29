@@ -20,9 +20,10 @@ from .models import AjusteInventario, CompraCombustible, es_3r_nombre
 from .views import SIN_PERMISIONARIO, filtrar_cargas, get_patios_usuario
 
 MAX_FILAS = 20000
-# Sin cinchos, foto de horas del thermo ni foto del sticker: ya no se capturan.
-FOTOS = [('foto_bomba', 'Foto inicio (Bomba)'), ('foto_bomba_final', 'Foto final (Bomba)'), ('foto_odometro', 'Foto odómetro'),
-         ('foto_thermo', 'Foto inicio (Thermo)'), ('foto_thermo_final', 'Foto final (Thermo)'), ('foto_motor', 'Foto motor')]
+# Sin cinchos ni fotos de horas del thermo, sticker y motor: ya no se capturan.
+# Con los mismos nombres que en la app (captura y bitácora de cargas).
+FOTOS = [('foto_bomba', 'Foto inicio (Bomba)'), ('foto_bomba_final', 'Foto final (Bomba)'),
+         ('foto_thermo', 'Foto inicio (Thermo)'), ('foto_thermo_final', 'Foto final (Thermo)'), ('foto_odometro', 'Foto odómetro')]
 COMPLEMENTARIAS = 3  # columnas para las fotos complementarias (las demás se ven en la app)
 
 
@@ -196,10 +197,10 @@ class CargasExcelAPIView(APIView):
         # (título, ancho, formato numérico o None)
         columnas = [
             ('#', 6, '0'), ('Fecha', 12, None), ('Hora', 8, None), ('Tipo', 9, None), ('Unidad / Thermo', 16, None),
-            ('Permisionario', 26, None), ('Operador', 24, None), ('Patio', 20, None), ('Odómetro (km)', 15, '#,##0'), ('Horas thermo', 13, '#,##0.0'),
+            ('Permisionario', 26, None), ('Operador', 24, None), ('Patio', 20, None), ('Odómetro (km)', 15, '#,##0'),
             ('Litros diésel', 13, '#,##0.00'), ('Litros thermo', 13, '#,##0.00'), ('Total litros', 13, '#,##0.00'),
             ('Precio/L', 12, '"$"#,##0.00'), ('Costo', 15, '"$"#,##0.00'), ('Rendimiento (km/L)', 17, '0.00'),
-            ('Despachador', 22, None), ('Auditoría IA', 13, None), ('Litros según foto', 15, '#,##0.00'), ('Nota de auditoría', 40, None),
+            ('Despachador', 22, None),
             *[(nombre, 16, None) for _, nombre in FOTOS],
             *[(f'Foto complementaria {n}', 16, None) for n in range(1, COMPLEMENTARIAS + 1)],
         ]
@@ -241,7 +242,6 @@ class CargasExcelAPIView(APIView):
         ws.row_dimensions[enc].height = 30
 
         primera_foto = len(columnas) - len(FOTOS) - COMPLEMENTARIAS + 1
-        col_auditoria = [t for t, _, _ in columnas].index('Auditoría IA') + 1
         for n, c in enumerate(cargas, 1):
             r = enc + n
             local = timezone.localtime(c.fecha_carga)
@@ -251,21 +251,15 @@ class CargasExcelAPIView(APIView):
                 n, local.strftime('%d/%m/%Y'), local.strftime('%H:%M'), 'Thermo' if thermo else 'Unidad', c.equipo,
                 c.permisionario_nombre or 'Sin permisionario', c.operador_nombre or None, c.patio.nombre,
                 float(c.odometro) if c.odometro is not None and not thermo else None,
-                float(c.hrs_thermo) if thermo and c.hrs_thermo else None,
                 float(c.litros_diesel), float(c.litros_thermo), float(c.litros_diesel + c.litros_thermo),
                 float(c.precio_litro) or None, float(c.costo_total),
                 float(c.rendimiento) if es3r and c.rendimiento is not None else None,
                 c.usuario.get_full_name() or c.usuario.username,
-                c.get_auditoria_estado_display() or None,
-                float(c.auditoria_litros_foto) if c.auditoria_litros_foto is not None else None,
-                c.auditoria_nota or None,
             ]
             for i, v in enumerate(valores, 1):
                 celda = ws.cell(row=r, column=i, value=v if v is not None else '—')
                 if columnas[i - 1][2] and v is not None:
                     celda.number_format = columnas[i - 1][2]
-            if c.auditoria_estado:  # Alerta en rojo, Verificado en verde
-                ws.cell(row=r, column=col_auditoria).font = Font(bold=True, color='B91C1C' if c.auditoria_estado == 'alerta' else '15803D')
             archivos = [getattr(c, campo) for campo, _ in FOTOS]
             extras = [f.foto for f in c.fotos_complementarias.all()][:COMPLEMENTARIAS]
             archivos += extras + [None] * (COMPLEMENTARIAS - len(extras))
