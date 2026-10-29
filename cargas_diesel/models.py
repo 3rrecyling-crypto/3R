@@ -78,6 +78,14 @@ class Permisionario(models.Model):
     def __str__(self):
         return self.nombre
 
+    def save(self, *args, **kwargs):
+        anterior = Permisionario.objects.filter(pk=self.pk).values_list('nombre', flat=True).first() if self.pk else None
+        super().save(*args, **kwargs)
+        # Sus cargas guardan el nombre (por si lo eliminan): si lo renombran (desde el admin o
+        # Catálogos), en el listado, filtros y reportes se ve el nombre nuevo.
+        if anterior is not None and anterior != self.nombre:
+            self.cargas.update(permisionario_nombre=self.nombre)
+
 
 class PermisionarioUnidad(models.Model):
     """Unidad de Catálogos (la misma de remisiones) asignada a un permisionario.
@@ -473,6 +481,17 @@ class CargaDiesel(models.Model):
             return round(km / float(self.litros_diesel), 2)
         return None
 
+    def recalcular_siguiente(self):
+        """Esta carga es la anterior de la siguiente carga de la unidad (o lo era, si la cambiaron o
+        la borraron): a esa se le vuelve a calcular el rendimiento."""
+        if self.tipo_carga != 'unidad' or self.odometro is None or not self.unidad_id:
+            return
+        siguiente = CargaDiesel.objects.filter(
+            unidad_id=self.unidad_id, tipo_carga='unidad', odometro__isnull=False, fecha_carga__gt=self.fecha_carga,
+        ).order_by('fecha_carga', 'pk').first()
+        if siguiente:
+            CargaDiesel.objects.filter(pk=siguiente.pk).update(rendimiento=siguiente.calcular_rendimiento())
+
     def descontar_del_totem(self):
         """Saca del tótem del patio lo cargado: el diésel del motor y el del thermo
         salen de la misma bomba; la urea, de su propio depósito."""
@@ -498,12 +517,8 @@ class CargaDiesel(models.Model):
         ultima_compra = compras.order_by('-fecha').first()
         if ultima_compra:
             self.precio_litro = ultima_compra.precio_unitario
-            self.costo_total = self.litros_diesel * self.precio_litro
-        total = self.litros_diesel
-        if self.litros_thermo > 0:
-            total += self.litros_thermo
-        if ultima_compra:
-            self.costo_total = total * self.precio_litro
+        # Motor y thermo salen de la misma bomba. Sin compra se queda con el precio que traía.
+        self.costo_total = (self.litros_diesel + self.litros_thermo) * self.precio_litro
 
 
 class FotoComplementaria(models.Model):

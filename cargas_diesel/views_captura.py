@@ -364,18 +364,6 @@ class CapturaCargaSerializer(serializers.Serializer):
         return data
 
 
-def _recalcular_siguiente(carga):
-    """Una carga olvidada que queda en medio de otras pasa a ser la anterior de la siguiente carga
-    de esa unidad: a esa se le vuelve a calcular el rendimiento."""
-    if carga.tipo_carga != 'unidad' or carga.odometro is None:
-        return
-    siguiente = CargaDiesel.objects.filter(
-        unidad=carga.unidad, tipo_carga='unidad', odometro__isnull=False, fecha_carga__gt=carga.fecha_carga,
-    ).order_by('fecha_carga', 'pk').first()
-    if siguiente:
-        CargaDiesel.objects.filter(pk=siguiente.pk).update(rendimiento=siguiente.calcular_rendimiento())
-
-
 class CapturaCargaAPIView(APIView):
     """POST (multipart): registra una carga de Unidad o de Thermo. El despachador
     es el usuario que la registra y el permisionario sale de la unidad o del thermo.
@@ -453,7 +441,7 @@ class CapturaCargaAPIView(APIView):
             if fecha:  # auto_now_add le pone la hora de ahora al guardar
                 carga.fecha_carga = fecha
                 CargaDiesel.objects.filter(pk=carga.pk).update(fecha_carga=fecha)
-                _recalcular_siguiente(carga)
+                carga.recalcular_siguiente()  # queda en medio: es la anterior de la siguiente
             for n, foto in enumerate(d['fotos_complementarias'], 1):
                 extra = FotoComplementaria(carga=carga)
                 archivos.subir(extra, 'foto', foto, f'la foto "Complementaria {n}"')
