@@ -1843,6 +1843,96 @@ def export_remisiones_to_excel(request):
     return response
 
 
+# Cobro de PROBOCA por material (reporte PROBOCA de Reportes Específicos)
+PROBOCA_FLETE_BASURA = 3600         # basura: flete + relleno
+PROBOCA_RELLENO_KG = 0.3            # relleno: $ por kg descargado (solo basura)
+PROBOCA_FLETE_MADERA = 4500         # desperdicio de madera y tarimas
+PROBOCA_PRECIO_CARTON = 1           # cartón: $ por kg descargado
+
+
+def _cobro_proboca(material):
+    """'basura', 'madera' (desperdicio de madera y tarimas), 'carton' o None según el nombre del material."""
+    nombre = (material or '').upper().replace('Ó', 'O')
+    if 'BASURA' in nombre:
+        return 'basura'
+    if 'MADERA' in nombre or 'TARIMA' in nombre:
+        return 'madera'
+    if 'CARTON' in nombre:
+        return 'carton'
+    return None
+
+
+def _excel_cobro_proboca(queryset, request, lunes):
+    """PROBOCA: el archivo de cobro de la semana, igual al que armaba el capturista ("SEMANA 43
+    PROBOCA"). Una fila por material, con lo que se cobra (en fórmulas, para poder ajustarlo):
+    - Basura: flete $3,600 + relleno ($0.30 por kg descargado).
+    - Desperdicio de madera y tarimas: flete $4,500.
+    - Cartón: kg descargados × precio del cartón ($1).
+    Folio de SIS = Folio de Salida; Comentarios = comentario de la remisión."""
+    kg = '#,##0.000'
+    pesos = '_-"$"* #,##0.00_-;\\-"$"* #,##0.00_-;_-"$"* "-"??_-;_-@_-'
+    columnas = [  # (título, ancho, formato)
+        ('Remisión', 11, None), ('Origen', 12, None), ('Destino', 19, None), ('Material', 24, None),
+        ('Peso Carga (Kg)', 18, kg), ('Inicia Carga', 15, 'dd/mm/yyyy'), ('Peso Descarga (Kg)', 21, kg),
+        ('Folio Descarga', 17, None), ('Folio de SIS', 18, None), ('Comentarios', 14, None),
+        ('Precio Reciclaje', 16, pesos), ('Costo flete', 15, pesos), ('Costo relleno', 15, pesos), ('Total', 15, pesos),
+        ('Links Evidencias', 22, None),
+    ]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'PROBOCA'
+    centro = Alignment(horizontal='center', vertical='center')
+    for i, (titulo, ancho, _) in enumerate(columnas, 1):
+        celda = ws.cell(row=1, column=i, value=titulo)
+        celda.font, celda.alignment = Font(bold=True), centro
+        ws.column_dimensions[get_column_letter(i)].width = ancho
+
+    def inicia(r):
+        return timezone.localtime(r.inicia_ld).date() if r.inicia_ld else r.fecha
+
+    def numero(r):
+        m = re.search(r'(\d+)\s*$', r.remision or '')
+        return int(m.group(1)) if m else 0
+
+    fila = 1
+    for r in sorted(queryset, key=lambda r: (inicia(r) or datetime.date.min, numero(r), r.remision or '')):
+        evidencias = [request.build_absolute_uri(ev.archivo.url) for ev in r.evidencias.all() if ev.archivo]
+        texto_evidencias = ('Descargar Evidencia' if len(evidencias) == 1 else
+                            'Múltiples Archivos' if evidencias else 'Sin adjuntos')
+        for d in r.detalles.all():
+            fila += 1
+            material = d.material.nombre if d.material else 'S/M'
+            cobro = _cobro_proboca(material)
+            precio = PROBOCA_PRECIO_CARTON if cobro == 'carton' else None
+            flete = {'basura': PROBOCA_FLETE_BASURA, 'madera': PROBOCA_FLETE_MADERA}.get(cobro)
+            relleno = f'=G{fila}*{PROBOCA_RELLENO_KG}' if cobro == 'basura' else None
+            total = {'basura': f'=L{fila}+M{fila}', 'madera': f'=L{fila}', 'carton': f'=K{fila}*G{fila}'}.get(cobro)
+            valores = [r.remision, r.origen.nombre if r.origen else '', r.destino.nombre if r.destino else '', material,
+                       float(d.peso_ld or 0), inicia(r), float(d.peso_dlv or 0), r.folio_dlv or '', r.folio_salida or '',
+                       r.comentario or '', precio, flete, relleno, total, texto_evidencias]
+            for i, (valor, (_, _, formato)) in enumerate(zip(valores, columnas), 1):
+                celda = ws.cell(row=fila, column=i, value=valor if valor != '' else None)
+                celda.alignment = centro
+                if formato:
+                    celda.number_format = formato
+            if len(evidencias) == 1:
+                link = ws.cell(row=fila, column=len(columnas))
+                link.hyperlink, link.font = evidencias[0], Font(color='0000FF', underline='single')
+
+    if fila > 1:
+        tabla = Table(displayName='TablaRemisiones', ref=f'A1:{get_column_letter(len(columnas))}{fila}')
+        tabla.tableStyleInfo = TableStyleInfo(name='TableStyleMedium9', showRowStripes=True)
+        ws.add_table(tabla)
+    else:
+        ws.cell(row=2, column=1, value='No hay remisiones de PROBOCA en ese periodo.')
+
+    nombre = f'SEMANA {lunes.isocalendar()[1]} PROBOCA' if lunes else f'PROBOCA {timezone.localdate():%Y-%m-%d}'
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="{nombre}.xlsx"'
+    wb.save(response)
+    return response
+
+
 @login_required
 def export_reportes_especificos(request):
     if not puede_exportar(request.user):
@@ -1875,9 +1965,9 @@ def export_reportes_especificos(request):
     except ValueError:
         precio_hudson_val = 0.0
 
-    # 1. Base Queryset: Terminados y Auditados. PROBOCA trae todos los estatus
-    # (pendientes y canceladas incluidas) y los muestra en su columna Estatus.
-    estatus_reporte = (['TERMINADO', 'AUDITADO', 'PENDIENTE', 'CANCELADO'] if tipo_reporte == 'proboca'
+    # 1. Base Queryset: Terminados y Auditados. PROBOCA (archivo de cobro) trae también las
+    # pendientes; las canceladas no se cobran.
+    estatus_reporte = (['TERMINADO', 'AUDITADO', 'PENDIENTE'] if tipo_reporte == 'proboca'
                        else ['TERMINADO', 'AUDITADO'])
     queryset = Remision.objects.filter(status__in=estatus_reporte).select_related(
         'empresa', 'origen', 'destino', 'linea_transporte', 'operador', 'unidad'
@@ -1930,6 +2020,9 @@ def export_reportes_especificos(request):
     else:
         periodo = "Todas las fechas"
 
+    if tipo_reporte == 'proboca':  # archivo de cobro con su propio formato
+        return _excel_cobro_proboca(queryset, request, lunes)
+
     # 4. Preparar el Excel
     wb = Workbook()
     ws = wb.active
@@ -1973,73 +2066,41 @@ def export_reportes_especificos(request):
             print(f"No se pudo cargar la imagen de S3: {e}") # Falla en silencio para que el Excel sí se descargue
 
     # =========================================================================
-    # ESTRUCTURA PARA HUAXING, BACHOCO, TRANE O PROBOCA
-    # (PROBOCA lleva además el Folio de Salida, junto a los otros folios)
+    # ESTRUCTURA PARA HUAXING, BACHOCO O TRANE (PROBOCA tiene su archivo de cobro)
     # =========================================================================
-    if tipo_reporte in ['huaxing', 'bachoco', 'trane', 'proboca']:
+    if tipo_reporte in ['huaxing', 'bachoco', 'trane']:
         ws.title = f"Reporte_{tipo_reporte.capitalize()}"
-        con_folio_salida = tipo_reporte == 'proboca'
-
-        if con_folio_salida:
-            # Sin logo en S3: título y periodo en las filas reservadas para la imagen
-            ws['A1'] = "PROBOCA - Remisiones"
-            ws['A1'].font = Font(bold=True, size=14, color="1F4E79")
-            ws['A2'] = periodo
-            ws['A3'] = "Incluye todos los estatus: Terminado, Auditado, Pendiente y Cancelado. Fecha = captura del folio."
-            ws['A3'].font = Font(italic=True, size=9, color="666666")
-
-        headers = ["Remisión", "Factura"]
-        if con_folio_salida:
-            headers.append("Estatus")
-        headers += ["Origen", "Destino", "Fecha", "Folio Carga", "Folio Descarga"]
-        if con_folio_salida:
-            headers.append("Folio de Salida")
-        headers += ["Operador", "Material", "Peso Carga (Kg)", "Peso Descarga (Kg)", "Links Evidencias"]
+        headers = ["Remisión", "Factura", "Origen", "Destino", "Fecha", "Folio Carga", "Folio Descarga",
+                   "Operador", "Material", "Peso Carga (Kg)", "Peso Descarga (Kg)", "Links Evidencias"]
         col_peso_ld = headers.index("Peso Carga (Kg)") + 1
         col_peso_dlv = headers.index("Peso Descarga (Kg)") + 1
         col_evidencias = len(headers)
         ws.append(headers)
 
-        # Estilo encabezados (que ahora están en ws[start_row_table]).
-        # PROBOCA: azul corporativo; los demás conservan el amarillo de siempre.
-        if con_folio_salida:
-            header_font = Font(bold=True, color="FFFFFF")
-            header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
-        else:
-            header_font = Font(bold=True)
-            header_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+        # Estilo encabezados (que ahora están en ws[start_row_table])
         for cell in ws[start_row_table]:
             cell.alignment = center_style
-            cell.font = header_font
-            cell.fill = header_fill
-        # Color del texto de cada estatus (columna Estatus de PROBOCA)
-        color_estatus = {'TERMINADO': '2E7D32', 'AUDITADO': '1F4E79', 'PENDIENTE': 'C65911', 'CANCELADO': 'C0392B'}
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
         for remision in queryset:
             evidencias_urls = [request.build_absolute_uri(ev.archivo.url) for ev in remision.evidencias.all() if ev.archivo]
             texto_evidencias = "Descargar Evidencia" if len(evidencias_urls) == 1 else ("Múltiples Archivos" if len(evidencias_urls) > 1 else "Sin adjuntos")
 
             for d in remision.detalles.all():
-                row_data = [remision.remision, remision.factura_nombre or '']
-                if con_folio_salida:
-                    row_data.append(remision.get_status_display())
-                row_data += [
+                ws.append([
+                    remision.remision, remision.factura_nombre or '',
                     remision.origen.nombre if remision.origen else '',
                     remision.destino.nombre if remision.destino else '',
                     remision.fecha_reporte.strftime("%d/%m/%Y") if remision.fecha_reporte else "",
                     remision.folio_ld or '',
                     remision.folio_dlv or '',
-                ]
-                if con_folio_salida:
-                    row_data.append(remision.folio_salida or '')
-                row_data += [
                     remision.operador.nombre if remision.operador else (remision.operador_manual or ''),
                     d.material.nombre if d.material else "S/M",
                     float(d.peso_ld or 0),
                     float(d.peso_dlv or 0),
                     texto_evidencias
-                ]
-                ws.append(row_data)
+                ])
 
                 current_row = ws.max_row
                 for col_idx in range(1, len(headers) + 1):
@@ -2047,24 +2108,12 @@ def export_reportes_especificos(request):
 
                 ws.cell(row=current_row, column=col_peso_ld).number_format = '#,##0.000'
                 ws.cell(row=current_row, column=col_peso_dlv).number_format = '#,##0.000'
-                if con_folio_salida:
-                    ws.cell(row=current_row, column=headers.index("Estatus") + 1).font = Font(
-                        bold=True, color=color_estatus.get(remision.status, '000000'))
 
                 # Link de evidencia
                 if len(evidencias_urls) == 1:
                     cell_link = ws.cell(row=current_row, column=col_evidencias)
                     cell_link.hyperlink = evidencias_urls[0]
                     cell_link.font = Font(color="0000FF", underline="single")
-
-        if con_folio_salida:
-            # Filtros en los encabezados y encabezado fijo al desplazarse
-            ultima_col = ws.cell(row=start_row_table, column=len(headers)).column_letter
-            ws.auto_filter.ref = f"A{start_row_table}:{ultima_col}{max(ws.max_row, start_row_table)}"
-            ws.freeze_panes = ws.cell(row=start_row_table + 1, column=1)
-            for col_idx, titulo in enumerate(headers, start=1):
-                ancho = 14 if titulo not in ("Origen", "Destino", "Operador", "Material", "Links Evidencias") else 22
-                ws.column_dimensions[ws.cell(row=start_row_table, column=col_idx).column_letter].width = ancho
 
     # =========================================================================
     # ESTRUCTURA PARA HUDSON
