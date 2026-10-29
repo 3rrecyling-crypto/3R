@@ -21,8 +21,8 @@ from .views import SIN_PERMISIONARIO, filtrar_cargas, get_patios_usuario
 
 MAX_FILAS = 20000
 # Sin cinchos, foto de horas del thermo ni foto del sticker: ya no se capturan.
-FOTOS = [('foto_bomba', 'Foto bomba'), ('foto_odometro', 'Foto odómetro'), ('foto_thermo', 'Foto bomba thermo'),
-         ('foto_motor', 'Foto motor')]
+FOTOS = [('foto_bomba', 'Foto inicio (Bomba)'), ('foto_bomba_final', 'Foto final (Bomba)'), ('foto_odometro', 'Foto odómetro'),
+         ('foto_thermo', 'Foto inicio (Thermo)'), ('foto_thermo_final', 'Foto final (Thermo)'), ('foto_motor', 'Foto motor')]
 COMPLEMENTARIAS = 3  # columnas para las fotos complementarias (las demás se ven en la app)
 
 

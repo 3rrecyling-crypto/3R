@@ -396,7 +396,10 @@ class CargaDiesel(models.Model):
 
     # Fotos clásicas (mantienen compatibilidad). Ahora son opcionales para
     # facilitar el registro en campo cuando el usuario no alcanza a tomar todas.
-    foto_bomba    = models.ImageField(upload_to='diesel/bombas/%Y/%m/',    verbose_name="Foto Bomba",    blank=True, null=True)
+    # La bomba se fotografía dos veces: al empezar (contador en 0) y al terminar (los litros de la
+    # carga). La de inicio es la que antes era "Foto Bomba"; la auditoría con IA lee la final.
+    foto_bomba    = models.ImageField(upload_to='diesel/bombas/%Y/%m/',    verbose_name="Foto inicio (Bomba)", blank=True, null=True)
+    foto_bomba_final = models.ImageField(upload_to='diesel/bombas/%Y/%m/', verbose_name="Foto final (Bomba)",  blank=True, null=True)
     foto_odometro = models.ImageField(upload_to='diesel/odometros/%Y/%m/', verbose_name="Foto Odómetro", blank=True, null=True)
 
     # ── NUEVO: trazabilidad operativa por carga ──────────────────────────
@@ -421,7 +424,9 @@ class CargaDiesel(models.Model):
     # Fotos opcionales adicionales (igual que el formulario operativo en campo).
     foto_sticker      = models.ImageField(upload_to='diesel/stickers/%Y/%m/',      verbose_name="Foto Sticker",       blank=True, null=True)
     foto_motor        = models.ImageField(upload_to='diesel/motor/%Y/%m/',         verbose_name="Foto Motor",         blank=True, null=True)
-    foto_thermo       = models.ImageField(upload_to='diesel/thermo/%Y/%m/',        verbose_name="Foto Thermo",        blank=True, null=True)
+    # Bomba del thermo: igual, al empezar y al terminar.
+    foto_thermo       = models.ImageField(upload_to='diesel/thermo/%Y/%m/',        verbose_name="Foto inicio (Thermo)", blank=True, null=True)
+    foto_thermo_final = models.ImageField(upload_to='diesel/thermo/%Y/%m/',        verbose_name="Foto final (Thermo)",  blank=True, null=True)
     foto_horas_thermo = models.ImageField(upload_to='diesel/horas_thermo/%Y/%m/',  verbose_name="Foto Horas Thermo",  blank=True, null=True)
 
     rendimiento = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, verbose_name="Rendimiento Km/L")
@@ -432,7 +437,7 @@ class CargaDiesel(models.Model):
     totem_despues = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, editable=False, verbose_name="Tótem después (L)")
     totem_capacidad = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, editable=False, verbose_name="Capacidad del tótem (L)")
 
-    # Auditoría con IA de la foto de la bomba (botón "Auditar con IA"). La IA solo lee la foto y
+    # Auditoría con IA de la foto final de la bomba (botón "Auditar con IA"). La IA solo lee la foto y
     # deja el estatus; nunca cambia los litros ni otro dato. Vacío = todavía no se audita.
     AUDITORIA = [('verificado', 'Verificado'), ('alerta', 'Alerta')]
     auditoria_estado = models.CharField("Auditoría IA", max_length=12, choices=AUDITORIA, blank=True, default='', editable=False)

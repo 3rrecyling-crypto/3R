@@ -5,9 +5,10 @@ La IA solo lee la foto y deja un estatus en la carga; nunca cambia litros ni nin
 - Verificado: el contador de la carga del medidor ("RESET TO ZERO") coincide con los litros
   capturados (±1 L o ±0.5 %).
 - Alerta: no coincide, o la foto no se lee. La nota dice por qué.
-Unidad: foto de la bomba contra litros de diésel. Thermo: foto de la bomba del thermo contra
-litros del thermo. La IA lee la foto sin conocer los litros capturados (para no sesgarla) y la
-comparación la hace el sistema. Se guarda también el totalizador ("TOTAL LITRES") que se lea.
+Unidad: foto final de la bomba contra litros de diésel. Thermo: foto final de la bomba del thermo
+contra litros del thermo. La de inicio (contador en 0) no se lee; las cargas de antes de tomar dos
+fotos solo tienen una y esa se lee. La IA lee la foto sin conocer los litros capturados (para no
+sesgarla) y la comparación la hace el sistema. Se guarda también el totalizador ("TOTAL LITRES").
 
 Solo se auditan las cargas sin estatus y con foto, desde AUDITAR_DESDE (antes las fotos no se
 guardaban en S3 y se perdieron); las que ya tienen estatus no se vuelven a revisar, para ahorrar.
@@ -77,19 +78,35 @@ def pendientes(user, params):
     """Cargas que faltan por auditar con los filtros del listado (sin el de auditoría)."""
     filtros = {k: v for k, v in params.items() if k != 'auditoria'}
     inicio = timezone.make_aware(datetime.combine(AUDITAR_DESDE, datetime.min.time()))
-    # Con su foto: unidad → bomba; thermo → bomba del thermo
-    con_foto = (Q(tipo_carga='thermo') & ~Q(foto_thermo='') & Q(foto_thermo__isnull=False)) | \
-        (~Q(tipo_carga='thermo') & ~Q(foto_bomba='') & Q(foto_bomba__isnull=False))
+    # Con su foto: unidad → bomba; thermo → bomba del thermo (la final o, en las de antes, la única)
+    con = lambda campo: ~Q(**{campo: ''}) & Q(**{f'{campo}__isnull': False})  # noqa: E731
+    con_foto = (Q(tipo_carga='thermo') & (con('foto_thermo_final') | con('foto_thermo'))) | \
+        (~Q(tipo_carga='thermo') & (con('foto_bomba_final') | con('foto_bomba')))
     return filtrar_cargas(user, filtros).filter(con_foto, auditoria_estado='', fecha_carga__gte=inicio)
+
+
+BOMBAS = {  # fotos de inicio y final de cada bomba
+    'unidad': ('foto_bomba', 'foto_bomba_final', 'bomba'),
+    'thermo': ('foto_thermo', 'foto_thermo_final', 'bomba del thermo'),
+}
+
+
+def _par(c, bomba, litros):
+    """(campo, litros, nombre) de la foto que se lee: la final, que al terminar marca los litros de la
+    carga. Las cargas de antes de tomar dos fotos solo tienen la de inicio (era la única) y se lee esa."""
+    inicio, final, nombre = BOMBAS[bomba]
+    if getattr(c, final):
+        return final, litros, f'foto final de la {nombre}'
+    return inicio, litros, f'foto de la {nombre}'
 
 
 def _pares(c):
     """(campo de la foto, litros capturados, nombre) que se comparan; nunca se cruzan unidad y thermo."""
     if c.tipo_carga == 'thermo':
-        return [('foto_thermo', c.litros_thermo, 'bomba del thermo')]
-    pares = [('foto_bomba', c.litros_diesel, 'bomba')]
+        return [_par(c, 'thermo', c.litros_thermo)]
+    pares = [_par(c, 'unidad', c.litros_diesel)]
     if c.litros_thermo:  # cargas del sistema anterior con motor y thermo en una sola
-        pares.append(('foto_thermo', c.litros_thermo, 'bomba del thermo'))
+        pares.append(_par(c, 'thermo', c.litros_thermo))
     return pares
 
 
@@ -152,11 +169,11 @@ def comparar(lectura, capturados, nombre):
     total = _decimal(lectura.get('totalizador'))
     if leidos is None:
         obs = ' '.join(str(lectura.get('observacion') or '').split())[:120]
-        return False, None, total, f'No se lee la foto de la {nombre}' + (f': {obs}' if obs else '')
+        return False, None, total, f'No se lee la {nombre}' + (f': {obs}' if obs else '')
     tolerancia = max(TOLERANCIA_L, capturados * TOLERANCIA_PCT)
     if abs(leidos - capturados) <= tolerancia:
         return True, leidos, total, ''
-    return False, leidos, total, f'La foto de la {nombre} marca {leidos:,.2f} L y se capturaron {capturados:,.2f} L'
+    return False, leidos, total, f'La {nombre} marca {leidos:,.2f} L y se capturaron {capturados:,.2f} L'
 
 
 def auditar(user, cargas, api_key, uso):

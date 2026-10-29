@@ -6,7 +6,8 @@ from .models import (
     Totem, CompraCombustible, AjusteInventario, CargaDiesel, Thermo,
 )
 
-FOTOS_CARGA = ('foto_bomba', 'foto_odometro', 'foto_sticker', 'foto_motor', 'foto_thermo', 'foto_horas_thermo')
+FOTOS_CARGA = ('foto_bomba', 'foto_bomba_final', 'foto_odometro', 'foto_sticker', 'foto_motor', 'foto_thermo',
+               'foto_thermo_final', 'foto_horas_thermo')
 
 
 class PatioSerializer(serializers.ModelSerializer):

@@ -27,7 +27,8 @@ from .views import get_patios_usuario
 MAX_DIAS = 366
 ULTIMAS = 50  # filas de detalle por sección / permisionario / compras / ajustes
 FOTOS = [
-    ('foto_bomba', 'Bomba'), ('foto_odometro', 'Odómetro'), ('foto_thermo', 'Bomba del thermo'),
+    ('foto_bomba', 'Foto inicio (Bomba)'), ('foto_bomba_final', 'Foto final (Bomba)'), ('foto_odometro', 'Odómetro'),
+    ('foto_thermo', 'Foto inicio (Thermo)'), ('foto_thermo_final', 'Foto final (Thermo)'),
     ('foto_horas_thermo', 'Horas del thermo'), ('foto_sticker', 'Sticker'), ('foto_motor', 'Motor'),
 ]
 

@@ -108,15 +108,18 @@ def normalizar_thermo(texto):
 
 
 def fotos_obligatorias(tipo_carga, permisionario):
-    """La foto de la bomba siempre; la del odómetro si la unidad es de 3R RECYCLING (y se exige)."""
+    """Las fotos de inicio y final de la bomba siempre; la del odómetro si la unidad es de 3R RECYCLING
+    (y se exige)."""
     if tipo_carga == 'thermo':
-        return ['foto_thermo']
-    return ['foto_bomba'] + (['foto_odometro'] if ODOMETRO_OBLIGATORIO and es_3r_recycling(permisionario) else [])
+        return ['foto_thermo', 'foto_thermo_final']
+    return ['foto_bomba', 'foto_bomba_final'] + (['foto_odometro'] if ODOMETRO_OBLIGATORIO and es_3r_recycling(permisionario) else [])
 
 
 AVISO_FOTO = {
-    'foto_bomba': 'Toma la foto de la bomba.',
-    'foto_thermo': 'Toma la foto de la bomba del thermo.',
+    'foto_bomba': 'Toma la foto de inicio de la bomba (en 0).',
+    'foto_bomba_final': 'Toma la foto final de la bomba (al terminar la carga).',
+    'foto_thermo': 'Toma la foto de inicio de la bomba del thermo (en 0).',
+    'foto_thermo_final': 'Toma la foto final de la bomba del thermo (al terminar la carga).',
     'foto_odometro': 'Toma la foto del odómetro (obligatoria en unidades de 3R RECYCLING).',
 }
 
@@ -197,7 +200,8 @@ class CapturaDatosAPIView(APIView):
 
 # Fotos fijas de una carga: campo → nombre (en el orden en que se comparten).
 FOTOS_CARGA = [
-    ('foto_bomba', 'Bomba'), ('foto_odometro', 'Odómetro'), ('foto_thermo', 'Bomba del thermo'),
+    ('foto_bomba', 'Foto inicio (Bomba)'), ('foto_bomba_final', 'Foto final (Bomba)'), ('foto_odometro', 'Odómetro'),
+    ('foto_thermo', 'Foto inicio (Thermo)'), ('foto_thermo_final', 'Foto final (Thermo)'),
     ('foto_horas_thermo', 'Horas del thermo'), ('foto_sticker', 'Sticker'), ('foto_motor', 'Motor'),
 ]
 
@@ -299,7 +303,9 @@ class CapturaCargaSerializer(serializers.Serializer):
     cinchos_actuales = serializers.CharField(max_length=120, required=False, allow_blank=True, default='')
     foto_odometro = serializers.ImageField(required=False, allow_null=True)
     foto_bomba = serializers.ImageField(required=False, allow_null=True)
+    foto_bomba_final = serializers.ImageField(required=False, allow_null=True)
     foto_thermo = serializers.ImageField(required=False, allow_null=True)
+    foto_thermo_final = serializers.ImageField(required=False, allow_null=True)
     foto_horas_thermo = serializers.ImageField(required=False, allow_null=True)
     operador = serializers.CharField(max_length=150, required=False, allow_blank=True, default='')
     # Fotos extra que el despachador anexa si aplican (varias con la misma clave).
@@ -432,7 +438,7 @@ class CapturaCargaAPIView(APIView):
                 carga.fecha_carga = fecha
                 carga.registrada_por, carga.registrada_en = request.user, timezone.now()
             # Las fotos van a S3 como las de remisiones (si falla una, no se guarda la carga).
-            for campo in ('foto_odometro', 'foto_bomba', 'foto_thermo', 'foto_horas_thermo'):
+            for campo in ('foto_odometro', 'foto_bomba', 'foto_bomba_final', 'foto_thermo', 'foto_thermo_final', 'foto_horas_thermo'):
                 if d.get(campo):
                     archivos.subir(carga, campo, d[campo], f'la foto "{dict(FOTOS_CARGA)[campo]}"')
             carga.rendimiento = carga.calcular_rendimiento()

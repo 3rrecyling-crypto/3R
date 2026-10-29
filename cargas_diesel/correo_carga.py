@@ -27,8 +27,9 @@ from .models import es_3r_nombre
 logger = logging.getLogger(__name__)
 
 FOTOS = [
-    ('foto_odometro', 'Odómetro'), ('foto_bomba', 'Bomba'),
-    ('foto_horas_thermo', 'Horas del thermo'), ('foto_thermo', 'Bomba del thermo'),
+    ('foto_odometro', 'Odómetro'), ('foto_bomba', 'Foto inicio (Bomba)'), ('foto_bomba_final', 'Foto final (Bomba)'),
+    ('foto_horas_thermo', 'Horas del thermo'), ('foto_thermo', 'Foto inicio (Thermo)'),
+    ('foto_thermo_final', 'Foto final (Thermo)'),
 ]
 
 
