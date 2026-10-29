@@ -3,8 +3,13 @@
 {% block title %}Asignación de factura{% endblock %}
 
 {% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
 <style>
     /* Asignación de factura: mismos colores y botones que Remisiones. */
+    /* Combobox (Select2) de los filtros: la lista va por encima de las ventanas */
+    .select2-container--bootstrap-5 .select2-dropdown { z-index: 2050; }
+    .select2-container--bootstrap-5 .select2-selection { font-weight: 600; }
     :root { --af-primario: #2c3e50; --af-azul: #2563eb; --af-borde: #e2e8f0; --af-tenue: #64748b; }
     .af-card { background: #fff; border: 1px solid var(--af-borde); border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.06); }
     .af-titulo { font-weight: 800; color: var(--af-primario); }
@@ -114,27 +119,31 @@
                 </div>
             </div>
             <div class="col-6 col-lg-2">
-                <label class="form-label small fw-bold text-muted mb-1">Unidad de negocio</label>
-                <select id="af-empresa" class="form-select"><option value="">Todas</option></select>
+                <label class="form-label small fw-bold text-muted mb-1" for="af-empresa">Unidad de negocio</label>
+                <select id="af-empresa" class="form-select af-combo" data-placeholder="Todas"><option value="">Todas</option></select>
+            </div>
+            <div class="col-6 col-lg-3">
+                <label class="form-label small fw-bold text-muted mb-1" for="af-cliente">Cliente</label>
+                <select id="af-cliente" class="form-select af-combo" data-placeholder="Todos"><option value="">Todos</option></select>
             </div>
             <div class="col-6 col-lg-2">
-                <label class="form-label small fw-bold text-muted mb-1">Estatus</label>
-                <select id="af-status" class="form-select">
+                <label class="form-label small fw-bold text-muted mb-1" for="af-status">Estatus</label>
+                <select id="af-status" class="form-select af-combo" data-placeholder="Todos (menos cancelados)">
                     <option value="">Todos (menos cancelados)</option>
                     <option value="PENDIENTE">Pendiente</option><option value="TERMINADO">Terminado</option><option value="AUDITADO">Auditado</option>
                 </select>
             </div>
             <div class="col-6 col-lg-2">
-                <label class="form-label small fw-bold text-muted mb-1">Fecha de</label>
-                <select id="af-fecha-de" class="form-select">
+                <label class="form-label small fw-bold text-muted mb-1" for="af-fecha-de">Fecha de</label>
+                <select id="af-fecha-de" class="form-select af-combo">
                     <option value="carga">Inicio de carga</option>
                     <option value="captura">Captura en sistema</option>
                     <option value="timbrado">Timbrado de la factura</option>
                 </select>
             </div>
-            <div class="col-6 col-lg-1"><label class="form-label small fw-bold text-muted mb-1">Desde</label><input type="date" id="af-desde" class="form-control"></div>
-            <div class="col-6 col-lg-1"><label class="form-label small fw-bold text-muted mb-1">Hasta</label><input type="date" id="af-hasta" class="form-control"></div>
-            <div class="col-6 col-lg-1 d-grid"><button type="button" id="af-limpiar" class="btn btn-outline-secondary" title="Limpiar filtros"><i class="fas fa-eraser"></i></button></div>
+            <div class="col-6 col-lg-2"><label class="form-label small fw-bold text-muted mb-1">Desde</label><input type="date" id="af-desde" class="form-control"></div>
+            <div class="col-6 col-lg-2"><label class="form-label small fw-bold text-muted mb-1">Hasta</label><input type="date" id="af-hasta" class="form-control"></div>
+            <div class="col-12 col-lg-1 d-grid"><button type="button" id="af-limpiar" class="btn btn-outline-secondary" title="Limpiar filtros"><i class="fas fa-eraser"></i></button></div>
         </div>
     </div>
 
@@ -166,29 +175,33 @@
                 <div class="col-lg-3">
                     <label class="form-label small fw-bold text-muted mb-1">Buscar factura</label>
                     <div class="input-group"><span class="input-group-text"><i class="fas fa-search"></i></span>
-                        <input type="text" id="af-f-q" class="form-control af-mayus" placeholder="NÚMERO, CLIENTE O FOLIO…" autocomplete="off"></div>
+                        <input type="text" id="af-f-q" class="form-control af-mayus" placeholder="CAPTURA, NÚMERO, CLIENTE O FOLIO…" autocomplete="off"></div>
                 </div>
                 <div class="col-6 col-lg-2">
-                    <label class="form-label small fw-bold text-muted mb-1">Unidad de negocio</label>
-                    <select id="af-f-empresa" class="form-select"><option value="">Todas</option></select>
+                    <label class="form-label small fw-bold text-muted mb-1" for="af-f-empresa">Unidad de negocio</label>
+                    <select id="af-f-empresa" class="form-select af-combo" data-placeholder="Todas"><option value="">Todas</option></select>
                 </div>
-                <div class="col-6 col-lg-1"><label class="form-label small fw-bold text-muted mb-1">Desde</label><input type="date" id="af-f-desde" class="form-control"></div>
-                <div class="col-6 col-lg-1"><label class="form-label small fw-bold text-muted mb-1">Hasta</label><input type="date" id="af-f-hasta" class="form-control"></div>
-                <div class="col-6 col-lg-2"><div class="af-dato"><small>Total</small><span id="af-f-total">$0.00</span></div></div>
-                <div class="col-lg-3 d-flex gap-2">
-                    <button type="button" class="btn btn-outline-success fw-bold flex-fill" id="af-f-reporte"
+                <div class="col-6 col-lg-3">
+                    <label class="form-label small fw-bold text-muted mb-1" for="af-f-cliente">Cliente</label>
+                    <select id="af-f-cliente" class="form-select af-combo" data-placeholder="Todos"><option value="">Todos</option></select>
+                </div>
+                <div class="col-6 col-lg-2"><label class="form-label small fw-bold text-muted mb-1">Desde</label><input type="date" id="af-f-desde" class="form-control"></div>
+                <div class="col-6 col-lg-2"><label class="form-label small fw-bold text-muted mb-1">Hasta</label><input type="date" id="af-f-hasta" class="form-control"></div>
+                <div class="col-lg-3"><div class="af-dato"><small>Total</small><span id="af-f-total">$0.00</span></div></div>
+                <div class="col-lg-9 d-flex flex-wrap justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-success fw-bold" id="af-f-reporte"
                         title="Excel con el detalle de cada concepto y el desglose de cada factura (con los filtros)"><i class="fas fa-file-excel me-1"></i>Reporte</button>
-                    <button type="button" class="btn btn-outline-primary fw-bold flex-fill" id="af-f-zip"
+                    <button type="button" class="btn btn-outline-primary fw-bold" id="af-f-zip"
                         title="Descargar en un ZIP los XML guardados, por fecha de timbrado"><i class="fas fa-file-zipper me-1"></i>XML (ZIP)</button>
+                    <button type="button" class="btn btn-success fw-bold px-4" id="af-f-alta"><i class="fas fa-plus me-1"></i>Alta de factura</button>
                 </div>
-                <div class="col-12 d-flex justify-content-end"><button type="button" class="btn btn-success fw-bold px-4" id="af-f-alta"><i class="fas fa-plus me-1"></i>Alta de factura</button></div>
             </div>
         </div>
         <div class="af-card">
             <div class="table-responsive">
                 <table class="table table-hover mb-0 af-tabla">
-                    <thead><tr><th>Factura</th><th>Fecha</th><th>Unidad de negocio</th><th>Cliente</th><th>Folios ligados</th><th>Total</th><th></th></tr></thead>
-                    <tbody id="af-f-filas"><tr><td colspan="7" class="py-5 text-muted">Cargando…</td></tr></tbody>
+                    <thead><tr><th>Captura</th><th>Factura</th><th>Fecha</th><th>Unidad de negocio</th><th>Cliente</th><th>Folios ligados</th><th>Total</th><th></th></tr></thead>
+                    <tbody id="af-f-filas"><tr><td colspan="8" class="py-5 text-muted">Cargando…</td></tr></tbody>
                 </table>
             </div>
             <div class="d-flex justify-content-end align-items-center px-3 py-2 border-top small text-muted gap-2">
@@ -234,8 +247,9 @@
                         </div>
                     </div>
                     <div class="col-lg-5">
-                        <label class="form-label small fw-bold text-muted mb-1">Unidad de negocio *</label>
-                        <select id="af-ff-empresa" class="form-select mb-2"><option value="">Elige…</option></select>
+                        <div class="af-dato h-auto mb-2"><small>Número de captura</small><span id="af-ff-captura"></span></div>
+                        <label class="form-label small fw-bold text-muted mb-1" for="af-ff-empresa">Unidad de negocio *</label>
+                        <div class="mb-2"><select id="af-ff-empresa" class="form-select af-combo" data-placeholder="Elige…"><option value="">Elige…</option></select></div>
                         <div class="row g-2 mb-2">
                             <div class="col-7"><label class="form-label small fw-bold text-muted mb-1">Número de factura *</label>
                                 <input type="text" id="af-ff-numero" class="form-control af-mayus fw-bold" maxlength="100" placeholder="EJ. A-1520"></div>
@@ -296,7 +310,8 @@
                                     <button type="button" class="btn btn-sm btn-outline-success fw-bold" data-vista="ligadas">Ligadas (<span id="af-fd-n-ligadas">0</span>)</button>
                                     <button type="button" class="btn btn-sm btn-outline-success fw-bold" data-vista="sin">Sin ligar</button>
                                 </div>
-                                <input type="text" id="af-fd-q" class="form-control af-mayus mb-2" placeholder="BUSCAR FOLIO O CLIENTE…">
+                                <input type="text" id="af-fd-q" class="form-control af-mayus mb-2" placeholder="BUSCAR FOLIO, FOLIO DE DESCARGA O CLIENTE…">
+                                <div class="mb-2"><select id="af-fd-cliente" class="form-select af-combo" data-placeholder="Todos los clientes" aria-label="Cliente de las remisiones"><option value="">Todos los clientes</option></select></div>
                                 <div class="row g-2">
                                     <div class="col-4"><input type="text" id="af-fd-desde" class="form-control af-mayus" placeholder="DESDE FOLIO"></div>
                                     <div class="col-4"><input type="text" id="af-fd-hasta" class="form-control af-mayus" placeholder="HASTA FOLIO"></div>
@@ -382,14 +397,40 @@
 
 {% block extra_js %}
 {% if not sin_permiso %}
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 (function () {
     const API = '/api/asignacion-factura/';
     const CSRF = '{{ csrf_token }}';
-    const estado = { q: '', factura: '', empresa: '', status: '', fecha_de: 'carga', desde: '', hasta: '', page: 1 };
+    const estado = { q: '', factura: '', empresa: '', cliente: '', status: '', fecha_de: 'carga', desde: '', hasta: '', page: 1 };
     const $ = (id) => document.getElementById(id);
+    const jq = window.jQuery;  // aquí `$` es getElementById
     // Las ventanas van directo en <body> para que no queden debajo de la barra superior.
     ['af-modal', 'af-fact-modal', 'af-zip'].forEach(id => document.body.appendChild($(id)));
+
+    // Todos los filtros son combobox con buscador (Select2). Los cambios se escuchan con jQuery
+    // (Select2 avisa con su 'change'); al poner un valor desde el código se usa fijar().
+    document.querySelectorAll('select.af-combo').forEach(sel => {
+        const enModal = sel.closest('.modal');
+        jq(sel).select2({
+            theme: 'bootstrap-5', width: '100%',
+            placeholder: sel.dataset.placeholder, allowClear: !!sel.dataset.placeholder,
+            dropdownParent: enModal ? jq(enModal) : undefined,
+            language: { noResults: () => 'Sin resultados', searching: () => 'Buscando…' },
+        });
+    });
+    const alCambiar = (id, fn) => jq($(id)).on('change', fn);
+    const fijar = (id, valor) => jq($(id)).val(valor).trigger('change.select2');
+    // Llena un combobox con nombres (sin repetir lo que ya tiene) y conserva lo elegido.
+    function llenarNombres(id, nombres) {
+        const sel = $(id), elegido = sel.value;
+        const actuales = [...sel.options].slice(1).map(o => o.value);
+        if (actuales.join('\n') === nombres.join('\n')) return;
+        sel.length = 1;
+        nombres.forEach(n => sel.add(new Option(n, n)));
+        fijar(id, nombres.includes(elegido) ? elegido : '');
+    }
     const dinero = (n, m) => Number(n || 0).toLocaleString('es-MX', { style: 'currency', currency: m === 'USD' ? 'USD' : 'MXN' }) + ' ' + (m || 'MXN');
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const num = (v, d = 2) => Number(v || 0).toLocaleString('es-MX', { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -440,6 +481,8 @@
     function pintar(d) {
         const sel = $('af-empresa');
         if (sel.options.length === 1) d.empresas.forEach(e => sel.add(new Option(e.nombre, e.id)));
+        llenarNombres('af-cliente', d.clientes);
+        llenarNombres('af-fd-cliente', d.clientes);  // filtro de remisiones en el alta
         $('af-n-total').textContent = num(d.conteos.total, 0); $('af-n-sin').textContent = num(d.conteos.sin_factura, 0); $('af-n-con').textContent = num(d.conteos.con_factura, 0);
         $('af-filas').innerHTML = d.resultados.length ? d.resultados.map(filaHtml).join('')
             : '<tr><td colspan="8" class="py-5 text-muted">No hay remisiones con estos filtros.</td></tr>';
@@ -551,17 +594,18 @@
     let espera;
     mayusculas($('af-q'));
     $('af-q').addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(() => { estado.q = $('af-q').value.trim(); estado.page = 1; cargar(); }, 350); });
-    [['af-empresa', 'empresa'], ['af-status', 'status'], ['af-fecha-de', 'fecha_de'], ['af-desde', 'desde'], ['af-hasta', 'hasta']].forEach(([id, k]) =>
-        $(id).addEventListener('change', () => { estado[k] = $(id).value; estado.page = 1; cargar(); }));
+    [['af-empresa', 'empresa'], ['af-cliente', 'cliente'], ['af-status', 'status'], ['af-fecha-de', 'fecha_de'], ['af-desde', 'desde'], ['af-hasta', 'hasta']].forEach(([id, k]) =>
+        alCambiar(id, () => { estado[k] = $(id).value; estado.page = 1; cargar(); }));
     $('af-chips').addEventListener('click', (e) => {
         const b = e.target.closest('.af-chip'); if (!b) return;
         document.querySelectorAll('.af-chip').forEach(x => x.classList.toggle('activo', x === b));
         estado.factura = b.dataset.factura; estado.page = 1; cargar();
     });
     $('af-limpiar').addEventListener('click', () => {
-        ['af-q', 'af-empresa', 'af-status', 'af-desde', 'af-hasta'].forEach(id => { $(id).value = ''; });
-        $('af-fecha-de').value = 'carga';
-        Object.assign(estado, { q: '', empresa: '', status: '', fecha_de: 'carga', desde: '', hasta: '', page: 1 }); cargar();
+        ['af-q', 'af-desde', 'af-hasta'].forEach(id => { $(id).value = ''; });
+        ['af-empresa', 'af-cliente', 'af-status'].forEach(id => fijar(id, ''));
+        fijar('af-fecha-de', 'carga');
+        Object.assign(estado, { q: '', empresa: '', cliente: '', status: '', fecha_de: 'carga', desde: '', hasta: '', page: 1 }); cargar();
     });
     $('af-ant').addEventListener('click', () => { if (estado.page > 1) { estado.page--; cargar(); } });
     $('af-sig').addEventListener('click', () => { if (estado.page < estado.pages) { estado.page++; cargar(); } });
@@ -587,11 +631,11 @@
 
     // ── Facturas dadas de alta (número, total y sus folios) ──
     const FAPI = API + 'facturas/';
-    const fEstado = { q: '', empresa: '', desde: '', hasta: '', page: 1, pages: 1 };
+    const fEstado = { q: '', empresa: '', cliente: '', desde: '', hasta: '', page: 1, pages: 1 };
     let facturasPagina = [];
     const filtrosFacturas = () => {
         const p = new URLSearchParams();
-        ['q', 'empresa', 'desde', 'hasta'].forEach(k => { if (fEstado[k]) p.set(k, fEstado[k]); });
+        ['q', 'empresa', 'cliente', 'desde', 'hasta'].forEach(k => { if (fEstado[k]) p.set(k, fEstado[k]); });
         return p;
     };
     async function cargarFacturas() {
@@ -600,8 +644,10 @@
             const r = await fetch(FAPI + '?' + p, { credentials: 'same-origin' });
             const d = await r.json(); if (!r.ok) throw new Error(d.detail || 'Error ' + r.status);
             facturasPagina = d.resultados;
+            llenarNombres('af-f-cliente', d.clientes);
             $('af-f-total').textContent = dinero(d.totales.MXN, 'MXN') + (d.totales.USD ? ' · ' + dinero(d.totales.USD, 'USD') : '');
             $('af-f-filas').innerHTML = d.resultados.length ? d.resultados.map(f => `<tr>
+                <td class="fw-bold text-nowrap text-secondary">${esc(f.captura) || '—'}</td>
                 <td class="af-remision">${esc(f.numero)}${f.tiene_xml ? ` <span class="af-badge-xml" title="CFDI ${esc(f.uuid)}">XML</span>` : ''}</td><td>${fecha(f.fecha)}</td><td>${esc(f.empresa.nombre)}</td><td>${esc(f.cliente) || '—'}</td>
                 <td style="max-width:340px">${f.folios.slice(0, 6).map(x => `<button type="button" class="badge border-0 bg-success bg-opacity-10 text-success me-1 af-folio-ver" data-remision="${x.id}" title="Ver datos y fotografías de la remisión">${esc(x.remision)}</button>`).join('')}${f.num_folios > 6 ? `<small class="text-muted">+${f.num_folios - 6}</small>` : ''}${f.num_folios ? '' : '<small class="text-muted">Sin folios</small>'}</td>
                 <td><b>${dinero(f.total, f.moneda)}</b>${(f.iva_importe || f.ret_iva_importe || f.ieps_importe || f.ret_isr_importe)
@@ -609,15 +655,16 @@
                 <td class="text-nowrap"><button type="button" class="btn btn-sm btn-outline-success af-f-reporte" data-id="${f.id}" title="Reporte detallado de esta factura (Excel)"><i class="fas fa-file-excel"></i></button>
                     <button type="button" class="btn btn-sm btn-outline-primary af-f-editar" data-id="${f.id}" title="Editar"><i class="fas fa-pen"></i></button>
                     <button type="button" class="btn btn-sm btn-outline-danger af-f-borrar" data-id="${f.id}" title="Eliminar"><i class="fas fa-trash"></i></button></td></tr>`).join('')
-                : '<tr><td colspan="7" class="py-5 text-muted">No hay facturas dadas de alta. Usa “Alta de factura”.</td></tr>';
+                : '<tr><td colspan="8" class="py-5 text-muted">No hay facturas con estos filtros. Usa “Alta de factura” para dar de alta una.</td></tr>';
             $('af-f-pag').textContent = `${d.page} / ${d.pages}`; fEstado.page = d.page; fEstado.pages = d.pages;
             $('af-f-ant').disabled = d.page <= 1; $('af-f-sig').disabled = d.page >= d.pages;
-        } catch (e) { $('af-f-filas').innerHTML = `<tr><td colspan="7" class="py-5 text-danger fw-bold">${esc(e.message)}</td></tr>`; }
+        } catch (e) { $('af-f-filas').innerHTML = `<tr><td colspan="8" class="py-5 text-danger fw-bold">${esc(e.message)}</td></tr>`; }
     }
     let esperaF;
     mayusculas($('af-f-q'));
     $('af-f-q').addEventListener('input', () => { clearTimeout(esperaF); esperaF = setTimeout(() => { fEstado.q = $('af-f-q').value.trim(); fEstado.page = 1; cargarFacturas(); }, 350); });
-    $('af-f-empresa').addEventListener('change', () => { fEstado.empresa = $('af-f-empresa').value; fEstado.page = 1; cargarFacturas(); });
+    alCambiar('af-f-empresa', () => { fEstado.empresa = $('af-f-empresa').value; fEstado.page = 1; cargarFacturas(); });
+    alCambiar('af-f-cliente', () => { fEstado.cliente = $('af-f-cliente').value; fEstado.page = 1; cargarFacturas(); });
     ['desde', 'hasta'].forEach(k => $('af-f-' + k).addEventListener('change', () => { fEstado[k] = $('af-f-' + k).value; fEstado.page = 1; cargarFacturas(); }));
     // Reporte detallado (Excel): de las facturas filtradas o de una sola
     async function reporte(p, boton) {
@@ -711,17 +758,20 @@
             $('af-fd-lista').innerHTML = '<p class="text-center text-muted p-4 mb-0">Elige la unidad de negocio para ver sus folios sin factura.</p>';
             $('af-fd-todos').textContent = 'Ligar visibles'; return;
         }
-        const q = $('af-fd-q').value.trim().toUpperCase();
-        const ligadas = [...elegidos.values()].filter(x => !q || `${x.remision} ${x.cliente}`.toUpperCase().includes(q))
+        const q = $('af-fd-q').value.trim().toUpperCase(), cliente = $('af-fd-cliente').value.toUpperCase();
+        const ligadas = [...elegidos.values()]
+            .filter(x => (!q || `${x.remision} ${x.folio_dlv || ''} ${x.cliente}`.toUpperCase().includes(q))
+                && (!cliente || (x.cliente || '').toUpperCase() === cliente))
             .sort((a, b) => numFolio(a.remision) - numFolio(b.remision) || a.remision.localeCompare(b.remision));
         const sinLigar = disponibles.filter(x => !elegidos.has(x.id));
         visiblesFolios = vistaFolios === 'ligadas' ? ligadas : vistaFolios === 'sin' ? sinLigar : [...ligadas, ...sinLigar];
         const principal = $('af-ff-empresa').value, varias = empresasBusqueda().length > 1;
         // Nombres de las columnas (fijos al desplazar la lista)
         const encabezado = `<div class="af-folio-enc"><span style="width:18px"></span><span style="width:110px">Remisión</span>
-            <span style="width:80px">Fecha</span><span class="flex-grow-1">Cliente</span><span style="width:90px;text-align:right">Descarga</span></div>`;
+            <span style="width:90px">Folio descarga</span><span style="width:80px">Fecha</span><span class="flex-grow-1">Cliente</span><span style="width:90px;text-align:right">Descarga</span></div>`;
         $('af-fd-lista').innerHTML = visiblesFolios.length ? encabezado + visiblesFolios.map(x => `<button type="button" class="af-folio ${elegidos.has(x.id) ? 'activo' : ''}" data-id="${x.id}">
             <span class="check"><i class="fas fa-check" style="font-size:.6rem"></i></span><b style="width:110px">${esc(x.remision)}</b>
+            <span class="text-truncate" style="width:90px" title="Folio de descarga">${esc(x.folio_dlv) || '<span class="text-muted">—</span>'}</span>
             <span class="text-muted" style="width:80px">${fecha(x.fecha)}</span>
             <span class="flex-grow-1 text-truncate">${esc(x.cliente) || '—'}${(varias || (x.empresa_id && String(x.empresa_id) !== principal)) && x.empresa
                 ? `<small class="d-block text-muted text-uppercase fw-bold" style="font-size:.62rem">${esc(x.empresa)}</small>` : ''}</span>
@@ -737,7 +787,7 @@
         if (!$('af-ff-empresa').value) { disponibles = []; pintarElegidos(); return; }
         const p = new URLSearchParams({ empresas: empresasBusqueda().join(',') });
         if (facturaEditando) p.set('factura', facturaEditando.id);
-        [['af-fd-q', 'q'], ['af-fd-desde', 'folio_desde'], ['af-fd-hasta', 'folio_hasta']].forEach(([id, k]) => { if ($(id).value.trim()) p.set(k, $(id).value.trim()); });
+        [['af-fd-q', 'q'], ['af-fd-cliente', 'cliente'], ['af-fd-desde', 'folio_desde'], ['af-fd-hasta', 'folio_hasta']].forEach(([id, k]) => { if ($(id).value.trim()) p.set(k, $(id).value.trim()); });
         try {
             const d = await (await fetch(API + 'disponibles/?' + p, { credentials: 'same-origin' })).json();
             disponibles = d.resultados; limitadoD = d.limitado;
@@ -746,7 +796,8 @@
     }
     const recargarDisponibles = () => { clearTimeout(esperaD); esperaD = setTimeout(cargarDisponibles, 300); };
     ['af-fd-q', 'af-fd-desde', 'af-fd-hasta'].forEach(id => $(id).addEventListener('input', recargarDisponibles));
-    $('af-ff-empresa').addEventListener('change', cargarDisponibles);
+    alCambiar('af-fd-cliente', recargarDisponibles);
+    alCambiar('af-ff-empresa', cargarDisponibles);
     $('af-fd-empresas').addEventListener('click', (e) => {
         const b = e.target.closest('[data-empresa]'); if (!b || b.disabled) return;
         empresasFolios.has(b.dataset.empresa) ? empresasFolios.delete(b.dataset.empresa) : empresasFolios.add(b.dataset.empresa);
@@ -879,7 +930,7 @@
             if (d.ya_registrada) throw new Error(`Este XML ya está dado de alta en la factura ${d.ya_registrada.numero}.`);
             const c = d.cfdi, sel = $('af-ff-empresa');
             const empresa = d.empresa_sugerida && [...sel.options].some(o => o.value === String(d.empresa_sugerida)) ? String(d.empresa_sugerida) : sel.value;
-            sel.value = empresa;
+            fijar('af-ff-empresa', empresa);
             $('af-ff-numero').value = c.numero_sugerido || $('af-ff-numero').value;
             if (c.fecha) $('af-ff-fecha').value = c.fecha;
             if (c.receptor.nombre) $('af-ff-cliente').value = c.receptor.nombre.toUpperCase().slice(0, 200);
@@ -924,9 +975,12 @@
         facturaEditando = f;
         const sel = $('af-ff-empresa');
         if (sel.options.length === 1) [...$('af-empresa').options].filter(o => o.value).forEach(o => sel.add(new Option(o.text, o.value)));
-        $('af-ff-titulo').innerHTML = `<i class="fas fa-file-invoice-dollar me-2"></i>${f ? 'Editar factura ' + esc(f.numero) : 'Alta de factura'}`;
+        $('af-ff-titulo').innerHTML = `<i class="fas fa-file-invoice-dollar me-2"></i>${f ? 'Editar factura ' + esc(f.numero) : 'Alta de factura'}`
+            + (f && f.captura ? ` <span class="badge bg-light text-dark ms-2">${esc(f.captura)}</span>` : '');
+        $('af-ff-captura').innerHTML = f && f.captura ? esc(f.captura) : '<span class="text-muted fw-normal">Se genera al dar de alta (3R-F-…)</span>';
         $('af-ff-guardar').innerHTML = `<i class="fas fa-check me-1"></i>${f ? 'Guardar cambios' : 'Dar de alta'}`;
-        sel.value = f ? f.empresa.id : (sel.options.length === 2 ? sel.options[1].value : '');
+        fijar('af-ff-empresa', f ? String(f.empresa.id) : (sel.options.length === 2 ? sel.options[1].value : ''));
+        fijar('af-fd-cliente', '');
         const hoy = new Date(), hoyIso = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
         $('af-ff-numero').value = f ? f.numero : ''; $('af-ff-fecha').value = f ? f.fecha : hoyIso;
         $('af-ff-cliente').value = f ? f.cliente : '';
@@ -985,7 +1039,7 @@
             const r = await fetch(url, { ...opciones, credentials: 'same-origin' });
             const d = await r.json(); if (!r.ok) throw new Error(d.detail || 'Error ' + r.status);
             modalFactura.hide();
-            aviso(`Factura ${d.numero}: ${d.num_folios} folio(s) ligados · ${dinero(d.total, d.moneda)}.`);
+            aviso(`${facturaEditando ? '' : 'Captura ' + d.captura + ' · '}Factura ${d.numero}: ${d.num_folios} folio(s) ligados · ${dinero(d.total, d.moneda)}.`);
             cargarFacturas(); cargar();
         } catch (e) { $('af-ff-error').textContent = e.message; }
     });

@@ -827,9 +827,12 @@ class FacturaRemision(models.Model):
     remisiones con su factura (la facturación propia vive en la app facturacion). Los
     folios ligados llevan el número en Remision.factura_nombre."""
     MONEDAS = [('MXN', 'MXN'), ('USD', 'USD')]
+    PREFIJO_CAPTURA = '3R-F-'
 
     empresa = models.ForeignKey('Empresa', on_delete=models.PROTECT, related_name='facturas_remisiones',
                                 verbose_name="Unidad de Negocio")
+    # Consecutivo de cada alta que hace el usuario (se ve como 3R-F-001); se asigna al darla de alta.
+    captura = models.PositiveIntegerField("Número de captura", unique=True, null=True, blank=True, editable=False)
     numero = models.CharField(max_length=100, unique=True, verbose_name="Número de factura")
     fecha = models.DateField(verbose_name="Fecha de la factura")
     cliente = models.CharField(max_length=200, blank=True, default='', verbose_name="Cliente")
@@ -878,6 +881,11 @@ class FacturaRemision(models.Model):
 
     def __str__(self):
         return f"{self.numero} · {self.total} {self.moneda}"
+
+    @property
+    def numero_captura(self):
+        """3R-F-001, 3R-F-002…"""
+        return f'{self.PREFIJO_CAPTURA}{self.captura:03d}' if self.captura else ''
 
 
 class HistorialFacturaRemision(models.Model):

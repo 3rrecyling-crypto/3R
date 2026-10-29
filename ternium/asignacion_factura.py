@@ -6,6 +6,10 @@ usuario), con búsqueda y filtros, y permite ver los datos de una remisión. Ah�
 factura solo se ve: se asigna únicamente desde "Facturas (alta y folios)". Todo lo
 que se escribe se guarda en MAYÚSCULAS.
 
+Filtros por cliente (remisiones, facturas y folios del alta). Cada alta lleva su
+número de captura consecutivo (3R-F-001); en el alta los folios se buscan también
+por folio de descarga.
+
 Facturas dadas de alta (FacturaRemision): número, fecha, cliente e importes
 (subtotal, descuento, IVA, IEPS, retenciones de IVA e ISR, total), con los folios
 que ampara (folios sin factura de una o varias unidades de negocio del usuario). Se capturan a
@@ -29,8 +33,8 @@ from functools import wraps
 from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 from django.core.paginator import Paginator
-from django.db import transaction
-from django.db.models import Q, Sum
+from django.db import IntegrityError, transaction
+from django.db.models import Max, Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -79,6 +83,18 @@ def _sin_factura_q():
     return Q(factura_nombre__isnull=True) | Q(factura_nombre='')
 
 
+def _clientes(qs):
+    """Opciones del filtro de cliente: el cliente de la remisión o, si no tiene, su destino (como en la lista)."""
+    qs = qs.order_by()
+    con = qs.filter(cliente__isnull=False).values_list('cliente__nombre', flat=True).distinct()
+    sin = qs.filter(cliente__isnull=True, destino__isnull=False).values_list('destino__nombre', flat=True).distinct()
+    return sorted({n for n in (*con, *sin) if n}, key=str.upper)
+
+
+def _filtro_cliente(nombre):
+    return Q(cliente__nombre__iexact=nombre) | Q(cliente__isnull=True, destino__nombre__iexact=nombre)
+
+
 def _nombre(user):
     return (user.get_full_name() or user.username) if user else ''
 
@@ -125,7 +141,7 @@ FECHAS_FILTRO = {  # ?fecha_de= → campo de la remisión
 @require_http_methods(['GET'])
 @_api
 def api_lista(request):
-    """GET ?q&factura=sin|con&empresa&status&desde&hasta&fecha_de&page → filas, conteos y empresas.
+    """GET ?q&factura=sin|con&empresa&cliente&status&desde&hasta&fecha_de&page → filas, conteos, empresas y clientes.
     fecha_de: a qué fecha aplican desde/hasta (inicio de carga, captura en el sistema o timbrado de la factura)."""
     p = request.GET
     qs = _base(request.user)
@@ -139,6 +155,8 @@ def api_lista(request):
         qs = qs.filter(filtro)
     if str(p.get('empresa', '')).isdigit():
         qs = qs.filter(empresa_id=int(p['empresa']))
+    if (p.get('cliente') or '').strip():
+        qs = qs.filter(_filtro_cliente(p['cliente'].strip()))
     if p.get('status') in ('PENDIENTE', 'TERMINADO', 'AUDITADO'):
         qs = qs.filter(status=p['status'])
     campo = FECHAS_FILTRO.get(p.get('fecha_de'), FECHAS_FILTRO['carga'])
@@ -160,6 +178,7 @@ def api_lista(request):
         'page': pagina.number, 'pages': pagina.paginator.num_pages, 'count': pagina.paginator.count,
         'conteos': {'total': total, 'sin_factura': sin, 'con_factura': total - sin},
         'empresas': [{'id': e.pk, 'nombre': e.nombre} for e in _empresas(request.user).order_by('nombre')],
+        'clientes': _clientes(_base(request.user)),
     })
 
 
@@ -313,6 +332,7 @@ def _folio_dict(r, kg):
         'cliente': (r.cliente.nombre if r.cliente_id else '') or (r.destino.nombre if r.destino_id else ''),
         'status_texto': ESTATUS.get(r.status, r.status), 'carga_kg': carga, 'descarga_kg': descarga,
         'factura': r.factura_nombre or '', 'empresa_id': r.empresa_id, 'empresa': r.empresa.nombre,
+        'folio_dlv': r.folio_dlv or '',
     }
 
 
@@ -324,7 +344,7 @@ DATOS_CFDI = ('serie', 'folio', 'uuid', 'tipo_comprobante', 'forma_pago', 'metod
 
 def _factura_dict(f, folios=True):
     datos = {
-        'id': f.pk, 'empresa': {'id': f.empresa_id, 'nombre': f.empresa.nombre}, 'numero': f.numero,
+        'id': f.pk, 'captura': f.numero_captura, 'empresa': {'id': f.empresa_id, 'nombre': f.empresa.nombre}, 'numero': f.numero,
         'fecha': f.fecha.isoformat(), 'cliente': f.cliente, 'moneda': f.moneda,
         'notas': f.notas, 'creado_por': _nombre(f.creado_por),
         'creado_en': timezone.localtime(f.creado_en).strftime('%d/%m/%Y %H:%M'),
@@ -456,6 +476,20 @@ def _borrar_xml_al_confirmar(archivo, nombre=None):
     transaction.on_commit(borrar)
 
 
+def _alta_con_captura(factura):
+    """Guarda la factura nueva con el siguiente número de captura (3R-F-001, 3R-F-002…). Si otra alta
+    tomó ese número al mismo tiempo, toma el siguiente."""
+    for intento in range(5):
+        factura.captura = (FacturaRemision.objects.aggregate(m=Max('captura'))['m'] or 0) + 1
+        try:
+            with transaction.atomic():
+                factura.save()
+            return
+        except IntegrityError:
+            if intento == 4 or not FacturaRemision.objects.filter(captura=factura.captura).exists():
+                raise
+
+
 def _guardar_factura(user, body, factura=None, xml=None):
     """Crea o actualiza la factura y deja ligados exactamente los folios de body['remisiones'].
     Con XML (CFDI) los importes y datos fiscales salen del XML; si no, se calculan de lo capturado."""
@@ -563,7 +597,10 @@ def _guardar_factura(user, body, factura=None, xml=None):
             # se sobrescribe: borrarlo entonces quitaría el XML nuevo.
             if anterior and anterior != factura.xml.name:
                 _borrar_xml_al_confirmar(factura.xml, anterior)
-        factura.save()
+        if nueva:
+            _alta_con_captura(factura)
+        else:
+            factura.save()
         # Los folios que se quitaron quedan otra vez sin factura
         Remision.objects.filter(factura_registro=factura).exclude(pk__in=ids).update(
             factura_registro=None, factura_nombre=None, factura_asignada_por=None, factura_asignada_en=None,
@@ -577,7 +614,7 @@ def _guardar_factura(user, body, factura=None, xml=None):
         # Bitácora: quién, cuándo y qué cambió
         folios_despues = {folios[i].remision for i in ids}
         if nueva:
-            cambios = [f'Alta {"con XML (UUID " + factura.uuid + ")" if cfdi else "capturada a mano"} · '
+            cambios = [f'Captura {factura.numero_captura} · Alta {"con XML (UUID " + factura.uuid + ")" if cfdi else "capturada a mano"} · '
                        f'Total ${factura.total:,.2f} {factura.moneda}']
             if folios_despues:
                 cambios.append('Folios: ' + ', '.join(sorted(folios_despues, key=lambda x: (_numero_folio(x) or 0, x))))
@@ -591,13 +628,20 @@ def _guardar_factura(user, body, factura=None, xml=None):
 
 
 def filtrar_facturas(qs, p):
-    """Filtros de la lista de facturas (y del reporte): ?q&empresa&desde&hasta."""
+    """Filtros de la lista de facturas (y del reporte): ?q&empresa&cliente&desde&hasta. La búsqueda
+    encuentra también el número de captura (3R-F-001, F-1 o F1) y el folio de descarga de sus remisiones."""
     q = _mayusculas(p.get('q'), 100)
     if q:
-        qs = qs.filter(Q(numero__icontains=q) | Q(cliente__icontains=q) | Q(remisiones__remision__icontains=q)
-                       | Q(notas__icontains=q) | Q(uuid__icontains=q)).distinct()
+        filtro = (Q(numero__icontains=q) | Q(cliente__icontains=q) | Q(remisiones__remision__icontains=q)
+                  | Q(remisiones__folio_dlv__icontains=q) | Q(notas__icontains=q) | Q(uuid__icontains=q))
+        captura = re.fullmatch(r'(?:3R-?)?F-?0*(\d+)', q)
+        if captura:
+            filtro |= Q(captura=int(captura.group(1)))
+        qs = qs.filter(filtro).distinct()
     if str(p.get('empresa', '')).isdigit():
         qs = qs.filter(empresa_id=int(p['empresa']))
+    if (p.get('cliente') or '').strip():
+        qs = qs.filter(cliente__iexact=p['cliente'].strip())
     if _fecha(p.get('desde')):
         qs = qs.filter(fecha__gte=_fecha(p.get('desde')))
     if _fecha(p.get('hasta')):
@@ -608,8 +652,8 @@ def filtrar_facturas(qs, p):
 @require_http_methods(['GET', 'POST'])
 @_api
 def api_facturas(request):
-    """GET ?q&empresa&desde&hasta&page → facturas dadas de alta con sus folios.
-    POST {empresa, numero, fecha, cliente, total, moneda, notas, remisiones: [ids]} → alta."""
+    """GET ?q&empresa&cliente&desde&hasta&page → facturas dadas de alta con sus folios (y los clientes del filtro).
+    POST {empresa, numero, fecha, cliente, total, moneda, notas, remisiones: [ids]} → alta (con su número de captura)."""
     if request.method == 'POST':
         try:
             body, xml = _cuerpo(request)
@@ -624,10 +668,11 @@ def api_facturas(request):
     qs = filtrar_facturas(_facturas(request.user), p)
     totales = {m: float(qs.filter(moneda=m).aggregate(t=Sum('total'))['t'] or 0) for m, _ in FacturaRemision.MONEDAS}
     pagina = Paginator(qs.order_by('-fecha', '-pk'), 25).get_page(p.get('page') or 1)
+    clientes = _facturas(request.user).exclude(cliente='').order_by().values_list('cliente', flat=True).distinct()
     return JsonResponse({
         'resultados': [_factura_dict(f) for f in pagina.object_list],
         'page': pagina.number, 'pages': pagina.paginator.num_pages, 'count': pagina.paginator.count,
-        'totales': totales,
+        'totales': totales, 'clientes': sorted(set(clientes), key=str.upper),
     })
 
 
@@ -787,9 +832,9 @@ def api_leer_xml(request):
 @require_http_methods(['GET'])
 @_api
 def api_disponibles(request):
-    """GET ?empresas=1,2 (o ?empresa=1)&q&folio_desde&folio_hasta&factura=<id> → folios que se pueden
-    ligar: los de esas unidades de negocio que no tienen factura (y, al editar, los que ya son de esa
-    factura)."""
+    """GET ?empresas=1,2 (o ?empresa=1)&q&cliente&folio_desde&folio_hasta&factura=<id> → folios que se
+    pueden ligar: los de esas unidades de negocio que no tienen factura (y, al editar, los que ya son de
+    esa factura). q busca en la remisión, el folio de descarga y el cliente."""
     p = request.GET
     ids = [int(x) for x in str(p.get('empresas') or p.get('empresa') or '').split(',') if x.strip().isdigit()]
     if not ids:
@@ -802,7 +847,10 @@ def api_disponibles(request):
     qs = qs.filter(_sin_factura_q())
     q = _mayusculas(p.get('q'), 100)
     if q:
-        qs = qs.filter(Q(remision__icontains=q) | Q(cliente__nombre__icontains=q) | Q(destino__nombre__icontains=q))
+        qs = qs.filter(Q(remision__icontains=q) | Q(folio_dlv__icontains=q) | Q(cliente__nombre__icontains=q)
+                       | Q(destino__nombre__icontains=q))
+    if (p.get('cliente') or '').strip():
+        qs = qs.filter(_filtro_cliente(p['cliente'].strip()))
     desde, hasta = _numero_folio(p.get('folio_desde')), _numero_folio(p.get('folio_hasta'))
     filas = list(propios)
     for r in qs.order_by('-fecha', '-pk'):

@@ -278,7 +278,7 @@ def construir(datos, subtitulo):
     rs = wb.create_sheet('Resumen')
     rs.sheet_view.showGridLines = False
     resumen = [
-        ('Factura', 12, 'texto'), ('Emisión', 17, 'fecha'), ('Unidad de negocio', 18, 'texto'), ('Cliente', 30, 'largo'),
+        ('Captura', 11, 'texto'), ('Factura', 12, 'texto'), ('Emisión', 17, 'fecha'), ('Unidad de negocio', 18, 'texto'), ('Cliente', 30, 'largo'),
         ('RFC receptor', 15, 'texto'), ('UUID', 38, 'texto'), ('Uso CFDI', 22, 'largo'), ('Método de pago', 20, 'largo'),
         ('Forma de pago', 18, 'largo'), ('Moneda', 9, 'texto'), ('Remisiones aplicadas', 26, 'largo'), ('Conceptos', 10, 'kg'),
         ('Subtotal', 14, 'dinero'), ('Descuento', 13, 'dinero'), ('IEPS', 13, 'dinero'),
@@ -292,7 +292,7 @@ def construir(datos, subtitulo):
         rs.column_dimensions[L(i)].width = ancho
     for n, d in enumerate(datos, enc + 1):
         f = d['factura']
-        valores = [f.numero, d['emision'], f.empresa.nombre, d['receptor_nombre'], d['receptor_rfc'], f.uuid,
+        valores = [f.numero_captura, f.numero, d['emision'], f.empresa.nombre, d['receptor_nombre'], d['receptor_rfc'], f.uuid,
                    _con_nombre(USO_CFDI, f.uso_cfdi), _con_nombre(METODO_PAGO, f.metodo_pago),
                    _con_nombre(FORMA_PAGO, f.forma_pago), f.moneda, d['aplicadas'], d['num_conceptos'],
                    float(f.subtotal), float(f.descuento), float(f.ieps_importe), float(f.iva_importe),
@@ -318,7 +318,7 @@ def construir(datos, subtitulo):
                             value=f'=SUMIFS({letra}{enc + 1}:{letra}{ultima},{col_moneda}{enc + 1}:{col_moneda}{ultima},"{moneda}")')
             celda.number_format, celda.font, celda.alignment = DINERO, Font(bold=True), centro
         fila_t += 1
-    rs.freeze_panes = f'B{enc + 1}'
+    rs.freeze_panes = f'C{enc + 1}'  # captura y factura fijas
     # Que el resumen se vea completo: cada columna al ancho de su contenido
     for i, (texto, ancho, tipo) in enumerate(resumen, 1):
         largos = [len(str(v)) for v in (rs.cell(row=n, column=i).value for n in range(enc + 1, ultima + 1))
@@ -343,7 +343,7 @@ def construir(datos, subtitulo):
 @require_http_methods(['GET'])
 @_api
 def api_reporte(request):
-    """GET ?q&empresa&desde&hasta (los filtros de la lista) o ?factura=<id> → Excel del reporte detallado."""
+    """GET ?q&empresa&cliente&desde&hasta (los filtros de la lista) o ?factura=<id> → Excel del reporte detallado."""
     p = request.GET
     qs = _facturas(request.user)
     if str(p.get('factura', '')).isdigit():
@@ -366,6 +366,8 @@ def api_reporte(request):
         filtros.append(f'búsqueda "{p["q"]}"')
     if str(p.get('empresa', '')).isdigit():
         filtros.append(datos[0]['factura'].empresa.nombre)
+    if (p.get('cliente') or '').strip():
+        filtros.append(f'cliente {p["cliente"].strip()}')
     subtitulo = (f'{cuantas} factura(s)' + (' · ' + ' · '.join(filtros) if filtros else '')
                  + f' · generado el {timezone.localtime():%d/%m/%Y %H:%M}')
     contenido = construir(datos, subtitulo)
