@@ -2593,6 +2593,11 @@ def _perm_check(request, perm, *, alt=None):
             return None
     return JsonResponse({'error': 'FORBIDDEN', 'detail': f'Permiso requerido: {perm}'}, status=403)
 
+def _perm_catalogo(request, perm, *alt):
+    """Agregar o editar en un catálogo: quien entra a Catálogos lo hace en todos sus apartados.
+    Desde otros módulos se necesita el permiso de ese catálogo (o uno de `alt`)."""
+    return _perm_check(request, perm, alt=['ternium.acceso_catalogos', *alt])
+
 # ── EMPRESAS ─────────────────────────────────────────────────────────────
 @csrf_exempt
 @login_required
@@ -2604,7 +2609,7 @@ def api_cat_empresas(request):
             qs = qs.filter(nombre__icontains=q)
         return JsonResponse({'results': [{'id': e.id, 'nombre': e.nombre, 'prefijo': e.prefijo or ''} for e in qs]})
     if request.method == 'POST':
-        err = _perm_check(request, 'ternium.add_empresa')
+        err = _perm_catalogo(request, 'ternium.add_empresa')
         if err: return err
         body, err = _json_body(request)
         if err: return err
@@ -2625,7 +2630,7 @@ def api_cat_empresa_detail(request, pk):
     if request.method == 'GET':
         return JsonResponse({'id': e.id, 'nombre': e.nombre, 'prefijo': e.prefijo or ''})
     if request.method in ('PUT', 'PATCH'):
-        err = _perm_check(request, 'ternium.change_empresa')
+        err = _perm_catalogo(request, 'ternium.change_empresa')
         if err: return err
         body, err = _json_body(request)
         if err: return err
@@ -2685,7 +2690,7 @@ def api_cat_lugares(request):
         if q: qs = qs.filter(nombre__icontains=q)
         return JsonResponse({'results': [_lugar_to_dict(l) for l in qs]})
     if request.method == 'POST':
-        err = _perm_check(request, 'ternium.add_lugar')
+        err = _perm_catalogo(request, 'ternium.add_lugar')
         if err: return err
         body, err = _json_body(request)
         if err: return err
@@ -2710,7 +2715,7 @@ def api_cat_lugar_detail(request, pk):
     if request.method in ('PUT', 'PATCH'):
         # Editar lugar también se hace desde dentro del detalle de un viaje
         # (al editar una parada). Aceptamos acceso_viajes como bypass.
-        err = _perm_check(request, 'ternium.change_lugar', alt='ternium.acceso_viajes')
+        err = _perm_catalogo(request, 'ternium.change_lugar', 'ternium.acceso_viajes')
         if err: return err
         body, err = _json_body(request)
         if err: return err
@@ -2735,7 +2740,7 @@ def api_cat_lineas(request):
         if q: qs = qs.filter(nombre__icontains=q)
         return JsonResponse({'results': [{'id': lt.id, 'nombre': lt.nombre, 'empresas': _empresas_ids(lt)} for lt in qs]})
     if request.method == 'POST':
-        err = _perm_check(request, 'ternium.add_lineatransporte')
+        err = _perm_catalogo(request, 'ternium.add_lineatransporte')
         if err: return err
         body, err = _json_body(request)
         if err: return err
@@ -2756,7 +2761,7 @@ def api_cat_linea_detail(request, pk):
     if request.method == 'GET':
         return JsonResponse({'id': lt.id, 'nombre': lt.nombre, 'empresas': _empresas_ids(lt)})
     if request.method in ('PUT', 'PATCH'):
-        err = _perm_check(request, 'ternium.change_lineatransporte')
+        err = _perm_catalogo(request, 'ternium.change_lineatransporte')
         if err: return err
         body, err = _json_body(request)
         if err: return err
@@ -2796,7 +2801,7 @@ def api_cat_operadores(request):
             qs = qs.filter(activo=True)
         return JsonResponse({'results': [_operador_dict(o) for o in qs]})
     if request.method == 'POST':
-        err = _perm_check(request, 'ternium.add_operador')
+        err = _perm_catalogo(request, 'ternium.add_operador')
         if err: return err
         body, err = _json_body(request)
         if err: return err
@@ -2828,7 +2833,7 @@ def api_cat_operador_detail(request, pk):
     if request.method == 'GET':
         return JsonResponse(_operador_dict(o))
     if request.method in ('PUT', 'PATCH'):
-        err = _perm_check(request, 'ternium.change_operador')
+        err = _perm_catalogo(request, 'ternium.change_operador')
         if err: return err
         body, err = _json_body(request)
         if err: return err
@@ -2842,7 +2847,7 @@ def api_cat_operador_detail(request, pk):
         # No se borra: se da de baja. Borrarlo dejaría sin operador a las
         # remisiones que ya lo tenían (la FK es SET_NULL) y ese dato no se
         # puede recuperar.
-        err = _perm_check(request, 'ternium.change_operador')
+        err = _perm_catalogo(request, 'ternium.change_operador')
         if err: return err
         o.activo = False
         o.save(update_fields=['activo'])
@@ -2861,7 +2866,7 @@ def api_cat_materiales(request):
             'clave_sat': m.clave_sat or '', 'clave_unidad_sat': m.clave_unidad_sat or '',
             'empresas': _empresas_ids(m)} for m in qs]})
     if request.method == 'POST':
-        err = _perm_check(request, 'ternium.add_material')
+        err = _perm_catalogo(request, 'ternium.add_material')
         if err: return err
         body, err = _json_body(request)
         if err: return err
@@ -2890,7 +2895,7 @@ def api_cat_material_detail(request, pk):
             'clave_sat': m.clave_sat or '', 'clave_unidad_sat': m.clave_unidad_sat or '',
             'empresas': _empresas_ids(m)})
     if request.method in ('PUT', 'PATCH'):
-        err = _perm_check(request, 'ternium.change_material')
+        err = _perm_catalogo(request, 'ternium.change_material')
         if err: return err
         body, err = _json_body(request)
         if err: return err
@@ -2972,7 +2977,7 @@ def api_cat_unidades(request):
         if q: qs = qs.filter(Q(internal_id__icontains=q) | Q(license_plate__icontains=q))
         return JsonResponse({'results': [_unidad_to_dict(u) for u in qs]})
     if request.method == 'POST':
-        err = _perm_check(request, 'ternium.add_unidad')
+        err = _perm_catalogo(request, 'ternium.add_unidad')
         if err: return err
         body, err = _json_body(request)
         if err: return err
@@ -2999,7 +3004,7 @@ def api_cat_unidad_detail(request, pk):
     if request.method in ('PUT', 'PATCH'):
         # Editar la unidad también se hace desde el detalle de un viaje
         # (tarjetas de Unidad / SCT). Aceptamos acceso_viajes como bypass.
-        err = _perm_check(request, 'ternium.change_unidad', alt='ternium.acceso_viajes')
+        err = _perm_catalogo(request, 'ternium.change_unidad', 'ternium.acceso_viajes')
         if err: return err
         body, err = _json_body(request)
         if err: return err
@@ -3028,7 +3033,7 @@ def api_cat_contenedores(request):
         if q: qs = qs.filter(Q(nombre__icontains=q) | Q(placas__icontains=q))
         return JsonResponse({'results': [{'id': c.id, 'nombre': c.nombre, 'placas': c.placas or '', 'empresas': _empresas_ids(c)} for c in qs]})
     if request.method == 'POST':
-        err = _perm_check(request, 'ternium.add_contenedor')
+        err = _perm_catalogo(request, 'ternium.add_contenedor')
         if err: return err
         body, err = _json_body(request)
         if err: return err
@@ -3049,7 +3054,7 @@ def api_cat_contenedor_detail(request, pk):
     if request.method == 'GET':
         return JsonResponse({'id': c.id, 'nombre': c.nombre, 'placas': c.placas or '', 'empresas': _empresas_ids(c)})
     if request.method in ('PUT', 'PATCH'):
-        err = _perm_check(request, 'ternium.change_contenedor')
+        err = _perm_catalogo(request, 'ternium.change_contenedor')
         if err: return err
         body, err = _json_body(request)
         if err: return err
