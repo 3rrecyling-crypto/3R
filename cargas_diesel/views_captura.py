@@ -86,9 +86,24 @@ def es_3r_recycling(permisionario):
     return bool(permisionario) and es_3r_nombre(permisionario.nombre)
 
 
+def es_3r_transporte(permisionario):
+    """Unidades de 3R TRANSPORTE: el kilometraje y la foto del odómetro son obligatorios."""
+    return bool(permisionario) and ' '.join(permisionario.nombre.upper().split()).startswith('3R TRANSPORTE')
+
+
 # Por ahora el kilometraje y la foto del odómetro se piden en las unidades de 3R RECYCLING
 # pero no se exigen. En True vuelven a ser obligatorios.
 ODOMETRO_OBLIGATORIO = False
+
+
+def pide_odometro(permisionario):
+    """Unidades que llevan kilometraje (y foto del odómetro); las de los demás permisionarios no."""
+    return es_3r_recycling(permisionario) or es_3r_transporte(permisionario)
+
+
+def odometro_obligatorio(permisionario):
+    """3R TRANSPORTE siempre; 3R RECYCLING solo si se exige (ODOMETRO_OBLIGATORIO)."""
+    return es_3r_transporte(permisionario) or (ODOMETRO_OBLIGATORIO and es_3r_recycling(permisionario))
 
 
 def _permisionario_activo(thermo):
@@ -109,11 +124,10 @@ def normalizar_thermo(texto):
 
 
 def fotos_obligatorias(tipo_carga, permisionario):
-    """Las fotos de inicio y final de la bomba siempre; la del odómetro si la unidad es de 3R RECYCLING
-    (y se exige)."""
+    """Las fotos de inicio y final de la bomba siempre; la del odómetro si el km es obligatorio."""
     if tipo_carga == 'thermo':
         return ['foto_thermo', 'foto_thermo_final']
-    return ['foto_bomba', 'foto_bomba_final'] + (['foto_odometro'] if ODOMETRO_OBLIGATORIO and es_3r_recycling(permisionario) else [])
+    return ['foto_bomba', 'foto_bomba_final'] + (['foto_odometro'] if odometro_obligatorio(permisionario) else [])
 
 
 AVISO_FOTO = {
@@ -121,7 +135,7 @@ AVISO_FOTO = {
     'foto_bomba_final': 'Toma la foto final de la bomba (al terminar la carga).',
     'foto_thermo': 'Toma la foto de inicio de la bomba del thermo (en 0).',
     'foto_thermo_final': 'Toma la foto final de la bomba del thermo (al terminar la carga).',
-    'foto_odometro': 'Toma la foto del odómetro (obligatoria en unidades de 3R RECYCLING).',
+    'foto_odometro': 'Toma la foto del odómetro (obligatoria en unidades de 3R TRANSPORTE).',
 }
 
 
@@ -150,15 +164,15 @@ class CapturaDatosAPIView(APIView):
             for u in Unidad.objects.filter(unidad_catalogo__isnull=False).annotate(
                 ultimo_km=Subquery(cargas_unidad.values('odometro')[:1]))
         }
-        # pide_lectura: solo las unidades de 3R RECYCLING piden km (y foto del odómetro);
-        # las de permisionarios no. A ningún thermo se le piden horas (solo litros).
+        # pide_lectura: solo las unidades de 3R RECYCLING y 3R TRANSPORTE piden km (y foto del
+        # odómetro); las de permisionarios no. A ningún thermo se le piden horas (solo litros).
         unidades = [{
             'id': u.pk,
             'nombre': u.internal_id,
             'detalle': ' · '.join(x for x in (u.license_plate or '', u.get_asset_type_display()) if x),
             'permisionario': _perm_dict(vinculos.get(u.pk)),
-            'pide_lectura': es_3r_recycling(vinculos.get(u.pk)),
-            'lectura_obligatoria': ODOMETRO_OBLIGATORIO and es_3r_recycling(vinculos.get(u.pk)),
+            'pide_lectura': pide_odometro(vinculos.get(u.pk)),
+            'lectura_obligatoria': odometro_obligatorio(vinculos.get(u.pk)),
             'fotos_obligatorias': fotos_obligatorias('unidad', vinculos.get(u.pk)),
             'ultima_lectura': float(ultimo_km[u.pk]) if ultimo_km.get(u.pk) is not None else None,
         } for u in UnidadCatalogo.objects.order_by('internal_id')]
@@ -341,10 +355,10 @@ class CapturaCargaSerializer(serializers.Serializer):
             if not data.get('unidad'):
                 raise serializers.ValidationError('Elige la unidad.')
             permisionario = _permisionario_de_unidad(data['unidad'])
-            # Solo las unidades de 3R RECYCLING llevan kilometraje; las de permisionarios no.
-            if not es_3r_recycling(permisionario):
+            # Solo las unidades de 3R RECYCLING y 3R TRANSPORTE llevan kilometraje; las de permisionarios no.
+            if not pide_odometro(permisionario):
                 data['odometro'] = None
-            elif ODOMETRO_OBLIGATORIO and data.get('odometro') is None:
+            elif odometro_obligatorio(permisionario) and data.get('odometro') is None:
                 raise serializers.ValidationError('Escribe el kilometraje de la unidad.')
         else:
             texto = normalizar_thermo(data.get('thermo_texto'))
