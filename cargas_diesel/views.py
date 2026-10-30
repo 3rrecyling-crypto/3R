@@ -221,10 +221,10 @@ def filtrar_cargas(user, params):
     elif auditoria == 'sin':
         qs = qs.filter(auditoria_estado='')
 
-    unidad = params.get('unidad')
+    unidad = (params.get('unidad') or '').strip()
     if unidad:
-        # El buscador encuentra unidades y también thermos.
-        qs = qs.filter(Q(unidad__numero_economico__icontains=unidad) | Q(thermo__identificador__icontains=unidad))
+        # La unidad o el thermo que se eligió en el buscador (combobox).
+        qs = qs.filter(Q(unidad__numero_economico__iexact=unidad) | Q(thermo__identificador__iexact=unidad))
 
     fecha_inicio = params.get('fecha_inicio')
     fecha_fin = params.get('fecha_fin')
@@ -237,16 +237,25 @@ def filtrar_cargas(user, params):
 
 
 class CargasPermisionariosAPIView(APIView):
-    """GET: opciones del filtro de permisionario del listado: los que tienen cargas en los
-    patios del usuario y si hay cargas sin permisionario."""
+    """GET: opciones de los filtros del listado: los permisionarios con cargas en los patios del
+    usuario (y si hay cargas sin permisionario) y las unidades y thermos cargados, cada uno con el
+    permisionario de su última carga (para el buscador de unidades)."""
 
     def get(self, request):
         cargas = CargaDiesel.objects.filter(patio__in=get_patios_usuario(request.user))
         nombres = cargas.exclude(permisionario_nombre='').values_list('permisionario_nombre', flat=True).distinct()
+        equipos = {}
+        for unidad, thermo, permisionario in cargas.order_by('-fecha_carga', '-pk').values_list(
+                'unidad__numero_economico', 'thermo__identificador', 'permisionario_nombre'):
+            nombre = unidad or thermo
+            if nombre and nombre.upper() not in equipos:
+                equipos[nombre.upper()] = {'nombre': nombre, 'tipo': 'thermo' if thermo and not unidad else 'unidad',
+                                           'permisionario': permisionario}
         return Response({
             'permisionarios': sorted(set(nombres), key=str.upper),
             'hay_sin_permisionario': cargas.filter(permisionario_nombre='').exists(),
             'sin_permisionario': SIN_PERMISIONARIO,
+            'equipos': sorted(equipos.values(), key=lambda e: (e['tipo'] == 'thermo', e['nombre'].upper())),
         })
 
 

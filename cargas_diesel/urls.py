@@ -1,5 +1,5 @@
 from django.urls import path
-from . import auditoria_ia, excel_cargas, ia_tablero, views, views_captura, views_config, views_tablero
+from . import auditoria_ia, excel_cargas, excel_semanal, ia_tablero, views, views_captura, views_config, views_tablero
 
 app_name = 'diesel'
 
@@ -21,6 +21,7 @@ urlpatterns = [
     path('api/cargas/', views.CargaDieselListAPIView.as_view(), name='api_cargas_lista'),
     path('api/cargas/crear/', views.CargaDieselCreateAPIView.as_view(), name='api_carga_crear'),
     path('api/cargas/excel/', excel_cargas.CargasExcelAPIView.as_view(), name='api_cargas_excel'),
+    path('api/cargas/excel-semanal/', excel_semanal.CargasSemanaExcelAPIView.as_view(), name='api_cargas_excel_semanal'),
     path('api/cargas/permisionarios/', views.CargasPermisionariosAPIView.as_view(), name='api_cargas_permisionarios'),
     path('api/cargas/auditoria/', auditoria_ia.AuditoriaCargasAPIView.as_view(), name='api_cargas_auditoria'),
 
