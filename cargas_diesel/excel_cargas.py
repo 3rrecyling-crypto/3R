@@ -4,7 +4,8 @@ Excel del listado de cargas (Next: /diesel/cargas, botón "Exportar Excel").
 Una tabla de Excel (con filtros y renglones alternados), todo centrado, con
 hipervínculos "Ver foto" a cada foto de la carga y una fila de totales.
 Usa los mismos filtros que el listado. El rendimiento solo aplica a 3R
-RECYCLING y 3R TRANSPORTE: los permisionarios son unidades ajenas.
+RECYCLING y 3R TRANSPORTE: los permisionarios son unidades ajenas. La unidad LONG STAR
+marca millas: su odómetro sale en "mi" (su rendimiento ya viene en km/L).
 La pestaña "Por permisionario" trae los totales, una tabla por permisionario y las
 compras y ajustes de diésel del periodo.
 """
@@ -16,7 +17,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import AjusteInventario, CompraCombustible, maneja_rendimiento
+from .models import AjusteInventario, CompraCombustible, maneja_rendimiento, unidad_en_millas
 from .views import SIN_PERMISIONARIO, filtrar_cargas, get_patios_usuario
 
 MAX_FILAS = 20000
@@ -197,7 +198,7 @@ class CargasExcelAPIView(APIView):
         # (título, ancho, formato numérico o None)
         columnas = [
             ('#', 6, '0'), ('Fecha', 12, None), ('Hora', 8, None), ('Tipo', 9, None), ('Unidad / Thermo', 16, None),
-            ('Permisionario', 26, None), ('Operador', 24, None), ('Patio', 20, None), ('Odómetro (km)', 15, '#,##0'),
+            ('Permisionario', 26, None), ('Operador', 24, None), ('Patio', 20, None), ('Odómetro', 15, '#,##0 "km"'),
             ('Litros diésel', 13, '#,##0.00'), ('Litros thermo', 13, '#,##0.00'), ('Total litros', 13, '#,##0.00'),
             ('Precio/L', 12, '"$"#,##0.00'), ('Costo', 15, '"$"#,##0.00'), ('Rendimiento (km/L)', 17, '0.00'),
             ('Despachador', 22, None),
@@ -242,11 +243,13 @@ class CargasExcelAPIView(APIView):
         ws.row_dimensions[enc].height = 30
 
         primera_foto = len(columnas) - len(FOTOS) - COMPLEMENTARIAS + 1
+        col_odometro = next(i for i, col in enumerate(columnas, 1) if col[0] == 'Odómetro')
         for n, c in enumerate(cargas, 1):
             r = enc + n
             local = timezone.localtime(c.fecha_carga)
             rinde = maneja_rendimiento(c.permisionario_nombre)
             thermo = c.tipo_carga == 'thermo'
+            millas = not thermo and unidad_en_millas(c.equipo)  # LONG STAR: el odómetro va en millas
             valores = [
                 n, local.strftime('%d/%m/%Y'), local.strftime('%H:%M'), 'Thermo' if thermo else 'Unidad', c.equipo,
                 c.permisionario_nombre or 'Sin permisionario', c.operador_nombre or None, c.patio.nombre,
@@ -259,7 +262,7 @@ class CargasExcelAPIView(APIView):
             for i, v in enumerate(valores, 1):
                 celda = ws.cell(row=r, column=i, value=v if v is not None else '—')
                 if columnas[i - 1][2] and v is not None:
-                    celda.number_format = columnas[i - 1][2]
+                    celda.number_format = '#,##0 "mi"' if i == col_odometro and millas else columnas[i - 1][2]
             archivos = [getattr(c, campo) for campo, _ in FOTOS]
             extras = [f.foto for f in c.fotos_complementarias.all()][:COMPLEMENTARIAS]
             archivos += extras + [None] * (COMPLEMENTARIAS - len(extras))

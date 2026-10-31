@@ -69,6 +69,16 @@ def maneja_rendimiento(nombre):
     return es_3r_nombre(nombre) or es_3r_transporte_nombre(nombre)
 
 
+KM_POR_MILLA = Decimal('1.609344')
+
+
+def unidad_en_millas(numero):
+    """La unidad LONG STAR (de 3R RECYCLING) solo tiene millas: su odómetro se captura en millas
+    (obligatorio) y el rendimiento se convierte a km/L como el de las demás."""
+    n = (numero or '').upper().replace(' ', '')
+    return 'LONGSTAR' in n or 'LONESTAR' in n
+
+
 class Permisionario(models.Model):
     """Titular del permiso de una o varias unidades. Al registrar una carga, la
     unidad elegida trae su permisionario."""
@@ -492,7 +502,10 @@ class CargaDiesel(models.Model):
         ultima = anteriores.order_by('-fecha_carga', '-pk').first()
 
         if ultima and ultima.odometro < self.odometro:
+            # LONG STAR marca millas: se pasan a km para que el rendimiento siempre sea km/L.
             km = float(self.odometro - ultima.odometro)
+            if unidad_en_millas(self.unidad.numero_economico):
+                km *= float(KM_POR_MILLA)
             return round(km / float(self.litros_diesel), 2)
         return None
 

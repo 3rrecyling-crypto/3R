@@ -22,7 +22,7 @@ from django.utils import timezone
 from django.utils.html import escape
 
 from .archivos import leer
-from .models import maneja_rendimiento
+from .models import KM_POR_MILLA, maneja_rendimiento, unidad_en_millas
 
 logger = logging.getLogger(__name__)
 
@@ -74,12 +74,16 @@ def _filas(carga):
             filas.append(('Horas del thermo', _num(carga.hrs_thermo, 1)))
         filas.append(('Litros al thermo', f'{_num(carga.litros_thermo, 2)} L'))
     else:
-        if carga.odometro is not None:  # solo las unidades de 3R llevan kilometraje
-            filas.append(('Kilometraje', f'{_num(carga.odometro)} km'))
+        millas = unidad_en_millas(carga.equipo)  # la unidad LONG STAR marca millas
+        if carga.odometro is not None:  # solo las unidades de 3R llevan odómetro
+            filas.append(('Odómetro', f'{_num(carga.odometro)} mi') if millas else ('Kilometraje', f'{_num(carga.odometro)} km'))
         filas.append(('Litros de diésel', f'{_num(carga.litros_diesel, 2)} L'))
-        # Solo 3R RECYCLING y 3R TRANSPORTE manejan rendimiento; las unidades de permisionarios son ajenas.
+        # Solo 3R RECYCLING y 3R TRANSPORTE manejan rendimiento (km/L); las unidades de permisionarios son ajenas.
         if carga.rendimiento is not None and maneja_rendimiento(carga.permisionario_nombre):
-            filas.append(('Rendimiento', f'{_num(carga.rendimiento, 2)} km/L'))
+            texto = f'{_num(carga.rendimiento, 2)} km/L'
+            if millas:
+                texto += f' ({_num(carga.rendimiento / KM_POR_MILLA, 2)} mi/L)'
+            filas.append(('Rendimiento', texto))
     # Los cinchos ya no se capturan desde el celular; solo salen si la carga los trae.
     if carga.cinchos_anteriores or carga.cinchos_actuales:
         filas += [

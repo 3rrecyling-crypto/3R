@@ -20,7 +20,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .excel_cargas import MAX_FILAS
-from .models import es_3r_nombre
+from .models import es_3r_nombre, unidad_en_millas
 from .views import filtrar_cargas
 
 APTOS, ARIAL = 'Aptos Narrow', 'Arial'
@@ -39,6 +39,7 @@ COLUMNAS = [
     ('MONTO', 14, APTOS, 'left', DINERO), ('ESTATUS', 17.375, APTOS, 'left', None),
 ]
 FECHA, CLIENTE, UNIDAD, SUMA, MONTO, ESTATUS = 0, 3, 5, 9, 12, 13  # columnas que usa la tabla dinámica
+KILOMETRAJE = 8  # la unidad LONG STAR marca millas: sus celdas dicen "mi"
 # Excel 2010+ no muestra el renglón "Valores" arriba de los encabezados de la tabla dinámica.
 SIN_RENGLON_VALORES = (
     '<extLst><ext uri="{962EF5D1-5CA2-4c93-8EF4-DBF5C05439D2}" '
@@ -246,6 +247,7 @@ class CargasSemanaExcelAPIView(APIView):
         cargas = filtrar_cargas(user, filtros).order_by('fecha_carga', 'pk')[:MAX_FILAS]
         filas = [_fila(c, semana) for c in cargas]
         precios = [float(c.precio_litro) for c in cargas]
+        millas = [c.tipo_carga != 'thermo' and unidad_en_millas(c.equipo) for c in cargas]
 
         clave = f'{semana:02d}{anio % 100:02d}'
         wb = Workbook()
@@ -254,7 +256,7 @@ class CargasSemanaExcelAPIView(APIView):
         for i, (titulo, ancho, *_resto) in enumerate(COLUMNAS, 1):
             ws.cell(row=1, column=i, value=titulo).alignment = Alignment(horizontal='left')
             ws.column_dimensions[L(i)].width = ancho
-        for r, (valores, precio) in enumerate(zip(filas, precios), 2):
+        for r, (valores, precio, en_millas) in enumerate(zip(filas, precios, millas), 2):
             valores = [*valores]
             valores[MONTO] = f'=J{r}*{precio}'
             for i, (v, (_, _, fuente, alineacion, formato)) in enumerate(zip(valores, COLUMNAS), 1):
@@ -264,7 +266,7 @@ class CargasSemanaExcelAPIView(APIView):
                 if alineacion:
                     celda.alignment = Alignment(horizontal=alineacion, vertical='center' if i - 1 == 11 else None)
                 if formato:
-                    celda.number_format = formato
+                    celda.number_format = '0.00 "mi"' if i - 1 == KILOMETRAJE and en_millas else formato
                 if i - 1 == ESTATUS:
                     celda.fill = PatternFill('solid', fgColor='FFFF00')
 
