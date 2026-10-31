@@ -59,6 +59,16 @@ def es_3r_nombre(nombre):
     return ' '.join((nombre or '').upper().split()).startswith('3R RECYCLING')
 
 
+def es_3r_transporte_nombre(nombre):
+    """¿El nombre es el de 3R TRANSPORTE (o 3R TRANSPORTES...)? Sus unidades llevan km obligatorio."""
+    return ' '.join((nombre or '').upper().split()).startswith('3R TRANSPORTE')
+
+
+def maneja_rendimiento(nombre):
+    """3R RECYCLING y 3R TRANSPORTE capturan km: sus cargas de unidad muestran rendimiento."""
+    return es_3r_nombre(nombre) or es_3r_transporte_nombre(nombre)
+
+
 class Permisionario(models.Model):
     """Titular del permiso de una o varias unidades. Al registrar una carga, la
     unidad elegida trae su permisionario."""

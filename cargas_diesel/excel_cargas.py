@@ -4,7 +4,7 @@ Excel del listado de cargas (Next: /diesel/cargas, botón "Exportar Excel").
 Una tabla de Excel (con filtros y renglones alternados), todo centrado, con
 hipervínculos "Ver foto" a cada foto de la carga y una fila de totales.
 Usa los mismos filtros que el listado. El rendimiento solo aplica a 3R
-RECYCLING: los permisionarios son unidades ajenas.
+RECYCLING y 3R TRANSPORTE: los permisionarios son unidades ajenas.
 La pestaña "Por permisionario" trae los totales, una tabla por permisionario y las
 compras y ajustes de diésel del periodo.
 """
@@ -16,7 +16,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import AjusteInventario, CompraCombustible, es_3r_nombre
+from .models import AjusteInventario, CompraCombustible, maneja_rendimiento
 from .views import SIN_PERMISIONARIO, filtrar_cargas, get_patios_usuario
 
 MAX_FILAS = 20000
@@ -245,7 +245,7 @@ class CargasExcelAPIView(APIView):
         for n, c in enumerate(cargas, 1):
             r = enc + n
             local = timezone.localtime(c.fecha_carga)
-            es3r = es_3r_nombre(c.permisionario_nombre)
+            rinde = maneja_rendimiento(c.permisionario_nombre)
             thermo = c.tipo_carga == 'thermo'
             valores = [
                 n, local.strftime('%d/%m/%Y'), local.strftime('%H:%M'), 'Thermo' if thermo else 'Unidad', c.equipo,
@@ -253,7 +253,7 @@ class CargasExcelAPIView(APIView):
                 float(c.odometro) if c.odometro is not None and not thermo else None,
                 float(c.litros_diesel), float(c.litros_thermo), float(c.litros_diesel + c.litros_thermo),
                 float(c.precio_litro) or None, float(c.costo_total),
-                float(c.rendimiento) if es3r and c.rendimiento is not None else None,
+                float(c.rendimiento) if rinde and c.rendimiento is not None else None,
                 c.usuario.get_full_name() or c.usuario.username,
             ]
             for i, v in enumerate(valores, 1):

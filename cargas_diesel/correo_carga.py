@@ -22,7 +22,7 @@ from django.utils import timezone
 from django.utils.html import escape
 
 from .archivos import leer
-from .models import es_3r_nombre
+from .models import maneja_rendimiento
 
 logger = logging.getLogger(__name__)
 
@@ -77,8 +77,8 @@ def _filas(carga):
         if carga.odometro is not None:  # solo las unidades de 3R llevan kilometraje
             filas.append(('Kilometraje', f'{_num(carga.odometro)} km'))
         filas.append(('Litros de diésel', f'{_num(carga.litros_diesel, 2)} L'))
-        # Solo la flota de 3R maneja rendimiento; las unidades de permisionarios son ajenas.
-        if carga.rendimiento is not None and es_3r_nombre(carga.permisionario_nombre):
+        # Solo 3R RECYCLING y 3R TRANSPORTE manejan rendimiento; las unidades de permisionarios son ajenas.
+        if carga.rendimiento is not None and maneja_rendimiento(carga.permisionario_nombre):
             filas.append(('Rendimiento', f'{_num(carga.rendimiento, 2)} km/L'))
     # Los cinchos ya no se capturan desde el celular; solo salen si la carga los trae.
     if carga.cinchos_anteriores or carga.cinchos_actuales:

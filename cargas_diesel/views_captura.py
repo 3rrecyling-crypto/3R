@@ -32,7 +32,7 @@ from . import archivos
 from .correo_carga import correo_invalido, programar_correo_carga, separar_correos
 from .models import (
     CargaDiesel, FotoComplementaria, Patio, PerfilUsuarioDiesel, Permisionario, PermisionarioUnidad, Thermo, Totem,
-    Unidad, es_3r_nombre,
+    Unidad, es_3r_nombre, es_3r_transporte_nombre, maneja_rendimiento,
 )
 from .views import get_patios_usuario
 
@@ -88,7 +88,7 @@ def es_3r_recycling(permisionario):
 
 def es_3r_transporte(permisionario):
     """Unidades de 3R TRANSPORTE: el kilometraje y la foto del odómetro son obligatorios."""
-    return bool(permisionario) and ' '.join(permisionario.nombre.upper().split()).startswith('3R TRANSPORTE')
+    return bool(permisionario) and es_3r_transporte_nombre(permisionario.nombre)
 
 
 # Por ahora el kilometraje y la foto del odómetro se piden en las unidades de 3R RECYCLING
@@ -287,8 +287,8 @@ def _carga_resumen(c):
         'litros': _litros(c),
         'odometro': float(c.odometro) if c.odometro is not None else None,
         'hrs_thermo': float(c.hrs_thermo),
-        # Solo la flota de 3R maneja rendimiento; las unidades de permisionarios son ajenas.
-        'rendimiento': float(c.rendimiento) if c.rendimiento is not None and es_3r_nombre(c.permisionario_nombre) else None,
+        # Solo 3R RECYCLING y 3R TRANSPORTE manejan rendimiento; las unidades de permisionarios son ajenas.
+        'rendimiento': float(c.rendimiento) if c.rendimiento is not None and maneja_rendimiento(c.permisionario_nombre) else None,
         'permisionario': c.permisionario_nombre,
         'operador': c.operador_nombre,
         'patio': c.patio.nombre,
