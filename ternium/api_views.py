@@ -9,6 +9,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction, IntegrityError
 from .models import Empresa, Material, Lugar, LineaTransporte, Operador, Unidad, Contenedor
+from cargas_diesel.models import Permisionario, PermisionarioUnidad
 from .borrado import es_staff, revisar_borrado, uso as uso_registro
 from .permiso_exportar import de_mis_empresas, puede_exportar, sin_permiso as sin_permiso_exportar
 import json
@@ -2915,7 +2916,12 @@ def api_cat_material_detail(request, pk):
     return JsonResponse({'error': 'Metodo no permitido'}, status=405)
 
 # ── UNIDADES ─────────────────────────────────────────────────────────────
-def _unidad_to_dict(u):
+def _permisionario_unidad(u):
+    """Permisionario de la unidad (captura de diésel); el vínculo vive en cargas_diesel."""
+    vinculo = PermisionarioUnidad.objects.select_related('permisionario').filter(unidad=u).first()
+    return vinculo.permisionario if vinculo else None
+
+def _unidad_to_dict(u, permisionario=None):
     return {
         'id': u.id,
         'internal_id': u.internal_id,
@@ -2943,7 +2949,25 @@ def _unidad_to_dict(u):
         'placa_remolque_2': u.placa_remolque_2 or '',
         'notes': u.notes or '',
         'empresas': _empresas_ids(u),
+        # Texto para el <select> del formulario ('' = sin permisionario).
+        'permisionario': str(permisionario.pk) if permisionario else '',
+        'permisionario_nombre': permisionario.nombre if permisionario else '',
     }
+
+def _permisionario_de_body(body):
+    """El permisionario que eligieron para la unidad: (permisionario o None, error)."""
+    pid = str(body.get('permisionario') or '')
+    if not pid:
+        return None, None
+    p = Permisionario.objects.filter(pk=pid).first() if pid.isdigit() else None
+    return (p, None) if p else (None, 'El permisionario no existe.')
+
+def _set_permisionario(u, permisionario):
+    """Una unidad tiene a lo más un permisionario; None la deja sin él."""
+    if permisionario:
+        PermisionarioUnidad.objects.update_or_create(unidad=u, defaults={'permisionario': permisionario})
+    else:
+        PermisionarioUnidad.objects.filter(unidad=u).delete()
 
 def _unidad_from_body(u, body):
     for field in ('internal_id', 'license_plate', 'make_model', 'color', 'vin',
@@ -2975,7 +2999,8 @@ def api_cat_unidades(request):
         qs = Unidad.objects.prefetch_related('empresas').all().order_by('internal_id')
         q = request.GET.get('q', '')
         if q: qs = qs.filter(Q(internal_id__icontains=q) | Q(license_plate__icontains=q))
-        return JsonResponse({'results': [_unidad_to_dict(u) for u in qs]})
+        vinculos = {v.unidad_id: v.permisionario for v in PermisionarioUnidad.objects.select_related('permisionario')}
+        return JsonResponse({'results': [_unidad_to_dict(u, vinculos.get(u.pk)) for u in qs]})
     if request.method == 'POST':
         err = _perm_catalogo(request, 'ternium.add_unidad')
         if err: return err
@@ -2986,11 +3011,16 @@ def api_cat_unidades(request):
             return JsonResponse({'error': 'El ID interno es requerido'}, status=400)
         if Unidad.objects.filter(internal_id__iexact=internal_id).exists():
             return JsonResponse({'error': 'Ya existe una unidad con ese ID'}, status=400)
+        permisionario, error = _permisionario_de_body(body)
+        if error:
+            return JsonResponse({'error': error}, status=400)
         u = Unidad(internal_id=internal_id)
         _unidad_from_body(u, body)
-        u.save()
-        _set_empresas(u, body)
-        return JsonResponse(_unidad_to_dict(u), status=201)
+        with transaction.atomic():
+            u.save()
+            _set_empresas(u, body)
+            _set_permisionario(u, permisionario)
+        return JsonResponse(_unidad_to_dict(u, permisionario), status=201)
     return JsonResponse({'error': 'Metodo no permitido'}, status=405)
 
 @csrf_exempt
@@ -3000,7 +3030,7 @@ def api_cat_unidad_detail(request, pk):
     if request.method == 'GET':
         if request.GET.get('uso') == '1':  # qué la usa (antes de eliminarla)
             return JsonResponse(uso_registro(u))
-        return JsonResponse(_unidad_to_dict(u))
+        return JsonResponse(_unidad_to_dict(u, _permisionario_unidad(u)))
     if request.method in ('PUT', 'PATCH'):
         # Editar la unidad también se hace desde el detalle de un viaje
         # (tarjetas de Unidad / SCT). Aceptamos acceso_viajes como bypass.
@@ -3008,10 +3038,17 @@ def api_cat_unidad_detail(request, pk):
         if err: return err
         body, err = _json_body(request)
         if err: return err
+        # Sin la clave 'permisionario' (p. ej. desde un viaje) el permisionario no cambia.
+        permisionario, error = _permisionario_de_body(body)
+        if error:
+            return JsonResponse({'error': error}, status=400)
         _unidad_from_body(u, body)
-        u.save()
-        _set_empresas(u, body)
-        return JsonResponse(_unidad_to_dict(u))
+        with transaction.atomic():
+            u.save()
+            _set_empresas(u, body)
+            if 'permisionario' in body:
+                _set_permisionario(u, permisionario)
+        return JsonResponse(_unidad_to_dict(u, _permisionario_unidad(u)))
     if request.method == 'DELETE':
         # Solo staff; no se borra si la usan viajes (PROTECT) y, si la usan remisiones u otros, pide confirmar.
         if not es_staff(request.user):
