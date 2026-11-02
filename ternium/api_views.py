@@ -1408,9 +1408,12 @@ def export_remisiones_to_excel(request):
         precio_archivo_val = 0.0
 
     # 2. Construir QuerySet Base
+    # Medline va siempre por inicio de carga, sin importar la preferencia del usuario.
+    es_medline = tipo_reporte == 'medline'
     queryset = _con_fecha_reporte(Remision.objects.all().select_related(
         'empresa', 'origen', 'destino', 'linea_transporte', 'operador', 'unidad', 'contenedor'
-    ).prefetch_related('detalles', 'detalles__material', 'evidencias'), request, estricta=tipo_reporte == 'medline')
+    ).prefetch_related('detalles', 'detalles__material', 'evidencias'), request,
+        'carga' if es_medline else None, estricta=es_medline)
     # Solo de las empresas autorizadas del usuario (igual que el listado)
     queryset = de_mis_empresas(request.user, queryset)
 
@@ -1476,12 +1479,9 @@ def export_remisiones_to_excel(request):
         yellow_header = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
         green_header = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
 
-        # La columna de fecha es la misma con la que se filtró el mes.
-        columna_fecha = {'carga': 'Inicia Carga', 'captura': 'Fecha Captura'}.get(
-            request.GET.get('fecha_base'), 'Inicia Descarga')
         medline_headers = [
             "Remisión", "Factura", "Origen", "Material", "Peso Carga (Kg)",
-            "Folio Carga", columna_fecha, "PRECIO", "VENTA", "BULTOS", "FOLIO"
+            "Folio Carga", "Inicia Carga", "PRECIO", "VENTA", "BULTOS", "FOLIO"
         ]
 
         def _estilo_encabezados_medline(sheet):
