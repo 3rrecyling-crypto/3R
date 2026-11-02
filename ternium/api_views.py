@@ -1328,18 +1328,23 @@ def api_remision_detalle(request, pk):
 # EXPORTS Y ACCIONES DE REMISIONES (MOVIDOS DESDE views.py)
 # =========================================================================
 
-def _con_fecha_reporte(queryset, request, fecha_base=None):
+def _con_fecha_reporte(queryset, request, fecha_base=None, estricta=False):
     """
     Agrega `fecha_reporte`: la fecha con la que se filtran, ordenan y muestran
     los reportes de Excel. El usuario la elige en Opciones de Descarga
     (fecha_base), salvo que el reporte la fije con el argumento fecha_base:
       - 'descarga' (por defecto): día de INICIO DE DESCARGA (en hora local); si
         la remisión no lo tiene, se usa la fecha de captura.
+      - 'carga': igual, con el día de INICIO DE CARGA.
       - 'captura': fecha de captura del folio.
+    Con estricta=True (Medline) no se usa la de captura como respaldo: sin la
+    fecha elegida `fecha_reporte` queda vacía y la remisión no entra al filtrar.
     """
-    if (fecha_base or request.GET.get('fecha_base')) == 'captura':
+    base = fecha_base or request.GET.get('fecha_base')
+    if base == 'captura':
         return queryset.annotate(fecha_reporte=F('fecha'))
-    return queryset.annotate(fecha_reporte=Coalesce(TruncDate('inicia_dlv'), 'fecha'))
+    fecha = TruncDate('inicia_ld' if base == 'carga' else 'inicia_dlv')
+    return queryset.annotate(fecha_reporte=fecha if estricta else Coalesce(fecha, 'fecha'))
 
 
 def _clave_folio(remision):
@@ -1405,7 +1410,7 @@ def export_remisiones_to_excel(request):
     # 2. Construir QuerySet Base
     queryset = _con_fecha_reporte(Remision.objects.all().select_related(
         'empresa', 'origen', 'destino', 'linea_transporte', 'operador', 'unidad', 'contenedor'
-    ).prefetch_related('detalles', 'detalles__material', 'evidencias'), request)
+    ).prefetch_related('detalles', 'detalles__material', 'evidencias'), request, estricta=tipo_reporte == 'medline')
     # Solo de las empresas autorizadas del usuario (igual que el listado)
     queryset = de_mis_empresas(request.user, queryset)
 
@@ -1415,20 +1420,20 @@ def export_remisiones_to_excel(request):
     if tipo_reporte == 'medline':
         queryset = queryset.filter(origen__nombre__icontains='MEDLINE')
 
-        if mes_medline:
-            try:
-                year, month = mes_medline.split('-')
-                queryset = queryset.filter(fecha_reporte__year=year, fecha_reporte__month=month)
-            except ValueError:
-                pass
+        # El reporte es de un solo mes: sin mes válido traería todos.
+        try:
+            year, month = mes_medline.split('-')
+            queryset = queryset.filter(fecha_reporte__year=year, fecha_reporte__month=month)
+        except ValueError:
+            return HttpResponse("Elige el mes a reportar.", status=400)
 
-            PrecioMedline.objects.update_or_create(
-                mes=mes_medline,
-                defaults={
-                    'precio_carton': precio_carton_val,
-                    'precio_archivo': precio_archivo_val
-                }
-            )
+        PrecioMedline.objects.update_or_create(
+            mes=mes_medline,
+            defaults={
+                'precio_carton': precio_carton_val,
+                'precio_archivo': precio_archivo_val
+            }
+        )
 
     # =========================================================================
     # TODOS LOS DEMÁS REPORTES: aplican filtros generales normalmente
@@ -1471,9 +1476,12 @@ def export_remisiones_to_excel(request):
         yellow_header = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
         green_header = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
 
+        # La columna de fecha es la misma con la que se filtró el mes.
+        columna_fecha = {'carga': 'Inicia Carga', 'captura': 'Fecha Captura'}.get(
+            request.GET.get('fecha_base'), 'Inicia Descarga')
         medline_headers = [
             "Remisión", "Factura", "Origen", "Material", "Peso Carga (Kg)",
-            "Folio Carga", "Inicia Carga", "PRECIO", "VENTA", "BULTOS", "FOLIO"
+            "Folio Carga", columna_fecha, "PRECIO", "VENTA", "BULTOS", "FOLIO"
         ]
 
         def _estilo_encabezados_medline(sheet):
@@ -1493,8 +1501,7 @@ def export_remisiones_to_excel(request):
             total_peso = 0.0
             total_venta = 0.0
             for remision in queryset:
-                val_inicia = timezone.localtime(remision.inicia_ld).date() if remision.inicia_ld else remision.fecha
-                fecha_str = val_inicia.strftime("%d/%m/%Y") if val_inicia else ""
+                fecha_str = remision.fecha_reporte.strftime("%d/%m/%Y") if remision.fecha_reporte else ""
                 for d in remision.detalles.all():
                     mat_nom = d.material.nombre.upper() if d.material else "CARTON"
                     es_archivo = "ARCHIVO" in mat_nom
@@ -1992,7 +1999,7 @@ def export_reportes_especificos(request):
         return HttpResponse("Tipo de reporte no válido.", status=400)
 
     # 3. Aplicar Filtro Dinámico de Fechas
-    # Por la fecha que eligió el usuario (inicio de descarga o captura), ver _con_fecha_reporte.
+    # Por la fecha que eligió el usuario (inicio de descarga, inicio de carga o captura), ver _con_fecha_reporte.
     # PROBOCA va siempre por la fecha normal de captura del folio, sin importar esa preferencia.
     queryset = _con_fecha_reporte(queryset, request, 'captura' if tipo_reporte == 'proboca' else None)
     if tipo_filtro == 'mes' and mes_req:

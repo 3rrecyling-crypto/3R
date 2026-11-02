@@ -298,8 +298,8 @@ def guardado_de(perfil):
 
 # ── Opciones de descarga de Excel (HTML "Opciones de Descarga" y Next) ──────
 ORDENES_FOLIO = ('asc', 'desc')
-# Fecha con la que se filtran los reportes: inicio de descarga (por defecto) o captura del folio.
-FECHAS_BASE = ('descarga', 'captura')
+# Fecha con la que se filtran los reportes: inicio de descarga (por defecto), inicio de carga o captura del folio.
+FECHAS_BASE = ('descarga', 'carga', 'captura')
 
 
 def empresas_para_descarga(usuario):
@@ -330,7 +330,7 @@ def _limpiar_descarga(datos, empresas_validas):
 def opciones_descarga_de(usuario, empresas_validas):
     """Lo último que el usuario eligió en el diálogo de descarga.
 
-    Devuelve {'orden_folio': 'asc'|'desc'|'', 'fecha_base': 'descarga'|'captura',
+    Devuelve {'orden_folio': 'asc'|'desc'|'', 'fecha_base': 'descarga'|'carga'|'captura',
     'unidad_negocio': '<id>'|''}. Una empresa que ya no está en
     empresas_validas (ids) se descarta.
     """

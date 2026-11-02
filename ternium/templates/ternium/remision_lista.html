@@ -725,6 +725,7 @@
                       <label for="descargaFechaBase" class="small fw-bold text-muted"><i class="fas fa-calendar-alt me-1"></i>Filtrar y mostrar fechas por</label>
                       <select id="descargaFechaBase" class="form-select form-select-sm" onchange="guardarOpcionesDescarga()">
                           <option value="descarga">Inicio de descarga</option>
+                          <option value="carga" {% if opciones_descarga.fecha_base == 'carga' %}selected{% endif %}>Inicio de carga</option>
                           <option value="captura" {% if opciones_descarga.fecha_base == 'captura' %}selected{% endif %}>Captura del folio</option>
                       </select>
                   </div>
@@ -745,7 +746,7 @@
                   <span class="chip"><i class="fas fa-filter"></i></span>
                   <div>
                       <h6>Reportes de la lista</h6>
-                      <small>Usan los filtros que tienes aplicados. Fechas por <strong id="textoFechaBase">{% if opciones_descarga.fecha_base == 'captura' %}captura del folio{% else %}inicio de descarga{% endif %}</strong>.</small>
+                      <small>Usan los filtros que tienes aplicados. Fechas por <strong class="textoFechaBase">{% if opciones_descarga.fecha_base == 'captura' %}captura del folio{% elif opciones_descarga.fecha_base == 'carga' %}inicio de carga{% else %}inicio de descarga{% endif %}</strong>.</small>
                   </div>
               </div>
               <div class="row g-2 g-lg-3">
@@ -802,7 +803,7 @@
                           <h6 class="fw-bold mb-0"><i class="fas fa-cog me-2"></i>Reporte Medline (Cartón + Archivo Muerto)</h6>
                       </div>
                       <div class="card-body">
-                          <p class="small text-muted mb-3">Se genera un Excel con dos pestañas: <strong>Cartón</strong> y <strong>Archivo Muerto</strong>, cada una con su propio precio por kilo.</p>
+                          <p class="small text-muted mb-3">Se genera un Excel con dos pestañas: <strong>Cartón</strong> y <strong>Archivo Muerto</strong>, cada una con su propio precio por kilo. Solo trae el mes elegido, por <strong class="textoFechaBase">{% if opciones_descarga.fecha_base == 'captura' %}captura del folio{% elif opciones_descarga.fecha_base == 'carga' %}inicio de carga{% else %}inicio de descarga{% endif %}</strong>.</p>
                           <div class="row g-2 align-items-end">
                               <div class="col-md-3">
                                   <label class="small fw-bold text-muted">Mes a Reportar</label>
@@ -1583,7 +1584,7 @@ $(document).ready(function() {
     actualizar();
 })();
 
-// --- FECHA (inicio de descarga / captura) Y ORDEN DE FOLIOS: aplican a todos los reportes ---
+// --- FECHA (inicio de descarga / inicio de carga / captura) Y ORDEN DE FOLIOS: aplican a todos los reportes ---
 function opcionesDescarga() {
     return `&fecha_base=${encodeURIComponent($('#descargaFechaBase').val() || '')}`
         + `&orden_folio=${encodeURIComponent($('#descargaOrdenFolio').val() || '')}`;
@@ -1611,7 +1612,7 @@ function descargarReporteEmpresa() {
 // Se guardan en el perfil del usuario: la próxima vez (aquí o en Next) ya vienen elegidas.
 function guardarOpcionesDescarga() {
     const aviso = $('#avisoOpcionesDescarga');
-    $('#textoFechaBase').text($('#descargaFechaBase').val() === 'captura' ? 'captura del folio' : 'inicio de descarga');
+    $('.textoFechaBase').text($('#descargaFechaBase option:selected').text().toLowerCase());
     const csrfToken = document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] || '';
     fetch("{% url 'api_opciones_descarga' %}", {
         method: 'POST',
@@ -1665,6 +1666,10 @@ function descargarMedlineCompleto() {
     const mes = $('#mesMedline').val();
     const precioCarton = $('#precioMedlineCarton').val();
     const precioArchivo = $('#precioMedlineArchivo').val();
+    if (!mes) {
+        alert("Selecciona el mes a reportar.");
+        return;
+    }
     // Se piden los dos: si uno viaja vacío, el backend deja AMBOS en 0.00 (el
     // float() de los dos precios comparte un mismo try/except).
     if (!precioCarton || !precioArchivo) {
