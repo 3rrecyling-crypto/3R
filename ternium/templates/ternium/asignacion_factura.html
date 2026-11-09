@@ -44,7 +44,7 @@
     .af-dato span { font-weight: 700; color: #0f172a; word-break: break-word; }
     .af-toast { position: fixed; bottom: 24px; right: 24px; z-index: 2100; display: none; }
     /* Las ventanas van por encima de la barra superior fija de la base. */
-    #af-modal, #af-fact-modal, #af-zip { z-index: 2000 !important; --bs-modal-margin: 5.5rem; }
+    #af-modal, #af-fact-modal, #af-zip, #af-lote { z-index: 2000 !important; --bs-modal-margin: 5.5rem; }
     .af-folio { display: flex; align-items: center; gap: .75rem; width: 100%; padding: .45rem .75rem; border: 0; border-bottom: 1px solid #f1f5f9;
                 background: transparent; text-align: left; font-size: .86rem; }
     .af-folio:hover { background: #f8fafc; } .af-folio.activo { background: #f0fdfa; }
@@ -193,6 +193,8 @@
                         title="Excel con el detalle de cada concepto y el desglose de cada factura (con los filtros)"><i class="fas fa-file-excel me-1"></i>Reporte</button>
                     <button type="button" class="btn btn-outline-primary fw-bold" id="af-f-zip"
                         title="Descargar en un ZIP los XML guardados, por fecha de timbrado"><i class="fas fa-file-zipper me-1"></i>XML (ZIP)</button>
+                    <button type="button" class="btn btn-outline-success fw-bold" id="af-f-masiva"
+                        title="Dar de alta varias facturas a la vez subiendo sus XML"><i class="fas fa-layer-group me-1"></i>Carga masiva (XML)</button>
                     <button type="button" class="btn btn-success fw-bold px-4" id="af-f-alta"><i class="fas fa-plus me-1"></i>Alta de factura</button>
                 </div>
             </div>
@@ -375,6 +377,51 @@
     </div>
 </div>
 
+<!-- Carga masiva: varios XML a la vez, revisión y alta de las elegidas -->
+<div class="modal fade" id="af-lote" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:16px">
+            <div class="modal-header text-white" style="background:linear-gradient(90deg,#1e293b,#115e59)">
+                <h5 class="modal-title fw-bold"><i class="fas fa-layer-group me-2"></i>Carga masiva de facturas (XML)</h5>
+                <button type="button" class="btn-close btn-close-white" id="af-lote-x" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <input type="file" id="af-lote-archivos" accept=".xml,text/xml,application/xml" multiple class="d-none">
+                <div id="af-lote-zona" class="af-xml-zona flex-column text-center py-5" role="button" tabindex="0">
+                    <span class="af-xml-icono" style="width:56px;height:56px;font-size:1.4rem"><i class="fas fa-layer-group" id="af-lote-zona-icono"></i></span>
+                    <div class="fw-bold fs-6" id="af-lote-zona-titulo">Selecciona o arrastra aquí los XML de las facturas (hasta 50)</div>
+                    <div class="small text-muted" style="max-width:680px">De cada XML salen el número, la fecha, el cliente y los importes, y se ligan los folios que vengan en la descripción. Antes de guardar ves la lista y eliges cuáles dar de alta. Las que no traigan folios se dan de alta sin folios y los ligas después.</div>
+                </div>
+                <div id="af-lote-revision" class="d-none">
+                    <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-2">
+                        <div class="d-flex flex-wrap gap-2 small fw-bold" id="af-lote-conteos"></div>
+                        <div style="width:300px">
+                            <label class="form-label small fw-bold text-muted mb-1" for="af-lote-empresa">Unidad de negocio de las facturas sin folios</label>
+                            <select id="af-lote-empresa" class="form-select af-combo" data-placeholder="Elige…"><option value="">Elige…</option></select>
+                        </div>
+                    </div>
+                    <div class="small fw-bold mb-2 d-none" id="af-lote-aviso" style="color:#92400e"></div>
+                    <div class="table-responsive border rounded-3">
+                        <table class="table table-sm align-top mb-0" style="font-size:.86rem">
+                            <thead class="table-light"><tr><th></th><th>Archivo</th><th>Factura</th><th>Total</th><th>Unidad de negocio</th><th>Folios en el XML</th><th>Estado</th></tr></thead>
+                            <tbody id="af-lote-filas"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="text-danger fw-bold small mt-2" id="af-lote-error"></div>
+            </div>
+            <div class="modal-footer justify-content-between">
+                <span class="small text-muted">Cada factura toma su número de captura (3R-F-…) al darse de alta.</span>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary fw-bold d-none" id="af-lote-cambiar"><i class="fas fa-upload me-1"></i>Cambiar archivos</button>
+                    <button type="button" class="btn btn-outline-secondary" id="af-lote-cerrar">Cancelar</button>
+                    <button type="button" class="btn btn-success fw-bold d-none" id="af-lote-guardar"><i class="fas fa-check me-1"></i><span>Dar de alta</span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Ventana con los datos de la remisión -->
 <div class="modal fade" id="af-modal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -407,7 +454,7 @@
     const $ = (id) => document.getElementById(id);
     const jq = window.jQuery;  // aquí `$` es getElementById
     // Las ventanas van directo en <body> para que no queden debajo de la barra superior.
-    ['af-modal', 'af-fact-modal', 'af-zip'].forEach(id => document.body.appendChild($(id)));
+    ['af-modal', 'af-fact-modal', 'af-zip', 'af-lote'].forEach(id => document.body.appendChild($(id)));
 
     // Todos los filtros son combobox con buscador (Select2). Los cambios se escuchan con jQuery
     // (Select2 avisa con su 'change'); al poner un valor desde el código se usa fijar().
@@ -953,7 +1000,12 @@
     zona.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('af-xml-archivo').click(); } });
     zona.addEventListener('dragover', (e) => { e.preventDefault(); zona.classList.add('arrastrando'); });
     zona.addEventListener('dragleave', () => zona.classList.remove('arrastrando'));
-    zona.addEventListener('drop', (e) => { e.preventDefault(); zona.classList.remove('arrastrando'); leerXml(e.dataTransfer.files[0]); });
+    zona.addEventListener('drop', (e) => {
+        e.preventDefault(); zona.classList.remove('arrastrando');
+        const n = e.dataTransfer.files.length;
+        if (n > 1) { $('af-ff-error').textContent = `Soltaste ${n} XML. Para darlos de alta juntos usa “Carga masiva (XML)”.`; return; }
+        leerXml(e.dataTransfer.files[0]);
+    });
     $('af-xml-archivo').addEventListener('change', (e) => { leerXml(e.target.files[0]); e.target.value = ''; });
     $('af-xml-cambiar').addEventListener('click', () => $('af-xml-archivo').click());
     $('af-xml-quitar').addEventListener('click', () => { lectura = null; xmlArchivo = null; pintarXml(); });
@@ -1042,6 +1094,137 @@
             aviso(`${facturaEditando ? '' : 'Captura ' + d.captura + ' · '}Factura ${d.numero}: ${d.num_folios} folio(s) ligados · ${dinero(d.total, d.moneda)}.`);
             cargarFacturas(); cargar();
         } catch (e) { $('af-ff-error').textContent = e.message; }
+    });
+
+    // ── Carga masiva: varios XML, revisión (revisar-lote, no guarda) y alta de las elegidas una por una,
+    //    cada una con su número de captura. Las que no traen folios se dan de alta sin folios. ──
+    const MAX_LOTE = 50;
+    let modalLote = null, lote = null, loteArchivos = [], loteGuardando = false;
+    const empresasLote = () => [...$('af-empresa').options].filter(o => o.value).map(o => ({ id: o.value, nombre: o.text }));
+    // Folios de dos unidades con el mismo número de folios: no se adivina, se elige en el renglón
+    const loteEmpate = (x) => x.ligar.length > 0 && !x.empresa_sugerida;
+    const loteEmpresaDe = (x) => x.empresa || (loteEmpate(x) ? '' : $('af-lote-empresa').value);
+    const lotePendiente = (x) => x.incluir && !x.error && !(x.resultado && x.resultado.ok);
+
+    function abrirLote() {
+        lote = null; loteArchivos = [];
+        $('af-lote-error').textContent = '';
+        const sel = $('af-lote-empresa');
+        if (sel.options.length === 1) empresasLote().forEach(e => sel.add(new Option(e.nombre, e.id)));
+        if (!sel.value && sel.options.length === 2) fijar('af-lote-empresa', sel.options[1].value);
+        pintarLote();
+        modalLote = modalLote || new bootstrap.Modal($('af-lote')); modalLote.show();
+    }
+    function pintarLote() {
+        const hay = !!lote;
+        $('af-lote-zona').classList.toggle('d-none', hay);
+        $('af-lote-revision').classList.toggle('d-none', !hay);
+        $('af-lote-cambiar').classList.toggle('d-none', !hay);
+        $('af-lote-guardar').classList.toggle('d-none', !hay);
+        $('af-lote-cerrar').disabled = $('af-lote-x').disabled = $('af-lote-cambiar').disabled = loteGuardando;
+        if (!hay) { $('af-lote-cerrar').textContent = 'Cancelar'; return; }
+        const empresas = empresasLote(), general = $('af-lote-empresa').value;
+        const nombreGeneral = (empresas.find(e => e.id === general) || {}).nombre;
+        const porGuardar = lote.filter(x => lotePendiente(x) && loteEmpresaDe(x)).length;
+        const sinEmpresa = lote.filter(x => lotePendiente(x) && !loteEmpresaDe(x)).length;
+        const conError = lote.filter(x => x.error).length, guardadas = lote.filter(x => x.resultado && x.resultado.ok).length;
+        $('af-lote-conteos').innerHTML = `<span class="badge text-bg-light border">${lote.length} archivo(s)</span>
+            <span class="badge" style="background:#ccfbf1;color:#115e59">${porGuardar} por dar de alta</span>
+            ${guardadas ? `<span class="badge text-bg-success">${guardadas} dadas de alta</span>` : ''}
+            ${conError ? `<span class="badge" style="background:#ffe4e6;color:#9f1239">${conError} no se pueden dar de alta</span>` : ''}`;
+        $('af-lote-aviso').classList.toggle('d-none', !sinEmpresa);
+        $('af-lote-aviso').innerHTML = `<i class="fas fa-circle-exclamation me-1"></i>${sinEmpresa} factura(s) sin unidad de negocio: elige la general (para las que no traen folios) o la de cada renglón.`;
+        $('af-lote-filas').innerHTML = lote.map((x, i) => {
+            const bloqueada = !!x.error || !!(x.resultado && x.resultado.ok) || loteGuardando;
+            // Folio de otra unidad de negocio que la de la factura: se dice cuál
+            const deOtra = (f) => f.estado === 'ligar' && f.empresa_id != null && String(f.empresa_id) !== loteEmpresaDe(x);
+            const folios = x.error ? '' : (!x.folios.length ? '<small class="text-muted">Sin folios: se da de alta sin folios</small>'
+                : x.folios.map(f => `<span class="af-xf ${f.estado === 'ligar' ? 'ligado' : f.estado === 'no_existe' ? 'no' : 'ocupado'} d-inline-block mb-1" title="${esc(f.texto + (f.empresa ? ' · ' + f.empresa : ''))}">${f.estado === 'ligar' ? '<i class="fas fa-check me-1"></i>' : ''}${esc(f.folio)}${deOtra(f) ? ' · ' + esc(f.empresa) : ''}${f.estado === 'ligar' ? '' : ' · ' + esc(f.texto)}</span>`).join(' '))
+                + (x.empresas_folios && x.empresas_folios.length > 1
+                    ? `<small class="d-block fw-bold mt-1" style="color:#0369a1">Folios de ${x.empresas_folios.length} unidades (${x.empresas_folios.map(e => esc(e.nombre) + ' ' + e.folios).join(' · ')}): se ligan todos y la factura queda en la que elijas.</small>` : '');
+            const estado = x.error ? `<span class="text-danger"><i class="fas fa-circle-xmark me-1"></i>${esc(x.error)}</span>`
+                : x.resultado ? `<span class="${x.resultado.ok ? 'text-success' : 'text-danger'}"><i class="fas ${x.resultado.ok ? 'fa-circle-check' : 'fa-circle-xmark'} me-1"></i>${esc(x.resultado.texto)}</span>`
+                : !x.incluir ? '<span class="text-muted">No se dará de alta</span>'
+                : !loteEmpresaDe(x) ? `<span style="color:#92400e"><i class="fas fa-circle-exclamation me-1"></i>${loteEmpate(x) ? `Sus folios son de ${x.empresas_folios.length} unidades con los mismos folios: elige en cuál queda la factura` : 'Elige la unidad de negocio'}</span>`
+                : '<span style="color:#0f766e">Lista para dar de alta</span>';
+            const empresa = x.error ? '' : `<select class="form-select form-select-sm af-lote-emp" data-i="${i}" ${bloqueada ? 'disabled' : ''} style="min-width:170px" aria-label="Unidad de negocio">
+                <option value="">${!loteEmpate(x) && nombreGeneral ? esc(nombreGeneral) + ' (la general)' : 'Elige…'}</option>
+                ${empresas.map(e => `<option value="${esc(e.id)}" ${x.empresa === e.id ? 'selected' : ''}>${esc(e.nombre)}</option>`).join('')}</select>`;
+            return `<tr class="${x.error || !x.incluir ? 'opacity-50' : ''}">
+                <td><input type="checkbox" class="form-check-input af-lote-incluir" data-i="${i}" ${x.incluir && !x.error ? 'checked' : ''} ${bloqueada ? 'disabled' : ''} aria-label="Dar de alta ${esc(x.archivo)}"></td>
+                <td class="small text-muted text-break" style="max-width:180px">${esc(x.archivo)}</td>
+                <td>${x.numero ? `<b>${esc(x.numero)}</b><small class="d-block text-muted">${fecha(x.fecha)}${x.cliente ? ' · ' + esc(x.cliente) : ''}</small>` : '—'}</td>
+                <td class="fw-bold text-nowrap">${x.total ? dinero(x.total, x.moneda) : '—'}</td>
+                <td>${empresa}</td>
+                <td style="max-width:320px">${folios}</td>
+                <td class="small fw-bold" style="max-width:260px">${estado}</td></tr>`;
+        }).join('');
+        const b = $('af-lote-guardar');
+        b.disabled = loteGuardando || !porGuardar;
+        b.innerHTML = loteGuardando ? '<i class="fas fa-spinner fa-spin me-1"></i>Dando de alta…' : `<i class="fas fa-check me-1"></i>Dar de alta ${porGuardar} factura(s)`;
+        $('af-lote-cerrar').textContent = guardadas ? 'Cerrar' : 'Cancelar';
+    }
+    async function revisarLote(lista) {
+        const archivos = [...(lista || [])];
+        if (!archivos.length) return;
+        $('af-lote-error').textContent = '';
+        if (archivos.length > MAX_LOTE) { $('af-lote-error').textContent = `Son ${archivos.length} archivos: sube máximo ${MAX_LOTE} a la vez.`; return; }
+        $('af-lote-zona-titulo').textContent = 'Leyendo los XML…'; $('af-lote-zona-icono').className = 'fas fa-spinner fa-spin';
+        $('af-lote-cambiar').disabled = true;
+        try {
+            const fd = new FormData(); archivos.forEach(a => fd.append('xml', a));
+            const r = await fetch(FAPI + 'revisar-lote/', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': CSRF }, body: fd });
+            const d = await r.json(); if (!r.ok) throw new Error(d.detail || 'Error ' + r.status);
+            const validas = new Set(empresasLote().map(e => e.id));
+            loteArchivos = archivos;
+            lote = d.resultados.map(x => ({ ...x, incluir: !x.error,
+                empresa: x.empresa_sugerida && validas.has(String(x.empresa_sugerida)) ? String(x.empresa_sugerida) : '' }));
+        } catch (e) { $('af-lote-error').textContent = e.message; }
+        finally {
+            $('af-lote-zona-titulo').textContent = `Selecciona o arrastra aquí los XML de las facturas (hasta ${MAX_LOTE})`;
+            $('af-lote-zona-icono').className = 'fas fa-layer-group';
+            pintarLote();
+        }
+    }
+    async function guardarLote() {
+        if (!lote || loteGuardando) return;
+        loteGuardando = true; $('af-lote-error').textContent = ''; pintarLote();
+        let ok = 0, mal = 0;
+        for (let i = 0; i < lote.length; i++) {
+            const x = lote[i];
+            if (!lotePendiente(x) || !loteEmpresaDe(x)) continue;
+            const fd = new FormData();
+            fd.append('datos', JSON.stringify({ empresa: loteEmpresaDe(x), remisiones: x.ligar, notas: '' }));
+            fd.append('xml', loteArchivos[i]);
+            try {
+                const r = await fetch(FAPI, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': CSRF }, body: fd });
+                const d = await r.json(); if (!r.ok) throw new Error(d.detail || 'Error ' + r.status);
+                x.resultado = { ok: true, texto: `${d.captura} · ${d.num_folios} folio(s)` }; ok++;
+            } catch (e) { x.resultado = { ok: false, texto: e.message }; mal++; }
+            pintarLote();
+        }
+        loteGuardando = false; pintarLote();
+        if (ok) { cargarFacturas(); cargar(); }
+        aviso(`${ok} factura(s) dadas de alta${mal ? ` · ${mal} con error (revisa la lista)` : ''}.`, mal === 0);
+    }
+    $('af-f-masiva').addEventListener('click', abrirLote);
+    const zonaLote = $('af-lote-zona');
+    zonaLote.addEventListener('click', () => $('af-lote-archivos').click());
+    zonaLote.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('af-lote-archivos').click(); } });
+    zonaLote.addEventListener('dragover', (e) => { e.preventDefault(); zonaLote.classList.add('arrastrando'); });
+    zonaLote.addEventListener('dragleave', () => zonaLote.classList.remove('arrastrando'));
+    zonaLote.addEventListener('drop', (e) => { e.preventDefault(); zonaLote.classList.remove('arrastrando'); revisarLote(e.dataTransfer.files); });
+    $('af-lote-archivos').addEventListener('change', (e) => { revisarLote(e.target.files); e.target.value = ''; });
+    $('af-lote-cambiar').addEventListener('click', () => $('af-lote-archivos').click());
+    $('af-lote-guardar').addEventListener('click', guardarLote);
+    ['af-lote-cerrar', 'af-lote-x'].forEach(id => $(id).addEventListener('click', () => { if (!loteGuardando) modalLote.hide(); }));
+    alCambiar('af-lote-empresa', () => pintarLote());
+    $('af-lote-filas').addEventListener('change', (e) => {
+        const t = e.target, i = Number(t.dataset.i);
+        if (!lote || !lote[i]) return;
+        if (t.classList.contains('af-lote-incluir')) lote[i].incluir = t.checked;
+        else if (t.classList.contains('af-lote-emp')) lote[i].empresa = t.value;
+        pintarLote();
     });
 
     cargar();

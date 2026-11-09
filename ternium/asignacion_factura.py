@@ -21,12 +21,17 @@ Factura" del formulario de remisiones), con quién y cuándo, por UPDATE directo
 no recalcular el estatus ni tocar remisiones auditadas. Reporte detallado en Excel:
 ternium/reporte_facturas.py.
 
+Carga masiva: se suben varios XML a la vez (api_revisar_lote los revisa sin guardar) y
+cada factura elegida se da de alta con el mismo POST del alta normal, una por una. Las
+que no traen folios se dan de alta sin folios y se ligan después a mano.
+
 Permiso: ternium.acceso_asignacion_factura (Permisos de usuario › Asignación de Factura).
 """
 import datetime as dt
 import json
 import re
 import secrets
+from collections import Counter
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from functools import wraps
 
@@ -827,6 +832,109 @@ def api_leer_xml(request):
         'empresa_sugerida': max(set(empresas), key=empresas.count) if empresas else None,
         'ya_registrada': {'id': ya.pk, 'numero': ya.numero} if ya else None,
     })
+
+
+MAX_LOTE = 50
+
+
+def _revisar_xml(user, archivo, uuids, numeros, tomados):
+    """Revisión de un XML de la carga masiva (no guarda nada). uuids y numeros: lo que ya trae el lote
+    ({uuid o número: archivo}); tomados: {remisión id: número de factura} de los folios ya propuestos a
+    otro XML del lote. Devuelve la fila con 'error' si no se puede dar de alta."""
+    fila = {'archivo': archivo.name, 'error': '', 'numero': '', 'fecha': None, 'cliente': '', 'total': 0,
+            'moneda': 'MXN', 'uuid': '', 'empresa_sugerida': None, 'empresas_folios': [], 'folios': [], 'ligar': []}
+    if not archivo.name.lower().endswith('.xml'):
+        fila['error'] = 'No es un archivo .xml.'
+        return fila
+    try:
+        cfdi = leer_cfdi(archivo.read())
+    except ErrorCFDI as e:
+        fila['error'] = str(e)
+        return fila
+    numero, uuid = _mayusculas(cfdi['numero_sugerido']), (cfdi['uuid'] or '').upper()
+    fila.update({'numero': numero, 'fecha': cfdi['fecha'], 'cliente': _mayusculas(cfdi['receptor']['nombre'], 200),
+                 'total': cfdi['total'], 'moneda': cfdi['moneda'] if cfdi['moneda'] in dict(FacturaRemision.MONEDAS) else 'MXN',
+                 'uuid': uuid})
+    ya = FacturaRemision.objects.filter(uuid__iexact=uuid).first() if uuid else None
+    if cfdi['tipo_comprobante'] in ('P', 'T') or cfdi['total'] <= 0:
+        fila['error'] = 'No es una factura con importe (parece un complemento de pago o un traslado).'
+    elif not numero:
+        fila['error'] = 'El XML no trae número de factura.'
+    elif ya:
+        fila['error'] = f'Ya está dada de alta: factura {ya.numero} ({ya.numero_captura}).'
+    elif uuid and uuid in uuids:
+        fila['error'] = f'Es el mismo XML que {uuids[uuid]}.'
+    elif FacturaRemision.objects.filter(numero__iexact=numero).exists():
+        fila['error'] = f'Ya existe la factura {numero}.'
+    elif numero in numeros:
+        fila['error'] = f'El número {numero} se repite con {numeros[numero]}.'
+    if fila['error']:
+        return fila
+    if uuid:
+        uuids[uuid] = archivo.name
+    numeros[numero] = archivo.name
+
+    # Folios escritos en la descripción: como en el alta de una sola factura, se liga el que esté libre
+    # (primero de la unidad de negocio con más folios libres). Un folio que ya se propuso a otro XML del
+    # lote no se repite. Se pueden ligar folios de varias unidades de negocio del usuario.
+    coincidencias = _buscar_folios(user, cfdi['folios_detectados'])
+    preferida = _mayoria(r['empresa_id'] for c in coincidencias for r in c['remisiones']
+                         if r['libre'] and r['id'] not in tomados)
+    for c in coincidencias:
+        libres = [r for r in c['remisiones'] if r['libre'] and r['id'] not in tomados]
+        elegida = next((r for r in libres if r['empresa_id'] == preferida), None) or (libres[0] if libres else None)
+        if elegida:
+            tomados[elegida['id']] = numero
+            fila['ligar'].append(elegida['id'])
+            fila['folios'].append({'folio': c['folio'], 'estado': 'ligar', 'remision': elegida['remision'],
+                                   'empresa_id': elegida['empresa_id'], 'empresa': elegida['empresa'], 'texto': 'Se liga'})
+            continue
+        ocupada = next((r for r in c['remisiones'] if not r['libre']), None)
+        en_lote = next((r for r in c['remisiones'] if r['id'] in tomados), None)
+        if en_lote:
+            estado, texto = 'lote', f'Va en la factura {tomados[en_lote["id"]]} de este lote'
+        elif ocupada:
+            estado, texto = 'ocupado', f'Ya tiene factura {ocupada["factura"]}'
+        else:
+            estado, texto = 'no_existe', 'No existe en el sistema'
+        fila['folios'].append({'folio': c['folio'], 'estado': estado, 'remision': '', 'empresa_id': None,
+                               'empresa': '', 'texto': texto})
+
+    # Unidad de negocio de la factura: la que tiene más de los folios que se ligan. Si empatan dos, no se
+    # adivina (empresa_sugerida None con folios por ligar: el usuario la elige en el renglón). Sin folios
+    # por ligar tampoco se sugiere: se usa la unidad general que elija el usuario.
+    ligados = [x for x in fila['folios'] if x['estado'] == 'ligar']
+    fila['empresa_sugerida'] = _mayoria(x['empresa_id'] for x in ligados)
+    por_empresa = {}
+    for x in ligados:
+        por_empresa.setdefault(x['empresa_id'], {'id': x['empresa_id'], 'nombre': x['empresa'], 'folios': 0})['folios'] += 1
+    fila['empresas_folios'] = sorted(por_empresa.values(), key=lambda e: (-e['folios'], e['nombre']))
+    return fila
+
+
+def _mayoria(valores):
+    """El valor que más se repite; None si no hay valores o si empatan los primeros."""
+    primeros = Counter(valores).most_common(2)
+    if not primeros or (len(primeros) == 2 and primeros[0][1] == primeros[1][1]):
+        return None
+    return primeros[0][0]
+
+
+@require_http_methods(['POST'])
+@_api
+def api_revisar_lote(request):
+    """Carga masiva. POST multipart con varios archivos 'xml' (hasta MAX_LOTE): lee cada CFDI y propone
+    sus folios, sin guardar nada. Cada factura se da de alta después con POST /facturas/ (datos + su XML),
+    una por una, para que cada una tome su número de captura y un error no detenga a las demás. Las que
+    no traen folios (o no se encuentran) se dan de alta sin folios y se ligan después a mano."""
+    archivos = request.FILES.getlist('xml')
+    if not archivos:
+        return JsonResponse({'detail': 'Sube los XML de las facturas (.xml).'}, status=400)
+    if len(archivos) > MAX_LOTE:
+        return JsonResponse({'detail': f'Son {len(archivos)} archivos: sube máximo {MAX_LOTE} a la vez.'}, status=400)
+    uuids, numeros, tomados = {}, {}, {}
+    return JsonResponse({'resultados': [_revisar_xml(request.user, a, uuids, numeros, tomados) for a in archivos],
+                         'max': MAX_LOTE})
 
 
 @require_http_methods(['GET'])

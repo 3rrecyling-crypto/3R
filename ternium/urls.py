@@ -61,6 +61,7 @@ urlpatterns = [
     # Facturas dadas de alta (número, total) con sus folios ligados
     path('api/asignacion-factura/facturas/', asignacion_factura.api_facturas, name='api_asignacion_facturas'),
     path('api/asignacion-factura/facturas/leer-xml/', asignacion_factura.api_leer_xml, name='api_asignacion_factura_leer_xml'),
+    path('api/asignacion-factura/facturas/revisar-lote/', asignacion_factura.api_revisar_lote, name='api_asignacion_factura_revisar_lote'),
     path('api/asignacion-factura/facturas/reporte/', reporte_facturas.api_reporte, name='api_asignacion_facturas_reporte'),
     path('api/asignacion-factura/facturas/xml-zip/', asignacion_factura.api_xml_zip, name='api_asignacion_facturas_xml_zip'),
     path('api/asignacion-factura/facturas/<int:pk>/xml/', asignacion_factura.api_factura_xml, name='api_asignacion_factura_xml'),
