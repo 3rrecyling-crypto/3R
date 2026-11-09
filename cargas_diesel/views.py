@@ -41,6 +41,15 @@ def get_patios_usuario(user):
     return patios if patios is not None else Patio.objects.none()
 
 
+def patios_consulta(user):
+    """Patios cuyas cargas se ven en el listado "Cargas de diésel" (/diesel/cargas), su detalle y sus
+    Excel. Quien tiene acceso al módulo de diésel (o es superusuario) ve todos los patios aunque tenga
+    patios asignados: los patios asignados solo limitan dónde captura. Los demás, los suyos."""
+    if user.is_authenticated and (user.is_superuser or user.has_perm('ternium.acceso_diesel')):
+        return Patio.objects.filter(activo=True)
+    return get_patios_usuario(user)
+
+
 # ─────────────────────────────────────────────
 # PATIOS
 # ─────────────────────────────────────────────
@@ -196,10 +205,11 @@ SIN_PERMISIONARIO = '__sin__'  # ?permisionario= para las cargas sin permisionar
 
 
 def filtrar_cargas(user, params):
-    """Cargas de los patios del usuario con los filtros del listado (?patio, ?unidad,
-    ?permisionario, ?auditoria, ?fecha_inicio, ?fecha_fin). La usan el listado y su Excel."""
+    """Cargas que el usuario puede consultar (patios_consulta: con acceso al módulo de diésel, todas)
+    con los filtros del listado (?patio, ?unidad, ?permisionario, ?auditoria, ?fecha_inicio,
+    ?fecha_fin). La usan el listado, sus Excel y la auditoría con IA."""
     qs = CargaDiesel.objects.filter(
-        patio__in=get_patios_usuario(user)
+        patio__in=patios_consulta(user)
     ).select_related('unidad', 'thermo', 'patio', 'usuario', 'registrada_por').prefetch_related('fotos_complementarias')
 
     patio_id = params.get('patio')
@@ -237,12 +247,13 @@ def filtrar_cargas(user, params):
 
 
 class CargasPermisionariosAPIView(APIView):
-    """GET: opciones de los filtros del listado: los permisionarios con cargas en los patios del
-    usuario (y si hay cargas sin permisionario) y las unidades y thermos cargados, cada uno con el
-    permisionario de su última carga (para el buscador de unidades)."""
+    """GET: opciones de los filtros del listado: los patios que puede consultar, los permisionarios con
+    cargas en esos patios (y si hay cargas sin permisionario) y las unidades y thermos cargados, cada
+    uno con el permisionario de su última carga (para el buscador de unidades)."""
 
     def get(self, request):
-        cargas = CargaDiesel.objects.filter(patio__in=get_patios_usuario(request.user))
+        patios = patios_consulta(request.user)
+        cargas = CargaDiesel.objects.filter(patio__in=patios)
         nombres = cargas.exclude(permisionario_nombre='').values_list('permisionario_nombre', flat=True).distinct()
         equipos = {}
         for unidad, thermo, permisionario in cargas.order_by('-fecha_carga', '-pk').values_list(
@@ -252,6 +263,7 @@ class CargasPermisionariosAPIView(APIView):
                 equipos[nombre.upper()] = {'nombre': nombre, 'tipo': 'thermo' if thermo and not unidad else 'unidad',
                                            'permisionario': permisionario}
         return Response({
+            'patios': PatioSerializer(patios.order_by('nombre'), many=True).data,
             'permisionarios': sorted(set(nombres), key=str.upper),
             'hay_sin_permisionario': cargas.filter(permisionario_nombre='').exists(),
             'sin_permisionario': SIN_PERMISIONARIO,

@@ -18,7 +18,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import AjusteInventario, CompraCombustible, maneja_rendimiento, unidad_en_millas
-from .views import SIN_PERMISIONARIO, filtrar_cargas, get_patios_usuario
+from .views import SIN_PERMISIONARIO, filtrar_cargas, patios_consulta
 
 MAX_FILAS = 20000
 # Sin cinchos ni fotos de horas del thermo, sticker y motor: ya no se capturan.
@@ -39,9 +39,9 @@ def _url(request, archivo):
 
 
 def compras_y_ajustes(user, params):
-    """Compras y ajustes de diésel de los patios del usuario con el patio y las fechas del listado
-    (no dependen del permisionario ni de la unidad)."""
-    filtros = {'patio__in': get_patios_usuario(user)}
+    """Compras y ajustes de diésel de los patios que el usuario consulta en el listado (patios_consulta),
+    con el patio y las fechas del listado (no dependen del permisionario ni de la unidad)."""
+    filtros = {'patio__in': patios_consulta(user)}
     if params.get('patio'):
         filtros['patio_id'] = params['patio']
     if params.get('fecha_inicio'):

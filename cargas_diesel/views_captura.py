@@ -34,7 +34,7 @@ from .models import (
     CargaDiesel, FotoComplementaria, Patio, PerfilUsuarioDiesel, Permisionario, PermisionarioUnidad, Thermo, Totem,
     Unidad, es_3r_nombre, es_3r_transporte_nombre, maneja_rendimiento, unidad_en_millas,
 )
-from .views import get_patios_usuario
+from .views import get_patios_usuario, patios_consulta
 
 PERM_CAPTURA = 'cargas_diesel.acceso_carga_diesel'
 
@@ -483,9 +483,9 @@ class CapturaCargaAPIView(APIView):
 
 
 def _carga_visible(user, pk):
-    """La carga, si el usuario la puede ver: el despachador las suyas; quien administra diésel, todas
-    (de sus patios)."""
-    cargas = CargaDiesel.objects.filter(pk=pk, patio__in=get_patios_usuario(user))
+    """La carga, si el usuario la puede ver: el despachador las suyas (de sus patios); quien tiene
+    acceso al módulo de diésel, todas (como en el listado de cargas)."""
+    cargas = CargaDiesel.objects.filter(pk=pk, patio__in=patios_consulta(user))
     if not (user.is_superuser or user.has_perm('ternium.acceso_diesel')):
         cargas = cargas.filter(usuario=user)
     return cargas.select_related('patio', 'usuario').first()
