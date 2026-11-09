@@ -140,6 +140,11 @@ COLUMNAS += [
     {'clave': 'factura_nombre', 'etiqueta': 'Folio de factura', 'grupo': 'Identificación',
      'th': 'py-3 px-2 col-corta', 'td': 'py-3 px-2 small', 'accessor': 'factura_nombre'},
 
+    # Consecutivo con que se dio de alta la factura en Asignación de factura (3R-F-030).
+    {'clave': 'factura_captura', 'etiqueta': 'Captura de factura', 'grupo': 'Identificación',
+     'th': 'py-3 px-2 col-corta', 'td': 'py-3 px-2 small text-nowrap',
+     'accessor': 'factura_registro.numero_captura'},
+
     {'clave': 'folio_medline', 'etiqueta': 'Folio Medline', 'grupo': 'Identificación',
      'th': 'py-3 px-2 col-corta', 'td': 'py-3 px-2 small', 'accessor': 'folio_medline'},
 
@@ -213,7 +218,29 @@ SELECT_RELATED_POR_CLAVE = {
     'unidad': 'unidad',
     'contenedor': 'contenedor',
     'auditado_por': 'auditado_por',
+    # La celda Factura muestra el número asignado y su captura (3R-F-030).
+    'factura': 'factura_registro',
+    'factura_captura': 'factura_registro',
 }
+
+
+def filtro_factura(texto):
+    """Búsqueda "Factura" de la lista de remisiones (HTML y Next): el número asignado en
+    Asignación de factura (factura_nombre), su número de captura (3R-F-030, F-030 o F30) y el
+    folio de las facturas CFDI. None si no hay texto. Cruza con las facturas CFDI (muchos a
+    muchos): quien lo use debe aplicar .distinct()."""
+    import re
+
+    from django.db.models import Q
+
+    texto = (texto or '').strip()
+    if not texto:
+        return None
+    filtro = Q(factura_nombre__icontains=texto) | Q(facturas__folio__icontains=texto)
+    captura = re.fullmatch(r'(?:3R\s*-?\s*)?F\s*-?\s*0*(\d+)', texto.upper())
+    if captura:
+        filtro |= Q(factura_registro__captura=int(captura.group(1)))
+    return filtro
 
 
 def sanear(claves):

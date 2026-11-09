@@ -454,6 +454,10 @@
                         <input type="text" name="q_folio_salida" id="q_folio_salida" class="form-control form-control-sm" placeholder="" value="{{ search_params.q_folio_salida|default:'' }}">
                     </div>
                     <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
+                        <label for="q_factura" class="form-label small fw-bold text-success">Factura</label>
+                        <input type="text" name="q_factura" id="q_factura" class="form-control form-control-sm" placeholder="Número o 3R-F-030" title="Número de factura, captura (3R-F-030) o folio CFDI. Busca en todas las fechas." value="{{ search_params.q_factura|default:'' }}">
+                    </div>
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2">
                         <label for="q_destruccion" class="form-label small fw-bold text-black">Destrucción Fiscal</label>
                         <select name="q_destruccion" id="q_destruccion" class="form-select form-select-sm searchable-select border-danger">
                             <option value="">Todos</option>
@@ -1839,12 +1843,13 @@ function ejecutarDescargaEspecifica() {
 }
 // ========================================================
 
-// --- FOLIO LD / DLV / SALIDA: buscar en toda la BD ignorando otros filtros ---
+// --- FOLIO LD / DLV / SALIDA / FACTURA: buscar en toda la BD ignorando otros filtros ---
 $('#filterForm').on('submit', function(e) {
     const folioLd = $('#q_folio_ld').val().trim();
     const folioDlv = $('#q_folio_dlv').val().trim();
     const folioSalida = $('#q_folio_salida').val().trim();
-    if (folioLd || folioDlv || folioSalida) {
+    const factura = $('#q_factura').val().trim();
+    if (folioLd || folioDlv || folioSalida || factura) {
         e.preventDefault();
         // Limpia todos los demás campos, deja solo los folios y page_size
         $('#q_remision, #q_prefijo, #q_material, #q_status, #q_origen, #q_destino, #q_operador, #q_fecha_desde, #q_fecha_hasta, #q_destruccion').val('').trigger('change');

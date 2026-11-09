@@ -16,15 +16,21 @@ Las columnas nuevas son de valor simple y se resuelven con el filtro valor_col.
 {% elif col.clave == 'status' %}<span class="status-badge status-{{ remision.status }}" style="transform: scale(0.9);">{{ remision.get_status_display }}</span>
 
 {% elif col.clave == 'factura' %}
-    {% if remision.facturas.exists %}
-        {% for factura in remision.facturas.all %}
-            <a href="{% url 'detalle_factura_cliente' factura.id %}" class="badge bg-success text-decoration-none border border-light shadow-sm" data-bs-toggle="tooltip" title="Ver Factura">
-                <i class="fas fa-file-invoice"></i>
-            </a>
-        {% endfor %}
-    {% else %}
+    {# Número asignado en Asignación de factura y, si se dio de alta, su captura (3R-F-030); después las facturas CFDI. #}
+    {% with cfdis=remision.facturas.all reg=remision.factura_registro %}
+    {% if remision.factura_nombre or reg %}
+        <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle text-nowrap" title="Factura">{% firstof remision.factura_nombre reg.numero %}</span>
+        {% if reg.captura %}<div class="text-muted text-nowrap mt-1" style="font-size: 0.7rem; font-family: monospace;" title="Número de captura">{{ reg.numero_captura }}</div>{% endif %}
+    {% endif %}
+    {% for factura in cfdis %}
+        <a href="{% url 'detalle_factura_cliente' factura.id %}" class="badge bg-success text-decoration-none border border-light shadow-sm" data-bs-toggle="tooltip" title="Ver Factura">
+            <i class="fas fa-file-invoice"></i>
+        </a>
+    {% endfor %}
+    {% if not remision.factura_nombre and not reg and not cfdis %}
         <span class="text-muted small">-</span>
     {% endif %}
+    {% endwith %}
 
 {% elif col.clave == 'material' %}
     {% for detalle in remision.detalles.all %}

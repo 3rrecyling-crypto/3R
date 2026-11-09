@@ -782,7 +782,7 @@ class RemisionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         # Las relaciones a precargar dependen de las columnas que el usuario
         # tenga activas: si pide Operador o Línea de transporte y no se
         # precargan aquí, se dispara una consulta por fila.
-        from .columnas_remisiones import SELECT_RELATED_POR_CLAVE, columnas_de
+        from .columnas_remisiones import SELECT_RELATED_POR_CLAVE, columnas_de, filtro_factura
 
         relaciones = {'empresa', 'origen', 'destino'}
         for col in columnas_de(self.request.user):
@@ -815,20 +815,25 @@ class RemisionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         q_folio_ld_raw = self.request.GET.get('q_folio_ld', '').strip()
         q_folio_dlv_raw = self.request.GET.get('q_folio_dlv', '').strip()
         q_folio_salida_raw = self.request.GET.get('q_folio_salida', '').strip()
+        # Factura: número asignado, captura (3R-F-030) o folio CFDI.
+        q_factura = filtro_factura(self.request.GET.get('q_factura'))
 
         # --- CASO A: SI BUSCAN POR FOLIO PRINCIPAL (BÚSQUEDA GLOBAL) ---
         if q_remision:
             # Buscamos en TODA la base de datos, ignorando las fechas
             queryset = queryset.filter(remision__icontains=q_remision)
 
-        # --- CASO A2: FOLIO LD / DLV / SALIDA — búsqueda global, sin filtros de fecha ---
-        elif q_folio_ld_raw or q_folio_dlv_raw or q_folio_salida_raw:
+        # --- CASO A2: FOLIO LD / DLV / SALIDA / FACTURA — búsqueda global, sin filtros de fecha ---
+        # (una factura ampara remisiones de varios meses)
+        elif q_folio_ld_raw or q_folio_dlv_raw or q_folio_salida_raw or q_factura:
             if q_folio_ld_raw:
                 queryset = queryset.filter(folio_ld__icontains=q_folio_ld_raw)
             if q_folio_dlv_raw:
                 queryset = queryset.filter(folio_dlv__icontains=q_folio_dlv_raw)
             if q_folio_salida_raw:
                 queryset = queryset.filter(folio_salida__icontains=q_folio_salida_raw)
+            if q_factura:
+                queryset = queryset.filter(q_factura)
             return queryset.distinct()
 
         # --- CASO B: SI NO HAY FOLIO PRINCIPAL (FILTROS NORMALES + FECHAS) ---
@@ -889,6 +894,9 @@ class RemisionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         if q_folio_salida_raw:
             queryset = queryset.filter(folio_salida__icontains=q_folio_salida_raw)
 
+        if q_factura:
+            queryset = queryset.filter(q_factura)
+
         # ==============================================================
         # --- NUEVO: FILTRO DE DESTRUCCIÓN FISCAL (COMPLETO / PENDIENTE)
         # ==============================================================
@@ -924,9 +932,9 @@ class RemisionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         # ==============================================================
                 
         # Evitar duplicados si se filtra por relaciones ManyToMany (como materiales)
-        if filters.get('detalles__material_id') or q_destruccion:
+        if filters.get('detalles__material_id') or q_destruccion or q_factura:
             queryset = queryset.distinct()
-            
+
         return queryset
 
     def get_context_data(self, **kwargs):

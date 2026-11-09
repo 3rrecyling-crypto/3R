@@ -272,11 +272,13 @@ def api_remisiones_lista(request):
     from .columnas_remisiones import (
         SELECT_RELATED_POR_CLAVE,
         columnas_de as _columnas_de,
+        filtro_factura as _filtro_factura,
         valor_texto as _valor_texto_col,
     )
 
     _columnas_usuario = _columnas_de(request.user)
-    _relaciones = {'empresa', 'origen', 'destino', 'operador'}
+    # factura_registro: la vista por defecto muestra la captura de la factura (3R-F-030).
+    _relaciones = {'empresa', 'origen', 'destino', 'operador', 'factura_registro'}
     for _c in _columnas_usuario:
         _rel = SELECT_RELATED_POR_CLAVE.get(_c['clave'])
         if _rel:
@@ -369,6 +371,11 @@ def api_remisiones_lista(request):
     if q_folio_salida:  # PROBOCA (como en la lista HTML)
         queryset = queryset.filter(folio_salida__icontains=q_folio_salida)
 
+    # --- FACTURA: número asignado, captura (3R-F-030) o folio CFDI ---
+    q_factura = _filtro_factura(params.get('q_factura'))
+    if q_factura:
+        queryset = queryset.filter(q_factura)
+
     # --- FILTRO DE DESTRUCCIÓN FISCAL (COMPLETO / PENDIENTE) ---
     q_destruccion = params.get('q_destruccion', '').strip()
     if q_destruccion:
@@ -394,7 +401,7 @@ def api_remisiones_lista(request):
                 queryset = queryset.none()
 
     # Evitar duplicados si se filtra por relaciones ManyToMany
-    if q_material or q_destruccion:
+    if q_material or q_destruccion or q_factura:
         queryset = queryset.distinct()
 
     # 6. CONTADORES (sobre la base SIN el filtro de status → badges con totales reales)
@@ -506,6 +513,9 @@ def api_remisiones_lista(request):
             'detalles': detalles,
             'evidencias_urls': evidencias_urls,
             'facturas': facturas_data,
+            # Factura asignada en Asignación de factura y su número de captura (3R-F-030).
+            'factura_numero': rem.factura_nombre or (rem.factura_registro.numero if rem.factura_registro else ''),
+            'factura_captura': rem.factura_registro.numero_captura if rem.factura_registro else '',
             'permite_manifiesto_destruccion': permite_word,
             'destruccion_fiscal_completa': destruccion_completa,
             # Alias cortos (lo que ya consume el front Next.js).
