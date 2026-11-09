@@ -64,6 +64,22 @@ def subir(instancia, campo, archivo, nombre_visible=None):
     return nombre
 
 
+def borrar(nombre):
+    """Borra un archivo guardado por su ruta: de S3 si está configurado y, por si era anterior, del
+    almacenamiento por defecto. No falla si no existe."""
+    if not nombre:
+        return
+    if usa_s3():
+        try:
+            _cliente().delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=_llave(nombre))
+        except Exception:
+            logger.warning('No se pudo borrar de S3: %s', nombre, exc_info=True)
+    try:
+        default_storage.delete(nombre)
+    except Exception:
+        pass
+
+
 def leer(archivo):
     """Contenido (bytes) de un archivo guardado: de S3 si está configurado; si no está ahí,
     del almacenamiento por defecto (fotos anteriores en el disco del servidor)."""

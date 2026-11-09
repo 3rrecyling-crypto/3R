@@ -32,6 +32,7 @@ import json
 import re
 import secrets
 from collections import Counter
+from contextlib import contextmanager
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from functools import wraps
 
@@ -45,6 +46,11 @@ from django.shortcuts import render
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_http_methods
+
+from cargas_diesel.archivos import ErrorArchivo
+from cargas_diesel.archivos import borrar as borrar_archivo
+from cargas_diesel.archivos import leer as leer_archivo
+from cargas_diesel.archivos import subir as subir_archivo
 
 from .cfdi_xml import ErrorCFDI, leer_cfdi
 from .models import Empresa, FacturaRemision, HistorialFacturaRemision, Remision
@@ -467,18 +473,28 @@ def _importes_cfdi(cfdi):
                                                     'ret_isr_importe', 'tipo_cambio', 'total')}}
 
 
-def _borrar_xml_al_confirmar(archivo, nombre=None):
-    """Borra del almacenamiento el XML guardado (o el archivo `nombre`), solo si la transacción se confirma."""
-    if not archivo and not nombre:
-        return
-    almacen, nombre = archivo.storage, nombre or archivo.name
+def _borrar_xml_al_confirmar(nombre):
+    """Borra el XML guardado con esa ruta (de S3), solo si la transacción se confirma."""
+    if nombre:
+        transaction.on_commit(lambda: borrar_archivo(nombre))
 
-    def borrar():
-        try:
-            almacen.delete(nombre)
-        except Exception:
-            pass
-    transaction.on_commit(borrar)
+
+@contextmanager
+def _borrar_si_falla(rutas):
+    """Si el bloque falla, borra los archivos ya subidos (sus rutas) para que no queden huérfanos en S3."""
+    try:
+        yield
+    except Exception:
+        for ruta in rutas:
+            borrar_archivo(ruta)
+        raise
+
+
+def leer_xml_guardado(factura):
+    """Bytes del XML guardado de la factura: de S3 (como las fotos de remisiones) y, si no está ahí, del
+    disco del servidor (los XML de antes de este cambio, que Render borra en cada deploy).
+    FileNotFoundError si no está en ningún lado."""
+    return leer_archivo(factura.xml)
 
 
 def _alta_con_captura(factura):
@@ -565,7 +581,8 @@ def _guardar_factura(user, body, factura=None, xml=None):
     antes = None if nueva else _foto(factura)
     folios_antes = set() if nueva else set(Remision.objects.filter(factura_registro=factura).values_list('remision', flat=True))
     tenia_xml = bool(factura and factura.xml)
-    with transaction.atomic():
+    subidos = []  # el XML que se sube a S3: se borra si al final no se guarda la factura
+    with _borrar_si_falla(subidos), transaction.atomic():
         if factura is None:
             factura = FacturaRemision(creado_por=user)
         factura.empresa, factura.numero, factura.fecha, factura.moneda = empresa, numero, fecha, moneda
@@ -594,14 +611,19 @@ def _guardar_factura(user, body, factura=None, xml=None):
             factura.receptor_rfc = cfdi['receptor']['rfc'][:13]
             factura.conceptos = cfdi['conceptos']
             anterior = factura.xml.name if factura.xml else None
+            # Se sube a S3 como las fotos de remisiones (boto3 a media/<ruta>; el campo guarda la ruta).
+            # El almacenamiento por defecto guarda en el disco de Render, que se borra en cada deploy.
             # Nombre con una parte aleatoria: el UUID viene impreso en la factura y no debe bastar
-            # para adivinar la ruta del XML en el almacenamiento.
-            factura.xml.save(f'{re.sub(r"[^A-Za-z0-9-]", "_", (cfdi["uuid"] or numero)[:40])}_{secrets.token_hex(8)}.xml',
-                             ContentFile(contenido_xml), save=False)
-            # El XML anterior se borra si se reemplazó por otro archivo. En S3 el mismo nombre
-            # se sobrescribe: borrarlo entonces quitaría el XML nuevo.
+            # para adivinar la ruta del XML (el bucket deja leer media/).
+            nombre = f'{re.sub(r"[^A-Za-z0-9-]", "_", (cfdi["uuid"] or numero)[:40])}_{secrets.token_hex(8)}.xml'
+            try:
+                subir_archivo(factura, 'xml', ContentFile(contenido_xml, name=nombre), 'el XML de la factura')
+            except ErrorArchivo as e:
+                raise ErrorFactura(str(e))
+            subidos.append(factura.xml.name)
+            # El XML anterior se borra si se reemplazó por otro archivo (la ruta nueva siempre es distinta).
             if anterior and anterior != factura.xml.name:
-                _borrar_xml_al_confirmar(factura.xml, anterior)
+                _borrar_xml_al_confirmar(anterior)
         if nueva:
             _alta_con_captura(factura)
         else:
@@ -697,7 +719,7 @@ def api_factura(request, pk):
                 factura_registro=None, factura_nombre=None, factura_asignada_por=None, factura_asignada_en=None,
                 actualizado_en=timezone.now())
             numero = factura.numero
-            _borrar_xml_al_confirmar(factura.xml)
+            _borrar_xml_al_confirmar(factura.xml.name if factura.xml else None)
             factura.delete()
         return JsonResponse({'ok': True, 'detail': f'Factura {numero} eliminada; sus folios quedaron sin factura.'})
     try:
@@ -759,10 +781,10 @@ def api_factura_xml(request, pk):
     if not factura or not factura.xml:
         return JsonResponse({'detail': 'La factura no tiene XML.'}, status=404)
     try:
-        with factura.xml.open('rb') as archivo:
-            contenido = archivo.read()
+        contenido = leer_xml_guardado(factura)
     except (FileNotFoundError, OSError):
-        return JsonResponse({'detail': 'No se encontró el archivo XML.'}, status=404)
+        return JsonResponse({'detail': 'No se encontró el archivo XML: se perdió en una actualización del servidor. '
+                                       'Vuelve a subirlo en Editar → Reemplazar XML.'}, status=404)
     respuesta = HttpResponse(contenido, content_type='application/xml')
     nombre = re.sub(r'[^A-Za-z0-9_-]', '_', factura.numero) or 'factura'
     respuesta['Content-Disposition'] = f'attachment; filename="{nombre}.xml"'
@@ -794,8 +816,7 @@ def api_xml_zip(request):
     with zipfile.ZipFile(salida, 'w', zipfile.ZIP_DEFLATED) as zf:
         for f in qs:
             try:
-                with f.xml.open('rb') as archivo:
-                    contenido = archivo.read()
+                contenido = leer_xml_guardado(f)
             except (FileNotFoundError, OSError):
                 faltan.append(f.numero)
                 continue

@@ -23,7 +23,7 @@ from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_http_methods
 
 from .asignacion_factura import (_api, _base, _facturas, _norm, _numero_folio, catalogo_sat as _catalogo,
-                                 claves_de_folio, filtrar_facturas, remisiones_del_folio)
+                                 claves_de_folio, filtrar_facturas, leer_xml_guardado, remisiones_del_folio)
 from .cfdi_xml import ErrorCFDI, leer_cfdi
 
 MAX_FACTURAS = 1000
@@ -47,10 +47,10 @@ def datos_factura(f, user):
     cfdi, avisos = None, []
     if f.xml:
         try:
-            with f.xml.open('rb') as archivo:
-                cfdi = leer_cfdi(archivo.read())
+            cfdi = leer_cfdi(leer_xml_guardado(f))
         except (OSError, ValueError, ErrorCFDI):
-            avisos.append('No se pudo leer el XML guardado: se usan los datos registrados.')
+            avisos.append('No se encontró el XML guardado (se perdió en una actualización del servidor): se usan los '
+                          'datos registrados. Vuelve a subirlo en Editar → Reemplazar XML.')
     conceptos = cfdi['conceptos'] if cfdi else list(f.conceptos or [])
     emision = parse_datetime(cfdi['fecha_emision']) if cfdi and cfdi.get('fecha_emision') else None
     if emision and timezone.is_aware(emision):
@@ -73,7 +73,10 @@ def datos_factura(f, user):
                 encontradas = remisiones_del_folio(otras, folio)
                 r = encontradas[0] if encontradas else None
                 if r is not None:
-                    notas.append(f'El folio {folio} no está ligado a esta factura')
+                    # Se dice por qué: ya es de otra factura, o está libre y se puede ligar en Editar
+                    notas.append(f'El folio {folio} no está ligado a esta factura: está en la factura {r.factura_nombre}'
+                                 if r.factura_nombre else
+                                 f'El folio {folio} no está ligado a esta factura: está libre, lígalo en Editar')
                 else:
                     de_otra = remisiones_del_folio(_base(user).exclude(empresa_id=f.empresa_id), folio)
                     notas.append(f'El folio {folio} es de {de_otra[0].empresa.nombre}, no de {f.empresa.nombre}' if de_otra
