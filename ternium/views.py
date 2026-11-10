@@ -789,6 +789,9 @@ class RemisionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
             rel = SELECT_RELATED_POR_CLAVE.get(col['clave'])
             if rel:
                 relaciones.add(rel)
+        # La celda Factura dice también si la remisión se cobró en efectivo (EFECTIVO 3R-E-001).
+        if 'factura_registro' in relaciones:
+            relaciones.add('efectivo_registro')
 
         queryset = Remision.objects.select_related(
             *sorted(relaciones)
@@ -5326,12 +5329,15 @@ def exportar_vista_remisiones(request):
     vista = RemisionListView()
     vista.request = request
     vista.kwargs = {}
-    queryset = vista.get_queryset()
+    # efectivo_registro: la columna Factura dice EFECTIVO 3R-E-001 en las cobradas en efectivo
+    queryset = vista.get_queryset().select_related('efectivo_registro')
 
     # Todos los Excel de remisiones llevan la Factura (factura_nombre, la que se
     # asigna en Asignación de factura) junto a la Remisión, aunque el usuario no
     # la tenga en su tabla y sin repetirla si sí la tiene. La columna 'factura'
     # de la tabla son las facturas CFDI: en el Excel se llama "Factura CFDI".
+    # Si la remisión se cobró en efectivo (sin factura), ahí va el folio de
+    # captura de su operación: EFECTIVO 3R-E-001.
     columnas = []
     for col in columnas_de(request.user):
         if col['clave'] == 'factura_nombre':

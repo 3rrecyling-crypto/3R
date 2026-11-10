@@ -218,17 +218,33 @@ SELECT_RELATED_POR_CLAVE = {
     'unidad': 'unidad',
     'contenedor': 'contenedor',
     'auditado_por': 'auditado_por',
-    # La celda Factura muestra el número asignado y su captura (3R-F-030).
+    # La celda Factura muestra el número asignado y su captura (3R-F-030). Las cobradas en efectivo
+    # dicen EFECTIVO 3R-E-001: las listas precargan también efectivo_registro.
     'factura': 'factura_registro',
     'factura_captura': 'factura_registro',
+    # "Folio de factura" dice EFECTIVO 3R-E-001 en las cobradas en efectivo
+    'factura_nombre': 'efectivo_registro',
 }
+
+
+def factura_o_efectivo(remision):
+    """Lo que va en la columna "Factura" de los Excel de remisiones: la factura asignada en
+    Asignación de factura o, si la remisión se cobró en efectivo (sin factura), el folio de
+    captura de su operación: 'EFECTIVO 3R-E-001'. Vacío si no tiene ninguna de las dos.
+    Quien lo use en una lista debe precargar efectivo_registro (select_related)."""
+    if remision.factura_nombre:
+        return remision.factura_nombre
+    if remision.efectivo_registro_id:
+        return f'EFECTIVO {remision.efectivo_registro.numero_captura}'
+    return ''
 
 
 def filtro_factura(texto):
     """Búsqueda "Factura" de la lista de remisiones (HTML y Next): el número asignado en
-    Asignación de factura (factura_nombre), su número de captura (3R-F-030, F-030 o F30) y el
-    folio de las facturas CFDI. None si no hay texto. Cruza con las facturas CFDI (muchos a
-    muchos): quien lo use debe aplicar .distinct()."""
+    Asignación de factura (factura_nombre), su número de captura (3R-F-030, F-030 o F30), el
+    folio de las facturas CFDI y las cobradas en efectivo (EFECTIVO, o su captura 3R-E-001, E-1 o
+    E1). None si no hay texto. Cruza con las facturas CFDI (muchos a muchos): quien lo use debe
+    aplicar .distinct()."""
     import re
 
     from django.db.models import Q
@@ -240,6 +256,11 @@ def filtro_factura(texto):
     captura = re.fullmatch(r'(?:3R\s*-?\s*)?F\s*-?\s*0*(\d+)', texto.upper())
     if captura:
         filtro |= Q(factura_registro__captura=int(captura.group(1)))
+    efectivo = re.fullmatch(r'(?:3R\s*-?\s*)?E\s*-?\s*0*(\d+)', texto.upper())
+    if efectivo:
+        filtro |= Q(efectivo_registro__captura=int(efectivo.group(1)))
+    if len(texto) >= 3 and 'EFECTIVO'.startswith(texto.upper()):
+        filtro |= Q(efectivo_registro__isnull=False)
     return filtro
 
 
@@ -442,6 +463,8 @@ def valor_plano(remision, col):
         return remision.get_status_display()
     if clave == 'factura':
         return ', '.join(f.folio or str(f.id) for f in remision.facturas.all()) or ''
+    if clave == 'factura_nombre':  # la factura asignada o, si se cobró en efectivo, EFECTIVO 3R-E-001
+        return factura_o_efectivo(remision)
     if clave == 'material':
         return _lineas((d.material.nombre if d.material else '') for d in remision.detalles.all())
     if clave == 'bultos':

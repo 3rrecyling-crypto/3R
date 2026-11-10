@@ -42,6 +42,7 @@ from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
+from .columnas_remisiones import factura_o_efectivo
 from .models import (
     Cliente, ConfiguracionManifiesto, Contenedor, DetalleRemision, Empresa, EvidenciaRemision,
     HistorialRemision, LineaTransporte, Lugar, Material, Operador, Remision, Unidad,
@@ -885,7 +886,7 @@ def _tabla_lista(c, remisiones, sumas_r, merma_expr, mat_ids, resumen, limite):
     filtro_mat = Q(detalles__material_id__in=mat_ids) if mat_ids is not None else None
     qs = (remisiones
           .select_related('empresa', 'origen', 'destino', 'cliente', 'operador',
-                          'linea_transporte', 'unidad', 'contenedor', 'auditado_por')
+                          'linea_transporte', 'unidad', 'contenedor', 'auditado_por', 'efectivo_registro')
           .annotate(fecha_ref=_expr_fecha(f['campo_fecha']), **sumas_r,
                     bultos_sum=Coalesce(Sum('detalles__bultos', filter=filtro_mat), Value(0)),
                     importe=_suma(F('detalles__peso_dlv') * F('detalles__precio'), filtro_mat),
@@ -963,7 +964,7 @@ def _tabla_lista(c, remisiones, sumas_r, merma_expr, mat_ids, resumen, limite):
             # Precio por kg: el de la remisión, o el promedio ponderado si trae varios
             'precio_kg': (round(float(r.importe or 0) / kg_precio, 4) if kg_precio
                           else (float(con_precio[0].precio) if con_precio else None)),
-            'factura': r.factura_nombre or '',
+            'factura': factura_o_efectivo(r),  # la factura o, si se cobró en efectivo, EFECTIVO 3R-E-001
             'facturas_cfdi': (', '.join(
                 f'{fa.serie or ""}{"-" if fa.serie else ""}{fa.folio or fa.pk}'
                 + (' (cancelada)' if fa.estado == 'cancelada' else '')

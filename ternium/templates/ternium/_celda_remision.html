@@ -17,17 +17,22 @@ Las columnas nuevas son de valor simple y se resuelven con el filtro valor_col.
 
 {% elif col.clave == 'factura' %}
     {# Número asignado en Asignación de factura y, si se dio de alta, su captura (3R-F-030); después las facturas CFDI. #}
-    {% with cfdis=remision.facturas.all reg=remision.factura_registro %}
+    {% with cfdis=remision.facturas.all reg=remision.factura_registro efe=remision.efectivo_registro %}
     {% if remision.factura_nombre or reg %}
         <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle text-nowrap" title="Factura">{% firstof remision.factura_nombre reg.numero %}</span>
         {% if reg.captura %}<div class="text-muted text-nowrap mt-1" style="font-size: 0.7rem; font-family: monospace;" title="Número de captura">{{ reg.numero_captura }}</div>{% endif %}
+    {% endif %}
+    {# Cobrada en efectivo (sin factura): la captura de su operación (3R-E-001). #}
+    {% if efe %}
+        <span class="badge text-nowrap" style="background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe;" title="Cobrada en efectivo, sin factura"><i class="fas fa-money-bill-wave me-1"></i>EFECTIVO</span>
+        <div class="text-muted text-nowrap mt-1" style="font-size: 0.7rem; font-family: monospace;" title="Número de captura del efectivo">{{ efe.numero_captura }}</div>
     {% endif %}
     {% for factura in cfdis %}
         <a href="{% url 'detalle_factura_cliente' factura.id %}" class="badge bg-success text-decoration-none border border-light shadow-sm" data-bs-toggle="tooltip" title="Ver Factura">
             <i class="fas fa-file-invoice"></i>
         </a>
     {% endfor %}
-    {% if not remision.factura_nombre and not reg and not cfdis %}
+    {% if not remision.factura_nombre and not reg and not cfdis and not efe %}
         <span class="text-muted small">-</span>
     {% endif %}
     {% endwith %}

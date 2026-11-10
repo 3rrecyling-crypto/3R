@@ -577,6 +577,11 @@ class Remision(models.Model):
     # Factura dada de alta (con su total) a la que está ligado este folio; factura_nombre lleva su número.
     factura_registro = models.ForeignKey('FacturaRemision', on_delete=models.SET_NULL, null=True, blank=True,
                                          related_name='remisiones', verbose_name="Factura (alta)")
+    # Operación en efectivo (sin factura) a la que pertenece este folio. Una remisión va en una factura
+    # o en un efectivo, nunca en los dos; factura_asignada_por / _en guardan también quién y cuándo la
+    # puso en efectivo.
+    efectivo_registro = models.ForeignKey('EfectivoRemision', on_delete=models.SET_NULL, null=True, blank=True,
+                                          related_name='remisiones', verbose_name="Efectivo (sin factura)")
 
     # --- EVIDENCIAS Y DATOS DE DESTRUCCIÓN FISCAL ---
     fecha_destruccion = models.DateField(null=True, blank=True, verbose_name="Fecha de Destrucción")
@@ -906,6 +911,91 @@ class HistorialFacturaRemision(models.Model):
 
     def __str__(self):
         return f"{self.factura.numero} · {self.get_accion_display()} · {self.fecha:%d/%m/%Y %H:%M}"
+
+
+class EfectivoRemision(models.Model):
+    """Operación en efectivo de "Asignación de factura" (pestaña Efectivo): remisiones que se cobraron
+    en efectivo y no llevan factura. Se capturan la unidad de negocio, la fecha, el cliente, las
+    remisiones y el precio por kg de cada material; no hay XML ni impuestos. El monto se calcula
+    (precio × kg descargados de cada material, ver EfectivoLinea) y se puede corregir a mano. Sus
+    remisiones quedan ligadas con Remision.efectivo_registro y dejan de contar como "sin factura"."""
+    MONEDAS = FacturaRemision.MONEDAS
+    PREFIJO_CAPTURA = '3R-E-'
+
+    empresa = models.ForeignKey('Empresa', on_delete=models.PROTECT, related_name='efectivos_remisiones',
+                                verbose_name="Unidad de Negocio")
+    # Consecutivo de cada alta (se ve como 3R-E-001); se asigna al darla de alta.
+    captura = models.PositiveIntegerField("Número de captura", unique=True, null=True, blank=True, editable=False)
+    fecha = models.DateField(verbose_name="Fecha de la operación")
+    cliente = models.CharField(max_length=200, blank=True, default='', verbose_name="Cliente")
+    # Lo cobrado. Sale de los precios (monto_calculado) salvo que el usuario lo corrija a mano.
+    monto = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True, verbose_name="Monto en efectivo")
+    # Suma de precio × kg descargados de los materiales con precio; None si ninguno tiene precio.
+    monto_calculado = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True,
+                                          verbose_name="Monto calculado (precio × kg descargados)")
+    monto_ajustado = models.BooleanField(default=False, verbose_name="Monto corregido a mano")
+    moneda = models.CharField(max_length=3, choices=MONEDAS, default='MXN')
+    # Pesos por dólar: se pide cuando la moneda es USD (en MXN vale 1).
+    tipo_cambio = models.DecimalField("Tipo de cambio (MXN por USD)", max_digits=12, decimal_places=4, default=1)
+    notas = models.TextField(blank=True, default='')
+    creado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name='efectivos_remision_creados')
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Efectivo (asignación de remisiones)"
+        verbose_name_plural = "Efectivos (asignación de remisiones)"
+        ordering = ['-fecha', '-pk']
+
+    def __str__(self):
+        return f"{self.numero_captura or 'Efectivo'} · {self.fecha:%d/%m/%Y}"
+
+    @property
+    def numero_captura(self):
+        """3R-E-001, 3R-E-002…"""
+        return f'{self.PREFIJO_CAPTURA}{self.captura:03d}' if self.captura else ''
+
+
+class EfectivoLinea(models.Model):
+    """Un material de una remisión dentro de una operación en efectivo: los kg descargados que tenía al
+    guardar, el precio por kg que se capturó y su importe (precio × kg). Se rehacen todas en cada
+    guardado de la operación, con el peso descargado de ese momento."""
+    efectivo = models.ForeignKey(EfectivoRemision, on_delete=models.CASCADE, related_name='lineas')
+    remision = models.ForeignKey('Remision', on_delete=models.CASCADE, related_name='lineas_efectivo')
+    detalle = models.ForeignKey('DetalleRemision', on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    material = models.ForeignKey('Material', on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    material_nombre = models.CharField(max_length=200, blank=True, default='')
+    kg = models.DecimalField("Kg descargados", max_digits=14, decimal_places=3, default=0)
+    precio = models.DecimalField("Precio por kg", max_digits=14, decimal_places=4, null=True, blank=True)
+    importe = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Material de un efectivo"
+        verbose_name_plural = "Materiales de los efectivos"
+        ordering = ['remision_id', 'pk']
+
+    def __str__(self):
+        return f"{self.efectivo.numero_captura} · {self.material_nombre or 'Sin material'} · {self.kg} kg"
+
+
+class HistorialEfectivoRemision(models.Model):
+    """Bitácora de una operación en efectivo: quién y cuándo la dio de alta o la modificó, y qué cambió."""
+    ACCIONES = HistorialFacturaRemision.ACCIONES
+
+    efectivo = models.ForeignKey(EfectivoRemision, on_delete=models.CASCADE, related_name='historial')
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    fecha = models.DateTimeField(auto_now_add=True)
+    accion = models.CharField(max_length=20, choices=ACCIONES)
+    cambios = models.JSONField(default=list, blank=True)  # ["Monto: $1,000.00 → $1,200.00", "Folios agregados: MTY-1"]
+
+    class Meta:
+        verbose_name = "Modificación de efectivo (asignación)"
+        verbose_name_plural = "Modificaciones de efectivos (asignación)"
+        ordering = ['-fecha', '-pk']
+
+    def __str__(self):
+        return f"{self.efectivo.numero_captura} · {self.get_accion_display()} · {self.fecha:%d/%m/%Y %H:%M}"
 
 
 class Cliente(models.Model):

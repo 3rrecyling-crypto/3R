@@ -5,7 +5,7 @@ from . import views
 from django.urls import path, include
 from .forms import CustomLoginForm  # <--- Nombre correcto
 from . import api_views, api_viajes, api_liquidaciones, reportes_ia, reportes_ia_consumo, alertas_merma, asignacion_factura
-from . import excel_tabla, reporte_facturas, carga_logistica
+from . import excel_tabla, reporte_facturas, carga_logistica, efectivo_remisiones, reporte_efectivo
 from .views import (
     UnidadDetailView, UnidadUpdateView, LugarDetailView, LugarUpdateView, 
     EmpresaDetailView, EmpresaUpdateView, ContenedorDetailView, ContenedorUpdateView,
@@ -67,6 +67,10 @@ urlpatterns = [
     path('api/asignacion-factura/facturas/<int:pk>/xml/', asignacion_factura.api_factura_xml, name='api_asignacion_factura_xml'),
     path('api/asignacion-factura/facturas/<int:pk>/', asignacion_factura.api_factura, name='api_asignacion_factura_detalle'),
     path('api/asignacion-factura/disponibles/', asignacion_factura.api_disponibles, name='api_asignacion_factura_disponibles'),
+    # Efectivo: operaciones cobradas en efectivo, sin factura (misma pantalla y permiso)
+    path('api/asignacion-factura/efectivo/', efectivo_remisiones.api_efectivos, name='api_asignacion_efectivos'),
+    path('api/asignacion-factura/efectivo/reporte/', reporte_efectivo.api_reporte, name='api_asignacion_efectivo_reporte'),
+    path('api/asignacion-factura/efectivo/<int:pk>/', efectivo_remisiones.api_efectivo, name='api_asignacion_efectivo'),
     path('api/asignacion-factura/<int:pk>/', asignacion_factura.api_remision, name='api_asignacion_factura_remision'),
     path('api/remisiones/columnas/', api_views.api_columnas_remisiones, name='api_columnas_remisiones'),
     # Empresa y orden de folios que el usuario eligió en el diálogo de descarga (HTML y Next)

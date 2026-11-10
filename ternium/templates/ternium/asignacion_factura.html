@@ -26,9 +26,13 @@
     .af-chip[data-factura=""] .ico { background: #e2e8f0; color: #334155; }
     .af-chip[data-factura="sin"] .ico { background: #fef3c7; color: #b45309; }
     .af-chip[data-factura="con"] .ico { background: #dcfce7; color: #15803d; }
+    .af-chip[data-factura="efectivo"] .ico { background: #ede9fe; color: #6d28d9; }
     .af-chip.activo[data-factura=""] { background: #1e293b; color: #fff; }
     .af-chip.activo[data-factura="sin"] { background: #d97706; color: #fff; }
     .af-chip.activo[data-factura="con"] { background: #16a34a; color: #fff; }
+    .af-chip.activo[data-factura="efectivo"] { background: #7c3aed; color: #fff; }
+    /* Remisión cobrada en efectivo (sin factura): se registra en la pestaña Efectivo de la versión nueva */
+    .af-efectivo { display: inline-block; padding: .2rem .6rem; border-radius: .5rem; background: #ede9fe; color: #5b21b6; font-weight: 800; font-size: .8rem; }
     .af-chip.activo .ico { background: rgba(255,255,255,.2); color: #fff; }
     .af-chip.activo .txt { opacity: .9; }
     .af-tabla th { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--af-tenue); background: #f8fafc;
@@ -100,6 +104,8 @@
                 <span><span class="txt">Sin factura</span><span class="num" id="af-n-sin">0</span></span></button>
             <button type="button" class="af-chip" data-factura="con"><span class="ico"><i class="fas fa-file-invoice-dollar"></i></span>
                 <span><span class="txt">Con factura</span><span class="num" id="af-n-con">0</span></span></button>
+            <button type="button" class="af-chip" data-factura="efectivo" title="Cobradas en efectivo: no llevan factura"><span class="ico"><i class="fas fa-money-bill-wave"></i></span>
+                <span><span class="txt">Efectivo</span><span class="num" id="af-n-efectivo">0</span></span></button>
         </div>
     </div>
 
@@ -516,7 +522,8 @@
     function filaHtml(f) {
         return `<tr data-id="${f.id}">
             <td class="af-remision">${esc(f.remision)}</td>
-            <td>${f.factura ? `<span class="af-factura-asignada">${esc(f.factura)}</span>` : '<small class="text-muted fw-bold">Sin factura</small>'}
+            <td>${f.efectivo ? `<span class="af-efectivo" title="Cobrada en efectivo: no lleva factura"><i class="fas fa-money-bill-wave me-1"></i>EFECTIVO · ${esc(f.efectivo)}</span>${f.efectivo_importe != null ? `<small class="d-block fw-bold" style="color: #5b21b6;">Esta remisión: ${dinero(f.efectivo_importe, f.efectivo_moneda)}</small>` : ''}${f.efectivo_monto != null ? `<small class="d-block text-muted fw-bold">Total del efectivo: ${dinero(f.efectivo_monto, f.efectivo_moneda)}</small>` : ''}`
+                : f.factura ? `<span class="af-factura-asignada">${esc(f.factura)}</span>` : '<small class="text-muted fw-bold">Sin factura</small>'}
                 ${f.factura_id ? `<button type="button" class="af-total-link d-block mx-auto" data-factura="${f.factura_id}" title="Ver la factura y sus folios">Total factura: ${dinero(f.factura_total, f.factura_moneda)}</button>` : ''}</td>
             <td>${fecha(f.fecha)}</td><td>${esc(f.empresa)}</td><td>${esc(f.cliente) || '—'}</td>
             <td><span class="af-badge af-${esc(f.status)}">${esc(f.status_texto)}</span></td>
@@ -531,6 +538,7 @@
         llenarNombres('af-cliente', d.clientes);
         llenarNombres('af-fd-cliente', d.clientes);  // filtro de remisiones en el alta
         $('af-n-total').textContent = num(d.conteos.total, 0); $('af-n-sin').textContent = num(d.conteos.sin_factura, 0); $('af-n-con').textContent = num(d.conteos.con_factura, 0);
+        $('af-n-efectivo').textContent = num(d.conteos.efectivo, 0);
         $('af-filas').innerHTML = d.resultados.length ? d.resultados.map(filaHtml).join('')
             : '<tr><td colspan="8" class="py-5 text-muted">No hay remisiones con estos filtros.</td></tr>';
         $('af-conteo').textContent = `${d.count} remisiones`;

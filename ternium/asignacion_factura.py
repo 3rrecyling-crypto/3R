@@ -6,6 +6,10 @@ usuario), con búsqueda y filtros, y permite ver los datos de una remisión. Ah�
 factura solo se ve: se asigna únicamente desde "Facturas (alta y folios)". Todo lo
 que se escribe se guarda en MAYÚSCULAS.
 
+Efectivo: las remisiones que se cobraron en efectivo no llevan factura. Se registran en la
+pestaña "Efectivo" (ternium/efectivo_remisiones.py) y quedan con Remision.efectivo_registro: ya
+no cuentan como "sin factura" ni se pueden ligar a una factura (y al revés).
+
 Filtros por cliente (remisiones, facturas y folios del alta). Cada alta lleva su
 número de captura consecutivo (3R-F-001); en el alta los folios se buscan también
 por folio de descarga.
@@ -53,7 +57,7 @@ from cargas_diesel.archivos import leer as leer_archivo
 from cargas_diesel.archivos import subir as subir_archivo
 
 from .cfdi_xml import ErrorCFDI, leer_cfdi
-from .models import Empresa, FacturaRemision, HistorialFacturaRemision, Remision
+from .models import DetalleRemision, EfectivoLinea, Empresa, FacturaRemision, HistorialFacturaRemision, Remision
 
 PERMISO = 'ternium.acceso_asignacion_factura'
 POR_PAGINA = 50
@@ -87,11 +91,17 @@ def _base(user):
     """Remisiones que no están canceladas y tienen número de remisión, de las empresas del usuario."""
     return (Remision.objects.filter(empresa__in=_empresas(user))
             .exclude(status='CANCELADO').exclude(remision__isnull=True).exclude(remision='')
-            .select_related('empresa', 'cliente', 'destino', 'origen', 'factura_asignada_por', 'factura_registro'))
+            .select_related('empresa', 'cliente', 'destino', 'origen', 'factura_asignada_por', 'factura_registro',
+                            'efectivo_registro'))
 
 
 def _sin_factura_q():
     return Q(factura_nombre__isnull=True) | Q(factura_nombre='')
+
+
+def _libre_q():
+    """Remisiones que se pueden ligar a una factura o poner en efectivo: sin factura y sin efectivo."""
+    return _sin_factura_q() & Q(efectivo_registro__isnull=True)
 
 
 def _clientes(qs):
@@ -110,12 +120,13 @@ def _nombre(user):
     return (user.get_full_name() or user.username) if user else ''
 
 
-def _fila(r):
+def _fila(r, importes=None):
+    """importes: {remisión id: importe de esa remisión en su efectivo (suma de precio × kg de sus materiales)}."""
     return {
         'id': r.pk,
         'remision': r.remision,
         'fecha': r.fecha.isoformat() if r.fecha else None,
-        'empresa': r.empresa.nombre if r.empresa_id else '',
+        'empresa': r.empresa.nombre if r.empresa_id else '', 'empresa_id': r.empresa_id,
         'cliente': (r.cliente.nombre if r.cliente_id else '') or (r.destino.nombre if r.destino_id else ''),
         'origen': r.origen.nombre if r.origen_id else '',
         'status': r.status,
@@ -125,6 +136,13 @@ def _fila(r):
         'factura_id': r.factura_registro_id,
         'factura_total': float(r.factura_registro.total) if r.factura_registro_id else None,
         'factura_moneda': r.factura_registro.moneda if r.factura_registro_id else '',
+        # Si está en una operación en efectivo (sin factura): su captura (3R-E-001) y el monto
+        'efectivo_id': r.efectivo_registro_id,
+        'efectivo': r.efectivo_registro.numero_captura if r.efectivo_registro_id else '',
+        'efectivo_monto': (float(r.efectivo_registro.monto)
+                           if r.efectivo_registro_id and r.efectivo_registro.monto is not None else None),
+        'efectivo_moneda': r.efectivo_registro.moneda if r.efectivo_registro_id else '',
+        'efectivo_importe': (importes or {}).get(r.pk),
         'asignada_por': _nombre(r.factura_asignada_por),
         'asignada_en': timezone.localtime(r.factura_asignada_en).strftime('%d/%m/%Y %H:%M') if r.factura_asignada_en else '',
     }
@@ -152,7 +170,8 @@ FECHAS_FILTRO = {  # ?fecha_de= → campo de la remisión
 @require_http_methods(['GET'])
 @_api
 def api_lista(request):
-    """GET ?q&factura=sin|con&empresa&cliente&status&desde&hasta&fecha_de&page → filas, conteos, empresas y clientes.
+    """GET ?q&factura=sin|con|efectivo&empresa&cliente&status&desde&hasta&fecha_de&page → filas, conteos, empresas y clientes.
+    Cada remisión está en uno de tres grupos: en efectivo, con factura o sin factura (ni efectivo).
     fecha_de: a qué fecha aplican desde/hasta (inicio de carga, captura en el sistema o timbrado de la factura)."""
     p = request.GET
     qs = _base(request.user)
@@ -163,6 +182,9 @@ def api_lista(request):
                       'origen__nombre', 'folio_ld', 'folio_dlv', 'folio_medline', 'folio_salida',
                       'operador__nombre', 'operador_manual', 'unidad__internal_id', 'unidad_manual'):
             filtro |= Q(**{f'{campo}__icontains': q})
+        captura = re.fullmatch(r'(?:3R-?)?E-?0*(\d+)', q)  # captura del efectivo: 3R-E-001, E-1 o E1
+        if captura:
+            filtro |= Q(efectivo_registro__captura=int(captura.group(1)))
         qs = qs.filter(filtro)
     if str(p.get('empresa', '')).isdigit():
         qs = qs.filter(empresa_id=int(p['empresa']))
@@ -176,18 +198,22 @@ def api_lista(request):
     if _fecha(p.get('hasta')):
         qs = qs.filter(**{f'{campo}__date__lte': _fecha(p.get('hasta'))})
 
-    sin = qs.filter(_sin_factura_q()).count()
+    sin = qs.filter(_libre_q()).count()
+    efectivo = qs.filter(efectivo_registro__isnull=False).count()
     total = qs.count()
     if p.get('factura') == 'sin':
-        qs = qs.filter(_sin_factura_q())
+        qs = qs.filter(_libre_q())
     elif p.get('factura') == 'con':
-        qs = qs.exclude(_sin_factura_q())
+        qs = qs.exclude(_sin_factura_q()).filter(efectivo_registro__isnull=True)
+    elif p.get('factura') == 'efectivo':
+        qs = qs.filter(efectivo_registro__isnull=False)
 
     pagina = Paginator(qs.order_by('-fecha', '-pk'), POR_PAGINA).get_page(p.get('page') or 1)
+    importes = importes_efectivo([r.pk for r in pagina.object_list if r.efectivo_registro_id])
     return JsonResponse({
-        'resultados': [_fila(r) for r in pagina.object_list],
+        'resultados': [_fila(r, importes) for r in pagina.object_list],
         'page': pagina.number, 'pages': pagina.paginator.num_pages, 'count': pagina.paginator.count,
-        'conteos': {'total': total, 'sin_factura': sin, 'con_factura': total - sin},
+        'conteos': {'total': total, 'sin_factura': sin, 'con_factura': total - sin - efectivo, 'efectivo': efectivo},
         'empresas': [{'id': e.pk, 'nombre': e.nombre} for e in _empresas(request.user).order_by('nombre')],
         'clientes': _clientes(_base(request.user)),
     })
@@ -223,6 +249,26 @@ def _factura_de_remision(r):
             'de_esta_remision': bool(propias & {_norm(x) for x in c.get('folios') or []}),
         } for c in conceptos],
         'remisiones': list(f.remisiones.exclude(status='CANCELADO').order_by('remision').values_list('remision', flat=True)),
+    }
+
+
+def _efectivo_de_remision(r):
+    """La operación en efectivo de la remisión (para la ventana de datos), o None."""
+    e = r.efectivo_registro
+    if e is None:
+        return None
+    numero = lambda n: float(n) if n is not None else None  # noqa: E731
+    lineas = [{'material': li.material_nombre or '—', 'kg': float(li.kg), 'precio': numero(li.precio),
+               'importe': numero(li.importe)} for li in EfectivoLinea.objects.filter(efectivo=e, remision=r)]
+    con_precio = [li['importe'] for li in lineas if li['importe'] is not None]
+    return {
+        'id': e.pk, 'captura': e.numero_captura, 'fecha': e.fecha.isoformat(), 'cliente': e.cliente,
+        'monto': numero(e.monto), 'monto_calculado': numero(e.monto_calculado), 'monto_ajustado': e.monto_ajustado,
+        'moneda': e.moneda, 'tipo_cambio': float(e.tipo_cambio), 'notas': e.notas,
+        'empresa': e.empresa.nombre, 'creado_por': _nombre(e.creado_por),
+        'remisiones': list(e.remisiones.exclude(status='CANCELADO').order_by('remision').values_list('remision', flat=True)),
+        # Los materiales de ESTA remisión con su precio por kg, y lo que suma esta remisión
+        'lineas': lineas, 'importe': round(sum(con_precio), 2) if con_precio else None,
     }
 
 
@@ -268,7 +314,7 @@ def _detalle(r):
     except Exception:  # el módulo de facturación CFDI es opcional
         cfdi = []
     return {
-        **_fila(r),
+        **_fila(r, importes_efectivo([r.pk]) if r.efectivo_registro_id else None),
         'operador': (r.operador.nombre if r.operador_id else '') or (r.operador_manual or ''),
         'unidad': (r.unidad.internal_id if r.unidad_id else '') or (r.unidad_manual or ''),
         'placas_unidad': (r.unidad.license_plate if r.unidad_id else '') or (r.placas_unidad_manual or ''),
@@ -292,6 +338,7 @@ def _detalle(r):
         'auditado_por': _nombre(r.auditado_por), 'auditado_en': fecha_hora(r.auditado_en),
         'cfdi': cfdi,
         'factura_alta': _factura_de_remision(r),
+        'efectivo_alta': _efectivo_de_remision(r),
         'archivos': _archivos(r),
     }
 
@@ -336,14 +383,40 @@ def _kg_por_remision(ids):
     return {f['pk']: (float(f['carga'] or 0), float(f['descarga'] or 0)) for f in filas}
 
 
-def _folio_dict(r, kg):
+def importes_efectivo(ids):
+    """{remisión id: importe de la remisión en su efectivo}: suma de precio × kg de sus materiales con precio."""
+    if not ids:
+        return {}
+    filas = (EfectivoLinea.objects.filter(remision_id__in=ids, importe__isnull=False)
+             .values('remision_id').annotate(t=Sum('importe')))
+    return {f['remision_id']: float(f['t']) for f in filas}
+
+
+def materiales_por_remision(ids):
+    """{remisión id: [{detalle, material_id, material, kg, sugerido}]}: los materiales de cada remisión con
+    sus kg descargados (peso de descarga, que se guarda en kg). sugerido: el precio por kg que ya tenga
+    capturado el material en la remisión, si lo tiene."""
+    salida = {}
+    for d in (DetalleRemision.objects.filter(remision_id__in=ids).select_related('material').order_by('pk')):
+        salida.setdefault(d.remision_id, []).append({
+            'detalle': d.pk, 'material_id': d.material_id, 'material': d.material.nombre if d.material_id else 'SIN MATERIAL',
+            'kg': float(d.peso_dlv or 0), 'sugerido': float(d.precio) if d.precio is not None else None,
+        })
+    return salida
+
+
+def _folio_dict(r, kg, materiales=None):
+    """materiales: resultado de materiales_por_remision (solo lo piden las pantallas del efectivo)."""
     carga, descarga = kg.get(r.pk, (0.0, 0.0))
+    extra = {} if materiales is None else {'materiales': materiales.get(r.pk, [])}
     return {
+        **extra,
         'id': r.pk, 'remision': r.remision, 'fecha': r.fecha.isoformat() if r.fecha else None,
         'cliente': (r.cliente.nombre if r.cliente_id else '') or (r.destino.nombre if r.destino_id else ''),
         'status_texto': ESTATUS.get(r.status, r.status), 'carga_kg': carga, 'descarga_kg': descarga,
         'factura': r.factura_nombre or '', 'empresa_id': r.empresa_id, 'empresa': r.empresa.nombre,
         'folio_dlv': r.folio_dlv or '',
+        'efectivo': r.efectivo_registro.numero_captura if r.efectivo_registro_id else '',
     }
 
 
@@ -574,6 +647,10 @@ def _guardar_factura(user, body, factura=None, xml=None):
                 if r.factura_nombre and (not factura or r.factura_registro_id != factura.pk)]
     if con_otra:
         raise ErrorFactura('Estos folios ya tienen factura y no se pueden ligar: ' + ', '.join(con_otra[:10]) + '.')
+    en_efectivo = [f'{r.remision} ({r.efectivo_registro.numero_captura})' for r in folios.values() if r.efectivo_registro_id]
+    if en_efectivo:
+        raise ErrorFactura('Estos folios están en efectivo (sin factura) y no se pueden ligar: '
+                           + ', '.join(en_efectivo[:10]) + '. Quítalos primero de su efectivo.')
 
     ahora = timezone.now()
     nueva = factura is None
@@ -632,12 +709,12 @@ def _guardar_factura(user, body, factura=None, xml=None):
         Remision.objects.filter(factura_registro=factura).exclude(pk__in=ids).update(
             factura_registro=None, factura_nombre=None, factura_asignada_por=None, factura_asignada_en=None,
             actualizado_en=ahora)
-        # Ligar: solo los que siguen sin factura o ya eran de esta (el filtro va en el UPDATE)
-        ligados = Remision.objects.filter(pk__in=ids).filter(_sin_factura_q() | Q(factura_registro=factura)).update(
+        # Ligar: solo los que siguen sin factura ni efectivo, o ya eran de esta (el filtro va en el UPDATE)
+        ligados = Remision.objects.filter(pk__in=ids).filter(_libre_q() | Q(factura_registro=factura)).update(
             factura_registro=factura, factura_nombre=numero, factura_asignada_por=user, factura_asignada_en=ahora,
             actualizado_en=ahora)
         if ligados != len(ids):
-            raise ErrorFactura('Alguien le asignó factura a uno de los folios mientras tanto. Vuelve a intentarlo.')
+            raise ErrorFactura('Alguien le asignó factura o efectivo a uno de los folios mientras tanto. Vuelve a intentarlo.')
         # Bitácora: quién, cuándo y qué cambió
         folios_despues = {folios[i].remision for i in ids}
         if nueva:
@@ -769,7 +846,8 @@ def _buscar_folios(user, folios, factura_id=None):
     kg = _kg_por_remision([r.pk for _, rs in por_folio for r in rs])
     return [{'folio': folio, 'remisiones': [{
         **_folio_dict(r, kg), 'empresa_id': r.empresa_id, 'empresa': r.empresa.nombre,
-        'libre': not r.factura_nombre or (factura_id is not None and r.factura_registro_id == factura_id),
+        'libre': (not r.factura_nombre and not r.efectivo_registro_id)
+                 or (factura_id is not None and r.factura_registro_id == factura_id),
     } for r in rs]} for folio, rs in por_folio]
 
 
@@ -915,7 +993,8 @@ def _revisar_xml(user, archivo, uuids, numeros, tomados):
         if en_lote:
             estado, texto = 'lote', f'Va en la factura {tomados[en_lote["id"]]} de este lote'
         elif ocupada:
-            estado, texto = 'ocupado', f'Ya tiene factura {ocupada["factura"]}'
+            estado, texto = 'ocupado', (f'Está en efectivo {ocupada["efectivo"]}' if ocupada['efectivo']
+                                        else f'Ya tiene factura {ocupada["factura"]}')
         else:
             estado, texto = 'no_existe', 'No existe en el sistema'
         fila['folios'].append({'folio': c['folio'], 'estado': estado, 'remision': '', 'empresa_id': None,
@@ -961,10 +1040,22 @@ def api_revisar_lote(request):
 @require_http_methods(['GET'])
 @_api
 def api_disponibles(request):
-    """GET ?empresas=1,2 (o ?empresa=1)&q&cliente&folio_desde&folio_hasta&factura=<id> → folios que se
-    pueden ligar: los de esas unidades de negocio que no tienen factura (y, al editar, los que ya son de
-    esa factura). q busca en la remisión, el folio de descarga y el cliente."""
+    """GET ?empresas=1,2 (o ?empresa=1)&q&cliente&folio_desde&folio_hasta&factura=<id>&efectivo=<id> → folios
+    que se pueden ligar a una factura o poner en efectivo: los de esas unidades de negocio que no tienen
+    factura ni efectivo (y, al editar, los que ya son de esa factura o de ese efectivo). q busca en la
+    remisión, el folio de descarga y el cliente.
+    Con ?ids=1,2,3 devuelve solo esas remisiones (las que sigan libres): son las que el usuario marcó en la
+    lista de remisiones para mandarlas a una factura o a un efectivo. Con ?materiales=1 cada folio trae sus
+    materiales con los kg descargados (para capturar el precio por kg en el efectivo)."""
     p = request.GET
+    marcadas = [int(x) for x in str(p.get('ids') or '').split(',') if x.strip().isdigit()][:MAX_DISPONIBLES]
+    if marcadas:
+        filas = list(_base(request.user).filter(pk__in=marcadas).filter(_libre_q()))
+        kg = _kg_por_remision([r.pk for r in filas])
+        mats = materiales_por_remision([r.pk for r in filas]) if p.get('materiales') == '1' else None
+        return JsonResponse({'resultados': sorted((_folio_dict(r, kg, mats) for r in filas),
+                                                  key=lambda x: (_numero_folio(x['remision']) or 0, x['remision'])),
+                             'limitado': False})
     ids = [int(x) for x in str(p.get('empresas') or p.get('empresa') or '').split(',') if x.strip().isdigit()]
     if not ids:
         return JsonResponse({'resultados': [], 'limitado': False})
@@ -973,7 +1064,9 @@ def api_disponibles(request):
     propios = []
     if str(p.get('factura', '')).isdigit():
         propios = list(qs.filter(factura_registro_id=int(p['factura'])))
-    qs = qs.filter(_sin_factura_q())
+    elif str(p.get('efectivo', '')).isdigit():
+        propios = list(qs.filter(efectivo_registro_id=int(p['efectivo'])))
+    qs = qs.filter(_libre_q())
     q = _mayusculas(p.get('q'), 100)
     if q:
         qs = qs.filter(Q(remision__icontains=q) | Q(folio_dlv__icontains=q) | Q(cliente__nombre__icontains=q)
@@ -992,7 +1085,8 @@ def api_disponibles(request):
         if len(filas) >= MAX_DISPONIBLES:
             break
     kg = _kg_por_remision([r.pk for r in filas])
-    resultado = sorted((_folio_dict(r, kg) for r in filas), key=lambda x: (_numero_folio(x['remision']) or 0, x['remision']))
+    mats = materiales_por_remision([r.pk for r in filas]) if p.get('materiales') == '1' else None
+    resultado = sorted((_folio_dict(r, kg, mats) for r in filas), key=lambda x: (_numero_folio(x['remision']) or 0, x['remision']))
     return JsonResponse({'resultados': resultado, 'limitado': len(filas) >= MAX_DISPONIBLES})
 
 

@@ -52,6 +52,8 @@ from openpyxl.utils import get_column_letter
 from openpyxl.drawing.image import Image as OpenXLImage
 from django.http import HttpResponse
 from django.shortcuts import redirect
+
+from .columnas_remisiones import factura_o_efectivo
 from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.views.decorators.http import require_POST, require_http_methods
@@ -278,7 +280,7 @@ def api_remisiones_lista(request):
 
     _columnas_usuario = _columnas_de(request.user)
     # factura_registro: la vista por defecto muestra la captura de la factura (3R-F-030).
-    _relaciones = {'empresa', 'origen', 'destino', 'operador', 'factura_registro'}
+    _relaciones = {'empresa', 'origen', 'destino', 'operador', 'factura_registro', 'efectivo_registro'}
     for _c in _columnas_usuario:
         _rel = SELECT_RELATED_POR_CLAVE.get(_c['clave'])
         if _rel:
@@ -516,6 +518,8 @@ def api_remisiones_lista(request):
             # Factura asignada en Asignación de factura y su número de captura (3R-F-030).
             'factura_numero': rem.factura_nombre or (rem.factura_registro.numero if rem.factura_registro else ''),
             'factura_captura': rem.factura_registro.numero_captura if rem.factura_registro else '',
+            # Si se cobró en efectivo (sin factura): la captura de su operación (3R-E-001).
+            'efectivo_captura': rem.efectivo_registro.numero_captura if rem.efectivo_registro_id else '',
             'permite_manifiesto_destruccion': permite_word,
             'destruccion_fiscal_completa': destruccion_completa,
             # Alias cortos (lo que ya consume el front Next.js).
@@ -1420,8 +1424,9 @@ def export_remisiones_to_excel(request):
     # 2. Construir QuerySet Base
     # Medline va siempre por inicio de carga, sin importar la preferencia del usuario.
     es_medline = tipo_reporte == 'medline'
+    # efectivo_registro: la columna Factura dice EFECTIVO 3R-E-001 en las cobradas en efectivo
     queryset = _con_fecha_reporte(Remision.objects.all().select_related(
-        'empresa', 'origen', 'destino', 'linea_transporte', 'operador', 'unidad', 'contenedor'
+        'empresa', 'origen', 'destino', 'linea_transporte', 'operador', 'unidad', 'contenedor', 'efectivo_registro'
     ).prefetch_related('detalles', 'detalles__material', 'evidencias'), request,
         'carga' if es_medline else None, estricta=es_medline)
     # Solo de las empresas autorizadas del usuario (igual que el listado)
@@ -1531,7 +1536,7 @@ def export_remisiones_to_excel(request):
                     folio_generado = remision.folio_medline or "N/A"
                     row_data = [
                         remision.remision,
-                        remision.factura_nombre or '',
+                        factura_o_efectivo(remision),
                         remision.origen.nombre if remision.origen else 'MEDLINE',
                         mat_nom,
                         peso_ld,
@@ -1629,7 +1634,7 @@ def export_remisiones_to_excel(request):
             rechazo_val = total_rechazo if total_rechazo > 0 else "N/A"
 
             row_data = [
-                remision.remision, remision.factura_nombre or '', remision.fecha_reporte, remision.get_status_display(),
+                remision.remision, factura_o_efectivo(remision), remision.fecha_reporte, remision.get_status_display(),
                 remision.empresa.nombre if remision.empresa else '',
                 remision.origen.nombre if remision.origen else '',
                 remision.destino.nombre if remision.destino else '',
@@ -1716,7 +1721,7 @@ def export_remisiones_to_excel(request):
                 rechazo_val = peso_rechazado if peso_rechazado > 0 else "N/A"
 
                 row_data = [
-                    remision.remision, remision.factura_nombre or '', remision.fecha_reporte, remision.get_status_display(),
+                    remision.remision, factura_o_efectivo(remision), remision.fecha_reporte, remision.get_status_display(),
                     remision.empresa.nombre if remision.empresa else '',
                     remision.origen.nombre if remision.origen else '',
                     remision.destino.nombre if remision.destino else '',
@@ -1795,7 +1800,7 @@ def export_remisiones_to_excel(request):
             rechazo_val = peso_rechazado if peso_rechazado > 0 else "N/A"
 
             row_data = [
-                remision.remision, remision.factura_nombre or '', remision.fecha_reporte, remision.get_status_display(),
+                remision.remision, factura_o_efectivo(remision), remision.fecha_reporte, remision.get_status_display(),
                 remision.empresa.nombre if remision.empresa else '',
                 remision.origen.nombre if remision.origen else '',
                 remision.destino.nombre if remision.destino else '',
@@ -1988,7 +1993,7 @@ def export_reportes_especificos(request):
     estatus_reporte = (['TERMINADO', 'AUDITADO', 'PENDIENTE'] if tipo_reporte == 'proboca'
                        else ['TERMINADO', 'AUDITADO'])
     queryset = Remision.objects.filter(status__in=estatus_reporte).select_related(
-        'empresa', 'origen', 'destino', 'linea_transporte', 'operador', 'unidad'
+        'empresa', 'origen', 'destino', 'linea_transporte', 'operador', 'unidad', 'efectivo_registro'
     ).prefetch_related('detalles', 'detalles__material', 'evidencias')
 
     # 2. Filtrar por tipo de reporte (Origen)
@@ -2107,7 +2112,7 @@ def export_reportes_especificos(request):
 
             for d in remision.detalles.all():
                 ws.append([
-                    remision.remision, remision.factura_nombre or '',
+                    remision.remision, factura_o_efectivo(remision),
                     remision.origen.nombre if remision.origen else '',
                     remision.destino.nombre if remision.destino else '',
                     remision.fecha_reporte.strftime("%d/%m/%Y") if remision.fecha_reporte else "",
@@ -2172,7 +2177,7 @@ def export_reportes_especificos(request):
 
                 row_data = [
                     remision.remision,
-                    remision.factura_nombre or '',
+                    factura_o_efectivo(remision),
                     remision.empresa.nombre if remision.empresa else 'HUDSON',
                     remision.operador.nombre if remision.operador else (remision.operador_manual or ''),
                     remision.unidad.internal_id if remision.unidad else (remision.unidad_manual or ''),
@@ -2234,7 +2239,7 @@ def export_reportes_especificos(request):
 
                 ws.append([
                     remision.remision,
-                    remision.factura_nombre or '',
+                    factura_o_efectivo(remision),
                     remision.origen.nombre if remision.origen else '',
                     remision.destino.nombre if remision.destino else '',
                     d.material.nombre if d.material else "S/M",
