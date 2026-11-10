@@ -50,7 +50,7 @@
               </div>
               
               <div class="col-md-4">
-                <label for="{{ form.boleta_bascula.id_for_label }}" class="form-label fw-bold"># Boleta Báscula*</label>
+                <label for="{{ form.boleta_bascula.id_for_label }}" class="form-label fw-bold"># Boleta Báscula{% if form.boleta_bascula.field.required %}*{% endif %}</label>
                 {{ form.boleta_bascula }}
                 <div class="invalid-feedback">{{ form.boleta_bascula.errors.as_text }}</div>
               </div>

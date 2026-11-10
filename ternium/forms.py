@@ -747,7 +747,12 @@ class RegistroLogisticoForm(forms.ModelForm):
 
         self.fields['transportista'].empty_label = "Seleccione Transportista"
         self.fields['material'].empty_label = "Seleccione Material"
-        
+
+        # Al editar, la boleta es opcional: los registros de la carga masiva desde Excel
+        # (ternium/carga_logistica.py) pueden venir sin ella. Al crear sigue siendo obligatoria.
+        if self.instance and self.instance.pk:
+            self.fields['boleta_bascula'].required = False
+
         if self.instance and self.instance.pk and self.instance.status == 'AUDITADO':
             for field in self.fields:
                 self.fields[field].disabled = True
