@@ -1193,11 +1193,18 @@ class RegistroLogistico(models.Model):
         verbose_name="XML Factura"
     )
     acuse_pdf = models.FileField(
-        upload_to=get_registro_logistico_upload_path, 
-        max_length=255, 
-        null=True, 
-        blank=True, 
+        upload_to=get_registro_logistico_upload_path,
+        max_length=255,
+        null=True,
+        blank=True,
         verbose_name="Acuse (PDF)"
+    )
+    # Dado de alta con la carga masiva del Excel (ternium/carga_logistica.py). Esos
+    # registros pueden venir sin boleta de báscula: para Terminado no se les exige.
+    carga_masiva = models.BooleanField(
+        default=False,
+        editable=False,
+        verbose_name="Desde carga masiva (Excel)",
     )
 
     class Meta:
@@ -1245,10 +1252,13 @@ class RegistroLogistico(models.Model):
     def _is_terminado(self):
         # Campos mínimos requeridos para considerar terminado
         campos_principales_requeridos = [
-            self.remision, self.fecha_carga, self.boleta_bascula, self.transportista,
+            self.remision, self.fecha_carga, self.transportista,
             self.chofer, self.tractor, self.tolva, self.material,
             self.toneladas_remisionadas, self.toneladas_recibidas
         ]
+        # La boleta se exige salvo en los que vienen de la carga masiva del Excel
+        if not self.carga_masiva:
+            campos_principales_requeridos.append(self.boleta_bascula)
 
         if not all(campos_principales_requeridos):
             return False

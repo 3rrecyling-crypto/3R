@@ -602,6 +602,7 @@ def importar(rev, user, elegidas=None, usar_sugeridas=False):
             f['comentario'], f'Carga masiva desde Excel ({f["hoja"]}, renglón {f["renglon"]}) por {quien} el {hoy}') if x),
         # Sin documentos nunca queda Terminado: el save() del modelo lo dejaría Pendiente.
         status=f['status'],
+        carga_masiva=True,  # para Terminado no se le exige la boleta
     ) for f in filas]
     RegistroLogistico.objects.bulk_create(registros, batch_size=200)
     return {
