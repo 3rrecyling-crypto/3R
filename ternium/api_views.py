@@ -1424,7 +1424,7 @@ def export_remisiones_to_excel(request):
     # 2. Construir QuerySet Base
     # Medline va siempre por inicio de carga, sin importar la preferencia del usuario.
     es_medline = tipo_reporte == 'medline'
-    # efectivo_registro: la columna Factura dice EFECTIVO 3R-E-001 en las cobradas en efectivo
+    # efectivo_registro: la columna Factura lleva el folio de captura (3R-E-001) en las cobradas en efectivo
     queryset = _con_fecha_reporte(Remision.objects.all().select_related(
         'empresa', 'origen', 'destino', 'linea_transporte', 'operador', 'unidad', 'contenedor', 'efectivo_registro'
     ).prefetch_related('detalles', 'detalles__material', 'evidencias'), request,

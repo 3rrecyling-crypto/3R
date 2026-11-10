@@ -5329,7 +5329,7 @@ def exportar_vista_remisiones(request):
     vista = RemisionListView()
     vista.request = request
     vista.kwargs = {}
-    # efectivo_registro: la columna Factura dice EFECTIVO 3R-E-001 en las cobradas en efectivo
+    # efectivo_registro: la columna Factura lleva el folio de captura (3R-E-001) en las cobradas en efectivo
     queryset = vista.get_queryset().select_related('efectivo_registro')
 
     # Todos los Excel de remisiones llevan la Factura (factura_nombre, la que se
@@ -5337,7 +5337,7 @@ def exportar_vista_remisiones(request):
     # la tenga en su tabla y sin repetirla si sí la tiene. La columna 'factura'
     # de la tabla son las facturas CFDI: en el Excel se llama "Factura CFDI".
     # Si la remisión se cobró en efectivo (sin factura), ahí va el folio de
-    # captura de su operación: EFECTIVO 3R-E-001.
+    # captura de su operación: 3R-E-001.
     columnas = []
     for col in columnas_de(request.user):
         if col['clave'] == 'factura_nombre':

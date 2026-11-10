@@ -222,7 +222,7 @@ SELECT_RELATED_POR_CLAVE = {
     # dicen EFECTIVO 3R-E-001: las listas precargan también efectivo_registro.
     'factura': 'factura_registro',
     'factura_captura': 'factura_registro',
-    # "Folio de factura" dice EFECTIVO 3R-E-001 en las cobradas en efectivo
+    # "Folio de factura" lleva el folio de captura (3R-E-001) en las cobradas en efectivo
     'factura_nombre': 'efectivo_registro',
 }
 
@@ -230,12 +230,13 @@ SELECT_RELATED_POR_CLAVE = {
 def factura_o_efectivo(remision):
     """Lo que va en la columna "Factura" de los Excel de remisiones: la factura asignada en
     Asignación de factura o, si la remisión se cobró en efectivo (sin factura), el folio de
-    captura de su operación: 'EFECTIVO 3R-E-001'. Vacío si no tiene ninguna de las dos.
+    captura de su operación, solo el folio: '3R-E-001' (sin la palabra EFECTIVO: así se pidió para el
+    cliente). Vacío si no tiene ninguna de las dos.
     Quien lo use en una lista debe precargar efectivo_registro (select_related)."""
     if remision.factura_nombre:
         return remision.factura_nombre
     if remision.efectivo_registro_id:
-        return f'EFECTIVO {remision.efectivo_registro.numero_captura}'
+        return remision.efectivo_registro.numero_captura
     return ''
 
 
@@ -463,7 +464,7 @@ def valor_plano(remision, col):
         return remision.get_status_display()
     if clave == 'factura':
         return ', '.join(f.folio or str(f.id) for f in remision.facturas.all()) or ''
-    if clave == 'factura_nombre':  # la factura asignada o, si se cobró en efectivo, EFECTIVO 3R-E-001
+    if clave == 'factura_nombre':  # la factura asignada o, si se cobró en efectivo, su folio 3R-E-001
         return factura_o_efectivo(remision)
     if clave == 'material':
         return _lineas((d.material.nombre if d.material else '') for d in remision.detalles.all())

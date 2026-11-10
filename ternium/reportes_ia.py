@@ -964,7 +964,7 @@ def _tabla_lista(c, remisiones, sumas_r, merma_expr, mat_ids, resumen, limite):
             # Precio por kg: el de la remisión, o el promedio ponderado si trae varios
             'precio_kg': (round(float(r.importe or 0) / kg_precio, 4) if kg_precio
                           else (float(con_precio[0].precio) if con_precio else None)),
-            'factura': factura_o_efectivo(r),  # la factura o, si se cobró en efectivo, EFECTIVO 3R-E-001
+            'factura': factura_o_efectivo(r),  # la factura o, si se cobró en efectivo, su folio 3R-E-001
             'facturas_cfdi': (', '.join(
                 f'{fa.serie or ""}{"-" if fa.serie else ""}{fa.folio or fa.pk}'
                 + (' (cancelada)' if fa.estado == 'cancelada' else '')
