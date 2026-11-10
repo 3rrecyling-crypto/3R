@@ -20,7 +20,11 @@
                     <a href="{% url 'crear_registro_logistica' %}" class="btn btn-light btn-sm px-3 me-2" id="btn-nuevo-registro">
                         <i class="fas fa-plus me-2"></i>Nuevo Registro
                     </a>
-                    
+
+                    <a href="{% url 'carga_masiva_logistica' %}" class="btn btn-light btn-sm px-3 me-2" id="btn-carga-masiva" title="Subir varios registros desde el Excel del reporte de salidas">
+                        <i class="fas fa-file-upload me-2"></i>Carga masiva (Excel)
+                    </a>
+
                     <button type="button" class="btn btn-success btn-sm px-3" data-bs-toggle="modal" data-bs-target="#exportModal">
                         <i class="fas fa-file-excel me-2"></i>Exportar a Excel
                     </button>

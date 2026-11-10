@@ -1,0 +1,324 @@
+{% extends "ternium/base.html" %}
+
+{% block title %}Carga masiva de salidas - Ternium{% endblock title %}
+
+{% block content %}
+<div class="container-fluid mt-4" id="cl">
+  <div class="card shadow-lg border-0">
+    <div class="card-header cl-header text-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <h4 class="mb-0 fw-bold"><i class="fas fa-file-upload me-2"></i>Carga masiva de salidas (Excel)</h4>
+      <a href="{% url 'lista_registros_logistica' %}" class="btn btn-light btn-sm" id="cl-volver"><i class="fas fa-arrow-left me-1"></i>Volver a registros</a>
+    </div>
+    <div class="card-body">
+      <p class="text-muted small mb-3">
+        Sube el <strong>Reporte de salidas Ternium</strong> (una hoja por mes). Primero se revisa sin guardar nada; al confirmar
+        se dan de alta solo las remisiones que no existen. <strong>Lo que ya está en el sistema no se modifica.</strong>
+      </p>
+      <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <input type="file" id="cl-archivo" class="form-control" accept=".xlsx,.xlsm" style="max-width: 420px">
+        <button type="button" class="btn btn-primary" id="cl-revisar"><i class="fas fa-search me-1"></i>Revisar</button>
+        <span id="cl-estado" class="small text-muted"></span>
+      </div>
+      <div id="cl-error" class="alert alert-danger d-none"></div>
+      <div id="cl-hecho" class="alert alert-success d-none"></div>
+
+      <div id="cl-resultado" class="d-none">
+        <div id="cl-resumen" class="d-flex flex-wrap gap-2 mb-2"></div>
+        <div id="cl-hojas" class="small text-muted mb-3"></div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-lg-6">
+            <h6 class="fw-bold mb-1">Transportistas</h6>
+            <div class="small text-muted mb-1">Los parecidos se juntan con el del catálogo; los que no existen se dan de alta.</div>
+            <div id="cl-trans" class="cl-catalogo"></div>
+          </div>
+          <div class="col-lg-6">
+            <h6 class="fw-bold mb-1">Materiales</h6>
+            <div class="small text-muted mb-1">Por código de Ternium; los que no existen se dan de alta con su descripción.</div>
+            <div id="cl-mats" class="cl-catalogo"></div>
+          </div>
+        </div>
+
+        <div id="cl-sug" class="alert alert-warning py-2 d-none">
+          <div class="form-check mb-0">
+            <input type="checkbox" id="cl-usar-sug" class="form-check-input">
+            <label for="cl-usar-sug" class="form-check-label" id="cl-sug-texto"></label>
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+          <div class="btn-group btn-group-sm flex-wrap" id="cl-filtros" role="group"></div>
+          <input type="search" id="cl-buscar" class="form-control form-control-sm" placeholder="Buscar remisión, chofer…" style="max-width: 220px">
+          <button type="button" class="btn btn-success ms-auto" id="cl-subir"></button>
+        </div>
+        <div class="table-responsive cl-tabla-caja">
+          <table class="table table-sm table-hover align-middle small mb-0" id="cl-tabla">
+            <thead class="table-light">
+              <tr>
+                <th>Hoja · renglón</th><th>Remisión</th><th>Estado</th><th>Fecha carga</th><th>Entrega</th>
+                <th>Transportista</th><th>Material</th><th class="text-end">Ton. rem.</th><th class="text-end">Ton. rec.</th>
+                <th>Estatus</th><th>Avisos</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="cl-pie" class="small text-muted mt-2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_css %}
+<style>
+  .cl-header { background: linear-gradient(135deg, #0056b3 0%, #003366 100%); }
+  #cl .card { border-radius: 12px; overflow: hidden; }
+  .cl-tabla-caja { max-height: 65vh; overflow: auto; border: 1px solid #dee2e6; border-radius: 8px; }
+  .cl-tabla-caja thead th { position: sticky; top: 0; z-index: 1; white-space: nowrap; }
+  .cl-catalogo { max-height: 220px; overflow: auto; border: 1px solid #eef2f7; border-radius: 8px; }
+  .cl-catalogo table { margin: 0; }
+  .cl-avisos { margin: 0; padding-left: 1rem; min-width: 220px; }
+  .cl-avisos li.err { color: #b02a37; }
+  .cl-avisos li.av { color: #8a5a00; }
+  .cl-avisos li.cor { color: #0a6c8a; }
+  .cl-fila-existe td, .cl-fila-repetida td { color: #6c757d; }
+  .cl-fila-error td { background: #fff5f5; }
+  #cl-filtros .btn.active { color: #fff; }
+</style>
+{% endblock extra_css %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const CSRF = '{{ csrf_token }}';
+    const URL_REVISAR = "{% url 'carga_masiva_logistica_revisar' %}";
+    const URL_IMPORTAR = "{% url 'carga_masiva_logistica_importar' %}";
+    const URL_LISTA = "{% url 'lista_registros_logistica' %}";
+    const $ = id => document.getElementById(id);
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const fecha = iso => iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : '';
+    const ton = n => n == null ? '' : Number(n).toLocaleString('es-MX', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+    const FILTROS = [
+        ['todos', 'Todos', 'secondary'], ['nuevo', 'Se suben', 'success'], ['existe', 'Ya existen', 'secondary'],
+        ['repetida', 'Repetidas', 'warning'], ['error', 'Con error', 'danger'], ['aviso', 'Con aviso', 'warning'],
+        ['corregida', 'Fecha corregida', 'info'], ['rechazado', 'Rechazados', 'dark'],
+    ];
+    const ESPECIALES = ['todos', 'aviso', 'corregida', 'rechazado'];
+    const tieneSugerida = f => !!(f.sugerida || f.entrega_sugerida);
+
+    let datos = null, archivo = null, elegidas = {}, filtro = 'todos';
+
+    function avisar(id, html) { const el = $(id); el.innerHTML = html; el.classList.toggle('d-none', !html); }
+
+    async function enviar(url, extra) {
+        const fd = new FormData();
+        fd.append('archivo', archivo);
+        Object.entries(extra || {}).forEach(([k, v]) => fd.append(k, v));
+        const r = await fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': CSRF }, body: fd });
+        let d = {};
+        try { d = await r.json(); } catch (e) { /* respuesta sin JSON */ }
+        if (!r.ok) throw new Error(d.detail || `Error ${r.status} del servidor.`);
+        return d;
+    }
+
+    // Estado que se ve: de las remisiones repetidas solo la elegida "se sube"
+    function estadoDe(f) {
+        if (f.estado !== 'nuevo' || !f.grupo) return f.estado;
+        return elegidas[f.grupo] === f.key ? 'nuevo' : 'repetida';
+    }
+    const aSubir = () => datos.filas.filter(f => estadoDe(f) === 'nuevo');
+    const usarSugeridas = () => $('cl-usar-sug').checked;
+
+    function pasaFiltro(f) {
+        const e = estadoDe(f);
+        if (filtro === 'aviso' && !(e === 'nuevo' && f.avisos.length)) return false;
+        if (filtro === 'corregida' && !(e === 'nuevo' && f.correcciones.length)) return false;
+        if (filtro === 'rechazado' && !(e === 'nuevo' && f.status === 'RECHAZADO')) return false;
+        if (!ESPECIALES.includes(filtro) && e !== filtro) return false;
+        const q = $('cl-buscar').value.trim().toUpperCase();
+        return !q || [f.remision, f.chofer, f.transportista, f.hoja, f.material].some(x => String(x || '').toUpperCase().includes(q));
+    }
+
+    function pintarResumen() {
+        const subir = aSubir();
+        const cuenta = e => datos.filas.filter(f => estadoDe(f) === e).length;
+        const rech = subir.filter(f => f.status === 'RECHAZADO').length;
+        const conAviso = subir.filter(f => f.avisos.length).length;
+        const corregidas = subir.filter(f => f.correcciones.length).length;
+        const chips = [
+            ['success', `<strong>${subir.length}</strong> se suben` + (rech ? ` (${rech} rechazados)` : '')],
+            ['secondary', `<strong>${cuenta('existe')}</strong> ya existen (no se tocan)`],
+            ['warning text-dark', `<strong>${cuenta('repetida')}</strong> repetidas en el archivo (no se suben)`],
+            ['danger', `<strong>${cuenta('error')}</strong> con error (no se suben)`],
+            ['light text-dark border', `<strong>${conAviso}</strong> con aviso`],
+            ['info text-dark', `<strong>${corregidas}</strong> con día y mes volteados (ya corregidos)`],
+        ];
+        $('cl-resumen').innerHTML = chips.map(([c, t]) => `<span class="badge bg-${c} fs-6 fw-normal">${t}</span>`).join('');
+        const porHoja = {};
+        subir.forEach(f => { porHoja[f.hoja] = (porHoja[f.hoja] || 0) + 1; });
+        $('cl-hojas').innerHTML = 'Por hoja (se suben): ' + datos.hojas.map(h => `${esc(h)} <strong>${porHoja[h] || 0}</strong>`).join(' · ')
+            + (datos.hojas_omitidas.length ? `<br>Hojas sin encabezados (no se leen): ${datos.hojas_omitidas.map(esc).join(', ')}` : '')
+            + (datos.resumen.sin_boleta ? `<br>${datos.resumen.sin_boleta} renglones no traen boleta de báscula: se suben sin ella.` : '');
+        const btn = $('cl-subir');
+        btn.disabled = !subir.length;
+        btn.innerHTML = `<i class="fas fa-cloud-upload-alt me-1"></i>Subir ${subir.length} registro${subir.length === 1 ? '' : 's'}`;
+    }
+
+    function pintarCatalogo(id, lista, campo) {
+        const usos = {};
+        aSubir().forEach(f => { if (f[campo]) usos[f[campo]] = (usos[f[campo]] || 0) + 1; });
+        if (!lista.length) { $(id).innerHTML = '<div class="p-2 text-muted small">Ninguno.</div>'; return; }
+        $(id).innerHTML = `<table class="table table-sm small align-middle"><thead class="table-light"><tr><th>En el Excel</th><th>En el sistema</th><th class="text-end">Renglones</th></tr></thead><tbody>`
+            + lista.map(e => `<tr${usos[e.nombre] ? '' : ' class="text-muted"'}>
+                <td>${e.excel.map(esc).join('<br>')}</td>
+                <td><strong>${esc(e.nombre)}</strong>
+                    ${e.nuevo ? '<span class="badge bg-primary ms-1">se da de alta</span>' : ''}
+                    ${!e.nuevo && e.ligar_ternium ? '<span class="badge bg-info text-dark ms-1" title="Si no, no aparece al editar el registro">se liga a Ternium</span>' : ''}</td>
+                <td class="text-end">${usos[e.nombre] || 0}</td></tr>`).join('')
+            + '</tbody></table>';
+    }
+
+    function pintarSugeridas() {
+        const subir = aSubir();
+        const n = subir.filter(tieneSugerida).length;
+        const nc = subir.filter(f => f.sugerida).length, ne = subir.filter(f => f.entrega_sugerida).length;
+        $('cl-sug').classList.toggle('d-none', !n);
+        $('cl-sug-texto').innerHTML = `<strong>${n}</strong> renglones traen fechas que no cuadran: ${nc} de carga con su hoja (o con el año ${datos.anio}) `
+            + `y ${ne} de entrega con la carga. Márcalo para usar la <strong>fecha sugerida</strong> `
+            + `(carga: mismo día con el mes de la hoja y el año del archivo; entrega: mismo día en el mes de la carga o el siguiente). `
+            + `Si no, se suben con la fecha como viene. Usa el filtro "Con aviso" para verlos.`;
+    }
+
+    function celdaEstado(f, e) {
+        let html = {
+            nuevo: '<span class="badge bg-success">Se sube</span>',
+            existe: `<span class="badge bg-secondary">Ya existe</span>${f.existe_como && f.existe_como !== f.remision ? `<div class="text-muted">como ${esc(f.existe_como)}</div>` : ''}`,
+            repetida: '<span class="badge bg-warning text-dark">Repetida: no se sube</span>',
+            error: '<span class="badge bg-danger">No se sube</span>',
+        }[e];
+        if (f.grupo) {
+            html += `<div class="form-check mt-1 mb-0"><input class="form-check-input cl-elige" type="checkbox" id="el-${esc(f.key)}"
+                data-grupo="${esc(f.grupo)}" data-key="${esc(f.key)}" ${elegidas[f.grupo] === f.key ? 'checked' : ''}>
+                <label class="form-check-label" for="el-${esc(f.key)}">subir esta</label></div>`;
+        }
+        return html;
+    }
+
+    function celdaFecha(viene, sugerida) {
+        if (!sugerida) return fecha(viene);
+        return usarSugeridas()
+            ? `<s class="text-muted">${fecha(viene)}</s><br><strong>${fecha(sugerida)}</strong>`
+            : `${fecha(viene)} <i class="fas fa-exclamation-triangle text-warning" title="Sugerida: ${fecha(sugerida)}"></i>`;
+    }
+
+    function pintarTabla() {
+        const filas = datos.filas.filter(pasaFiltro);
+        $('cl-tabla').tBodies[0].innerHTML = filas.map(f => {
+            const e = estadoDe(f);
+            const avisos = [...f.errores.map(t => `<li class="err">${esc(t)}</li>`), ...f.avisos.map(t => `<li class="av">${esc(t)}</li>`),
+                ...f.correcciones.map(t => `<li class="cor">${esc(t)}</li>`)].join('');
+            return `<tr class="cl-fila-${e}">
+                <td class="text-nowrap">${esc(f.hoja)} · ${f.renglon}</td>
+                <td class="fw-bold text-nowrap">${esc(f.remision)}</td>
+                <td>${celdaEstado(f, e)}</td>
+                <td class="text-nowrap">${celdaFecha(f.fecha, f.sugerida)}</td>
+                <td class="text-nowrap">${celdaFecha(f.entrega, f.entrega_sugerida)}</td>
+                <td>${esc(f.transportista)}${f.transportista_nuevo ? ' <span class="badge bg-primary">nuevo</span>' : ''}</td>
+                <td>${esc(f.material)}${f.material_nuevo ? ' <span class="badge bg-primary">nuevo</span>' : ''}</td>
+                <td class="text-end">${ton(f.ton_rem)}</td>
+                <td class="text-end">${ton(f.ton_rec)}</td>
+                <td>${f.status === 'RECHAZADO' ? `<span class="badge bg-dark" title="${esc(f.motivo_rechazo)}">Rechazado</span>` : '<span class="badge bg-light text-dark border">Pendiente</span>'}
+                    ${f.comentario ? `<i class="fas fa-comment-dots text-muted ms-1" title="Comentarios: ${esc(f.comentario)}"></i>` : ''}</td>
+                <td>${avisos ? `<ul class="cl-avisos">${avisos}</ul>` : ''}</td></tr>`;
+        }).join('') || '<tr><td colspan="11" class="text-center text-muted py-3">Sin renglones con este filtro.</td></tr>';
+        $('cl-pie').textContent = `${filas.length} de ${datos.filas.length} renglones.`;
+    }
+
+    function pintarFiltros() {
+        $('cl-filtros').innerHTML = FILTROS.map(([k, t, c]) =>
+            `<button type="button" class="btn btn-outline-${c} ${filtro === k ? 'active btn-' + c : ''}" data-filtro="${k}">${t}</button>`).join('');
+    }
+
+    function pintar() {
+        pintarResumen();
+        pintarCatalogo('cl-trans', datos.transportistas, 'transportista');
+        pintarCatalogo('cl-mats', datos.materiales, 'material');
+        pintarSugeridas();
+        pintarFiltros();
+        pintarTabla();
+    }
+
+    $('cl-revisar').addEventListener('click', async () => {
+        archivo = $('cl-archivo').files[0];
+        avisar('cl-error', ''); avisar('cl-hecho', '');
+        if (!archivo) { avisar('cl-error', 'Elige el archivo Excel.'); return; }
+        $('cl-revisar').disabled = true;
+        $('cl-estado').textContent = 'Revisando el archivo…';
+        try {
+            datos = await enviar(URL_REVISAR);
+            elegidas = {};
+            datos.filas.forEach(f => { if (f.grupo && f.defecto) elegidas[f.grupo] = f.key; });
+            $('cl-usar-sug').checked = false;
+            filtro = 'todos';
+            $('cl-buscar').value = '';
+            pintar();
+            $('cl-resultado').classList.remove('d-none');
+            $('cl-estado').textContent = '';
+        } catch (e) {
+            $('cl-resultado').classList.add('d-none');
+            avisar('cl-error', esc(e.message));
+            $('cl-estado').textContent = '';
+        } finally {
+            $('cl-revisar').disabled = false;
+        }
+    });
+
+    $('cl-archivo').addEventListener('change', () => { $('cl-resultado').classList.add('d-none'); avisar('cl-hecho', ''); datos = null; });
+    $('cl-filtros').addEventListener('click', ev => {
+        const b = ev.target.closest('[data-filtro]');
+        if (!b) return;
+        filtro = b.dataset.filtro;
+        pintarFiltros();
+        pintarTabla();
+    });
+    $('cl-buscar').addEventListener('input', pintarTabla);
+    $('cl-usar-sug').addEventListener('change', pintarTabla);
+    $('cl-tabla').addEventListener('change', ev => {
+        const c = ev.target.closest('.cl-elige');
+        if (!c) return;
+        elegidas[c.dataset.grupo] = c.checked ? c.dataset.key : '';
+        pintar();
+    });
+
+    $('cl-subir').addEventListener('click', async () => {
+        const subir = aSubir();
+        const rech = subir.filter(f => f.status === 'RECHAZADO').length;
+        const sug = usarSugeridas() ? subir.filter(tieneSugerida).length : 0;
+        if (!subir.length) return;
+        if (!confirm(`Se darán de alta ${subir.length} registros${rech ? ` (${rech} como Rechazados)` : ''}`
+            + `${sug ? `, ${sug} con la fecha sugerida` : ''}.\nLo que ya existe no se modifica.\n\n¿Continuar?`)) return;
+        $('cl-subir').disabled = true;
+        $('cl-estado').textContent = 'Dando de alta…';
+        avisar('cl-error', '');
+        try {
+            const d = await enviar(URL_IMPORTAR, { elegidas: JSON.stringify(elegidas), usar_sugeridas: usarSugeridas() ? '1' : '0' });
+            $('cl-resultado').classList.add('d-none');
+            $('cl-archivo').value = '';
+            datos = null;
+            avisar('cl-hecho', `<strong>Listo: se dieron de alta ${d.creados} registros</strong>`
+                + (d.rechazados ? ` (${d.rechazados} como Rechazados)` : '') + '.'
+                + (d.fechas_sugeridas ? `<br>${d.fechas_sugeridas} con la fecha sugerida.` : '')
+                + (d.transportistas_nuevos.length ? `<br>Transportistas nuevos: ${d.transportistas_nuevos.map(esc).join(', ')}.` : '')
+                + (d.materiales_nuevos.length ? `<br>Materiales nuevos: ${d.materiales_nuevos.map(esc).join(', ')}.` : '')
+                + `<div class="mt-2"><a class="btn btn-sm btn-success" href="${URL_LISTA}">Ver registros</a></div>`);
+        } catch (e) {
+            avisar('cl-error', esc(e.message));
+            $('cl-subir').disabled = false;
+        } finally {
+            $('cl-estado').textContent = '';
+        }
+    });
+})();
+</script>
+{% endblock extra_js %}

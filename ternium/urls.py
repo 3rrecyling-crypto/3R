@@ -5,7 +5,7 @@ from . import views
 from django.urls import path, include
 from .forms import CustomLoginForm  # <--- Nombre correcto
 from . import api_views, api_viajes, api_liquidaciones, reportes_ia, reportes_ia_consumo, alertas_merma, asignacion_factura
-from . import excel_tabla, reporte_facturas
+from . import excel_tabla, reporte_facturas, carga_logistica
 from .views import (
     UnidadDetailView, UnidadUpdateView, LugarDetailView, LugarUpdateView, 
     EmpresaDetailView, EmpresaUpdateView, ContenedorDetailView, ContenedorUpdateView,
@@ -83,7 +83,11 @@ urlpatterns = [
     # ======================================================
     path('registros-logistica/', RegistroLogisticoListView.as_view(), name='lista_registros_logistica'),
     path('registros-logistica/nuevo/', RegistroLogisticoCreateView.as_view(), name='crear_registro_logistica'),
-    path('registros-logistica/<int:pk>/', RegistroLogisticoDetailView.as_view(), name='detalle_registro_logistica'),
+    # Carga masiva desde el Excel "Reporte de salidas Ternium" (no modifica lo que ya existe)
+    path('registros-logistica/carga-masiva/', carga_logistica.pagina, name='carga_masiva_logistica'),
+    path('registros-logistica/carga-masiva/revisar/', carga_logistica.api_revisar, name='carga_masiva_logistica_revisar'),
+    path('registros-logistica/carga-masiva/importar/', carga_logistica.api_importar, name='carga_masiva_logistica_importar'),
+    path('registros-logistica/<int:pk>/',RegistroLogisticoDetailView.as_view(), name='detalle_registro_logistica'),
     path('registros-logistica/<int:pk>/editar/', RegistroLogisticoUpdateView.as_view(), name='editar_registro_logistica'),
     path('registros-logistica/<int:pk>/descargar-zip/', DescargarPaqueteZipView.as_view(), name='descargar_paquete_zip'),
     path('logistica/export/excel/', views.export_logistica_to_excel, name='export_logistica_excel'),
