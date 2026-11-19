@@ -1,9 +1,23 @@
 # ternium/middleware.py
 
+from urllib.parse import urlsplit
+
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.contrib import messages
 from django.conf import settings
+
+
+def viene_de_next(request):
+    """¿La petición viene de la app Next (app.3recycling.com.mx, o :3000 en local)? Sus llamadas
+    (fetch) traen el encabezado Origin, y sus descargas por enlace o window.location traen el
+    Referer con el dominio de Next. Los dominios son los de CORS_ALLOWED_ORIGINS."""
+    origen = request.headers.get('Origin', '')
+    if not origen:
+        ref = urlsplit(request.headers.get('Referer', ''))
+        origen = f'{ref.scheme}://{ref.netloc}' if ref.scheme and ref.netloc else ''
+    return bool(origen) and origen in getattr(settings, 'CORS_ALLOWED_ORIGINS', [])
+
 
 class ProfileCompletionMiddleware:
     def __init__(self, get_response):
@@ -12,6 +26,12 @@ class ProfileCompletionMiddleware:
     def __call__(self, request):
         # 1. Si el usuario no está logueado, dejar pasar (el login_required lo detendrá después)
         if not request.user.is_authenticated:
+            return self.get_response(request)
+
+        # La regla de perfil completo es solo del sistema HTML. En Next se ve la información
+        # aunque falten datos del perfil: antes el API contestaba con la redirección a /perfil/
+        # (HTML), Next no la podía leer y las pantallas salían vacías (p. ej. Diésel › Cargas).
+        if viene_de_next(request):
             return self.get_response(request)
 
         # 2. Definir rutas exentas (para evitar bucles infinitos)
