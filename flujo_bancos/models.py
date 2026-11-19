@@ -183,3 +183,131 @@ class ComprobanteFiscal(models.Model):
 
     def __str__(self):
         return f"Comprobante {self.uuid} - {self.movimiento}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RESULTADOS (Next: /finanzas/resultados)
+# Estado de resultados de dirección: por cuenta (cliente) y por mes, capturado a mano.
+# La lógica y las rutas están en flujo_bancos/resultados.py.
+# ─────────────────────────────────────────────────────────────────────────────
+class ResultadoCuenta(models.Model):
+    """Cuenta (cliente) de Resultados: una columna de la vista por mes."""
+    nombre = models.CharField(max_length=80, unique=True)
+    orden = models.PositiveIntegerField(default=0)
+    activa = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = "Cuenta de Resultados"
+        verbose_name_plural = "Cuentas de Resultados"
+        ordering = ['orden', 'nombre']
+        permissions = [
+            ("acceso_resultados", "Puede ver y capturar Resultados (utilidad por cuenta)"),
+        ]
+
+
+class ResultadoConcepto(models.Model):
+    """Renglón que se captura. La sección decide en qué suma entra (ventas, ingresos, costo o gastos)."""
+    VENTA_ARCHIVO, VENTA_EMITIDA, INGRESO_BANCOS, COSTO_MATERIAL, GASTO = (
+        'VENTA_ARCHIVO', 'VENTA_EMITIDA', 'INGRESO_BANCOS', 'COSTO_MATERIAL', 'GASTO')
+    SECCIONES = [
+        (VENTA_ARCHIVO, 'Venta archivos'),
+        (VENTA_EMITIDA, 'Venta emitida real'),
+        (INGRESO_BANCOS, 'Ingreso a bancos'),
+        (COSTO_MATERIAL, 'Costo de material'),
+        (GASTO, 'Gastos operativos'),
+    ]
+    MONEDAS = [('MXN', 'Pesos'), ('USD', 'Dólares')]
+
+    seccion = models.CharField(max_length=20, choices=SECCIONES)
+    nombre = models.CharField(max_length=120)
+    # Los montos se guardan en esta moneda; los dólares se pasan a pesos con el tipo de cambio del mes.
+    moneda = models.CharField(max_length=3, choices=MONEDAS, default='MXN')
+    # Se resta dentro de su sección (p. ej. las notas de crédito restan a la venta emitida).
+    resta = models.BooleanField(default=False)
+    orden = models.PositiveIntegerField(default=0)
+    activo = models.BooleanField(default=True)
+    # Cuando los montos se capturan con IVA (ResultadoAjustes.montos_con_iva), a este renglón se le quita para
+    # calcular. Se apaga en lo que no lleva IVA (nómina, IMSS, impuestos…): eso se deja como se capturó.
+    lleva_iva = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.get_seccion_display()} · {self.nombre}"
+
+    class Meta:
+        verbose_name = "Concepto de Resultados"
+        verbose_name_plural = "Conceptos de Resultados"
+        ordering = ['orden', 'id']
+        constraints = [
+            models.UniqueConstraint(fields=['seccion', 'nombre'], name='resultado_concepto_unico'),
+        ]
+
+
+class ResultadoPartida(models.Model):
+    """Un monto capturado en una celda (cuenta + concepto + mes). Una celda es la suma de sus partidas:
+    así se puede anotar cada factura con su folio y ubicar después la que se canceló."""
+    cuenta = models.ForeignKey(ResultadoCuenta, on_delete=models.PROTECT, related_name='partidas')
+    concepto = models.ForeignKey(ResultadoConcepto, on_delete=models.PROTECT, related_name='partidas')
+    anio = models.PositiveSmallIntegerField()
+    mes = models.PositiveSmallIntegerField()  # 1 a 12
+    monto = models.DecimalField(max_digits=15, decimal_places=2)  # en la moneda del concepto
+    referencia = models.CharField(max_length=80, blank=True, default='')  # folio de factura, etc.
+    nota = models.CharField(max_length=250, blank=True, default='')
+    # Cancelada: se conserva a la vista pero deja de sumar.
+    cancelada = models.BooleanField(default=False)
+    usuario = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    creado = models.DateTimeField(auto_now_add=True)
+    actualizado = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.cuenta} · {self.concepto.nombre} · {self.mes:02d}/{self.anio} · {self.monto}"
+
+    class Meta:
+        verbose_name = "Partida de Resultados"
+        verbose_name_plural = "Partidas de Resultados"
+        ordering = ['id']
+        indexes = [
+            models.Index(fields=['anio', 'mes'], name='resultado_partida_periodo'),
+            models.Index(fields=['cuenta', 'concepto', 'anio', 'mes'], name='resultado_partida_celda'),
+        ]
+
+
+class ResultadoTipoCambio(models.Model):
+    """Tipo de cambio (pesos por dólar) con el que se convierten los dólares de un mes."""
+    anio = models.PositiveSmallIntegerField()
+    mes = models.PositiveSmallIntegerField()
+    tc = models.DecimalField(max_digits=10, decimal_places=4)
+    origen = models.CharField(max_length=10, default='MANUAL')  # MANUAL o BANXICO
+    actualizado = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"TC {self.mes:02d}/{self.anio}: {self.tc}"
+
+    class Meta:
+        verbose_name = "Tipo de cambio de Resultados"
+        verbose_name_plural = "Tipos de cambio de Resultados"
+        ordering = ['anio', 'mes']
+        constraints = [
+            models.UniqueConstraint(fields=['anio', 'mes'], name='resultado_tc_unico'),
+        ]
+
+
+class ResultadoAjustes(models.Model):
+    """Ajustes del semáforo de utilidad (un solo renglón, pk=1). Utilidad ÷ venta:
+    menos de `umbral_amarillo` es rojo, de ahí a `umbral_verde` es amarillo y de ahí en adelante verde."""
+    umbral_amarillo = models.DecimalField(max_digits=5, decimal_places=2, default=10)
+    umbral_verde = models.DecimalField(max_digits=5, decimal_places=2, default=20)
+    # IVA: el usuario dice en Catálogos si captura los montos con IVA. Si es así, los resultados se calculan
+    # sin IVA (monto ÷ (1 + tasa/100)) en los renglones que lo llevan. Capturando sin IVA no se toca nada.
+    montos_con_iva = models.BooleanField(default=False)
+    tasa_iva = models.DecimalField(max_digits=5, decimal_places=2, default=16)
+
+    class Meta:
+        verbose_name = "Ajustes de Resultados"
+        verbose_name_plural = "Ajustes de Resultados"
+
+    @classmethod
+    def actuales(cls):
+        return cls.objects.get_or_create(pk=1)[0]

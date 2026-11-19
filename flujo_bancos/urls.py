@@ -1,7 +1,22 @@
 from django.urls import path
-from . import views, api_views
+from . import views, api_views, ia_resultados, resultados
 
 urlpatterns = [
+    # ── Resultados (Next: /finanzas/resultados) ─────────────────────────────
+    path('api/resultados/',                         resultados.api_resultados,   name='api_resultados'),
+    path('api/resultados/celda/',                   resultados.api_celda,        name='api_resultados_celda'),
+    path('api/resultados/partidas/',                resultados.api_partidas,     name='api_resultados_partidas'),
+    path('api/resultados/partidas/<int:pk>/',       resultados.api_partida,      name='api_resultados_partida'),
+    path('api/resultados/tc/',                      resultados.api_tc,           name='api_resultados_tc'),
+    path('api/resultados/tc/sugerido/',             resultados.api_tc_sugerido,  name='api_resultados_tc_sugerido'),
+    path('api/resultados/cuentas/',                 resultados.api_cuentas,      name='api_resultados_cuentas'),
+    path('api/resultados/cuentas/<int:pk>/',        resultados.api_cuenta,       name='api_resultados_cuenta'),
+    path('api/resultados/conceptos/',               resultados.api_conceptos,    name='api_resultados_conceptos'),
+    path('api/resultados/conceptos/<int:pk>/',      resultados.api_concepto,     name='api_resultados_concepto'),
+    path('api/resultados/ajustes/',                 resultados.api_ajustes,      name='api_resultados_ajustes'),
+    path('api/resultados/excel/',                   resultados.api_excel,        name='api_resultados_excel'),
+    path('api/resultados/ia/',                      ia_resultados.api_ia,        name='api_resultados_ia'),
+
     # ── API JSON (Next.js) ──────────────────────────────────────────────────
     path('api/cuentas/',                    api_views.api_lista_cuentas,        name='api_bancos_cuentas'),
     path('api/movimientos/',                api_views.api_lista_movimientos,     name='api_bancos_lista'),

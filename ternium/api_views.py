@@ -3483,6 +3483,7 @@ _MODULE_PERMS = [
     ('ternium.acceso_remisiones',  'Remisiones'),
     ('ternium.acceso_trane',       'Portal Trane'),
     ('ternium.acceso_bancos',      'Flujo Bancario'),
+    ('flujo_bancos.acceso_resultados', 'Resultados (utilidad por cuenta)'),
     ('ternium.acceso_diesel',      'Control Diésel'),
     ('cargas_diesel.acceso_carga_diesel', 'App PWA diésel (captura desde el celular)'),
     ('ternium.acceso_catalogos',   'Catálogos'),

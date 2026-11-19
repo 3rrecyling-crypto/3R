@@ -375,6 +375,15 @@
                     </li>
                     {% endif %}
 
+                    {# Resultados (utilidad por cuenta y por mes): vive en la versión nueva (Next). #}
+                    {% if perms.flujo_bancos.acceso_resultados %}
+                    <li class="nav-item dynamic-nav-item">
+                        <a class="nav-link" href="{{ NEXT_APP_URL }}/finanzas/resultados" title="Resultados: venta, gastos y utilidad por cuenta y por mes (se abre en la versión nueva)">
+                            <i class="fas fa-chart-line me-1"></i> Resultados
+                        </a>
+                    </li>
+                    {% endif %}
+
                     {% if perms.ternium.acceso_remisiones or perms.ternium.view_remision %}
                     <li class="nav-item dynamic-nav-item">
                         <a class="nav-link" href="{% url 'remision_lista' %}">
